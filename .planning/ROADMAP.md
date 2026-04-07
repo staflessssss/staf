@@ -6,7 +6,7 @@
 
 ## Summary
 
-The roadmap is organized around the product's actual operating model: secure multi-tenant foundations first, then client connectivity, then operator agent assembly, then deploy/runtime, then conversation visibility, and finally hardening. This keeps the first usable vertical slice aligned with the business promise of "operator-managed agents for many clients."
+The roadmap is organized around the product's actual operating model: secure multi-tenant foundations first, then client connectivity, then a dedicated UI/UX foundation pass for the two product surfaces, then operator agent assembly, then deploy/runtime, then conversation visibility, and finally hardening. This keeps the first usable vertical slice aligned with the business promise of "operator-managed agents for many clients" while protecting the central operator experience from rushed interface decisions.
 
 ## Phases
 
@@ -15,10 +15,11 @@ The roadmap is organized around the product's actual operating model: secure mul
 | 1 | Identity & Access Foundation | Establish invite-only auth, roles, and route protection for admin and client surfaces | AUTH-01, AUTH-02, AUTH-03 | 3 |
 | 2 | Tenant Administration Core | Let the operator create tenants, inspect them, and invite client users | TENT-01, TENT-02, TENT-03 | 3 |
 | 3 | Client Connections & Credential Vault | Let clients connect channels/integrations with encrypted credential storage and visible status | CONN-01, CONN-02, CONN-03, CONN-04, CONN-05 | 4 |
-| 4 | Agent Builder Wizard | Enable operators to assemble, review, and test agents from flexible knowledge blocks and tools | AGNT-01, AGNT-02, AGNT-03, AGNT-04, AGNT-05 | 4 |
-| 5 | Deploy & Shared Runtime | Deploy agents and process incoming channel events through a shared tool-calling runtime | RUN-01, RUN-02, RUN-03, RUN-04, RUN-05 | 5 |
-| 6 | Conversation Visibility & Client Reporting | Persist isolated conversations and expose useful views to admins and clients | CONV-01, CONV-02, CONV-03, CONV-04 | 4 |
-| 7 | Security, Reliability & Operational Clarity | Harden webhooks, credential handling, and failure visibility for production readiness | SECR-01, SECR-02, SECR-03 | 4 |
+| 4 | UI Foundation & Agent Builder UX | Define and implement the shared UI patterns, layout rules, and wizard UX needed before deeper agent-building work | Design foundation phase - supports later requirements | 5 |
+| 5 | Agent Builder Wizard | Enable operators to assemble, review, and test agents from flexible knowledge blocks and tools | AGNT-01, AGNT-02, AGNT-03, AGNT-04, AGNT-05 | 4 |
+| 6 | Deploy & Shared Runtime | Deploy agents and process incoming channel events through a shared tool-calling runtime | RUN-01, RUN-02, RUN-03, RUN-04, RUN-05 | 5 |
+| 7 | Conversation Visibility & Client Reporting | Persist isolated conversations and expose useful views to admins and clients | CONV-01, CONV-02, CONV-03, CONV-04 | 4 |
+| 8 | Security, Reliability & Operational Clarity | Harden webhooks, credential handling, and failure visibility for production readiness | SECR-01, SECR-02, SECR-03 | 4 |
 
 ## Phase Details
 
@@ -56,7 +57,20 @@ The roadmap is organized around the product's actual operating model: secure mul
 3. Credentials are encrypted before persistence and are not exposed in plain text in the UI or logs.
 4. Operators can see that required connections exist before building an agent for a tenant.
 
-### Phase 4: Agent Builder Wizard
+### Phase 4: UI Foundation & Agent Builder UX
+
+**Goal:** Establish the information architecture, screen patterns, and interaction model for the admin and client surfaces before the agent builder grows deeper behavior.
+
+**Requirements:** Design foundation phase - no direct REQ IDs, but unblocks and shapes later implementation phases.
+
+**Success criteria:**
+1. Admin and client surfaces use a coherent layout system and shared interaction patterns instead of ad hoc page-by-page decisions.
+2. The five-step agent builder flow is represented as a deliberate UX with clear step boundaries, navigation, and review states.
+3. Connection forms, knowledge blocks, tool rows, and summary cards have reusable UI patterns that later phases can extend.
+4. The review, test, and deploy experience is designed before runtime wiring adds complexity.
+5. The roadmap protects the operator experience as a first-class product concern rather than treating UI as incidental polish.
+
+### Phase 5: Agent Builder Wizard
 
 **Goal:** Enable the operator to define an agent in a universal, business-agnostic builder flow.
 
@@ -68,7 +82,7 @@ The roadmap is organized around the product's actual operating model: secure mul
 3. Prompt preview reflects the current wizard configuration accurately enough for operator review.
 4. Test mode lets the operator send a sample message and inspect the agent response before deploy.
 
-### Phase 5: Deploy & Shared Runtime
+### Phase 6: Deploy & Shared Runtime
 
 **Goal:** Turn an agent config into a live, shared-runtime agent that can answer and use tools in the right channel.
 
@@ -81,7 +95,7 @@ The roadmap is organized around the product's actual operating model: secure mul
 4. Model can call real tools backed by integrations and continue multi-step reasoning to a final answer.
 5. Final replies are delivered back through the correct adapter with channel-specific formatting rules.
 
-### Phase 6: Conversation Visibility & Client Reporting
+### Phase 7: Conversation Visibility & Client Reporting
 
 **Goal:** Make runtime behavior inspectable and useful to both the operator and the client.
 
@@ -93,7 +107,7 @@ The roadmap is organized around the product's actual operating model: secure mul
 3. Operator can inspect recent conversations and agent activity from the admin surface.
 4. Client can view their own conversations and lead-relevant activity without seeing platform internals from other tenants.
 
-### Phase 7: Security, Reliability & Operational Clarity
+### Phase 8: Security, Reliability & Operational Clarity
 
 **Goal:** Close the most important production-readiness gaps around safety and visibility.
 
@@ -107,10 +121,11 @@ The roadmap is organized around the product's actual operating model: secure mul
 
 ## Notes
 
-- Phase 4 depends on Phase 3 because agent creation must select from tenant-connected channels and integrations.
-- Phase 5 depends on Phase 4 because deploy/runtime must consume the persisted builder output.
-- Phase 6 should begin only after Phase 5 produces real conversation data worth inspecting.
-- Phase 7 runs last in this milestone, but security checks should still influence implementation earlier when convenient.
+- Phase 4 depends on Phase 3 because the UI/UX pass needs the real shapes of tenant connections and client setup flows.
+- Phase 5 depends on Phase 4 because the agent builder should be implemented on top of deliberate wizard UX, not retrofitted later.
+- Phase 6 depends on Phase 5 because deploy/runtime must consume the persisted builder output.
+- Phase 7 should begin only after Phase 6 produces real conversation data worth inspecting.
+- Phase 8 runs last in this milestone, but security checks should still influence implementation earlier when convenient.
 
 ---
-*Last updated: 2026-04-07 after roadmap creation*
+*Last updated: 2026-04-07 after inserting dedicated UI foundation phase*

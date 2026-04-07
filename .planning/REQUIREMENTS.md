@@ -97,23 +97,23 @@
 | CONN-03 | Phase 3 | Pending |
 | CONN-04 | Phase 3 | Pending |
 | CONN-05 | Phase 3 | Pending |
-| AGNT-01 | Phase 4 | Pending |
-| AGNT-02 | Phase 4 | Pending |
-| AGNT-03 | Phase 4 | Pending |
-| AGNT-04 | Phase 4 | Pending |
-| AGNT-05 | Phase 4 | Pending |
-| RUN-01 | Phase 5 | Pending |
-| RUN-02 | Phase 5 | Pending |
-| RUN-03 | Phase 5 | Pending |
-| RUN-04 | Phase 5 | Pending |
-| RUN-05 | Phase 5 | Pending |
-| CONV-01 | Phase 6 | Pending |
-| CONV-02 | Phase 6 | Pending |
-| CONV-03 | Phase 6 | Pending |
-| CONV-04 | Phase 6 | Pending |
-| SECR-01 | Phase 7 | Pending |
-| SECR-02 | Phase 7 | Pending |
-| SECR-03 | Phase 7 | Pending |
+| AGNT-01 | Phase 5 | Pending |
+| AGNT-02 | Phase 5 | Pending |
+| AGNT-03 | Phase 5 | Pending |
+| AGNT-04 | Phase 5 | Pending |
+| AGNT-05 | Phase 5 | Pending |
+| RUN-01 | Phase 6 | Pending |
+| RUN-02 | Phase 6 | Pending |
+| RUN-03 | Phase 6 | Pending |
+| RUN-04 | Phase 6 | Pending |
+| RUN-05 | Phase 6 | Pending |
+| CONV-01 | Phase 7 | Pending |
+| CONV-02 | Phase 7 | Pending |
+| CONV-03 | Phase 7 | Pending |
+| CONV-04 | Phase 7 | Pending |
+| SECR-01 | Phase 8 | Pending |
+| SECR-02 | Phase 8 | Pending |
+| SECR-03 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 28 total
@@ -122,4 +122,4 @@
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-07 after initial definition*
+*Last updated: 2026-04-07 after roadmap shift for dedicated UI foundation phase*
