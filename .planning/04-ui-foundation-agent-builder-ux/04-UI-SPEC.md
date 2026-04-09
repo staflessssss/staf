@@ -36,8 +36,19 @@ The design language should communicate:
 ### Surface Roles
 
 - Admin surface: control room. Dense enough for operators managing many businesses, but never cluttered.
-- Client surface: guided setup and visibility. Simpler, calmer, with less operational density.
+- Client surface: guided business visibility. Simpler, calmer, and strictly non-technical.
 - Agent builder wizard: editorial workspace. Clear step rhythm, strong hierarchy, low ambiguity.
+
+### Product Boundary Rules
+
+- Client surface must expose only five primary sections: `Dashboard`, `Agents`, `Leads`, `Dialogs`, and `Connections`.
+- Client copy must stay in plain business language and avoid technical product terms such as prompt, deploy, runtime, tool binding, orchestration, workflow, system config, or model settings.
+- Admin surface is organized around clients first, not abstract platform objects first. The main operator flow is: open client list -> open one client -> inspect status, channels, integrations, agents, and activity -> create or edit that client's agent.
+- Agent builder is admin-only. Clients must never see builder internals or setup controls beyond simple business-facing connection steps.
+- Clients can manage connections but do not edit agents directly in v1.
+- `Dialogs` and `Leads` are separate UI concepts: dialogs are all conversations, while leads represent target outcomes captured for that client.
+- `Leads` UI must support variable business-specific fields rather than implying one fixed vertical schema.
+- `Agents` should remain a first-class client navigation item even when some clients have only one agent, because the product model supports multiple agents.
 
 ---
 
@@ -159,12 +170,19 @@ The interface should feel warm-neutral with terracotta emphasis, not cold enterp
 - Never make the user decode system terms when plain language works.
 - Client-facing copy should reduce anxiety and explain the next step simply.
 - Admin-facing copy should optimize for speed and confidence.
+- Client-facing copy must describe outcomes and business actions, not internal mechanics.
 
 ### Microcopy Style
 
 - Good: `Credentials are encrypted before they are stored.`
 - Good: `Connect at least one channel before creating an agent.`
+- Good: `Your assistant is active.`
+- Good: `Recent customer dialogs`
+- Good: `Connect your channels`
 - Bad: `Please complete the necessary setup requirements to proceed.`
+- Bad: `Configure runtime`
+- Bad: `Prompt configuration`
+- Bad: `Deploy metadata`
 
 ---
 
@@ -174,20 +192,27 @@ The interface should feel warm-neutral with terracotta emphasis, not cold enterp
 
 - Persistent left navigation on desktop.
 - Content area max width around `1280px`.
-- Dashboard starts with page title + primary action.
-- Follow with stats row, then operational lists/tables.
-- Tenant detail should group into:
+- Primary navigation should center on `Clients`; other sections are secondary.
+- Admin dashboard, if present, is secondary to the client list and should function as an operator summary rather than the main product structure.
+- Client detail should group into:
   - header;
   - summary metrics;
   - connection status blocks;
   - users / invites / agents.
+- If the client has no agent, the dominant CTA should be `Create agent`.
+- If the client already has an agent, the detail page should make it obvious how to review or edit it.
 
 ### Client Shell
 
 - Simpler top navigation.
 - More generous whitespace than admin.
+- Navigation must be limited to `Dashboard`, `Agents`, `Leads`, `Dialogs`, and `Connections`.
 - Setup-oriented pages should lead with guidance, not metrics overload.
-- Client overview should highlight setup completeness and next action.
+- Client overview should highlight business metrics, simple agent activity, and next action.
+- The client surface should never visually resemble an admin console.
+- Dashboard should prioritize numbers business users care about, including dialog count, total messages, and period-based summaries.
+- Agent cards should expose status, assigned channel, and short purpose/description.
+- Lead views should expose both common lead metadata and client-specific captured details.
 
 ### Agent Builder Wizard
 
@@ -297,3 +322,30 @@ No unreviewed third-party component registry should enter the wizard flow withou
 - [x] Dimension 6 Registry Safety: PASS
 
 **Approval:** approved 2026-04-08
+
+---
+
+## Approved Visual References
+
+The following Stitch-generated screens are approved as visual and structural references for implementation. They are not source code contracts and should not override product rules, permissions, routing, or real backend behavior.
+
+### Client Surface References
+
+- `Dashboard`: approved as reference for layout, metric hierarchy, recent dialogs/leads sections, and period selector.
+- `Agents`: approved as partial reference for agent cards, status treatment, and channel/description layout. Copy and actions must remain client-safe.
+- `Leads`: approved as reference for lead list structure, filters, source-agent visibility, and support for client-specific captured fields.
+- `Dialogs`: approved as reference for split-pane list/detail layout, agent visibility, and channel filtering. Client-side takeover or reply controls are not approved for v1.
+- `Connections`: approved as reference for two-column `Channels` + `Integrations` structure and guided setup presentation.
+
+### Admin Surface References
+
+- `Clients`: approved as reference for the primary admin home screen, search/filter layout, client readiness visibility, and table/list structure.
+- `Client Detail`: approved as reference for the managed-client workspace layout, including client identity, channels, integrations, agents, recent activity, and channel-assignment prompts.
+
+### Reference Use Rules
+
+- Keep the approved visual direction, hierarchy, and layout patterns.
+- Replace demo-only copy, fake metrics, AI-lab wording, and decorative platform concepts with real product copy.
+- Buttons and controls in implementation must route to real app pages and actions that follow the Stafless product model.
+- Client-side screens must not inherit operator-only actions from the reference designs.
+- Admin-side screens must stay client-centric and should not drift into a generic platform-operations dashboard.

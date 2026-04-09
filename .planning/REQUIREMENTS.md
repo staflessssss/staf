@@ -16,6 +16,7 @@
 - [ ] **TENT-01**: Admin can create a tenant with name, slug, timezone, and lifecycle status.
 - [ ] **TENT-02**: Admin can view a tenant detail page with connected channels, integrations, agents, and summary activity.
 - [ ] **TENT-03**: Admin can issue a client invite linked to a tenant.
+- [ ] **TENT-04**: Admin primary navigation centers on clients, and the client detail workspace is the main place to inspect status, connections, agents, and readiness.
 
 ### Client Connections
 
@@ -24,14 +25,16 @@
 - [ ] **CONN-03**: Client can connect Instagram for their tenant and see connection status when Meta access is available.
 - [ ] **CONN-04**: Client can connect business integrations such as Google Sheets, Google Calendar, and Google Drive and see connection status.
 - [ ] **CONN-05**: Connection credentials are stored encrypted and scoped to the tenant.
+- [ ] **CONN-06**: Client-facing connection UX uses plain business language and does not expose technical setup concepts beyond simple connect/reconnect/status flows.
 
 ### Agent Builder
 
-- [ ] **AGNT-01**: Admin can create an agent for a tenant and define name, persona, tone, and language.
+- [ ] **AGNT-01**: Admin can create an agent for a tenant and define name, persona, tone, plus an optional preferred response language without restricting multilingual behavior.
 - [ ] **AGNT-02**: Admin can bind an agent to one connected channel for that tenant.
 - [ ] **AGNT-03**: Admin can add, edit, reorder, and remove free-form knowledge blocks for an agent.
 - [ ] **AGNT-04**: Admin can add, edit, reorder, and remove free-form tools for an agent by binding integration-backed actions.
 - [ ] **AGNT-05**: Admin can review the generated prompt and test an agent before deployment.
+- [ ] **AGNT-06**: One connected channel can be assigned to only one agent at a time within a client workspace.
 
 ### Deploy & Runtime
 
@@ -47,6 +50,10 @@
 - [ ] **CONV-02**: System stores user, assistant, and tool messages with enough metadata to inspect runtime behavior later.
 - [ ] **CONV-03**: Admin can view recent conversations for a tenant and inspect agent activity.
 - [ ] **CONV-04**: Client can view conversations and lead-relevant activity for their own tenant.
+- [ ] **CONV-05**: Client navigation is limited to `Dashboard`, `Agents`, `Leads`, `Dialogs`, and `Connections`, and avoids admin/system wording.
+- [ ] **CONV-06**: Client dialogs view supports filtering by agent.
+- [ ] **CONV-07**: Leads are created only from client-specific target actions rather than from every conversation.
+- [ ] **CONV-08**: Lead data supports common base fields plus client-specific captured fields without hardcoding one business vertical.
 
 ### Security & Reliability
 
@@ -92,16 +99,19 @@
 | TENT-01 | Phase 2 | Pending |
 | TENT-02 | Phase 2 | Pending |
 | TENT-03 | Phase 2 | Pending |
+| TENT-04 | Phase 4 | Pending |
 | CONN-01 | Phase 3 | Pending |
 | CONN-02 | Phase 3 | Pending |
 | CONN-03 | Phase 3 | Pending |
 | CONN-04 | Phase 3 | Pending |
 | CONN-05 | Phase 3 | Pending |
+| CONN-06 | Phase 4 | Pending |
 | AGNT-01 | Phase 5 | Pending |
 | AGNT-02 | Phase 5 | Pending |
 | AGNT-03 | Phase 5 | Pending |
 | AGNT-04 | Phase 5 | Pending |
 | AGNT-05 | Phase 5 | Pending |
+| AGNT-06 | Phase 5 | Pending |
 | RUN-01 | Phase 6 | Pending |
 | RUN-02 | Phase 6 | Pending |
 | RUN-03 | Phase 6 | Pending |
@@ -111,15 +121,19 @@
 | CONV-02 | Phase 7 | Pending |
 | CONV-03 | Phase 7 | Pending |
 | CONV-04 | Phase 7 | Pending |
+| CONV-05 | Phase 4 | Pending |
+| CONV-06 | Phase 7 | Pending |
+| CONV-07 | Phase 7 | Pending |
+| CONV-08 | Phase 7 | Pending |
 | SECR-01 | Phase 8 | Pending |
 | SECR-02 | Phase 8 | Pending |
 | SECR-03 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 28 total
-- Mapped to phases: 28
+- v1 requirements: 35 total
+- Mapped to phases: 35
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-07 after roadmap shift for dedicated UI foundation phase*
+*Last updated: 2026-04-08 after clarifying client/admin surface product rules*

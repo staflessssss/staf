@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  hashedPassword String
+  name           String?
+  role           UserRole  @default(CLIENT)
+  tenantId       String?
+  tenant         Tenant?   @relation(fields: [tenantId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model InviteToken {
+  id        String   @id @default(cuid())
+  token     String   @unique @default(cuid())
+  tenantId  String
+  email     String
+  role      UserRole @default(CLIENT)
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+}
+
+model Tenant {
+  id                     String                  @id @default(cuid())
+  name                   String
+  slug                   String                  @unique
+  status                 TenantStatus            @default(ONBOARDING)
+  timezone               String                  @default("UTC")
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  users                  User[]
+  inviteTokens           InviteToken[]
+  channelConnections     ChannelConnection[]
+  integrationConnections IntegrationConnection[]
+  agents                 Agent[]
+}
+
+enum TenantStatus {
+  ONBOARDING
+  ACTIVE
+  PAUSED
+  CHURNED
+}
+
+model ChannelConnection {
+  id             String           @id @default(cuid())
+  tenantId       String
+  type           ChannelType
+  status         ConnectionStatus @default(PENDING)
+  credentialsEnc String
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  agents         Agent[]
+
+  @@unique([tenantId, type])
+}
+
+model IntegrationConnection {
+  id             String           @id @default(cuid())
+  tenantId       String
+  type           IntegrationType
+  status         ConnectionStatus @default(PENDING)
+  credentialsEnc String
+  metadata       Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  steps          Step[]
+
+  @@unique([tenantId, type])
+}
+
+enum ChannelType {
+  GMAIL
+  INSTAGRAM
+  TELEGRAM
+  WHATSAPP
+}
+
+enum IntegrationType {
+  GOOGLE_SHEETS
+  GOOGLE_CALENDAR
+  GOOGLE_DRIVE
+  HONEYBOOK
+  HUBSPOT
+}
+
+enum ConnectionStatus {
+  PENDING
+  CONNECTED
+  ERROR
+  REVOKED
+}
+
+model Agent {
+  id            String            @id @default(cuid())
+  tenantId      String
+  channelId     String
+  name          String
+  persona       String
+  tone          String            @default("friendly")
+  languagePreference String?
+  status        AgentStatus       @default(DRAFT)
+  channelConfig Json?
+  n8nWorkflowId String?
+  webhookSecret String?
+  deployedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  channel       ChannelConnection @relation(fields: [channelId], references: [id])
+  features      Feature[]
+  conversations Conversation[]
+
+  @@unique([channelId])
+}
+
+enum AgentStatus {
+  DRAFT
+  DEPLOYING
+  ACTIVE
+  PAUSED
+  ERROR
+}
+
+model Feature {
+  id               String      @id @default(cuid())
+  agentId          String
+  name             String
+  description      String
+  type             FeatureType
+  sortOrder        Int         @default(0)
+  knowledgeContent String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  agent            Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  steps            Step[]
+}
+
+enum FeatureType {
+  KNOWLEDGE
+  TOOL
+}
+
+model Step {
+  id            String                @id @default(cuid())
+  featureId     String
+  integrationId String
+  action        String
+  params        Json
+  sortOrder     Int                   @default(0)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  feature       Feature               @relation(fields: [featureId], references: [id], onDelete: Cascade)
+  integration   IntegrationConnection @relation(fields: [integrationId], references: [id])
+}
+
+model Conversation {
+  id        String             @id @default(cuid())
+  agentId   String
+  contactId String
+  channel   ChannelType
+  status    ConversationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  agent     Agent              @relation(fields: [agentId], references: [id])
+  messages  Message[]
+
+  @@unique([agentId, contactId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  toolName       String?
+  toolInput      Json?
+  toolResult     Json?
+  durationMs     Int?
+  model          String?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+  ESCALATED
+}

@@ -37,10 +37,10 @@ The product evolved from an earlier n8n-centric architecture that became expensi
 
 The technical target stack is Next.js 15 with App Router and TypeScript, PostgreSQL with Prisma ORM, Auth.js v5 for invite-only authentication, Vercel AI SDK with OpenAI for tool-calling, and deployment on Vercel. Tenant credentials must be encrypted at rest. Runtime execution is shared: agents are database records, not separate processes.
 
-The product has two distinct surfaces. The client-facing area lets a business connect channels and integrations and review conversations, leads, and activity. The operator-facing admin panel manages tenants, invites, agents, testing, deploy, and ongoing oversight. This separation is central to the product model.
+The product has two distinct surfaces. The client-facing area is intentionally simple and business-facing: it lets a business review a dashboard, their agents, leads, dialogs, and connections without seeing technical agent-building concepts. The operator-facing admin panel is account-centric: the operator manages a list of clients, opens a specific client workspace, reviews that client's status, channels, integrations, agents, and activity, and creates or edits agents only from the admin side. This separation is central to the product model.
 
 The universal agent creation flow is a five-step wizard:
-- Basics: name, persona, tone, language
+- Basics: name, persona, tone, and optional preferred response language for a multilingual agent
 - Channel: choose one of the tenant's connected channels
 - Knowledge: add any number of free-form knowledge blocks
 - Tools: add any number of free-form tools bound to real integrations/actions
@@ -57,8 +57,50 @@ Conversation isolation is critical. The same external contact may talk to differ
 - **Integration strategy**: Direct SDK/API integrations in code - avoid rebuilding runtime logic inside n8n.
 - **Security**: Client credentials must be encrypted at rest and separated by tenant - this is a hard requirement, not a polish item.
 - **Product model**: Operator-managed first - business clients should not see or control technical agent construction details.
+- **Surface boundary**: Client UX must stay in plain business language and expose only `Dashboard`, `Agents`, `Leads`, `Dialogs`, and `Connections` - agent construction, technical settings, and internal setup logic belong only to the admin surface.
 - **Runtime architecture**: One shared runtime serving many DB-backed agents - do not introduce per-agent processes unless later evidence demands it.
 - **Deploy target**: Vercel for app deployment, self-hosted n8n only for thin Gmail relay - design should respect these operational boundaries.
+
+## Canonical Product Contract v1
+
+### Client Surface
+
+- Client navigation is limited to `Dashboard`, `Agents`, `Leads`, `Dialogs`, and `Connections`.
+- Client copy must stay business-facing and simple. Do not expose builder internals, technical setup concepts, or admin terminology.
+- Clients can manage only connections in v1. They do not create or edit agents directly.
+- `Dashboard` should emphasize business-facing metrics such as dialog volume, total messages, and period-based summaries, plus current agent status.
+- `Agents` shows all client agents with status, assigned channel, and short purpose/description.
+- `Dialogs` shows all dialogs and supports filtering by agent.
+- `Leads` shows qualified business outcomes, not all dialogs.
+- `Connections` presents channels and integrations in a guided, non-technical way.
+
+### Admin Surface
+
+- Admin navigation centers on `Clients`. That is the primary operator workspace.
+- Admin flow is: open client list -> open one client -> inspect client status, agents, channels, integrations, and activity -> edit client data or create/update an agent.
+- Client detail is the main admin page for account management.
+- If a client has no agent, the dominant CTA is `Create agent`.
+- Agent creation and editing are admin-only flows.
+- Client-requested business changes are handled by editing existing client/agent fields, not by a separate formal change-request system in v1.
+
+### Agent and Channel Rules
+
+- A client may have multiple agents.
+- One connected channel may be assigned to only one agent.
+- Agent creation requires an available connected channel.
+- If a channel is already assigned to an agent, it cannot be reused by another agent.
+- Agent status exposed to clients should stay simple in v1: `Active` and `Paused`.
+- Channel enable/disable behavior should live with the agent experience rather than inside client connection forms when practical.
+
+### Lead and Dialog Model
+
+- `Dialogs` represent all conversations for a client.
+- `Leads` are created only when the agent completes one of the client-specific target actions.
+- Target actions are defined per client. For the first client, the primary target action is creating a Google Calendar event.
+- Lead schema must not be vertical-specific. Each lead has:
+  - a base layer of common fields;
+  - plus client-specific captured fields relevant to that business.
+- Example client-specific fields may vary by business and must not be hardcoded around one industry.
 
 ## Key Decisions
 
@@ -69,6 +111,8 @@ Conversation isolation is critical. The same external contact may talk to differ
 | Use direct code integrations for tools instead of n8n runtime orchestration | The previous n8n-heavy model caused credential pain, JSON workflow complexity, and poor debugging | - Pending |
 | Make the agent builder a universal five-step wizard with free-form knowledge and tools | Different businesses need different structures; rigid templates would constrain the product too early | - Pending |
 | Separate client and admin surfaces | The client experience is onboarding/visibility, while the operator experience is configuration and operations | - Pending |
+| Keep the client surface strictly business-facing and non-technical | Clients need confidence and clarity, not builder complexity or system language | - Approved 2026-04-08 |
+| Make the admin surface client-centric rather than tool-centric | The operator primarily works account-by-account: review client state, then create or update that client's agent | - Approved 2026-04-08 |
 
 ## Evolution
 
@@ -88,4 +132,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 after initialization*
+*Last updated: 2026-04-08 after clarifying client/admin surface boundaries*

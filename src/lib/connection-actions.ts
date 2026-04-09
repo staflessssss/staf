@@ -1,0 +1,288 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  ChannelType,
+  ConnectionStatus,
+  IntegrationType,
+  Prisma,
+} from "@prisma/client";
+import { z } from "zod";
+
+import { requireClientSession } from "@/lib/client-auth";
+import { encrypt } from "@/lib/crypto";
+import { db } from "@/lib/db";
+
+const channelSchema = z.object({
+  type: z.nativeEnum(ChannelType),
+  status: z.nativeEnum(ConnectionStatus),
+  credentials: z.string().trim().min(2),
+  metadata: z.string().trim().optional(),
+});
+
+const integrationSchema = z.object({
+  type: z.nativeEnum(IntegrationType),
+  status: z.nativeEnum(ConnectionStatus),
+  credentials: z.string().trim().min(2),
+  metadata: z.string().trim().optional(),
+});
+
+const presetChannelSchema = z.object({
+  type: z.nativeEnum(ChannelType),
+});
+
+const presetIntegrationSchema = z.object({
+  type: z.nativeEnum(IntegrationType),
+});
+
+const revokeChannelSchema = z.object({
+  type: z.nativeEnum(ChannelType),
+});
+
+function parseMetadata(metadata?: string) {
+  if (!metadata) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(metadata);
+  } catch {
+    return null;
+  }
+}
+
+async function upsertChannelConnection(input: {
+  tenantId: string;
+  type: ChannelType;
+  status: ConnectionStatus;
+  credentials: string;
+  metadata?: Prisma.InputJsonValue;
+}) {
+  await db.channelConnection.upsert({
+    where: {
+      tenantId_type: {
+        tenantId: input.tenantId,
+        type: input.type,
+      },
+    },
+    update: {
+      status: input.status,
+      credentialsEnc: encrypt(input.credentials),
+      metadata: input.metadata,
+    },
+    create: {
+      tenantId: input.tenantId,
+      type: input.type,
+      status: input.status,
+      credentialsEnc: encrypt(input.credentials),
+      metadata: input.metadata,
+    },
+  });
+}
+
+async function upsertIntegrationConnection(input: {
+  tenantId: string;
+  type: IntegrationType;
+  status: ConnectionStatus;
+  credentials: string;
+  metadata?: Prisma.InputJsonValue;
+}) {
+  await db.integrationConnection.upsert({
+    where: {
+      tenantId_type: {
+        tenantId: input.tenantId,
+        type: input.type,
+      },
+    },
+    update: {
+      status: input.status,
+      credentialsEnc: encrypt(input.credentials),
+      metadata: input.metadata,
+    },
+    create: {
+      tenantId: input.tenantId,
+      type: input.type,
+      status: input.status,
+      credentialsEnc: encrypt(input.credentials),
+      metadata: input.metadata,
+    },
+  });
+}
+
+export async function saveChannelConnectionAction(formData: FormData) {
+  const session = await requireClientSession();
+  const tenantId = session.user.tenantId;
+  const parsed = channelSchema.safeParse({
+    type: formData.get("type"),
+    status: formData.get("status"),
+    credentials: formData.get("credentials"),
+    metadata: formData.get("metadata") || undefined,
+  });
+
+  if (!parsed.success) {
+    redirect("/client/connections?error=channel");
+  }
+
+  const metadata = parseMetadata(parsed.data.metadata);
+
+  if (metadata === null) {
+    redirect("/client/connections?error=channel-metadata");
+  }
+
+  await upsertChannelConnection({
+    tenantId,
+    type: parsed.data.type,
+    status: parsed.data.status,
+    credentials: parsed.data.credentials,
+    metadata,
+  });
+
+  revalidatePath("/client");
+  revalidatePath("/client/connections");
+  revalidatePath("/admin");
+  redirect("/client/connections?saved=channel");
+}
+
+export async function saveIntegrationConnectionAction(formData: FormData) {
+  const session = await requireClientSession();
+  const tenantId = session.user.tenantId;
+  const parsed = integrationSchema.safeParse({
+    type: formData.get("type"),
+    status: formData.get("status"),
+    credentials: formData.get("credentials"),
+    metadata: formData.get("metadata") || undefined,
+  });
+
+  if (!parsed.success) {
+    redirect("/client/connections?error=integration");
+  }
+
+  const metadata = parseMetadata(parsed.data.metadata);
+
+  if (metadata === null) {
+    redirect("/client/connections?error=integration-metadata");
+  }
+
+  await upsertIntegrationConnection({
+    tenantId,
+    type: parsed.data.type,
+    status: parsed.data.status,
+    credentials: parsed.data.credentials,
+    metadata,
+  });
+
+  revalidatePath("/client");
+  revalidatePath("/client/connections");
+  revalidatePath("/admin");
+  redirect("/client/connections?saved=integration");
+}
+
+export async function connectPresetChannelAction(formData: FormData) {
+  const session = await requireClientSession();
+  const tenantId = session.user.tenantId;
+  const parsed = presetChannelSchema.safeParse({
+    type: formData.get("type"),
+  });
+  const redirectTo = String(formData.get("redirectTo") || "/client/connections");
+
+  if (!parsed.success) {
+    redirect("/client/connections?error=channel");
+  }
+
+  const type = parsed.data.type;
+
+  await upsertChannelConnection({
+    tenantId,
+    type,
+    status: ConnectionStatus.CONNECTED,
+    credentials: `preset:${type.toLowerCase()}:connected`,
+    metadata:
+      type === ChannelType.GMAIL
+        ? { provider: "google", access: ["gmail", "calendar", "sheets", "drive"] }
+        : { provider: type.toLowerCase() },
+  });
+
+  if (type === ChannelType.GMAIL) {
+    for (const integrationType of [
+      IntegrationType.GOOGLE_CALENDAR,
+      IntegrationType.GOOGLE_SHEETS,
+      IntegrationType.GOOGLE_DRIVE,
+    ]) {
+      await upsertIntegrationConnection({
+        tenantId,
+        type: integrationType,
+        status: ConnectionStatus.CONNECTED,
+        credentials: `preset:${integrationType.toLowerCase()}:connected`,
+        metadata: { provider: "google", via: "gmail_workspace" },
+      });
+    }
+  }
+
+  revalidatePath("/client");
+  revalidatePath("/client/connections");
+  revalidatePath("/admin");
+  redirect(`${redirectTo}?saved=channel`);
+}
+
+export async function connectPresetIntegrationAction(formData: FormData) {
+  const session = await requireClientSession();
+  const tenantId = session.user.tenantId;
+  const parsed = presetIntegrationSchema.safeParse({
+    type: formData.get("type"),
+  });
+  const redirectTo = String(formData.get("redirectTo") || "/client/connections");
+
+  if (!parsed.success) {
+    redirect("/client/connections?error=integration");
+  }
+
+  await upsertIntegrationConnection({
+    tenantId,
+    type: parsed.data.type,
+    status: ConnectionStatus.CONNECTED,
+    credentials: `preset:${parsed.data.type.toLowerCase()}:connected`,
+    metadata: { provider: "preset" },
+  });
+
+  revalidatePath("/client");
+  revalidatePath("/client/connections");
+  revalidatePath("/admin");
+  redirect(`${redirectTo}?saved=integration`);
+}
+
+export async function revokeChannelConnectionAction(formData: FormData) {
+  const session = await requireClientSession();
+  const tenantId = session.user.tenantId;
+  const parsed = revokeChannelSchema.safeParse({
+    type: formData.get("type"),
+  });
+  const redirectTo = String(formData.get("redirectTo") || "/client/connections");
+
+  if (!parsed.success) {
+    redirect(`${redirectTo}?error=channel`);
+  }
+
+  await db.channelConnection.upsert({
+    where: {
+      tenantId_type: {
+        tenantId,
+        type: parsed.data.type,
+      },
+    },
+    update: {
+      status: ConnectionStatus.REVOKED,
+    },
+    create: {
+      tenantId,
+      type: parsed.data.type,
+      status: ConnectionStatus.REVOKED,
+      credentialsEnc: encrypt("revoked"),
+    },
+  });
+
+  revalidatePath("/client");
+  revalidatePath("/client/connections");
+  revalidatePath("/admin");
+  redirect(`${redirectTo}?saved=channel`);
+}
