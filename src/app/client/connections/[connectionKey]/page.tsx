@@ -61,6 +61,7 @@ export default async function ConnectionDetailPage({
       : connection?.status === "CONNECTED";
 
   const isTelegram = definition.kind === "channel" && definition.type === ChannelType.TELEGRAM;
+  const isGmail = definition.kind === "channel" && definition.type === ChannelType.GMAIL;
   const isGoogleWorkspace =
     definition.kind === "integration" && definition.key === "google-workspace";
 
@@ -200,7 +201,7 @@ export default async function ConnectionDetailPage({
               </div>
             ) : null}
 
-            {!isTelegram && !isGoogleWorkspace && definition.kind === "channel" ? (
+            {!isTelegram && !isGoogleWorkspace && !isGmail && definition.kind === "channel" ? (
               <form action={connectPresetChannelAction} className="pt-2">
                 <input type="hidden" name="type" value={definition.type} />
                 <input
@@ -285,6 +286,35 @@ export default async function ConnectionDetailPage({
                         type="submit"
                       >
                         Disconnect Telegram
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              ) : isGmail ? (
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-2xl border border-[#ece6da] bg-white p-4 text-sm leading-7 text-[#554336]">
+                    Use one Google sign-in to unlock Gmail, Calendar, Sheets, and Drive for this
+                    business workspace.
+                  </div>
+                  <Link
+                    href={`/api/google/connect?redirectTo=${encodeURIComponent("/client/connections/gmail")}`}
+                    className="inline-flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#8d4b00_0%,#b15f00_100%)] px-6 py-4 text-base font-bold text-white shadow-[0_18px_30px_rgba(141,75,0,0.18)] transition hover:translate-y-[-1px]"
+                  >
+                    {isConnected ? "Reconnect Google Account" : "Connect Google Account"}
+                  </Link>
+                  {connection ? (
+                    <form action={revokeChannelConnectionAction}>
+                      <input type="hidden" name="type" value={definition.type} />
+                      <input
+                        type="hidden"
+                        name="redirectTo"
+                        value={`/client/connections/${definition.key}`}
+                      />
+                      <button
+                        className="w-full rounded-2xl border border-[#dbc2b0] bg-white px-6 py-4 text-base font-bold text-[#1b1c19] transition hover:bg-[#f7f3ed]"
+                        type="submit"
+                      >
+                        Disconnect Google Account
                       </button>
                     </form>
                   ) : null}

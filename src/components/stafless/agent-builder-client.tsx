@@ -7,6 +7,7 @@ import {
   ChannelConnection,
   Feature,
   FeatureType,
+  IntegrationType,
   IntegrationConnection,
   Step,
 } from "@prisma/client";
@@ -82,6 +83,18 @@ type ToolDraft = {
   steps: ToolStepDraft[];
 };
 
+type SheetInspectionState = {
+  isLoading: boolean;
+  error: string | null;
+  spreadsheetId?: string;
+  title?: string;
+  sheets: string[];
+  spreadsheets?: Array<{
+    id: string;
+    name: string;
+  }>;
+};
+
 type BuilderDraft = {
   name: string;
   persona: string;
@@ -146,6 +159,46 @@ const sampleTools: ToolDraft[] = [
     steps: [],
   },
 ];
+
+function safeParseJsonObject(value: string) {
+  try {
+    const parsed = JSON.parse(value || "{}");
+
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return {};
+  }
+
+  return {};
+}
+
+function stringifyJsonObject(value: Record<string, unknown>) {
+  return JSON.stringify(value, null, 2);
+}
+
+function getGoogleSheetsParams(step: ToolStepDraft) {
+  const params = safeParseJsonObject(step.params);
+
+  return {
+    operation:
+      typeof params.operation === "string" ? params.operation : "booking_date_lookup",
+    spreadsheetId:
+      typeof params.spreadsheetId === "string" ? params.spreadsheetId : "",
+    spreadsheetTitle:
+      typeof params.spreadsheetTitle === "string" ? params.spreadsheetTitle : "",
+    sheetName: typeof params.sheetName === "string" ? params.sheetName : "",
+    lookupColumn:
+      typeof params.lookupColumn === "string" ? params.lookupColumn : "date",
+    matchMode:
+      typeof params.matchMode === "string"
+        ? params.matchMode
+        : "date_equals_requested_date",
+    headerRow:
+      typeof params.headerRow === "number" && params.headerRow > 0 ? params.headerRow : 1,
+  };
+}
 
 function moveItem<T>(items: T[], index: number, direction: -1 | 1) {
   const nextIndex = index + direction;
@@ -241,6 +294,7 @@ export function AgentBuilderClient({
   const [isCheckingDeploy, setIsCheckingDeploy] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployReadiness, setDeployReadiness] = useState<DeployReadinessResult | null>(null);
+  const [sheetInspectors, setSheetInspectors] = useState<Record<string, SheetInspectionState>>({});
 
   const connectedIntegrations = useMemo(
     () =>
@@ -248,6 +302,14 @@ export function AgentBuilderClient({
         (connection) => connection.status === "CONNECTED",
       ),
     [tenant.integrationConnections],
+  );
+
+  const integrationById = useMemo(
+    () =>
+      new Map(
+        connectedIntegrations.map((integration) => [integration.id, integration]),
+      ),
+    [connectedIntegrations],
   );
 
   const assignedChannels = useMemo(
@@ -364,6 +426,167 @@ export function AgentBuilderClient({
           : tool,
       ),
     }));
+  }
+
+  function getToolStepKey(toolIndex: number, stepIndex: number) {
+    return `${toolIndex}:${stepIndex}`;
+  }
+
+  function updateToolStepParams(
+    toolIndex: number,
+    stepIndex: number,
+    patch: Record<string, unknown>,
+  ) {
+    const currentParams = safeParseJsonObject(
+      draft.toolBlocks[toolIndex]?.steps[stepIndex]?.params ?? "{}",
+    );
+
+    updateToolStep(toolIndex, stepIndex, {
+      params: stringifyJsonObject({
+        ...currentParams,
+        ...patch,
+      }),
+    });
+  }
+
+  async function inspectGoogleSpreadsheet(toolIndex: number, stepIndex: number) {
+    const step = draft.toolBlocks[toolIndex]?.steps[stepIndex];
+    const integration = step ? integrationById.get(step.integrationId) : null;
+    const sheetParams = step ? getGoogleSheetsParams(step) : null;
+    const spreadsheetId = sheetParams?.spreadsheetId.trim() ?? "";
+    const key = getToolStepKey(toolIndex, stepIndex);
+
+    if (!integration || integration.type !== IntegrationType.GOOGLE_SHEETS || !spreadsheetId) {
+      return;
+    }
+
+    setSheetInspectors((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        isLoading: true,
+        error: null,
+        spreadsheetId,
+        sheets: current[key]?.sheets ?? [],
+      },
+    }));
+
+    try {
+      const response = await fetch(
+        `/api/admin/tenants/${tenant.id}/integrations/${integration.id}/google-sheets/inspect?spreadsheetId=${encodeURIComponent(spreadsheetId)}`,
+      );
+      const result = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            item?: {
+              spreadsheetId: string;
+              title: string;
+              sheets: Array<{ title: string }>;
+            };
+          }
+        | null;
+
+      if (!response.ok || !result?.item) {
+        throw new Error(result?.error ?? "Could not inspect this spreadsheet.");
+      }
+
+      const item = result.item;
+
+      updateToolStepParams(toolIndex, stepIndex, {
+        spreadsheetId: item.spreadsheetId,
+        spreadsheetTitle: item.title,
+        sheetName:
+          sheetParams?.sheetName && item.sheets.some((sheet) => sheet.title === sheetParams.sheetName)
+            ? sheetParams.sheetName
+            : item.sheets[0]?.title ?? "",
+      });
+
+      setSheetInspectors((current) => ({
+        ...current,
+        [key]: {
+          isLoading: false,
+          error: null,
+          spreadsheetId: item.spreadsheetId,
+          title: item.title,
+          sheets: item.sheets.map((sheet) => sheet.title),
+        },
+      }));
+    } catch (inspectError) {
+      setSheetInspectors((current) => ({
+        ...current,
+        [key]: {
+          isLoading: false,
+          error:
+            inspectError instanceof Error
+              ? inspectError.message
+              : "Could not inspect this spreadsheet.",
+          spreadsheetId,
+          sheets: [],
+        },
+      }));
+    }
+  }
+
+  async function loadGoogleSpreadsheetCatalog(toolIndex: number, stepIndex: number) {
+    const step = draft.toolBlocks[toolIndex]?.steps[stepIndex];
+    const integration = step ? integrationById.get(step.integrationId) : null;
+    const key = getToolStepKey(toolIndex, stepIndex);
+
+    if (!integration || integration.type !== IntegrationType.GOOGLE_SHEETS) {
+      return;
+    }
+
+    setSheetInspectors((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        isLoading: true,
+        error: null,
+        sheets: current[key]?.sheets ?? [],
+        spreadsheets: current[key]?.spreadsheets ?? [],
+      },
+    }));
+
+    try {
+      const response = await fetch(
+        `/api/admin/tenants/${tenant.id}/integrations/${integration.id}/google-sheets/catalog`,
+      );
+      const result = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            items?: Array<{ id: string; name: string }>;
+          }
+        | null;
+
+      if (!response.ok || !result?.items) {
+        throw new Error(result?.error ?? "Could not load Google spreadsheets.");
+      }
+
+      setSheetInspectors((current) => ({
+        ...current,
+        [key]: {
+          ...current[key],
+          isLoading: false,
+          error: null,
+          sheets: current[key]?.sheets ?? [],
+          spreadsheets: result.items,
+        },
+      }));
+    } catch (catalogError) {
+      setSheetInspectors((current) => ({
+        ...current,
+        [key]: {
+          ...current[key],
+          isLoading: false,
+          error:
+            catalogError instanceof Error
+              ? catalogError.message
+              : "Could not load Google spreadsheets.",
+          sheets: current[key]?.sheets ?? [],
+          spreadsheets: current[key]?.spreadsheets ?? [],
+        },
+      }));
+    }
   }
 
   function addKnowledgeBlock() {
@@ -938,76 +1161,295 @@ export function AgentBuilderClient({
                           No integration steps yet.
                         </p>
                       ) : null}
-                      {tool.steps.map((step, stepIndex) => (
-                        <div
-                          key={`${step.integrationId}-${stepIndex}`}
-                          className="rounded-[16px] border border-border bg-[#faf6f0] p-4"
-                        >
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <FormField label="Integration">
-                              <select
-                                className={selectClassName}
-                                disabled={mode === "detail"}
-                                onChange={(event) =>
-                                  updateToolStep(toolIndex, stepIndex, {
-                                    integrationId: event.target.value,
-                                  })
-                                }
-                                value={step.integrationId}
-                              >
-                                <option value="">Select integration</option>
-                                {connectedIntegrations.map((integration) => (
-                                  <option key={integration.id} value={integration.id}>
-                                    {integration.type}
-                                  </option>
-                                ))}
-                              </select>
-                            </FormField>
-                            <FormField label="Action">
-                              <input
-                                className={inputClassName}
-                                onChange={(event) =>
-                                  updateToolStep(toolIndex, stepIndex, {
-                                    action: event.target.value,
-                                  })
-                                }
-                                readOnly={mode === "detail"}
-                                value={step.action}
-                              />
-                            </FormField>
-                          </div>
-                          <div className="mt-4">
-                            <FormField label="Params (JSON)">
-                              <textarea
-                                className={textareaClassName}
-                                onChange={(event) =>
-                                  updateToolStep(toolIndex, stepIndex, {
-                                    params: event.target.value,
-                                  })
-                                }
-                                readOnly={mode === "detail"}
-                                value={step.params}
-                              />
-                            </FormField>
-                          </div>
-                          {mode !== "detail" ? (
-                            <div className="mt-4 flex justify-end">
-                              <button
-                                className={secondaryButtonClassName}
-                                onClick={() =>
-                                  updateTool(toolIndex, {
-                                    steps: tool.steps.filter((_, index) => index !== stepIndex),
-                                  })
-                                }
-                                type="button"
-                              >
-                                <Trash2 className="mr-2 size-4" />
-                                Remove step
-                              </button>
+                      {tool.steps.map((step, stepIndex) => {
+                        const selectedIntegration = integrationById.get(step.integrationId);
+                        const isGoogleSheets = selectedIntegration?.type === IntegrationType.GOOGLE_SHEETS;
+                        const sheetParams = getGoogleSheetsParams(step);
+                        const sheetInspector = sheetInspectors[getToolStepKey(toolIndex, stepIndex)];
+
+                        return (
+                          <div
+                            key={`${step.integrationId}-${stepIndex}`}
+                            className="rounded-[16px] border border-border bg-[#faf6f0] p-4"
+                          >
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <FormField label="Integration">
+                                <select
+                                  className={selectClassName}
+                                  disabled={mode === "detail"}
+                                  onChange={(event) => {
+                                    const nextIntegrationId = event.target.value;
+                                    const nextIntegration = integrationById.get(nextIntegrationId);
+
+                                    updateToolStep(toolIndex, stepIndex, {
+                                      integrationId: nextIntegrationId,
+                                      action:
+                                        nextIntegration?.type === IntegrationType.GOOGLE_SHEETS &&
+                                        !step.action.trim()
+                                          ? "check booking sheet"
+                                          : step.action,
+                                      params:
+                                        nextIntegration?.type === IntegrationType.GOOGLE_SHEETS &&
+                                        step.params.trim() === "{}"
+                                          ? stringifyJsonObject({
+                                              operation: "booking_date_lookup",
+                                              spreadsheetId: "",
+                                              spreadsheetTitle: "",
+                                              sheetName: "",
+                                              lookupColumn: "date",
+                                              matchMode: "date_equals_requested_date",
+                                              headerRow: 1,
+                                            })
+                                          : step.params,
+                                    });
+                                    setSheetInspectors((current) => {
+                                      const next = { ...current };
+                                      delete next[getToolStepKey(toolIndex, stepIndex)];
+                                      return next;
+                                    });
+                                  }}
+                                  value={step.integrationId}
+                                >
+                                  <option value="">Select integration</option>
+                                  {connectedIntegrations.map((integration) => (
+                                    <option key={integration.id} value={integration.id}>
+                                      {integration.type}
+                                    </option>
+                                  ))}
+                                </select>
+                              </FormField>
+                              <FormField label="Action">
+                                <input
+                                  className={inputClassName}
+                                  onChange={(event) =>
+                                    updateToolStep(toolIndex, stepIndex, {
+                                      action: event.target.value,
+                                    })
+                                  }
+                                  readOnly={mode === "detail"}
+                                  value={step.action}
+                                />
+                              </FormField>
                             </div>
-                          ) : null}
-                        </div>
-                      ))}
+                            {isGoogleSheets ? (
+                              <div className="mt-4 space-y-4 rounded-[16px] border border-[#e7dece] bg-white p-4">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-sm font-semibold text-foreground">
+                                      Google Sheets booking rule
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Choose the spreadsheet, sheet tab, and column this step should check.
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      className={secondaryButtonClassName}
+                                      disabled={mode === "detail" || sheetInspector?.isLoading}
+                                      onClick={() => loadGoogleSpreadsheetCatalog(toolIndex, stepIndex)}
+                                      type="button"
+                                    >
+                                      {sheetInspector?.isLoading ? "Loading..." : "Load spreadsheets"}
+                                    </button>
+                                    <button
+                                      className={secondaryButtonClassName}
+                                      disabled={
+                                        mode === "detail" ||
+                                        sheetInspector?.isLoading ||
+                                        !sheetParams.spreadsheetId.trim()
+                                      }
+                                      onClick={() => inspectGoogleSpreadsheet(toolIndex, stepIndex)}
+                                      type="button"
+                                    >
+                                      {sheetInspector?.isLoading ? "Loading..." : "Load sheets"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <FormField label="What should this step check?">
+                                    <select
+                                      className={selectClassName}
+                                      disabled={mode === "detail"}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          operation: event.target.value,
+                                        })
+                                      }
+                                      value={sheetParams.operation}
+                                    >
+                                      <option value="booking_date_lookup">
+                                        Booked dates by column match
+                                      </option>
+                                    </select>
+                                  </FormField>
+                                  <FormField label="Match rule">
+                                    <select
+                                      className={selectClassName}
+                                      disabled={mode === "detail"}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          matchMode: event.target.value,
+                                        })
+                                      }
+                                      value={sheetParams.matchMode}
+                                    >
+                                      <option value="date_equals_requested_date">
+                                        Date equals requested date
+                                      </option>
+                                    </select>
+                                  </FormField>
+                                </div>
+                                <FormField label="Available spreadsheets">
+                                  <select
+                                    className={selectClassName}
+                                    disabled={mode === "detail" || !sheetInspector?.spreadsheets?.length}
+                                    onChange={(event) => {
+                                      const selectedSpreadsheet = sheetInspector?.spreadsheets?.find(
+                                        (spreadsheet) => spreadsheet.id === event.target.value,
+                                      );
+
+                                      updateToolStepParams(toolIndex, stepIndex, {
+                                        spreadsheetId: event.target.value,
+                                        spreadsheetTitle: selectedSpreadsheet?.name ?? "",
+                                        sheetName: "",
+                                      });
+                                    }}
+                                    value={sheetParams.spreadsheetId}
+                                  >
+                                    <option value="">
+                                      {sheetInspector?.spreadsheets?.length
+                                        ? "Select spreadsheet"
+                                        : "Load spreadsheets first"}
+                                    </option>
+                                    {sheetInspector?.spreadsheets?.map((spreadsheet) => (
+                                      <option key={spreadsheet.id} value={spreadsheet.id}>
+                                        {spreadsheet.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </FormField>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <FormField label="Spreadsheet ID or URL">
+                                    <input
+                                      className={inputClassName}
+                                      onChange={(event) => {
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          spreadsheetId: event.target.value,
+                                          spreadsheetTitle: "",
+                                          sheetName: "",
+                                        });
+                                        setSheetInspectors((current) => ({
+                                          ...current,
+                                          [getToolStepKey(toolIndex, stepIndex)]: {
+                                            isLoading: false,
+                                            error: null,
+                                            spreadsheetId: event.target.value,
+                                            sheets: [],
+                                          },
+                                        }));
+                                      }}
+                                      readOnly={mode === "detail"}
+                                      placeholder="Paste a Google Sheets URL or spreadsheet ID"
+                                      value={sheetParams.spreadsheetId}
+                                    />
+                                  </FormField>
+                                  <FormField label="Sheet tab">
+                                    <select
+                                      className={selectClassName}
+                                      disabled={mode === "detail" || !sheetInspector?.sheets?.length}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          sheetName: event.target.value,
+                                        })
+                                      }
+                                      value={sheetParams.sheetName}
+                                    >
+                                      <option value="">
+                                        {sheetInspector?.sheets?.length
+                                          ? "Select sheet"
+                                          : "Load spreadsheet first"}
+                                      </option>
+                                      {sheetInspector?.sheets.map((sheetName) => (
+                                        <option key={sheetName} value={sheetName}>
+                                          {sheetName}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </FormField>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <FormField label="Lookup column">
+                                    <input
+                                      className={inputClassName}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          lookupColumn: event.target.value,
+                                        })
+                                      }
+                                      readOnly={mode === "detail"}
+                                      placeholder="date"
+                                      value={sheetParams.lookupColumn}
+                                    />
+                                  </FormField>
+                                  <FormField label="Header row">
+                                    <input
+                                      className={inputClassName}
+                                      min={1}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          headerRow: Math.max(Number(event.target.value || 1), 1),
+                                        })
+                                      }
+                                      readOnly={mode === "detail"}
+                                      type="number"
+                                      value={sheetParams.headerRow}
+                                    />
+                                  </FormField>
+                                </div>
+                                {sheetInspector?.title || sheetParams.spreadsheetTitle ? (
+                                  <p className="text-sm text-muted-foreground">
+                                    Spreadsheet: {sheetInspector?.title ?? sheetParams.spreadsheetTitle}
+                                  </p>
+                                ) : null}
+                                {sheetInspector?.error ? (
+                                  <p className="text-sm text-destructive">{sheetInspector.error}</p>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <div className="mt-4">
+                                <FormField label="Params (JSON)">
+                                  <textarea
+                                    className={textareaClassName}
+                                    onChange={(event) =>
+                                      updateToolStep(toolIndex, stepIndex, {
+                                        params: event.target.value,
+                                      })
+                                    }
+                                    readOnly={mode === "detail"}
+                                    value={step.params}
+                                  />
+                                </FormField>
+                              </div>
+                            )}
+                            {mode !== "detail" ? (
+                              <div className="mt-4 flex justify-end">
+                                <button
+                                  className={secondaryButtonClassName}
+                                  onClick={() =>
+                                    updateTool(toolIndex, {
+                                      steps: tool.steps.filter((_, index) => index !== stepIndex),
+                                    })
+                                  }
+                                  type="button"
+                                >
+                                  <Trash2 className="mr-2 size-4" />
+                                  Remove step
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

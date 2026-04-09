@@ -25,6 +25,8 @@ async function executeIntegrationStep(args: {
   params: Prisma.JsonValue;
   request: string;
   metadata?: Prisma.JsonValue | null;
+  credentialsEnc?: string;
+  date?: string;
 }) {
   switch (args.integrationType) {
     case IntegrationType.GOOGLE_CALENDAR:
@@ -70,9 +72,15 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
             .string()
             .trim()
             .min(1)
-            .describe("What the tool should help accomplish for the customer."),
+            .describe("What the tool should help accomplish for the customer. Preserve the user's exact date details."),
+          date: z
+            .string()
+            .trim()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional()
+            .describe("Exact customer date in YYYY-MM-DD when the request mentions one."),
         }),
-        execute: async ({ request }) => {
+        execute: async ({ request, date }) => {
           const startedAt = Date.now();
           const steps = [];
 
@@ -83,6 +91,8 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
               params: step.params,
               request,
               metadata: step.integration.metadata,
+              credentialsEnc: step.integration.credentialsEnc,
+              date,
             });
 
             steps.push({
@@ -96,6 +106,7 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
           const output = {
             feature: feature.name,
             request,
+            ...(date ? { date } : {}),
             steps,
             summary: steps
               .map((step) => {
@@ -107,7 +118,7 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
 
           onToolResult?.({
             toolName: feature.name,
-            toolInput: { request },
+            toolInput: { request, ...(date ? { date } : {}) },
             toolResult: output,
             durationMs: Date.now() - startedAt,
           });

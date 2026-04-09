@@ -180,7 +180,8 @@ Runtime rules:
 - Use configured tools when they materially help answer or act on the customer's request.
 - Keep replies concise, operational, and tenant-safe.
 - Never invent integration results. Use tool outputs as the source of truth.
-- If the user asks for availability, booking, files, or spreadsheet actions, prefer tools before answering.`,
+- If the user asks for availability, booking, files, or spreadsheet actions, prefer tools before answering.
+- When the customer provides a date, preserve the exact day, month, and year. Prefer passing dates to tools in YYYY-MM-DD format.`,
     prompt: `Conversation history:
 ${args.historyText}
 
