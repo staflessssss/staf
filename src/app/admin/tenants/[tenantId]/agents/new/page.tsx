@@ -1,11 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AgentBuilderWorkspace } from "@/components/stafless/agent-builder";
-import {
-  PageHeader,
-  secondaryButtonClassName,
-} from "@/components/stafless/foundation";
+import { AgentWorkbenchShell } from "@/components/stafless/agent-workbench-shell";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 
@@ -36,21 +32,8 @@ export default async function CreateAgentPage({
   if (!tenant) notFound();
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Agent builder"
-        title="Create agent"
-        description={`Build a real operator-managed draft for ${tenant.name}: define the agent, bind its channel, shape knowledge and tools, then review readiness before deployment work begins.`}
-        actions={
-          <Link
-            href={`/admin/clients/${tenant.id}`}
-            className={secondaryButtonClassName}
-          >
-            Back to client
-          </Link>
-        }
-      />
+    <AgentWorkbenchShell mode="create" tenant={tenant}>
       <AgentBuilderWorkspace mode="create" tenant={tenant} />
-    </div>
+    </AgentWorkbenchShell>
   );
 }

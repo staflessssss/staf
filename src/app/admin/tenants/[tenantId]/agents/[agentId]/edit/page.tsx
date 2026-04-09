@@ -1,11 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AgentBuilderWorkspace } from "@/components/stafless/agent-builder";
-import {
-  PageHeader,
-  secondaryButtonClassName,
-} from "@/components/stafless/foundation";
+import { AgentWorkbenchShell } from "@/components/stafless/agent-workbench-shell";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 
@@ -49,21 +45,8 @@ export default async function EditAgentPage({ params }: EditAgentPageProps) {
   if (!tenant || !agent) notFound();
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Edit agent"
-        title={`Refine ${agent.name}`}
-        description="Update the draft, rebalance its knowledge and tools, and keep the review state current before deploy work begins."
-        actions={
-          <Link
-            href={`/admin/clients/${tenant.id}/agents/${agent.id}`}
-            className={secondaryButtonClassName}
-          >
-            View detail
-          </Link>
-        }
-      />
+    <AgentWorkbenchShell agent={agent} mode="edit" tenant={tenant}>
       <AgentBuilderWorkspace agent={agent} mode="edit" tenant={tenant} />
-    </div>
+    </AgentWorkbenchShell>
   );
 }
