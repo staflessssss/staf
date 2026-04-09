@@ -1,13 +1,19 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-
 import { getDefaultRedirectForRole } from "@/lib/auth-redirect";
+
+const sessionCookieName =
+  process.env.NODE_ENV === "production"
+    ? "__Secure-authjs.session-token"
+    : "authjs.session-token";
 
 export async function middleware(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
+    cookieName: sessionCookieName,
+    secureCookie: process.env.NODE_ENV === "production",
   });
   const { pathname } = request.nextUrl;
 
