@@ -15,14 +15,21 @@ type SheetsExecutionArgs = {
   date?: string;
 };
 
-type BookingLookupConfig = {
-  operation?: string;
+type SheetsFilterConfig = {
+  column: string;
+  operator: "equals" | "not_equals" | "contains" | "is_empty" | "is_not_empty";
+  valueSource: "literal" | "requested_date" | "user_message";
+  value?: string;
+};
+
+type SheetsLookupConfig = {
+  operation: "get_rows";
   spreadsheetId?: string;
-  sheetName?: string;
-  lookupColumn?: string;
-  matchMode?: string;
-  headerRow?: number;
   spreadsheetTitle?: string;
+  sheetName?: string;
+  headerRow: number;
+  combineFilters: "AND" | "OR";
+  filters: SheetsFilterConfig[];
 };
 
 const monthMap: Record<string, number> = {
@@ -72,6 +79,10 @@ function asObject(value: Prisma.JsonValue | null | undefined) {
   return value as Record<string, Prisma.JsonValue>;
 }
 
+function asArray(value: Prisma.JsonValue | null | undefined) {
+  return Array.isArray(value) ? value : [];
+}
+
 function toJsonValue(value: unknown): Prisma.JsonValue {
   if (
     value === null ||
@@ -100,7 +111,7 @@ function normalizeHeader(value: string) {
   return value.trim().toLowerCase();
 }
 
-function normalizeDateString(value: string) {
+function normalizeText(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -118,7 +129,7 @@ function inferRequestedDate(request: string, explicitDate?: string) {
     return buildUtcDate(year, month - 1, day);
   }
 
-  const trimmed = normalizeDateString(request);
+  const trimmed = normalizeText(request);
   const now = new Date();
 
   const isoMatch = trimmed.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
@@ -180,7 +191,7 @@ export function normalizeSheetDateValue(value: unknown) {
       return `${dottedMatch[3]}-${dottedMatch[2].padStart(2, "0")}-${dottedMatch[1].padStart(2, "0")}`;
     }
 
-    const namedMonthMatch = normalizeDateString(trimmed).match(
+    const namedMonthMatch = normalizeText(trimmed).match(
       /^(\d{1,2})\s+(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec|января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s+(\d{4})$/u,
     );
 
@@ -206,16 +217,41 @@ export function normalizeSheetDateValue(value: unknown) {
   return null;
 }
 
-function parseBookingLookupConfig(
+function parseFilterConfig(value: Prisma.JsonValue): SheetsFilterConfig | null {
+  const filter = asObject(value);
+
+  if (!filter || typeof filter.column !== "string" || !filter.column.trim()) {
+    return null;
+  }
+
+  const operator =
+    typeof filter.operator === "string" &&
+    ["equals", "not_equals", "contains", "is_empty", "is_not_empty"].includes(filter.operator)
+      ? (filter.operator as SheetsFilterConfig["operator"])
+      : "equals";
+  const valueSource =
+    typeof filter.valueSource === "string" &&
+    ["literal", "requested_date", "user_message"].includes(filter.valueSource)
+      ? (filter.valueSource as SheetsFilterConfig["valueSource"])
+      : "literal";
+
+  return {
+    column: filter.column,
+    operator,
+    valueSource,
+    value: typeof filter.value === "string" ? filter.value : "",
+  };
+}
+
+function parseSheetsLookupConfig(
   params: Prisma.JsonValue,
   metadata?: Prisma.JsonValue | null,
-): BookingLookupConfig {
+): SheetsLookupConfig {
   const config = asObject(params);
   const integrationMetadata = asObject(metadata);
 
   return {
-    operation:
-      typeof config?.operation === "string" ? config.operation : "booking_date_lookup",
+    operation: "get_rows",
     spreadsheetId: parseSpreadsheetId(
       typeof config?.spreadsheetId === "string"
         ? config.spreadsheetId
@@ -226,21 +262,14 @@ function parseBookingLookupConfig(
     spreadsheetTitle:
       typeof config?.spreadsheetTitle === "string" ? config.spreadsheetTitle : undefined,
     sheetName: typeof config?.sheetName === "string" ? config.sheetName : undefined,
-    lookupColumn: typeof config?.lookupColumn === "string" ? config.lookupColumn : undefined,
-    matchMode:
-      typeof config?.matchMode === "string" ? config.matchMode : "date_equals_requested_date",
     headerRow:
       typeof config?.headerRow === "number" && config.headerRow > 0 ? config.headerRow : 1,
+    combineFilters:
+      typeof config?.combineFilters === "string" && config.combineFilters === "OR" ? "OR" : "AND",
+    filters: asArray(config?.filters)
+      .map((filter) => parseFilterConfig(filter))
+      .filter((filter): filter is SheetsFilterConfig => Boolean(filter)),
   };
-}
-
-function formatDate(date: Date) {
-  return date.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
 }
 
 async function createSheetsClient(credentialsEnc: string) {
@@ -264,9 +293,61 @@ function mapRowToObject(headers: unknown[], row: unknown[]) {
   }, {});
 }
 
-async function runBookingDateLookup(args: SheetsExecutionArgs) {
-  const config = parseBookingLookupConfig(args.params, args.metadata);
-  const requestedDate = inferRequestedDate(args.request, args.date);
+function resolveFilterValue(args: {
+  filter: SheetsFilterConfig;
+  request: string;
+  date?: string;
+}) {
+  switch (args.filter.valueSource) {
+    case "requested_date": {
+      const requestedDate = inferRequestedDate(args.request, args.date);
+      return requestedDate ? toIsoDate(requestedDate) : null;
+    }
+    case "user_message":
+      return args.request;
+    default:
+      return args.filter.value ?? "";
+  }
+}
+
+function evaluateFilter(args: {
+  cellValue: unknown;
+  filter: SheetsFilterConfig;
+  resolvedValue: string | null;
+}) {
+  const rawCell = args.cellValue == null ? "" : String(args.cellValue);
+  const normalizedCell = normalizeText(rawCell);
+
+  if (args.filter.operator === "is_empty") {
+    return !rawCell.trim();
+  }
+
+  if (args.filter.operator === "is_not_empty") {
+    return Boolean(rawCell.trim());
+  }
+
+  if (args.resolvedValue === null) {
+    return false;
+  }
+
+  const normalizedTarget = normalizeText(args.resolvedValue);
+  const normalizedCellDate = normalizeSheetDateValue(args.cellValue);
+  const normalizedTargetDate = normalizeSheetDateValue(args.resolvedValue);
+
+  if (args.filter.operator === "contains") {
+    return normalizedCell.includes(normalizedTarget);
+  }
+
+  const equalsByDate =
+    Boolean(normalizedCellDate && normalizedTargetDate) && normalizedCellDate === normalizedTargetDate;
+  const equalsByText = normalizedCell === normalizedTarget;
+  const isEqual = equalsByDate || equalsByText;
+
+  return args.filter.operator === "not_equals" ? !isEqual : isEqual;
+}
+
+async function runSheetsLookup(args: SheetsExecutionArgs) {
+  const config = parseSheetsLookupConfig(args.params, args.metadata);
 
   if (!args.credentialsEnc) {
     return {
@@ -280,20 +361,44 @@ async function runBookingDateLookup(args: SheetsExecutionArgs) {
     };
   }
 
-  if (!config.spreadsheetId || !config.sheetName || !config.lookupColumn) {
+  if (!config.spreadsheetId || !config.sheetName) {
     return {
       integration: "GOOGLE_SHEETS",
       mode: "live_unavailable",
       status: "misconfigured",
       action: args.action,
-      summary:
-        "This Google Sheets tool needs a spreadsheet, a sheet tab, and a lookup column before it can answer booking questions.",
+      summary: "This Google Sheets tool needs a spreadsheet and a sheet tab before it can run.",
       params: args.params,
       request: args.request,
     };
   }
 
-  if (!requestedDate) {
+  if (config.filters.length === 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_filters",
+      action: args.action,
+      summary: "This Google Sheets tool needs at least one filter before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const resolvedFilters = config.filters.map((filter) => ({
+    ...filter,
+    resolvedValue: resolveFilterValue({
+      filter,
+      request: args.request,
+      date: args.date,
+    }),
+  }));
+
+  const unresolvedRequestedDate = resolvedFilters.some(
+    (filter) => filter.valueSource === "requested_date" && filter.resolvedValue === null,
+  );
+
+  if (unresolvedRequestedDate) {
     return {
       integration: "GOOGLE_SHEETS",
       mode: "live_unavailable",
@@ -302,7 +407,7 @@ async function runBookingDateLookup(args: SheetsExecutionArgs) {
       spreadsheetId: config.spreadsheetId,
       sheetName: config.sheetName,
       summary:
-        "The booking sheet is connected, but the request did not contain a date I could safely check.",
+        "This lookup expects a requested date, but the customer's message did not contain one I could safely use.",
       params: args.params,
       request: args.request,
     };
@@ -320,11 +425,14 @@ async function runBookingDateLookup(args: SheetsExecutionArgs) {
     dateTimeRenderOption: "FORMATTED_STRING",
   });
   const rows = valuesResponse.data.values ?? [];
-  const headerRowIndex = Math.max((config.headerRow ?? 1) - 1, 0);
+  const headerRowIndex = Math.max(config.headerRow - 1, 0);
   const headers = rows[headerRowIndex] ?? [];
-  const columnIndex = getColumnIndex(headers, config.lookupColumn);
 
-  if (columnIndex === -1) {
+  const missingColumns = resolvedFilters
+    .filter((filter) => getColumnIndex(headers, filter.column) === -1)
+    .map((filter) => filter.column);
+
+  if (missingColumns.length > 0) {
     return {
       integration: "GOOGLE_SHEETS",
       mode: "live",
@@ -333,66 +441,63 @@ async function runBookingDateLookup(args: SheetsExecutionArgs) {
       spreadsheetId: config.spreadsheetId,
       spreadsheetTitle: metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
       sheetName: config.sheetName,
-      lookupColumn: config.lookupColumn,
-      summary: `Column "${config.lookupColumn}" was not found in sheet "${config.sheetName}".`,
+      missingColumns,
+      summary: `Columns not found: ${missingColumns.join(", ")}.`,
       params: args.params,
       request: args.request,
     };
   }
 
-  const requestedIso = toIsoDate(requestedDate);
   const matchedRows = rows
     .slice(headerRowIndex + 1)
     .map((row, index) => ({
       rowNumber: headerRowIndex + 2 + index,
-      value: row[columnIndex],
       row,
+      rowObject: mapRowToObject(headers, row),
     }))
-    .filter((row) => normalizeSheetDateValue(row.value) === requestedIso)
+    .filter((row) => {
+      const results = resolvedFilters.map((filter) => {
+        const columnIndex = getColumnIndex(headers, filter.column);
+        return evaluateFilter({
+          cellValue: row.row[columnIndex],
+          filter,
+          resolvedValue: filter.resolvedValue,
+        });
+      });
+
+      return config.combineFilters === "OR" ? results.some(Boolean) : results.every(Boolean);
+    })
     .map((row) => ({
       rowNumber: row.rowNumber,
-      matchedValue: toJsonValue(row.value),
-      row: mapRowToObject(headers, row.row),
+      row: row.rowObject,
     }));
-
-  const isBooked = matchedRows.length > 0;
-  const formattedDate = formatDate(requestedDate);
-  const spreadsheetTitle = metadata.data.properties?.title ?? config.spreadsheetTitle ?? null;
 
   return {
     integration: "GOOGLE_SHEETS",
     mode: "live",
-    status: isBooked ? "booked" : "available",
+    status: matchedRows.length > 0 ? "matched" : "not_found",
     action: args.action,
     operation: config.operation,
     spreadsheetId: config.spreadsheetId,
-    spreadsheetTitle,
+    spreadsheetTitle: metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
     sheetName: config.sheetName,
-    lookupColumn: config.lookupColumn,
-    date: requestedIso,
+    combineFilters: config.combineFilters,
+    filters: resolvedFilters.map((filter) => ({
+      column: filter.column,
+      operator: filter.operator,
+      valueSource: filter.valueSource,
+      resolvedValue: filter.resolvedValue,
+    })),
     matchedRows,
-    summary: isBooked
-      ? `Booking sheet check completed for ${formattedDate}. Matching booking rows were found.`
-      : `Booking sheet check completed for ${formattedDate}. No matching booking rows were found.`,
+    summary:
+      matchedRows.length > 0
+        ? `Google Sheets lookup found ${matchedRows.length} matching row(s).`
+        : "Google Sheets lookup found no matching rows.",
     params: args.params,
     request: args.request,
   };
 }
 
 export async function executeGoogleSheetsStep(args: SheetsExecutionArgs) {
-  const config = parseBookingLookupConfig(args.params, args.metadata);
-
-  if (config.operation === "booking_date_lookup") {
-    return runBookingDateLookup(args);
-  }
-
-  return {
-    integration: "GOOGLE_SHEETS",
-    mode: "live_unavailable",
-    status: "unsupported_operation",
-    action: args.action,
-    summary: `The Google Sheets executor does not support operation "${config.operation ?? "unknown"}" yet.`,
-    params: args.params,
-    request: args.request,
-  };
+  return runSheetsLookup(args);
 }

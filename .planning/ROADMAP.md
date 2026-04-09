@@ -127,5 +127,16 @@ The roadmap is organized around the product's actual operating model: secure mul
 - Phase 7 should begin only after Phase 6 produces real conversation data worth inspecting.
 - Phase 8 runs last in this milestone, but security checks should still influence implementation earlier when convenient.
 
+## Backlog
+
+### Phase 999.1: Operator Test Chat Drawer (BACKLOG)
+
+**Goal:** Let the operator open a right-side test chat drawer from an agent page and simulate customer conversations against the current draft or deployed agent without leaving the builder context.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
 ---
 *Last updated: 2026-04-07 after inserting dedicated UI foundation phase*

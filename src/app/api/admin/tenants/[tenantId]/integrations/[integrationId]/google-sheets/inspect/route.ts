@@ -25,6 +25,8 @@ export async function GET(request: Request, context: RouteContext) {
   const { tenantId, integrationId } = await context.params;
   const url = new URL(request.url);
   const spreadsheetId = parseSpreadsheetId(url.searchParams.get("spreadsheetId") ?? "");
+  const sheetName = url.searchParams.get("sheetName")?.trim() ?? "";
+  const headerRow = Math.max(Number(url.searchParams.get("headerRow") ?? "1") || 1, 1);
 
   if (!spreadsheetId) {
     return NextResponse.json({ error: "Spreadsheet ID is required." }, { status: 400 });
@@ -53,11 +55,27 @@ export async function GET(request: Request, context: RouteContext) {
       spreadsheetId,
       fields: "properties.title,sheets(properties(sheetId,title,index))",
     });
+    const selectedSheetName = sheetName || response.data.sheets?.[0]?.properties?.title || "";
+    let headers: string[] = [];
+
+    if (selectedSheetName) {
+      const valuesResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${selectedSheetName.replace(/'/g, "''")}'!${headerRow}:${headerRow}`,
+        valueRenderOption: "FORMATTED_VALUE",
+      });
+      headers = (valuesResponse.data.values?.[0] ?? [])
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean);
+    }
 
     return NextResponse.json({
       item: {
         spreadsheetId,
         title: response.data.properties?.title ?? "Untitled spreadsheet",
+        selectedSheetName,
+        headerRow,
+        headers,
         sheets:
           response.data.sheets?.map((sheet) => ({
             id: String(sheet.properties?.sheetId ?? ""),

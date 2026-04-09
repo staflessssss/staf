@@ -89,10 +89,20 @@ type SheetInspectionState = {
   spreadsheetId?: string;
   title?: string;
   sheets: string[];
+  headers?: string[];
+  selectedSheetName?: string;
+  headerRow?: number;
   spreadsheets?: Array<{
     id: string;
     name: string;
   }>;
+};
+
+type GoogleSheetsFilterDraft = {
+  column: string;
+  operator: "equals" | "not_equals" | "contains" | "is_empty" | "is_not_empty";
+  valueSource: "literal" | "requested_date" | "user_message";
+  value: string;
 };
 
 type BuilderDraft = {
@@ -180,23 +190,59 @@ function stringifyJsonObject(value: Record<string, unknown>) {
 
 function getGoogleSheetsParams(step: ToolStepDraft) {
   const params = safeParseJsonObject(step.params);
+  const filters = Array.isArray(params.filters)
+    ? params.filters
+        .map((filter) => {
+          if (!filter || typeof filter !== "object" || Array.isArray(filter)) {
+            return null;
+          }
+
+          const candidate = filter as Record<string, unknown>;
+
+          return {
+            column: typeof candidate.column === "string" ? candidate.column : "",
+            operator:
+              typeof candidate.operator === "string" &&
+              ["equals", "not_equals", "contains", "is_empty", "is_not_empty"].includes(
+                candidate.operator,
+              )
+                ? (candidate.operator as GoogleSheetsFilterDraft["operator"])
+                : "equals",
+            valueSource:
+              typeof candidate.valueSource === "string" &&
+              ["literal", "requested_date", "user_message"].includes(candidate.valueSource)
+                ? (candidate.valueSource as GoogleSheetsFilterDraft["valueSource"])
+                : "literal",
+            value: typeof candidate.value === "string" ? candidate.value : "",
+          };
+        })
+        .filter((filter): filter is GoogleSheetsFilterDraft => Boolean(filter))
+    : [];
 
   return {
-    operation:
-      typeof params.operation === "string" ? params.operation : "booking_date_lookup",
+    operation: typeof params.operation === "string" ? params.operation : "get_rows",
     spreadsheetId:
       typeof params.spreadsheetId === "string" ? params.spreadsheetId : "",
     spreadsheetTitle:
       typeof params.spreadsheetTitle === "string" ? params.spreadsheetTitle : "",
     sheetName: typeof params.sheetName === "string" ? params.sheetName : "",
-    lookupColumn:
-      typeof params.lookupColumn === "string" ? params.lookupColumn : "date",
-    matchMode:
-      typeof params.matchMode === "string"
-        ? params.matchMode
-        : "date_equals_requested_date",
+    combineFilters:
+      typeof params.combineFilters === "string" && params.combineFilters === "OR"
+        ? "OR"
+        : "AND",
     headerRow:
       typeof params.headerRow === "number" && params.headerRow > 0 ? params.headerRow : 1,
+    filters:
+      filters.length > 0
+        ? filters
+        : [
+            {
+              column: "",
+              operator: "equals" as const,
+              valueSource: "requested_date" as const,
+              value: "",
+            },
+          ],
   };
 }
 
@@ -449,6 +495,53 @@ export function AgentBuilderClient({
     });
   }
 
+  function updateGoogleSheetsFilters(
+    toolIndex: number,
+    stepIndex: number,
+    filters: GoogleSheetsFilterDraft[],
+  ) {
+    updateToolStepParams(toolIndex, stepIndex, { filters });
+  }
+
+  function updateGoogleSheetsFilter(
+    toolIndex: number,
+    stepIndex: number,
+    filterIndex: number,
+    patch: Partial<GoogleSheetsFilterDraft>,
+  ) {
+    const currentFilters = getGoogleSheetsParams(draft.toolBlocks[toolIndex].steps[stepIndex]).filters;
+
+    updateGoogleSheetsFilters(
+      toolIndex,
+      stepIndex,
+      currentFilters.map((filter, currentFilterIndex) =>
+        currentFilterIndex === filterIndex ? { ...filter, ...patch } : filter,
+      ),
+    );
+  }
+
+  function addGoogleSheetsFilter(toolIndex: number, stepIndex: number) {
+    const currentFilters = getGoogleSheetsParams(draft.toolBlocks[toolIndex].steps[stepIndex]).filters;
+
+    updateGoogleSheetsFilters(toolIndex, stepIndex, [
+      ...currentFilters,
+      { column: "", operator: "equals", valueSource: "literal", value: "" },
+    ]);
+  }
+
+  function removeGoogleSheetsFilter(toolIndex: number, stepIndex: number, filterIndex: number) {
+    const currentFilters = getGoogleSheetsParams(draft.toolBlocks[toolIndex].steps[stepIndex]).filters;
+    const nextFilters = currentFilters.filter((_, currentFilterIndex) => currentFilterIndex !== filterIndex);
+
+    updateGoogleSheetsFilters(
+      toolIndex,
+      stepIndex,
+      nextFilters.length > 0
+        ? nextFilters
+        : [{ column: "", operator: "equals", valueSource: "literal", value: "" }],
+    );
+  }
+
   async function inspectGoogleSpreadsheet(toolIndex: number, stepIndex: number) {
     const step = draft.toolBlocks[toolIndex]?.steps[stepIndex];
     const integration = step ? integrationById.get(step.integrationId) : null;
@@ -473,7 +566,7 @@ export function AgentBuilderClient({
 
     try {
       const response = await fetch(
-        `/api/admin/tenants/${tenant.id}/integrations/${integration.id}/google-sheets/inspect?spreadsheetId=${encodeURIComponent(spreadsheetId)}`,
+        `/api/admin/tenants/${tenant.id}/integrations/${integration.id}/google-sheets/inspect?spreadsheetId=${encodeURIComponent(spreadsheetId)}&sheetName=${encodeURIComponent(sheetParams?.sheetName ?? "")}&headerRow=${encodeURIComponent(String(sheetParams?.headerRow ?? 1))}`,
       );
       const result = (await response.json().catch(() => null)) as
         | {
@@ -481,6 +574,9 @@ export function AgentBuilderClient({
             item?: {
               spreadsheetId: string;
               title: string;
+              selectedSheetName: string;
+              headerRow: number;
+              headers: string[];
               sheets: Array<{ title: string }>;
             };
           }
@@ -498,7 +594,7 @@ export function AgentBuilderClient({
         sheetName:
           sheetParams?.sheetName && item.sheets.some((sheet) => sheet.title === sheetParams.sheetName)
             ? sheetParams.sheetName
-            : item.sheets[0]?.title ?? "",
+            : item.selectedSheetName || item.sheets[0]?.title || "",
       });
 
       setSheetInspectors((current) => ({
@@ -508,7 +604,11 @@ export function AgentBuilderClient({
           error: null,
           spreadsheetId: item.spreadsheetId,
           title: item.title,
+          selectedSheetName: item.selectedSheetName,
+          headerRow: item.headerRow,
+          headers: item.headers,
           sheets: item.sheets.map((sheet) => sheet.title),
+          spreadsheets: current[key]?.spreadsheets ?? [],
         },
       }));
     } catch (inspectError) {
@@ -522,6 +622,8 @@ export function AgentBuilderClient({
               : "Could not inspect this spreadsheet.",
           spreadsheetId,
           sheets: [],
+          headers: [],
+          spreadsheets: current[key]?.spreadsheets ?? [],
         },
       }));
     }
@@ -1186,19 +1288,26 @@ export function AgentBuilderClient({
                                       action:
                                         nextIntegration?.type === IntegrationType.GOOGLE_SHEETS &&
                                         !step.action.trim()
-                                          ? "check booking sheet"
+                                          ? "lookup rows in sheet"
                                           : step.action,
                                       params:
                                         nextIntegration?.type === IntegrationType.GOOGLE_SHEETS &&
                                         step.params.trim() === "{}"
                                           ? stringifyJsonObject({
-                                              operation: "booking_date_lookup",
+                                              operation: "get_rows",
                                               spreadsheetId: "",
                                               spreadsheetTitle: "",
                                               sheetName: "",
-                                              lookupColumn: "date",
-                                              matchMode: "date_equals_requested_date",
                                               headerRow: 1,
+                                              combineFilters: "AND",
+                                              filters: [
+                                                {
+                                                  column: "",
+                                                  operator: "equals",
+                                                  valueSource: "requested_date",
+                                                  value: "",
+                                                },
+                                              ],
                                             })
                                           : step.params,
                                     });
@@ -1236,10 +1345,10 @@ export function AgentBuilderClient({
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <p className="text-sm font-semibold text-foreground">
-                                      Google Sheets booking rule
+                                      Google Sheets lookup
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      Choose the spreadsheet, sheet tab, and column this step should check.
+                                      Configure a document, sheet, and universal row filters.
                                     </p>
                                   </div>
                                   <div className="flex flex-wrap gap-2">
@@ -1266,7 +1375,12 @@ export function AgentBuilderClient({
                                   </div>
                                 </div>
                                 <div className="grid gap-4 md:grid-cols-2">
-                                  <FormField label="What should this step check?">
+                                  <FormField label="Resource">
+                                    <select className={selectClassName} disabled value="sheet_within_document">
+                                      <option value="sheet_within_document">Sheet Within Document</option>
+                                    </select>
+                                  </FormField>
+                                  <FormField label="Operation">
                                     <select
                                       className={selectClassName}
                                       disabled={mode === "detail"}
@@ -1277,29 +1391,11 @@ export function AgentBuilderClient({
                                       }
                                       value={sheetParams.operation}
                                     >
-                                      <option value="booking_date_lookup">
-                                        Booked dates by column match
-                                      </option>
-                                    </select>
-                                  </FormField>
-                                  <FormField label="Match rule">
-                                    <select
-                                      className={selectClassName}
-                                      disabled={mode === "detail"}
-                                      onChange={(event) =>
-                                        updateToolStepParams(toolIndex, stepIndex, {
-                                          matchMode: event.target.value,
-                                        })
-                                      }
-                                      value={sheetParams.matchMode}
-                                    >
-                                      <option value="date_equals_requested_date">
-                                        Date equals requested date
-                                      </option>
+                                      <option value="get_rows">Get Row(s)</option>
                                     </select>
                                   </FormField>
                                 </div>
-                                <FormField label="Available spreadsheets">
+                                <FormField label="Document">
                                   <select
                                     className={selectClassName}
                                     disabled={mode === "detail" || !sheetInspector?.spreadsheets?.length}
@@ -1318,7 +1414,7 @@ export function AgentBuilderClient({
                                   >
                                     <option value="">
                                       {sheetInspector?.spreadsheets?.length
-                                        ? "Select spreadsheet"
+                                        ? "From list"
                                         : "Load spreadsheets first"}
                                     </option>
                                     {sheetInspector?.spreadsheets?.map((spreadsheet) => (
@@ -1353,7 +1449,7 @@ export function AgentBuilderClient({
                                       value={sheetParams.spreadsheetId}
                                     />
                                   </FormField>
-                                  <FormField label="Sheet tab">
+                                  <FormField label="Sheet">
                                     <select
                                       className={selectClassName}
                                       disabled={mode === "detail" || !sheetInspector?.sheets?.length}
@@ -1377,19 +1473,21 @@ export function AgentBuilderClient({
                                     </select>
                                   </FormField>
                                 </div>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                  <FormField label="Lookup column">
-                                    <input
-                                      className={inputClassName}
+                                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+                                  <FormField label="Combine filters">
+                                    <select
+                                      className={selectClassName}
+                                      disabled={mode === "detail"}
                                       onChange={(event) =>
                                         updateToolStepParams(toolIndex, stepIndex, {
-                                          lookupColumn: event.target.value,
+                                          combineFilters: event.target.value,
                                         })
                                       }
-                                      readOnly={mode === "detail"}
-                                      placeholder="date"
-                                      value={sheetParams.lookupColumn}
-                                    />
+                                      value={sheetParams.combineFilters}
+                                    >
+                                      <option value="AND">AND</option>
+                                      <option value="OR">OR</option>
+                                    </select>
                                   </FormField>
                                   <FormField label="Header row">
                                     <input
@@ -1406,9 +1504,137 @@ export function AgentBuilderClient({
                                     />
                                   </FormField>
                                 </div>
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold text-foreground">Filters</p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Build row conditions the same way you would in a spreadsheet query.
+                                      </p>
+                                    </div>
+                                    <button
+                                      className={secondaryButtonClassName}
+                                      disabled={mode === "detail"}
+                                      onClick={() => addGoogleSheetsFilter(toolIndex, stepIndex)}
+                                      type="button"
+                                    >
+                                      <Plus className="mr-2 size-4" />
+                                      Add filter
+                                    </button>
+                                  </div>
+                                  {sheetParams.filters.map((filter, filterIndex) => (
+                                    <div
+                                      key={`${filter.column}-${filterIndex}`}
+                                      className="space-y-3 rounded-[16px] border border-[#e7dece] bg-[#faf6f0] p-4"
+                                    >
+                                      <div className="grid gap-4 md:grid-cols-3">
+                                        <FormField label="Column">
+                                          <select
+                                            className={selectClassName}
+                                            disabled={mode === "detail"}
+                                            onChange={(event) =>
+                                              updateGoogleSheetsFilter(toolIndex, stepIndex, filterIndex, {
+                                                column: event.target.value,
+                                              })
+                                            }
+                                            value={filter.column}
+                                          >
+                                            <option value="">
+                                              {sheetInspector?.headers?.length
+                                                ? "Select column"
+                                                : "Load sheet headers first"}
+                                            </option>
+                                            {sheetInspector?.headers?.map((header) => (
+                                              <option key={header} value={header}>
+                                                {header}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </FormField>
+                                        <FormField label="Operator">
+                                          <select
+                                            className={selectClassName}
+                                            disabled={mode === "detail"}
+                                            onChange={(event) =>
+                                              updateGoogleSheetsFilter(toolIndex, stepIndex, filterIndex, {
+                                                operator: event.target.value as GoogleSheetsFilterDraft["operator"],
+                                              })
+                                            }
+                                            value={filter.operator}
+                                          >
+                                            <option value="equals">Equals</option>
+                                            <option value="not_equals">Not equals</option>
+                                            <option value="contains">Contains</option>
+                                            <option value="is_empty">Is empty</option>
+                                            <option value="is_not_empty">Is not empty</option>
+                                          </select>
+                                        </FormField>
+                                        <FormField label="Value source">
+                                          <select
+                                            className={selectClassName}
+                                            disabled={mode === "detail"}
+                                            onChange={(event) =>
+                                              updateGoogleSheetsFilter(toolIndex, stepIndex, filterIndex, {
+                                                valueSource: event.target.value as GoogleSheetsFilterDraft["valueSource"],
+                                              })
+                                            }
+                                            value={filter.valueSource}
+                                          >
+                                            <option value="literal">Literal value</option>
+                                            <option value="requested_date">Requested date</option>
+                                            <option value="user_message">User message</option>
+                                          </select>
+                                        </FormField>
+                                      </div>
+                                      {filter.operator !== "is_empty" &&
+                                      filter.operator !== "is_not_empty" &&
+                                      filter.valueSource === "literal" ? (
+                                        <FormField label="Value">
+                                          <input
+                                            className={inputClassName}
+                                            onChange={(event) =>
+                                              updateGoogleSheetsFilter(toolIndex, stepIndex, filterIndex, {
+                                                value: event.target.value,
+                                              })
+                                            }
+                                            readOnly={mode === "detail"}
+                                            value={filter.value}
+                                          />
+                                        </FormField>
+                                      ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                          {filter.valueSource === "requested_date"
+                                            ? "This filter uses the date extracted from the request."
+                                            : filter.valueSource === "user_message"
+                                              ? "This filter uses the full user message as the comparison value."
+                                              : "This operator does not require a comparison value."}
+                                        </p>
+                                      )}
+                                      {mode !== "detail" ? (
+                                        <div className="flex justify-end">
+                                          <button
+                                            className={secondaryButtonClassName}
+                                            onClick={() =>
+                                              removeGoogleSheetsFilter(toolIndex, stepIndex, filterIndex)
+                                            }
+                                            type="button"
+                                          >
+                                            <Trash2 className="mr-2 size-4" />
+                                            Remove filter
+                                          </button>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  ))}
+                                </div>
                                 {sheetInspector?.title || sheetParams.spreadsheetTitle ? (
                                   <p className="text-sm text-muted-foreground">
                                     Spreadsheet: {sheetInspector?.title ?? sheetParams.spreadsheetTitle}
+                                  </p>
+                                ) : null}
+                                {sheetInspector?.headers?.length ? (
+                                  <p className="text-sm text-muted-foreground">
+                                    Columns: {sheetInspector.headers.join(", ")}
                                   </p>
                                 ) : null}
                                 {sheetInspector?.error ? (
