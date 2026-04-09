@@ -924,7 +924,7 @@ export function AgentBuilderClient({
     }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-[1180px] space-y-8">
       <WizardStepper currentStep={currentStep} steps={wizardSteps} />
 
       {error ? (
@@ -938,7 +938,7 @@ export function AgentBuilderClient({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="space-y-8">
         <div className="space-y-6">
           <SurfaceCard
             title="Basics"
@@ -1725,10 +1725,10 @@ export function AgentBuilderClient({
           ) : null}
         </div>
 
-        <div className="space-y-6 xl:sticky xl:top-8 xl:self-start">
+        <div className="grid gap-6 xl:grid-cols-[0.88fr_1.12fr]">
           <SurfaceCard
             title="Review and launch"
-            description="The review area reads like a launch checklist instead of another generic form."
+            description="Keep launch actions close to the draft, then drop into testing before deployment."
           >
             <Checklist items={checklistItems} />
             <div className="mt-6 flex flex-wrap gap-3">
@@ -1783,20 +1783,39 @@ export function AgentBuilderClient({
                 </>
               )}
             </div>
-          </SurfaceCard>
-
-          <SurfaceCard
-            title="Prompt preview"
-            description="Structured preview of the current system prompt before runtime wiring is completed."
-          >
-            <pre className="overflow-x-auto rounded-[20px] border border-border bg-[#221b2d] p-5 font-mono text-[13px] leading-6 text-[#f4f1ea]">
-              {promptPreview}
-            </pre>
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3">
+                <Layers3 className="size-4 text-primary" />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{tenant.name}</p>
+                  <p className="text-xs text-muted-foreground">Tenant slug: {tenant.slug}</p>
+                </div>
+              </div>
+              {agent ? (
+                <div className="flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3">
+                  <Settings2 className="size-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{agent.name}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <StatusBadge status={agent.status} />
+                      {agent.deployedAt ? (
+                        <span className="text-xs text-muted-foreground">
+                          Deployed {new Date(agent.deployedAt).toLocaleString()}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              <p className="text-xs leading-5 text-muted-foreground">
+                Runtime isolation stays one conversation per `(agentId, contactId)`, and this builder keeps that operating model visible.
+              </p>
+            </div>
           </SurfaceCard>
 
           <SurfaceCard
             title="Sandbox"
-            description="Testing remains visually isolated so the operator understands this is a safe pre-deploy workspace."
+            description="Test the draft in a safe lane before you commit the prompt and tools to live traffic."
           >
             <div className="rounded-[20px] border border-border bg-[#faf6f0] p-5">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -1885,41 +1904,16 @@ export function AgentBuilderClient({
               ) : null}
             </div>
           </SurfaceCard>
-
-          <SurfaceCard
-            title="Tenant context"
-            description="The builder remains anchored to tenant isolation from the start."
-          >
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3">
-                <Layers3 className="size-4 text-primary" />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{tenant.name}</p>
-                  <p className="text-xs text-muted-foreground">Tenant slug: {tenant.slug}</p>
-                </div>
-              </div>
-              {agent ? (
-                <div className="flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3">
-                  <Settings2 className="size-4 text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{agent.name}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <StatusBadge status={agent.status} />
-                      {agent.deployedAt ? (
-                        <span className="text-xs text-muted-foreground">
-                          Deployed {new Date(agent.deployedAt).toLocaleString()}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-              <div className="text-xs leading-5 text-muted-foreground">
-                Future runtime isolation remains one conversation per `(agentId, contactId)` and the UI keeps that operational model visible.
-              </div>
-            </div>
-          </SurfaceCard>
         </div>
+
+        <SurfaceCard
+          title="Prompt preview"
+          description="Review the composed system prompt after the builder config is in place, instead of keeping it pinned beside the form."
+        >
+          <pre className="overflow-x-auto rounded-[20px] border border-border bg-[#221b2d] p-5 font-mono text-[13px] leading-6 text-[#f4f1ea]">
+            {promptPreview}
+          </pre>
+        </SurfaceCard>
       </div>
     </div>
   );
