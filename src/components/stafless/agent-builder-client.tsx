@@ -1184,7 +1184,7 @@ export function AgentBuilderClient({
               {draft.toolBlocks.map((tool, toolIndex) => (
                 <div
                   key={`${tool.name}-${toolIndex}`}
-                  className="rounded-[20px] border border-border bg-[#faf6f0] p-5"
+                  className="rounded-[24px] border border-border bg-white p-6 shadow-[0_10px_24px_rgba(31,23,40,0.04)]"
                 >
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold text-foreground">Tool block {toolIndex + 1}</p>
@@ -1244,7 +1244,7 @@ export function AgentBuilderClient({
                         value={tool.description}
                       />
                     </FormField>
-                    <div className="space-y-3 rounded-[16px] border border-[#e7dece] bg-white p-4">
+                    <div className="space-y-4 border-t border-[#ece2d4] pt-5">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-foreground">Executable steps</p>
                         {mode !== "detail" ? (
@@ -1272,8 +1272,18 @@ export function AgentBuilderClient({
                         return (
                           <div
                             key={`${step.integrationId}-${stepIndex}`}
-                            className="rounded-[16px] border border-border bg-[#faf6f0] p-4"
+                            className="rounded-[20px] border border-[#e8ddcf] bg-[#fcfaf6] p-5 shadow-[0_8px_18px_rgba(31,23,40,0.03)]"
                           >
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                              <p className="text-sm font-semibold text-foreground">
+                                Step {stepIndex + 1}
+                              </p>
+                              {selectedIntegration ? (
+                                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                  {selectedIntegration.type}
+                                </span>
+                              ) : null}
+                            </div>
                             <div className="grid gap-4 md:grid-cols-2">
                               <FormField label="Integration">
                                 <select
@@ -1341,7 +1351,7 @@ export function AgentBuilderClient({
                               </FormField>
                             </div>
                             {isGoogleSheets ? (
-                              <div className="mt-4 space-y-4 rounded-[16px] border border-[#e7dece] bg-white p-4">
+                              <div className="mt-5 space-y-5 border-t border-[#ece2d4] pt-5">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <p className="text-sm font-semibold text-foreground">
@@ -1525,7 +1535,7 @@ export function AgentBuilderClient({
                                   {sheetParams.filters.map((filter, filterIndex) => (
                                     <div
                                       key={`${filter.column}-${filterIndex}`}
-                                      className="space-y-3 rounded-[16px] border border-[#e7dece] bg-[#faf6f0] p-4"
+                                      className="space-y-3 rounded-[16px] border border-[#ece2d4] bg-white p-4"
                                     >
                                       <div className="grid gap-4 md:grid-cols-3">
                                         <FormField label="Column">
