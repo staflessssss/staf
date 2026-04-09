@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChannelConnection,
   Feature,
@@ -474,9 +474,15 @@ export function AgentBuilderClient({
     }));
   }
 
-  function getToolStepKey(toolIndex: number, stepIndex: number) {
-    return `${toolIndex}:${stepIndex}`;
-  }
+function getToolStepKey(toolIndex: number, stepIndex: number) {
+  return `${toolIndex}:${stepIndex}`;
+}
+
+function uniqueValues(values: Array<string | undefined | null>) {
+  return values.filter((value, index, allValues): value is string => {
+    return Boolean(value) && allValues.indexOf(value) === index;
+  });
+}
 
   function updateToolStepParams(
     toolIndex: number,
@@ -542,7 +548,7 @@ export function AgentBuilderClient({
     );
   }
 
-  async function inspectGoogleSpreadsheet(toolIndex: number, stepIndex: number) {
+  const inspectGoogleSpreadsheet = useCallback(async (toolIndex: number, stepIndex: number) => {
     const step = draft.toolBlocks[toolIndex]?.steps[stepIndex];
     const integration = step ? integrationById.get(step.integrationId) : null;
     const sheetParams = step ? getGoogleSheetsParams(step) : null;
@@ -588,13 +594,16 @@ export function AgentBuilderClient({
 
       const item = result.item;
 
-      updateToolStepParams(toolIndex, stepIndex, {
-        spreadsheetId: item.spreadsheetId,
-        spreadsheetTitle: item.title,
-        sheetName:
-          sheetParams?.sheetName && item.sheets.some((sheet) => sheet.title === sheetParams.sheetName)
-            ? sheetParams.sheetName
-            : item.selectedSheetName || item.sheets[0]?.title || "",
+      updateToolStep(toolIndex, stepIndex, {
+        params: stringifyJsonObject({
+          ...safeParseJsonObject(step?.params ?? "{}"),
+          spreadsheetId: item.spreadsheetId,
+          spreadsheetTitle: item.title,
+          sheetName:
+            sheetParams?.sheetName && item.sheets.some((sheet) => sheet.title === sheetParams.sheetName)
+              ? sheetParams.sheetName
+              : item.selectedSheetName || item.sheets[0]?.title || "",
+        }),
       });
 
       setSheetInspectors((current) => ({
@@ -627,7 +636,37 @@ export function AgentBuilderClient({
         },
       }));
     }
-  }
+  }, [draft.toolBlocks, integrationById, tenant.id]);
+
+  useEffect(() => {
+    draft.toolBlocks.forEach((tool, toolIndex) => {
+      tool.steps.forEach((step, stepIndex) => {
+        const integration = integrationById.get(step.integrationId);
+        if (integration?.type !== IntegrationType.GOOGLE_SHEETS) {
+          return;
+        }
+
+        const sheetParams = getGoogleSheetsParams(step);
+        const spreadsheetId = sheetParams.spreadsheetId.trim();
+        if (!spreadsheetId) {
+          return;
+        }
+
+        const key = getToolStepKey(toolIndex, stepIndex);
+        const inspector = sheetInspectors[key];
+        const needsInspection =
+          !inspector ||
+          inspector.spreadsheetId !== spreadsheetId ||
+          inspector.selectedSheetName !== sheetParams.sheetName ||
+          inspector.headerRow !== sheetParams.headerRow ||
+          !inspector.headers?.length;
+
+        if (needsInspection && !inspector?.isLoading && !inspector?.error) {
+          void inspectGoogleSpreadsheet(toolIndex, stepIndex);
+        }
+      });
+    });
+  }, [draft.toolBlocks, inspectGoogleSpreadsheet, integrationById, sheetInspectors]);
 
   async function loadGoogleSpreadsheetCatalog(toolIndex: number, stepIndex: number) {
     const step = draft.toolBlocks[toolIndex]?.steps[stepIndex];
@@ -1268,6 +1307,23 @@ export function AgentBuilderClient({
                         const isGoogleSheets = selectedIntegration?.type === IntegrationType.GOOGLE_SHEETS;
                         const sheetParams = getGoogleSheetsParams(step);
                         const sheetInspector = sheetInspectors[getToolStepKey(toolIndex, stepIndex)];
+                        const availableSpreadsheets = [
+                          ...(sheetInspector?.spreadsheets ?? []),
+                          ...((sheetParams.spreadsheetId && sheetParams.spreadsheetTitle)
+                            ? [{ id: sheetParams.spreadsheetId, name: sheetParams.spreadsheetTitle }]
+                            : []),
+                        ].filter(
+                          (spreadsheet, index, allSpreadsheets) =>
+                            allSpreadsheets.findIndex((item) => item.id === spreadsheet.id) === index,
+                        );
+                        const availableSheets = uniqueValues([
+                          ...(sheetInspector?.sheets ?? []),
+                          sheetParams.sheetName,
+                        ]);
+                        const availableHeaders = uniqueValues([
+                          ...(sheetInspector?.headers ?? []),
+                          ...sheetParams.filters.map((filter) => filter.column),
+                        ]);
 
                         return (
                           <div
@@ -1408,9 +1464,9 @@ export function AgentBuilderClient({
                                 <FormField label="Document">
                                   <select
                                     className={selectClassName}
-                                    disabled={mode === "detail" || !sheetInspector?.spreadsheets?.length}
+                                    disabled={mode === "detail" || !availableSpreadsheets.length}
                                     onChange={(event) => {
-                                      const selectedSpreadsheet = sheetInspector?.spreadsheets?.find(
+                                      const selectedSpreadsheet = availableSpreadsheets.find(
                                         (spreadsheet) => spreadsheet.id === event.target.value,
                                       );
 
@@ -1423,11 +1479,11 @@ export function AgentBuilderClient({
                                     value={sheetParams.spreadsheetId}
                                   >
                                     <option value="">
-                                      {sheetInspector?.spreadsheets?.length
+                                      {availableSpreadsheets.length
                                         ? "From list"
                                         : "Load spreadsheets first"}
                                     </option>
-                                    {sheetInspector?.spreadsheets?.map((spreadsheet) => (
+                                    {availableSpreadsheets.map((spreadsheet) => (
                                       <option key={spreadsheet.id} value={spreadsheet.id}>
                                         {spreadsheet.name}
                                       </option>
@@ -1462,7 +1518,7 @@ export function AgentBuilderClient({
                                   <FormField label="Sheet">
                                     <select
                                       className={selectClassName}
-                                      disabled={mode === "detail" || !sheetInspector?.sheets?.length}
+                                      disabled={mode === "detail" || !availableSheets.length}
                                       onChange={(event) =>
                                         updateToolStepParams(toolIndex, stepIndex, {
                                           sheetName: event.target.value,
@@ -1471,11 +1527,11 @@ export function AgentBuilderClient({
                                       value={sheetParams.sheetName}
                                     >
                                       <option value="">
-                                        {sheetInspector?.sheets?.length
+                                        {availableSheets.length
                                           ? "Select sheet"
                                           : "Load spreadsheet first"}
                                       </option>
-                                      {sheetInspector?.sheets.map((sheetName) => (
+                                      {availableSheets.map((sheetName) => (
                                         <option key={sheetName} value={sheetName}>
                                           {sheetName}
                                         </option>
@@ -1550,11 +1606,11 @@ export function AgentBuilderClient({
                                             value={filter.column}
                                           >
                                             <option value="">
-                                              {sheetInspector?.headers?.length
+                                              {availableHeaders.length
                                                 ? "Select column"
                                                 : "Load sheet headers first"}
                                             </option>
-                                            {sheetInspector?.headers?.map((header) => (
+                                            {availableHeaders.map((header) => (
                                               <option key={header} value={header}>
                                                 {header}
                                               </option>
