@@ -19,6 +19,30 @@ type ResolveToolsArgs = {
   onToolResult?: (entry: ToolExecutionLog) => void;
 };
 
+function toJsonValue(value: unknown): Prisma.JsonValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).reduce<Prisma.JsonObject>((acc, [key, entry]) => {
+      acc[key] = toJsonValue(entry);
+      return acc;
+    }, {});
+  }
+
+  return String(value);
+}
+
 async function executeIntegrationStep(args: {
   integrationType: IntegrationType;
   action: string;
@@ -26,7 +50,14 @@ async function executeIntegrationStep(args: {
   request: string;
   metadata?: Prisma.JsonValue | null;
   credentialsEnc?: string;
+  tenantId: string;
   date?: string;
+  timeText?: string;
+  coupleName?: string;
+  weddingDate?: string;
+  location?: string;
+  email?: string;
+  channel?: string;
 }) {
   switch (args.integrationType) {
     case IntegrationType.GOOGLE_CALENDAR:
@@ -79,13 +110,58 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
             .regex(/^\d{4}-\d{2}-\d{2}$/)
             .optional()
             .describe("Exact customer date in YYYY-MM-DD when the request mentions one."),
+          timeText: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe("Natural-language call time text such as 'tomorrow at 10am ET' when scheduling is involved."),
+          coupleName: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe("Couple name when a booking or lead log needs it."),
+          weddingDate: z
+            .string()
+            .trim()
+            .optional()
+            .describe("Wedding date in the customer's wording or YYYY-MM-DD if known."),
+          location: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe("Wedding location when it matters for logging or confirmation."),
+          email: z
+            .string()
+            .trim()
+            .email()
+            .optional()
+            .describe("Customer email for call booking and calendar invites."),
+          channel: z
+            .string()
+            .trim()
+            .min(1)
+            .optional()
+            .describe("Source channel label for lead logging or notifications."),
         }),
-        execute: async ({ request, date }) => {
+        execute: async ({
+          request,
+          date,
+          timeText,
+          coupleName,
+          weddingDate,
+          location,
+          email,
+          channel,
+        }) => {
           const startedAt = Date.now();
           const steps = [];
 
           for (const step of feature.steps) {
             const result = await executeIntegrationStep({
+              tenantId: agent.tenantId,
               integrationType: step.integration.type,
               action: step.action,
               params: step.params,
@@ -93,6 +169,12 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
               metadata: step.integration.metadata,
               credentialsEnc: step.integration.credentialsEnc,
               date,
+              timeText,
+              coupleName,
+              weddingDate,
+              location,
+              email,
+              channel,
             });
 
             steps.push({
@@ -107,6 +189,12 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
             feature: feature.name,
             request,
             ...(date ? { date } : {}),
+            ...(timeText ? { timeText } : {}),
+            ...(coupleName ? { coupleName } : {}),
+            ...(weddingDate ? { weddingDate } : {}),
+            ...(location ? { location } : {}),
+            ...(email ? { email } : {}),
+            ...(channel ? { channel } : {}),
             steps,
             summary: steps
               .map((step) => {
@@ -118,12 +206,21 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
 
           onToolResult?.({
             toolName: feature.name,
-            toolInput: { request, ...(date ? { date } : {}) },
-            toolResult: output,
+            toolInput: {
+              request,
+              ...(date ? { date } : {}),
+              ...(timeText ? { timeText } : {}),
+              ...(coupleName ? { coupleName } : {}),
+              ...(weddingDate ? { weddingDate } : {}),
+              ...(location ? { location } : {}),
+              ...(email ? { email } : {}),
+              ...(channel ? { channel } : {}),
+            },
+            toolResult: toJsonValue(output),
             durationMs: Date.now() - startedAt,
           });
 
-          return output;
+          return toJsonValue(output);
         },
       });
 

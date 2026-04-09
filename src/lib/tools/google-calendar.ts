@@ -1,15 +1,63 @@
+import { ChannelType, ConnectionStatus, Prisma } from "@prisma/client";
 import { google } from "googleapis";
-import { Prisma } from "@prisma/client";
 
+import { telegramAdapter } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
+import { db } from "@/lib/db";
+import { createGoogleOAuthClientFromEncryptedCredentials } from "@/lib/google-api-client";
 
 type CalendarExecutionArgs = {
+  tenantId: string;
   action: string;
   params: Prisma.JsonValue;
   request: string;
   metadata?: Prisma.JsonValue | null;
   credentialsEnc?: string;
   date?: string;
+  timeText?: string;
+  coupleName?: string;
+  weddingDate?: string;
+  location?: string;
+  email?: string;
+  channel?: string;
+};
+
+type SchedulingIntent = "date_availability" | "check_calendar" | "book_call";
+
+type SchedulingConfig = {
+  calendarId: string;
+  timeZone: string;
+  slotDurationMinutes: number;
+  businessWindowStartHour: number;
+  businessWindowEndHour: number;
+  businessDays: number[];
+  ownerTelegramChatId?: string;
+  leadSpreadsheetId?: string;
+  leadSpreadsheetTitle?: string;
+  leadSheetName?: string;
+  leadHeaderRow: number;
+  leadColumns: {
+    coupleName: string;
+    weddingDate: string;
+    location: string;
+    callDate: string;
+    callTime: string;
+    email: string;
+    channel: string;
+  };
+};
+
+type ParsedSchedulingRequest = {
+  date: string;
+  time: string;
+  startTime: string;
+  endTime: string;
+};
+
+type CalendarEventSummary = {
+  start: number;
+  end: number;
+  summary: string;
 };
 
 function asObject(value: Prisma.JsonValue | null | undefined) {
@@ -20,105 +68,196 @@ function asObject(value: Prisma.JsonValue | null | undefined) {
   return value as Record<string, Prisma.JsonValue>;
 }
 
-function inferIntent(action: string) {
-  const normalized = action.toLowerCase();
-
-  if (
-    normalized.includes("availability") ||
-    normalized.includes("freebusy") ||
-    normalized.includes("check") ||
-    normalized.includes("calendar")
-  ) {
-    return "availability";
-  }
-
-  if (normalized.includes("book") || normalized.includes("create") || normalized.includes("schedule")) {
-    return "create_event";
-  }
-
-  return "calendar_lookup";
+function asNumber(value: Prisma.JsonValue | null | undefined, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function asString(value: Prisma.JsonValue | null | undefined, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function normalizeText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function inferIntent(action: string) {
+  const normalized = normalizeText(action);
+
+  if (
+    normalized.includes("book_call") ||
+    normalized.includes("book call") ||
+    normalized.includes("book consultation") ||
+    normalized.includes("create consultation") ||
+    normalized.includes("schedule consultation")
+  ) {
+    return "book_call" as SchedulingIntent;
+  }
+
+  if (
+    normalized.includes("check_calendar") ||
+    normalized.includes("check calendar") ||
+    normalized.includes("consultation calendar") ||
+    normalized.includes("consultation slot") ||
+    normalized.includes("call slot") ||
+    normalized.includes("call calendar")
+  ) {
+    return "check_calendar" as SchedulingIntent;
+  }
+
+  return "date_availability" as SchedulingIntent;
+}
+
+function parseCalendarConfig(params: Prisma.JsonValue, metadata?: Prisma.JsonValue | null): SchedulingConfig {
+  const config = asObject(params);
+  const integrationMetadata = asObject(metadata);
+
+  return {
+    calendarId:
+      asString(config?.calendarId) ||
+      asString(integrationMetadata?.calendarId) ||
+      asString(integrationMetadata?.email) ||
+      "primary",
+    timeZone: asString(config?.timeZone) || "America/New_York",
+    slotDurationMinutes: asNumber(config?.slotDurationMinutes, 30),
+    businessWindowStartHour: asNumber(config?.businessWindowStartHour, 9),
+    businessWindowEndHour: asNumber(config?.businessWindowEndHour, 14),
+    businessDays:
+      Array.isArray(config?.businessDays) && config.businessDays.every((value) => typeof value === "number")
+        ? (config.businessDays as number[])
+        : [1, 2, 3, 4, 5],
+    ownerTelegramChatId: asString(config?.ownerTelegramChatId) || undefined,
+    leadSpreadsheetId: asString(config?.leadSpreadsheetId) || undefined,
+    leadSpreadsheetTitle: asString(config?.leadSpreadsheetTitle) || undefined,
+    leadSheetName: asString(config?.leadSheetName) || undefined,
+    leadHeaderRow: asNumber(config?.leadHeaderRow, 1),
+    leadColumns: {
+      coupleName: asString(asObject(config?.leadColumns)?.coupleName, "couple_name"),
+      weddingDate: asString(asObject(config?.leadColumns)?.weddingDate, "wedding_date"),
+      location: asString(asObject(config?.leadColumns)?.location, "location"),
+      callDate: asString(asObject(config?.leadColumns)?.callDate, "call_date"),
+      callTime: asString(asObject(config?.leadColumns)?.callTime, "call_time"),
+      email: asString(asObject(config?.leadColumns)?.email, "email"),
+      channel: asString(asObject(config?.leadColumns)?.channel, "channel"),
+    },
+  };
+}
+
+function toIsoDate(year: number, month: number, day: number) {
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function getTimeZoneParts(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  });
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  const weekdayValue = get("weekday");
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return {
+    year: Number(get("year")),
+    month: Number(get("month")),
+    day: Number(get("day")),
+    weekday: weekdayMap[weekdayValue] ?? new Date(Date.UTC(Number(get("year")), Number(get("month")) - 1, Number(get("day")))).getUTCDay(),
+  };
+}
+
+function addUtcDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+const weekdayMap: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
+
 const monthMap: Record<string, number> = {
-  january: 0,
-  jan: 0,
-  "января": 0,
-  januarys: 0,
-  february: 1,
-  feb: 1,
-  "февраля": 1,
-  march: 2,
-  mar: 2,
-  "марта": 2,
-  april: 3,
-  apr: 3,
-  "апреля": 3,
-  may: 4,
-  "мая": 4,
-  june: 5,
-  jun: 5,
-  "июня": 5,
-  july: 6,
-  jul: 6,
-  "июля": 6,
-  august: 7,
-  aug: 7,
-  "августа": 7,
-  september: 8,
-  sep: 8,
-  sept: 8,
-  "сентября": 8,
-  october: 9,
-  oct: 9,
-  "октября": 9,
-  november: 10,
-  nov: 10,
-  "ноября": 10,
-  december: 11,
-  dec: 11,
-  "декабря": 11,
+  january: 1,
+  jan: 1,
+  february: 2,
+  feb: 2,
+  march: 3,
+  mar: 3,
+  april: 4,
+  apr: 4,
+  may: 5,
+  june: 6,
+  jun: 6,
+  july: 7,
+  jul: 7,
+  august: 8,
+  aug: 8,
+  september: 9,
+  sep: 9,
+  sept: 9,
+  october: 10,
+  oct: 10,
+  november: 11,
+  nov: 11,
+  december: 12,
+  dec: 12,
 };
 
 function inferRequestedDate(request: string, explicitDate?: string) {
   if (explicitDate && /^\d{4}-\d{2}-\d{2}$/.test(explicitDate)) {
-    const [year, month, day] = explicitDate.split("-").map(Number);
-    return new Date(Date.UTC(year, month - 1, day));
+    return explicitDate;
   }
 
-  const trimmed = request.trim().toLowerCase();
+  const trimmed = normalizeText(request);
   const now = new Date();
-
   const isoMatch = trimmed.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
 
   if (isoMatch) {
-    return new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
   }
 
-  const dottedMatch = trimmed.match(/\b(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?\b/);
+  const dottedMatch = trimmed.match(/\b(\d{1,2})[./](\d{1,2})(?:[./](\d{4}))?\b/);
 
   if (dottedMatch) {
     const year = dottedMatch[3] ? Number(dottedMatch[3]) : now.getUTCFullYear();
-    let candidate = new Date(Date.UTC(year, Number(dottedMatch[2]) - 1, Number(dottedMatch[1])));
+    const month = Number(dottedMatch[2]);
+    const day = Number(dottedMatch[1]);
+    let candidate = toIsoDate(year, month, day);
 
-    if (!dottedMatch[3] && candidate < now) {
-      candidate = new Date(Date.UTC(year + 1, Number(dottedMatch[2]) - 1, Number(dottedMatch[1])));
+    if (!dottedMatch[3] && candidate < now.toISOString().slice(0, 10)) {
+      candidate = toIsoDate(year + 1, month, day);
     }
 
     return candidate;
   }
 
   const namedMonthMatch = trimmed.match(
-    /\b(\d{1,2})\s+(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec|января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)(?:\s+(\d{4}))?\b/u,
+    /\b(\d{1,2})\s+(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)(?:\s+(\d{4}))?\b/u,
   );
 
   if (namedMonthMatch) {
     const day = Number(namedMonthMatch[1]);
     const month = monthMap[namedMonthMatch[2]];
     const year = namedMonthMatch[3] ? Number(namedMonthMatch[3]) : now.getUTCFullYear();
-    let candidate = new Date(Date.UTC(year, month, day));
+    let candidate = toIsoDate(year, month, day);
 
-    if (!namedMonthMatch[3] && candidate < now) {
-      candidate = new Date(Date.UTC(year + 1, month, day));
+    if (!namedMonthMatch[3] && candidate < now.toISOString().slice(0, 10)) {
+      candidate = toIsoDate(year + 1, month, day);
     }
 
     return candidate;
@@ -127,48 +266,298 @@ function inferRequestedDate(request: string, explicitDate?: string) {
   return null;
 }
 
-function buildDayWindow(date: Date) {
-  const timeMin = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0));
-  const timeMax = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1, 0, 0, 0));
+function parseTimeFromText(text: string) {
+  const patterns = [
+    /\b(\d{1,2}):(\d{2})\s*(am|pm)\b/i,
+    /\b(\d{1,2})\s*(am|pm)\b/i,
+    /(?:\bat\b|\bfor\b|\bfrom\b)\s+(\d{1,2}):(\d{2})\b/i,
+    /(?:\bat\b|\bfor\b|\bfrom\b)\s+(\d{1,2})\b/i,
+  ];
 
-  return { timeMin, timeMax };
+  let hours = 0;
+  let minutes = 0;
+  let suffix = "";
+  let matched = false;
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+
+    if (!match) {
+      continue;
+    }
+
+    hours = Number(match[1]);
+    minutes = match[2] && /^\d+$/.test(match[2]) ? Number(match[2]) : 0;
+    suffix = match[3] && /^(am|pm)$/i.test(match[3]) ? match[3].toLowerCase() : "";
+    matched = true;
+    break;
+  }
+
+  if (!matched) {
+    return null;
+  }
+
+  if (suffix === "pm" && hours < 12) {
+    hours += 12;
+  } else if (suffix === "am" && hours === 12) {
+    hours = 0;
+  } else if (!suffix && hours >= 1 && hours <= 7) {
+    hours += 12;
+  }
+
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  return {
+    hours,
+    minutes,
+    time: `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`,
+  };
 }
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString("ru-RU", {
+function getTimeZoneOffsetString(dateIso: string, timeZone: string) {
+  const middayUtc = new Date(`${dateIso}T12:00:00Z`);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "shortOffset",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(middayUtc);
+  const offsetLabel = parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT-00:00";
+  const match = offsetLabel.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/i);
+
+  if (!match) {
+    return "-05:00";
+  }
+
+  const sign = match[1];
+  const hours = match[2].padStart(2, "0");
+  const minutes = (match[3] ?? "00").padStart(2, "0");
+  return `${sign}${hours}:${minutes}`;
+}
+
+function parseSchedulingRequest(args: {
+  request: string;
+  timeText?: string;
+  timeZone: string;
+  slotDurationMinutes: number;
+  referenceDate?: Date;
+}) {
+  const source = normalizeText(args.timeText || args.request);
+  const reference = args.referenceDate ?? new Date();
+  const base = getTimeZoneParts(reference, args.timeZone);
+  let targetDate = new Date(Date.UTC(base.year, base.month - 1, base.day));
+
+  if (source.includes("day after tomorrow")) {
+    targetDate = addUtcDays(targetDate, 2);
+  } else if (source.includes("tomorrow")) {
+    targetDate = addUtcDays(targetDate, 1);
+  } else if (source.includes("today")) {
+    targetDate = targetDate;
+  } else {
+    const foundWeekday = Object.entries(weekdayMap).find(([label]) => source.includes(label));
+
+    if (foundWeekday) {
+      let diff = foundWeekday[1] - targetDate.getUTCDay();
+      if (diff <= 0) {
+        diff += 7;
+      }
+      targetDate = addUtcDays(targetDate, diff);
+    } else {
+      const namedMonthMatch = source.match(
+        /\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/u,
+      );
+      const isoMatch = source.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+
+      if (namedMonthMatch) {
+        const month = monthMap[namedMonthMatch[1]];
+        const day = Number(namedMonthMatch[2]);
+        const year = namedMonthMatch[3] ? Number(namedMonthMatch[3]) : base.year;
+        targetDate = new Date(Date.UTC(year, month - 1, day));
+        if (!namedMonthMatch[3] && targetDate < new Date(Date.UTC(base.year, base.month - 1, base.day))) {
+          targetDate = new Date(Date.UTC(year + 1, month - 1, day));
+        }
+      } else if (isoMatch) {
+        targetDate = new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+      } else {
+        return null;
+      }
+    }
+  }
+
+  const time = parseTimeFromText(source);
+
+  if (!time) {
+    return null;
+  }
+
+  const dateIso = targetDate.toISOString().slice(0, 10);
+  const offset = getTimeZoneOffsetString(dateIso, args.timeZone);
+  const endMinutesTotal = time.hours * 60 + time.minutes + args.slotDurationMinutes;
+  const endHours = Math.floor(endMinutesTotal / 60);
+  const endMinutes = endMinutesTotal % 60;
+
+  return {
+    date: dateIso,
+    time: time.time,
+    startTime: `${dateIso}T${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}:00${offset}`,
+    endTime: `${dateIso}T${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}:00${offset}`,
+  } satisfies ParsedSchedulingRequest;
+}
+
+function validateSchedulingWindow(parsed: ParsedSchedulingRequest, config: SchedulingConfig) {
+  const [year, month, day] = parsed.date.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.getUTCDay();
+  const [hours, minutes] = parsed.time.split(":").map(Number);
+  const startMinutes = hours * 60 + minutes;
+  const endMinutes = startMinutes + config.slotDurationMinutes;
+  const minMinutes = config.businessWindowStartHour * 60;
+  const maxMinutes = config.businessWindowEndHour * 60;
+
+  if (!config.businessDays.includes(weekday)) {
+    return {
+      ok: false,
+      reason: "outside_business_days",
+      summary: "Consultation calls are only available Monday through Friday.",
+    };
+  }
+
+  if (startMinutes < minMinutes || endMinutes > maxMinutes) {
+    return {
+      ok: false,
+      reason: "outside_business_hours",
+      summary: `Consultation calls are only available between ${config.businessWindowStartHour}:00 and ${config.businessWindowEndHour}:00 ET.`,
+    };
+  }
+
+  return { ok: true } as const;
+}
+
+function formatHumanDate(dateIso: string, timeZone: string) {
+  return new Date(`${dateIso}T12:00:00Z`).toLocaleDateString("en-US", {
     day: "numeric",
     month: "long",
     year: "numeric",
-    timeZone: "UTC",
+    timeZone,
   });
 }
 
-async function createCalendarClient(credentialsEnc: string) {
-  const credentials = JSON.parse(decrypt(credentialsEnc)) as {
-    access_token?: string;
-    refresh_token?: string;
-    expiry_date?: number;
-    scope?: string;
-    token_type?: string;
-  };
-  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-  const redirectUri =
-    `${process.env.APP_BASE_URL?.trim() || process.env.NEXTAUTH_URL?.trim() || ""}/api/google/callback`;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("Google OAuth client credentials are missing.");
-  }
-
-  const auth = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-  auth.setCredentials(credentials);
-
+function createCalendarClient(credentialsEnc: string) {
+  const auth = createGoogleOAuthClientFromEncryptedCredentials(credentialsEnc);
   return google.calendar({ version: "v3", auth });
 }
 
-async function runAvailabilityLookup(args: CalendarExecutionArgs) {
-  const metadata = asObject(args.metadata);
-  const calendarId = typeof metadata?.calendarId === "string" ? metadata.calendarId : "primary";
+function createSheetsClient(credentialsEnc: string) {
+  const auth = createGoogleOAuthClientFromEncryptedCredentials(credentialsEnc);
+  return google.sheets({ version: "v4", auth });
+}
+
+function extractEmail(args: CalendarExecutionArgs) {
+  if (args.email) {
+    return args.email;
+  }
+
+  const match = args.request.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+  return match?.[0] ?? "";
+}
+
+function extractCoupleName(args: CalendarExecutionArgs) {
+  if (args.coupleName) {
+    return args.coupleName;
+  }
+
+  const match = args.request.match(/\b(?:we(?:'re| are)|names?[:\s]+)([^.,\n]+)/i);
+  return match?.[1]?.trim() || "Client";
+}
+
+function extractWeddingDate(args: CalendarExecutionArgs) {
+  if (args.weddingDate) {
+    return args.weddingDate;
+  }
+
+  return args.date || inferRequestedDate(args.request) || "";
+}
+
+function extractLocation(args: CalendarExecutionArgs) {
+  if (args.location) {
+    return args.location;
+  }
+
+  const match = args.request.match(/\b(?:in|at)\s+([^.,\n]+)/i);
+  return match?.[1]?.trim() ?? "";
+}
+
+async function listEventsForDate(args: {
+  calendar: ReturnType<typeof google.calendar>;
+  calendarId: string;
+  date: string;
+  timeZone: string;
+}) {
+  const offset = getTimeZoneOffsetString(args.date, args.timeZone);
+  const response = await args.calendar.events.list({
+    calendarId: args.calendarId,
+    singleEvents: true,
+    orderBy: "startTime",
+    timeZone: args.timeZone,
+    timeMin: `${args.date}T00:00:00${offset}`,
+    timeMax: `${args.date}T23:59:59${offset}`,
+    maxResults: 50,
+  });
+
+  return response.data.items ?? [];
+}
+
+function parseBusySlots(events: Awaited<ReturnType<typeof listEventsForDate>>) {
+  return events
+    .filter((event) => event.start?.dateTime && event.end?.dateTime)
+    .map((event) => {
+      const startMatch = event.start?.dateTime?.match(/T(\d{2}):(\d{2})/);
+      const endMatch = event.end?.dateTime?.match(/T(\d{2}):(\d{2})/);
+
+      return {
+        start: startMatch ? Number(startMatch[1]) * 60 + Number(startMatch[2]) : 0,
+        end: endMatch ? Number(endMatch[1]) * 60 + Number(endMatch[2]) : 0,
+        summary: event.summary ?? "",
+      } satisfies CalendarEventSummary;
+    });
+}
+
+function findAlternativeTimes(args: {
+  requestedMinutes: number;
+  busySlots: CalendarEventSummary[];
+  config: SchedulingConfig;
+}) {
+  const suggestions: string[] = [];
+  const candidateOffsets = [-60, -30, 30, 60, 90, 120];
+  const minMinutes = args.config.businessWindowStartHour * 60;
+  const maxMinutes = args.config.businessWindowEndHour * 60;
+
+  for (const offset of candidateOffsets) {
+    const slotStart = args.requestedMinutes + offset;
+    const slotEnd = slotStart + args.config.slotDurationMinutes;
+
+    if (slotStart < minMinutes || slotEnd > maxMinutes) {
+      continue;
+    }
+
+    const conflict = args.busySlots.some((slot) => slotStart < slot.end && slotEnd > slot.start);
+    if (!conflict) {
+      suggestions.push(
+        `${String(Math.floor(slotStart / 60)).padStart(2, "0")}:${String(slotStart % 60).padStart(2, "0")}`,
+      );
+    }
+
+    if (suggestions.length >= 3) {
+      break;
+    }
+  }
+
+  return suggestions;
+}
+
+async function runDateAvailabilityLookup(args: CalendarExecutionArgs, config: SchedulingConfig) {
   const requestedDate = inferRequestedDate(args.request, args.date);
 
   if (!requestedDate || !args.credentialsEnc) {
@@ -177,62 +566,396 @@ async function runAvailabilityLookup(args: CalendarExecutionArgs) {
       mode: "live_unavailable",
       status: "needs_date",
       action: args.action,
-      calendarId,
-      summary:
-        "The calendar tool is connected, but the request did not contain a date I could safely check.",
+      calendarId: config.calendarId,
+      summary: "The calendar tool is connected, but the request did not contain a date I could safely check.",
       request: args.request,
       params: args.params,
     };
   }
 
-  const { timeMin, timeMax } = buildDayWindow(requestedDate);
-  const calendar = await createCalendarClient(args.credentialsEnc);
+  const calendar = createCalendarClient(args.credentialsEnc);
+  const offset = getTimeZoneOffsetString(requestedDate, config.timeZone);
   const freebusy = await calendar.freebusy.query({
     requestBody: {
-      timeMin: timeMin.toISOString(),
-      timeMax: timeMax.toISOString(),
-      items: [{ id: calendarId }],
+      timeMin: `${requestedDate}T00:00:00${offset}`,
+      timeMax: `${requestedDate}T23:59:59${offset}`,
+      items: [{ id: config.calendarId }],
     },
   });
   const busy =
-    freebusy.data.calendars?.[calendarId]?.busy?.filter((entry) => entry.start && entry.end) ?? [];
-  const isAvailable = busy.length === 0;
-  const formattedDate = formatDate(requestedDate);
+    freebusy.data.calendars?.[config.calendarId]?.busy?.filter((entry) => entry.start && entry.end) ?? [];
 
   return {
     integration: "GOOGLE_CALENDAR",
     mode: "live",
-    status: isAvailable ? "available" : "busy",
+    status: busy.length === 0 ? "available" : "busy",
     action: args.action,
-    calendarId,
-    date: requestedDate.toISOString().slice(0, 10),
+    calendarId: config.calendarId,
+    date: requestedDate,
     busySlots: busy,
-    summary: isAvailable
-      ? `Calendar check completed for ${formattedDate}. No busy events were found that day.`
-      : `Calendar check completed for ${formattedDate}. Busy events were found that day.`,
+    summary:
+      busy.length === 0
+        ? `Calendar check completed for ${formatHumanDate(requestedDate, config.timeZone)}. No busy events were found that day.`
+        : `Calendar check completed for ${formatHumanDate(requestedDate, config.timeZone)}. Busy events were found that day.`,
+    request: args.request,
+    params: args.params,
+  };
+}
+
+async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (!args.credentialsEnc) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live_unavailable",
+      status: "missing_credentials",
+      action: args.action,
+      summary: "This Google Calendar integration does not have usable OAuth credentials.",
+      request: args.request,
+      params: args.params,
+    };
+  }
+
+  const parsed = parseSchedulingRequest({
+    request: args.request,
+    timeText: args.timeText,
+    timeZone: config.timeZone,
+    slotDurationMinutes: config.slotDurationMinutes,
+  });
+
+  if (!parsed) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: "needs_time",
+      action: args.action,
+      summary: "I could not safely parse a consultation date and time from the request.",
+      request: args.request,
+      params: args.params,
+    };
+  }
+
+  const windowValidation = validateSchedulingWindow(parsed, config);
+  if (!windowValidation.ok) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: windowValidation.reason,
+      action: args.action,
+      date: parsed.date,
+      time: parsed.time,
+      summary: windowValidation.summary,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
+  const calendar = createCalendarClient(args.credentialsEnc);
+  const events = await listEventsForDate({
+    calendar,
+    calendarId: config.calendarId,
+    date: parsed.date,
+    timeZone: config.timeZone,
+  });
+  const busySlots = parseBusySlots(events);
+  const [hours, minutes] = parsed.time.split(":").map(Number);
+  const requestedMinutes = hours * 60 + minutes;
+  const requestedEnd = requestedMinutes + config.slotDurationMinutes;
+  const hasConflict = busySlots.some((slot) => requestedMinutes < slot.end && requestedEnd > slot.start);
+
+  if (!hasConflict) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: "available",
+      action: args.action,
+      date: parsed.date,
+      time: parsed.time,
+      message: `${parsed.time} on ${parsed.date} is available.`,
+      summary: `Consultation slot ${parsed.time} on ${formatHumanDate(parsed.date, config.timeZone)} is available.`,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
+  const suggestedTimes = findAlternativeTimes({
+    requestedMinutes,
+    busySlots,
+    config,
+  });
+
+  return {
+    integration: "GOOGLE_CALENDAR",
+    mode: "live",
+    status: "busy",
+    action: args.action,
+    date: parsed.date,
+    requestedTime: parsed.time,
+    suggestedTimes,
+    message: `${parsed.time} is busy. Available nearby: ${suggestedTimes.join(", ")}`,
+    summary:
+      suggestedTimes.length > 0
+        ? `Consultation slot ${parsed.time} is busy. Nearby openings: ${suggestedTimes.join(", ")}.`
+        : `Consultation slot ${parsed.time} is busy and no nearby openings were found in the working window.`,
+    request: args.request,
+    params: args.params,
+  };
+}
+
+async function appendLeadRow(args: {
+  credentialsEnc: string;
+  config: SchedulingConfig;
+  row: Record<string, string>;
+}) {
+  if (!args.config.leadSpreadsheetId || !args.config.leadSheetName) {
+    return {
+      status: "skipped",
+      summary: "Lead logging was not configured for this booking tool.",
+    };
+  }
+
+  const sheets = createSheetsClient(args.credentialsEnc);
+  const range = `'${args.config.leadSheetName.replace(/'/g, "''")}'`;
+  const headersResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId: args.config.leadSpreadsheetId,
+    range: `${range}!${args.config.leadHeaderRow}:${args.config.leadHeaderRow}`,
+  });
+  const headers = headersResponse.data.values?.[0] ?? [];
+
+  if (!headers.length) {
+    return {
+      status: "skipped",
+      summary: "Lead logging sheet does not have a readable header row.",
+    };
+  }
+
+  const values = headers.map((header) => args.row[String(header).trim()] ?? "");
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: args.config.leadSpreadsheetId,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [values],
+    },
+  });
+
+  return {
+    status: "logged",
+    summary: "Lead row appended to Google Sheets.",
+  };
+}
+
+async function sendOwnerTelegramNotification(args: {
+  tenantId: string;
+  chatId?: string;
+  message: string;
+}) {
+  if (!args.chatId) {
+    return {
+      status: "skipped",
+      summary: "Owner Telegram chat is not configured for this booking tool.",
+    };
+  }
+
+  const telegramChannel = await db.channelConnection.findFirst({
+    where: {
+      tenantId: args.tenantId,
+      type: ChannelType.TELEGRAM,
+      status: ConnectionStatus.CONNECTED,
+    },
+  });
+
+  if (!telegramChannel) {
+    return {
+      status: "skipped",
+      summary: "No connected tenant Telegram channel is available for owner notifications.",
+    };
+  }
+
+  await telegramAdapter.sendReply({
+    credentials: decrypt(telegramChannel.credentialsEnc),
+    contactId: args.chatId,
+    message: args.message,
+  });
+
+  return {
+    status: "sent",
+    summary: "Owner Telegram notification sent.",
+  };
+}
+
+async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (!args.credentialsEnc) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live_unavailable",
+      status: "missing_credentials",
+      action: args.action,
+      summary: "This Google Calendar integration does not have usable OAuth credentials.",
+      request: args.request,
+      params: args.params,
+    };
+  }
+
+  const parsed = parseSchedulingRequest({
+    request: args.request,
+    timeText: args.timeText,
+    timeZone: config.timeZone,
+    slotDurationMinutes: config.slotDurationMinutes,
+  });
+
+  if (!parsed) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: "needs_time",
+      action: args.action,
+      summary: "I could not safely parse a consultation date and time from the request.",
+      request: args.request,
+      params: args.params,
+    };
+  }
+
+  const windowValidation = validateSchedulingWindow(parsed, config);
+  if (!windowValidation.ok) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: windowValidation.reason,
+      action: args.action,
+      date: parsed.date,
+      time: parsed.time,
+      summary: windowValidation.summary,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
+  const checkResult = await runCheckCalendar(args, config);
+  if (checkResult.status !== "available") {
+    return {
+      ...checkResult,
+      action: args.action,
+      summary:
+        checkResult.status === "busy"
+          ? checkResult.summary
+          : `Booking stopped before event creation. ${checkResult.summary}`,
+    };
+  }
+
+  const email = extractEmail(args);
+  const coupleName = extractCoupleName(args);
+  const weddingDate = extractWeddingDate(args);
+  const location = extractLocation(args);
+  const channel = args.channel ?? "gmail";
+  const summary = `Consultation Call with ${coupleName}${weddingDate ? ` - Wedding ${weddingDate}` : ""}`;
+  const description = [
+    weddingDate ? `Wedding date: ${weddingDate}` : "",
+    location ? `Location: ${location}` : "",
+    channel ? `Channel: ${channel}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const calendar = createCalendarClient(args.credentialsEnc);
+  const createdEvent = await calendar.events.insert({
+    calendarId: config.calendarId,
+    conferenceDataVersion: 1,
+    sendUpdates: "all",
+    requestBody: {
+      summary,
+      description,
+      start: {
+        dateTime: parsed.startTime,
+        timeZone: config.timeZone,
+      },
+      end: {
+        dateTime: parsed.endTime,
+        timeZone: config.timeZone,
+      },
+      attendees: email ? [{ email }] : [],
+      conferenceData: {
+        createRequest: {
+          requestId: `${args.tenantId}-${Date.now()}`,
+          conferenceSolutionKey: {
+            type: "hangoutsMeet",
+          },
+        },
+      },
+    },
+  });
+
+  const leadLog = await appendLeadRow({
+    credentialsEnc: args.credentialsEnc,
+    config,
+    row: {
+      [config.leadColumns.coupleName]: coupleName,
+      [config.leadColumns.weddingDate]: weddingDate,
+      [config.leadColumns.location]: location,
+      [config.leadColumns.callDate]: parsed.date,
+      [config.leadColumns.callTime]: parsed.time,
+      [config.leadColumns.email]: email,
+      [config.leadColumns.channel]: channel,
+    },
+  });
+
+  const telegramNotification = await sendOwnerTelegramNotification({
+    tenantId: args.tenantId,
+    chatId: config.ownerTelegramChatId,
+    message: [
+      "New Lead",
+      `Names - ${coupleName}`,
+      `Wedding Date - ${weddingDate || "Unknown"}`,
+      `Location - ${location || "Unknown"}`,
+      `Call - ${parsed.date} at ${parsed.time}`,
+      `Mail - ${email || "Unknown"}`,
+      createdEvent.data.hangoutLink ? `Google Meet - ${createdEvent.data.hangoutLink}` : "",
+      `Source - ${channel}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  });
+
+  return {
+    integration: "GOOGLE_CALENDAR",
+    mode: "live",
+    status: "booked",
+    action: args.action,
+    date: parsed.date,
+    time: parsed.time,
+    startTime: parsed.startTime,
+    endTime: parsed.endTime,
+    email,
+    coupleName,
+    weddingDate,
+    location,
+    channel,
+    eventId: createdEvent.data.id ?? null,
+    meetLink: createdEvent.data.hangoutLink ?? null,
+    leadLog,
+    telegramNotification,
+    summary: `Consultation call booked for ${parsed.time} on ${formatHumanDate(parsed.date, config.timeZone)}.${createdEvent.data.hangoutLink ? " Google Meet link created." : ""}`,
     request: args.request,
     params: args.params,
   };
 }
 
 export async function executeGoogleCalendarStep(args: CalendarExecutionArgs) {
-  const metadata = asObject(args.metadata);
-  const calendarId = typeof metadata?.calendarId === "string" ? metadata.calendarId : "primary";
+  const config = parseCalendarConfig(args.params, args.metadata);
   const intent = inferIntent(args.action);
 
-  if (intent === "create_event") {
-    return {
-      integration: "GOOGLE_CALENDAR",
-      mode: "simulated",
-      status: "accepted",
-      action: args.action,
-      calendarId,
-      summary:
-        "Calendar event creation was requested. The runtime accepted the instruction and recorded it as a simulated booking step until booking creation rules are finalized.",
-      request: args.request,
-      params: args.params,
-    };
+  if (intent === "check_calendar") {
+    return runCheckCalendar(args, config);
   }
 
-  return runAvailabilityLookup(args);
+  if (intent === "book_call") {
+    return runBookCall(args, config);
+  }
+
+  return runDateAvailabilityLookup(args, config);
 }
+
+export const calendarSchedulingTestHelpers = {
+  parseSchedulingRequest,
+  validateSchedulingWindow,
+  inferRequestedDate,
+};
