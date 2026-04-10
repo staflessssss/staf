@@ -278,6 +278,7 @@ function getDefaultGoogleCalendarParams() {
     businessWindowEndHour: 14,
     businessDays: [1, 2, 3, 4, 5],
     ownerTelegramChatId: "",
+    syncLeadToSheets: false,
     leadSpreadsheetId: "",
     leadSpreadsheetTitle: "",
     leadSheetName: "",
@@ -322,6 +323,13 @@ function getGoogleCalendarParams(step: ToolStepDraft) {
       typeof params.ownerTelegramChatId === "string"
         ? params.ownerTelegramChatId
         : defaults.ownerTelegramChatId,
+    syncLeadToSheets:
+      typeof params.syncLeadToSheets === "boolean"
+        ? params.syncLeadToSheets
+        : Boolean(
+            (typeof params.leadSpreadsheetId === "string" && params.leadSpreadsheetId) ||
+              (typeof params.leadSheetName === "string" && params.leadSheetName),
+          ),
     leadSpreadsheetId:
       typeof params.leadSpreadsheetId === "string"
         ? params.leadSpreadsheetId
@@ -2001,7 +2009,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                         Booking side effects
                                       </p>
                                       <p className="text-sm text-muted-foreground">
-                                        Configure where booked calls should log and who gets the owner notification.
+                                        Stafless Leads already records the tool result. Google Sheets sync is optional if the client still runs their workflow from a spreadsheet.
                                       </p>
                                     </div>
                                     <div className="grid gap-4 md:grid-cols-2">
@@ -2018,164 +2026,191 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                           value={calendarParams.ownerTelegramChatId}
                                         />
                                       </FormField>
-                                      <FormField label="Leads sheet name">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadSheetName: event.target.value,
-                                            })
-                                          }
-                                          placeholder="For example: Leads"
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadSheetName}
-                                        />
+                                      <FormField
+                                        label="Google Sheets lead sync"
+                                        hint="Turn this on only if booked calls should also be mirrored into a client spreadsheet."
+                                      >
+                                        <label className="flex items-center gap-3 rounded-[16px] border border-[#ece2d4] bg-[#faf6f0] px-4 py-3 text-sm text-foreground">
+                                          <input
+                                            checked={calendarParams.syncLeadToSheets}
+                                            disabled={mode === "detail"}
+                                            onChange={(event) =>
+                                              updateToolStepParams(toolIndex, stepIndex, {
+                                                syncLeadToSheets: event.target.checked,
+                                              })
+                                            }
+                                            type="checkbox"
+                                          />
+                                          Also sync booked calls to Google Sheets
+                                        </label>
                                       </FormField>
                                     </div>
-                                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px]">
-                                      <FormField label="Leads spreadsheet ID">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadSpreadsheetId: event.target.value,
-                                            })
-                                          }
-                                          placeholder="Paste spreadsheet ID"
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadSpreadsheetId}
-                                        />
-                                      </FormField>
-                                      <FormField label="Header row">
-                                        <input
-                                          className={inputClassName}
-                                          min={1}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadHeaderRow: Math.max(Number(event.target.value || 1), 1),
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          type="number"
-                                          value={calendarParams.leadHeaderRow}
-                                        />
-                                      </FormField>
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-semibold text-foreground">
-                                        Sheet column mapping
-                                      </p>
-                                      <p className="text-sm text-muted-foreground">
-                                        Match your Leads tab headers so booked calls log into the right columns.
-                                      </p>
-                                    </div>
-                                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                      <FormField label="Couple column">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadColumns: {
-                                                ...calendarParams.leadColumns,
-                                                coupleName: event.target.value,
-                                              },
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadColumns.coupleName}
-                                        />
-                                      </FormField>
-                                      <FormField label="Wedding date column">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadColumns: {
-                                                ...calendarParams.leadColumns,
-                                                weddingDate: event.target.value,
-                                              },
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadColumns.weddingDate}
-                                        />
-                                      </FormField>
-                                      <FormField label="Location column">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadColumns: {
-                                                ...calendarParams.leadColumns,
-                                                location: event.target.value,
-                                              },
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadColumns.location}
-                                        />
-                                      </FormField>
-                                      <FormField label="Email column">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadColumns: {
-                                                ...calendarParams.leadColumns,
-                                                email: event.target.value,
-                                              },
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadColumns.email}
-                                        />
-                                      </FormField>
-                                      <FormField label="Call date column">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadColumns: {
-                                                ...calendarParams.leadColumns,
-                                                callDate: event.target.value,
-                                              },
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadColumns.callDate}
-                                        />
-                                      </FormField>
-                                      <FormField label="Call time column">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadColumns: {
-                                                ...calendarParams.leadColumns,
-                                                callTime: event.target.value,
-                                              },
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadColumns.callTime}
-                                        />
-                                      </FormField>
-                                      <FormField label="Channel column">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              leadColumns: {
-                                                ...calendarParams.leadColumns,
-                                                channel: event.target.value,
-                                              },
-                                            })
-                                          }
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.leadColumns.channel}
-                                        />
-                                      </FormField>
-                                    </div>
+                                    {calendarParams.syncLeadToSheets ? (
+                                      <>
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                          <FormField label="Leads sheet name">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadSheetName: event.target.value,
+                                                })
+                                              }
+                                              placeholder="For example: Leads"
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadSheetName}
+                                            />
+                                          </FormField>
+                                          <div className="rounded-[16px] border border-[#ece2d4] bg-[#faf6f0] px-4 py-3 text-sm text-muted-foreground">
+                                            Stafless still keeps its own lead record even when this sync is enabled.
+                                          </div>
+                                        </div>
+                                        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px]">
+                                          <FormField label="Leads spreadsheet ID">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadSpreadsheetId: event.target.value,
+                                                })
+                                              }
+                                              placeholder="Paste spreadsheet ID"
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadSpreadsheetId}
+                                            />
+                                          </FormField>
+                                          <FormField label="Header row">
+                                            <input
+                                              className={inputClassName}
+                                              min={1}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadHeaderRow: Math.max(Number(event.target.value || 1), 1),
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              type="number"
+                                              value={calendarParams.leadHeaderRow}
+                                            />
+                                          </FormField>
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-semibold text-foreground">
+                                            Sheet column mapping
+                                          </p>
+                                          <p className="text-sm text-muted-foreground">
+                                            Match your Leads tab headers so booked calls log into the right columns.
+                                          </p>
+                                        </div>
+                                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                          <FormField label="Couple column">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadColumns: {
+                                                    ...calendarParams.leadColumns,
+                                                    coupleName: event.target.value,
+                                                  },
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadColumns.coupleName}
+                                            />
+                                          </FormField>
+                                          <FormField label="Wedding date column">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadColumns: {
+                                                    ...calendarParams.leadColumns,
+                                                    weddingDate: event.target.value,
+                                                  },
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadColumns.weddingDate}
+                                            />
+                                          </FormField>
+                                          <FormField label="Location column">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadColumns: {
+                                                    ...calendarParams.leadColumns,
+                                                    location: event.target.value,
+                                                  },
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadColumns.location}
+                                            />
+                                          </FormField>
+                                          <FormField label="Email column">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadColumns: {
+                                                    ...calendarParams.leadColumns,
+                                                    email: event.target.value,
+                                                  },
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadColumns.email}
+                                            />
+                                          </FormField>
+                                          <FormField label="Call date column">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadColumns: {
+                                                    ...calendarParams.leadColumns,
+                                                    callDate: event.target.value,
+                                                  },
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadColumns.callDate}
+                                            />
+                                          </FormField>
+                                          <FormField label="Call time column">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadColumns: {
+                                                    ...calendarParams.leadColumns,
+                                                    callTime: event.target.value,
+                                                  },
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadColumns.callTime}
+                                            />
+                                          </FormField>
+                                          <FormField label="Channel column">
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  leadColumns: {
+                                                    ...calendarParams.leadColumns,
+                                                    channel: event.target.value,
+                                                  },
+                                                })
+                                              }
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.leadColumns.channel}
+                                            />
+                                          </FormField>
+                                        </div>
+                                      </>
+                                    ) : null}
                                   </div>
                                 ) : null}
                               </div>

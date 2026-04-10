@@ -32,6 +32,7 @@ type SchedulingConfig = {
   businessWindowEndHour: number;
   businessDays: number[];
   ownerTelegramChatId?: string;
+  syncLeadToSheets: boolean;
   leadSpreadsheetId?: string;
   leadSpreadsheetTitle?: string;
   leadSheetName?: string;
@@ -126,6 +127,10 @@ function parseCalendarConfig(params: Prisma.JsonValue, metadata?: Prisma.JsonVal
         ? (config.businessDays as number[])
         : [1, 2, 3, 4, 5],
     ownerTelegramChatId: asString(config?.ownerTelegramChatId) || undefined,
+    syncLeadToSheets:
+      typeof config?.syncLeadToSheets === "boolean"
+        ? config.syncLeadToSheets
+        : Boolean(asString(config?.leadSpreadsheetId) || asString(config?.leadSheetName)),
     leadSpreadsheetId: asString(config?.leadSpreadsheetId) || undefined,
     leadSpreadsheetTitle: asString(config?.leadSpreadsheetTitle) || undefined,
     leadSheetName: asString(config?.leadSheetName) || undefined,
@@ -706,6 +711,13 @@ async function appendLeadRow(args: {
   config: SchedulingConfig;
   row: Record<string, string>;
 }) {
+  if (!args.config.syncLeadToSheets) {
+    return {
+      status: "skipped",
+      summary: "Google Sheets sync is turned off for this booking tool.",
+    };
+  }
+
   if (!args.config.leadSpreadsheetId || !args.config.leadSheetName) {
     return {
       status: "skipped",
