@@ -105,6 +105,8 @@ type GoogleSheetsFilterDraft = {
   value: string;
 };
 
+type GoogleCalendarOperationDraft = "check_calendar" | "book_call";
+
 type BuilderDraft = {
   name: string;
   persona: string;
@@ -243,6 +245,125 @@ function getGoogleSheetsParams(step: ToolStepDraft) {
               value: "",
             },
           ],
+  };
+}
+
+function inferGoogleCalendarOperation(action: string): GoogleCalendarOperationDraft {
+  const normalized = action.trim().toLowerCase();
+
+  if (
+    normalized.includes("book call") ||
+    normalized.includes("book_call") ||
+    normalized.includes("send invite") ||
+    normalized.includes("create consultation")
+  ) {
+    return "book_call";
+  }
+
+  return "check_calendar";
+}
+
+function getGoogleCalendarActionForOperation(operation: GoogleCalendarOperationDraft) {
+  return operation === "book_call"
+    ? "book call and send invite"
+    : "check consultation calendar availability";
+}
+
+function getDefaultGoogleCalendarParams() {
+  return {
+    calendarId: "",
+    timeZone: "America/New_York",
+    slotDurationMinutes: 30,
+    businessWindowStartHour: 9,
+    businessWindowEndHour: 14,
+    businessDays: [1, 2, 3, 4, 5],
+    ownerTelegramChatId: "",
+    leadSpreadsheetId: "",
+    leadSpreadsheetTitle: "",
+    leadSheetName: "",
+    leadHeaderRow: 1,
+    leadColumns: {
+      coupleName: "couple_name",
+      weddingDate: "wedding_date",
+      location: "location",
+      callDate: "call_date",
+      callTime: "call_time",
+      email: "email",
+      channel: "channel",
+    },
+  };
+}
+
+function getGoogleCalendarParams(step: ToolStepDraft) {
+  const params = safeParseJsonObject(step.params);
+  const defaults = getDefaultGoogleCalendarParams();
+  const leadColumns =
+    params.leadColumns && typeof params.leadColumns === "object" && !Array.isArray(params.leadColumns)
+      ? (params.leadColumns as Record<string, unknown>)
+      : {};
+
+  return {
+    operation: inferGoogleCalendarOperation(step.action),
+    calendarId: typeof params.calendarId === "string" ? params.calendarId : defaults.calendarId,
+    timeZone: typeof params.timeZone === "string" ? params.timeZone : defaults.timeZone,
+    slotDurationMinutes:
+      typeof params.slotDurationMinutes === "number" && params.slotDurationMinutes > 0
+        ? params.slotDurationMinutes
+        : defaults.slotDurationMinutes,
+    businessWindowStartHour:
+      typeof params.businessWindowStartHour === "number"
+        ? params.businessWindowStartHour
+        : defaults.businessWindowStartHour,
+    businessWindowEndHour:
+      typeof params.businessWindowEndHour === "number"
+        ? params.businessWindowEndHour
+        : defaults.businessWindowEndHour,
+    ownerTelegramChatId:
+      typeof params.ownerTelegramChatId === "string"
+        ? params.ownerTelegramChatId
+        : defaults.ownerTelegramChatId,
+    leadSpreadsheetId:
+      typeof params.leadSpreadsheetId === "string"
+        ? params.leadSpreadsheetId
+        : defaults.leadSpreadsheetId,
+    leadSpreadsheetTitle:
+      typeof params.leadSpreadsheetTitle === "string"
+        ? params.leadSpreadsheetTitle
+        : defaults.leadSpreadsheetTitle,
+    leadSheetName:
+      typeof params.leadSheetName === "string" ? params.leadSheetName : defaults.leadSheetName,
+    leadHeaderRow:
+      typeof params.leadHeaderRow === "number" && params.leadHeaderRow > 0
+        ? params.leadHeaderRow
+        : defaults.leadHeaderRow,
+    leadColumns: {
+      coupleName:
+        typeof leadColumns.coupleName === "string"
+          ? leadColumns.coupleName
+          : defaults.leadColumns.coupleName,
+      weddingDate:
+        typeof leadColumns.weddingDate === "string"
+          ? leadColumns.weddingDate
+          : defaults.leadColumns.weddingDate,
+      location:
+        typeof leadColumns.location === "string"
+          ? leadColumns.location
+          : defaults.leadColumns.location,
+      callDate:
+        typeof leadColumns.callDate === "string"
+          ? leadColumns.callDate
+          : defaults.leadColumns.callDate,
+      callTime:
+        typeof leadColumns.callTime === "string"
+          ? leadColumns.callTime
+          : defaults.leadColumns.callTime,
+      email:
+        typeof leadColumns.email === "string" ? leadColumns.email : defaults.leadColumns.email,
+      channel:
+        typeof leadColumns.channel === "string"
+          ? leadColumns.channel
+          : defaults.leadColumns.channel,
+    },
   };
 }
 
@@ -1305,7 +1426,10 @@ function uniqueValues(values: Array<string | undefined | null>) {
                       {tool.steps.map((step, stepIndex) => {
                         const selectedIntegration = integrationById.get(step.integrationId);
                         const isGoogleSheets = selectedIntegration?.type === IntegrationType.GOOGLE_SHEETS;
+                        const isGoogleCalendar =
+                          selectedIntegration?.type === IntegrationType.GOOGLE_CALENDAR;
                         const sheetParams = getGoogleSheetsParams(step);
+                        const calendarParams = getGoogleCalendarParams(step);
                         const sheetInspector = sheetInspectors[getToolStepKey(toolIndex, stepIndex)];
                         const availableSpreadsheets = [
                           ...(sheetInspector?.spreadsheets ?? []),
@@ -1355,6 +1479,9 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                         nextIntegration?.type === IntegrationType.GOOGLE_SHEETS &&
                                         !step.action.trim()
                                           ? "lookup rows in sheet"
+                                          : nextIntegration?.type === IntegrationType.GOOGLE_CALENDAR &&
+                                              !step.action.trim()
+                                            ? getGoogleCalendarActionForOperation("check_calendar")
                                           : step.action,
                                       params:
                                         nextIntegration?.type === IntegrationType.GOOGLE_SHEETS &&
@@ -1375,6 +1502,9 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                                 },
                                               ],
                                             })
+                                          : nextIntegration?.type === IntegrationType.GOOGLE_CALENDAR &&
+                                              step.params.trim() === "{}"
+                                            ? stringifyJsonObject(getDefaultGoogleCalendarParams())
                                           : step.params,
                                     });
                                     setSheetInspectors((current) => {
@@ -1394,16 +1524,34 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                 </select>
                               </FormField>
                               <FormField label="Action">
-                                <input
-                                  className={inputClassName}
-                                  onChange={(event) =>
-                                    updateToolStep(toolIndex, stepIndex, {
-                                      action: event.target.value,
-                                    })
-                                  }
-                                  readOnly={mode === "detail"}
-                                  value={step.action}
-                                />
+                                {isGoogleCalendar ? (
+                                  <select
+                                    className={selectClassName}
+                                    disabled={mode === "detail"}
+                                    onChange={(event) =>
+                                      updateToolStep(toolIndex, stepIndex, {
+                                        action: getGoogleCalendarActionForOperation(
+                                          event.target.value as GoogleCalendarOperationDraft,
+                                        ),
+                                      })
+                                    }
+                                    value={calendarParams.operation}
+                                  >
+                                    <option value="check_calendar">Get Many (check availability)</option>
+                                    <option value="book_call">Create (book call + invite)</option>
+                                  </select>
+                                ) : (
+                                  <input
+                                    className={inputClassName}
+                                    onChange={(event) =>
+                                      updateToolStep(toolIndex, stepIndex, {
+                                        action: event.target.value,
+                                      })
+                                    }
+                                    readOnly={mode === "detail"}
+                                    value={step.action}
+                                  />
+                                )}
                               </FormField>
                             </div>
                             {isGoogleSheets ? (
@@ -1705,6 +1853,330 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                 ) : null}
                                 {sheetInspector?.error ? (
                                   <p className="text-sm text-destructive">{sheetInspector.error}</p>
+                                ) : null}
+                              </div>
+                            ) : isGoogleCalendar ? (
+                              <div className="mt-5 space-y-5 border-t border-[#ece2d4] pt-5">
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">
+                                    Google Calendar event
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    One calendar integration, different operations inside it, just like the calendar node flow you showed.
+                                  </p>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <FormField label="Resource">
+                                    <select className={selectClassName} disabled value="event">
+                                      <option value="event">Event</option>
+                                    </select>
+                                  </FormField>
+                                  <FormField label="Operation">
+                                    <select
+                                      className={selectClassName}
+                                      disabled={mode === "detail"}
+                                      onChange={(event) =>
+                                        updateToolStep(toolIndex, stepIndex, {
+                                          action: getGoogleCalendarActionForOperation(
+                                            event.target.value as GoogleCalendarOperationDraft,
+                                          ),
+                                        })
+                                      }
+                                      value={calendarParams.operation}
+                                    >
+                                      <option value="check_calendar">Get Many</option>
+                                      <option value="book_call">Create</option>
+                                    </select>
+                                  </FormField>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <FormField
+                                    label="Calendar"
+                                    hint="Leave blank to use the connected Google account calendar."
+                                  >
+                                    <input
+                                      className={inputClassName}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          calendarId: event.target.value,
+                                        })
+                                      }
+                                      placeholder="primary or owner@company.com"
+                                      readOnly={mode === "detail"}
+                                      value={calendarParams.calendarId}
+                                    />
+                                  </FormField>
+                                  <FormField label="Timezone">
+                                    <input
+                                      className={inputClassName}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          timeZone: event.target.value,
+                                        })
+                                      }
+                                      readOnly={mode === "detail"}
+                                      value={calendarParams.timeZone}
+                                    />
+                                  </FormField>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-3">
+                                  <FormField label="Slot duration (min)">
+                                    <input
+                                      className={inputClassName}
+                                      min={15}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          slotDurationMinutes: Math.max(Number(event.target.value || 30), 15),
+                                        })
+                                      }
+                                      readOnly={mode === "detail"}
+                                      type="number"
+                                      value={calendarParams.slotDurationMinutes}
+                                    />
+                                  </FormField>
+                                  <FormField label="Start hour">
+                                    <input
+                                      className={inputClassName}
+                                      min={0}
+                                      max={23}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          businessWindowStartHour: Math.max(Number(event.target.value || 9), 0),
+                                        })
+                                      }
+                                      readOnly={mode === "detail"}
+                                      type="number"
+                                      value={calendarParams.businessWindowStartHour}
+                                    />
+                                  </FormField>
+                                  <FormField label="End hour">
+                                    <input
+                                      className={inputClassName}
+                                      min={1}
+                                      max={24}
+                                      onChange={(event) =>
+                                        updateToolStepParams(toolIndex, stepIndex, {
+                                          businessWindowEndHour: Math.max(Number(event.target.value || 14), 1),
+                                        })
+                                      }
+                                      readOnly={mode === "detail"}
+                                      type="number"
+                                      value={calendarParams.businessWindowEndHour}
+                                    />
+                                  </FormField>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  Working days are currently fixed to Monday-Friday. Consultation rules still respect the 9 AM - 2 PM ET policy from the prompt.
+                                </p>
+                                <div className="grid gap-4 md:grid-cols-3">
+                                  <div className="rounded-[16px] border border-[#ece2d4] bg-white p-4">
+                                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                                      Attendees
+                                    </p>
+                                    <p className="mt-2 text-sm text-foreground">
+                                      Customer email from the tool call
+                                    </p>
+                                  </div>
+                                  <div className="rounded-[16px] border border-[#ece2d4] bg-white p-4">
+                                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                                      Conference data
+                                    </p>
+                                    <p className="mt-2 text-sm text-foreground">
+                                      Google Meet
+                                    </p>
+                                  </div>
+                                  <div className="rounded-[16px] border border-[#ece2d4] bg-white p-4">
+                                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                                      Send updates
+                                    </p>
+                                    <p className="mt-2 text-sm text-foreground">
+                                      All invite updates
+                                    </p>
+                                  </div>
+                                </div>
+                                {calendarParams.operation === "book_call" ? (
+                                  <div className="space-y-4 rounded-[18px] border border-[#ece2d4] bg-white p-4">
+                                    <div>
+                                      <p className="text-sm font-semibold text-foreground">
+                                        Booking side effects
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Configure where booked calls should log and who gets the owner notification.
+                                      </p>
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                      <FormField label="Owner Telegram chat ID">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              ownerTelegramChatId: event.target.value,
+                                            })
+                                          }
+                                          placeholder="For example: 471657882"
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.ownerTelegramChatId}
+                                        />
+                                      </FormField>
+                                      <FormField label="Leads sheet name">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadSheetName: event.target.value,
+                                            })
+                                          }
+                                          placeholder="For example: Leads"
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadSheetName}
+                                        />
+                                      </FormField>
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px]">
+                                      <FormField label="Leads spreadsheet ID">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadSpreadsheetId: event.target.value,
+                                            })
+                                          }
+                                          placeholder="Paste spreadsheet ID"
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadSpreadsheetId}
+                                        />
+                                      </FormField>
+                                      <FormField label="Header row">
+                                        <input
+                                          className={inputClassName}
+                                          min={1}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadHeaderRow: Math.max(Number(event.target.value || 1), 1),
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          type="number"
+                                          value={calendarParams.leadHeaderRow}
+                                        />
+                                      </FormField>
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-semibold text-foreground">
+                                        Sheet column mapping
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Match your Leads tab headers so booked calls log into the right columns.
+                                      </p>
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                      <FormField label="Couple column">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadColumns: {
+                                                ...calendarParams.leadColumns,
+                                                coupleName: event.target.value,
+                                              },
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadColumns.coupleName}
+                                        />
+                                      </FormField>
+                                      <FormField label="Wedding date column">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadColumns: {
+                                                ...calendarParams.leadColumns,
+                                                weddingDate: event.target.value,
+                                              },
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadColumns.weddingDate}
+                                        />
+                                      </FormField>
+                                      <FormField label="Location column">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadColumns: {
+                                                ...calendarParams.leadColumns,
+                                                location: event.target.value,
+                                              },
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadColumns.location}
+                                        />
+                                      </FormField>
+                                      <FormField label="Email column">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadColumns: {
+                                                ...calendarParams.leadColumns,
+                                                email: event.target.value,
+                                              },
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadColumns.email}
+                                        />
+                                      </FormField>
+                                      <FormField label="Call date column">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadColumns: {
+                                                ...calendarParams.leadColumns,
+                                                callDate: event.target.value,
+                                              },
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadColumns.callDate}
+                                        />
+                                      </FormField>
+                                      <FormField label="Call time column">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadColumns: {
+                                                ...calendarParams.leadColumns,
+                                                callTime: event.target.value,
+                                              },
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadColumns.callTime}
+                                        />
+                                      </FormField>
+                                      <FormField label="Channel column">
+                                        <input
+                                          className={inputClassName}
+                                          onChange={(event) =>
+                                            updateToolStepParams(toolIndex, stepIndex, {
+                                              leadColumns: {
+                                                ...calendarParams.leadColumns,
+                                                channel: event.target.value,
+                                              },
+                                            })
+                                          }
+                                          readOnly={mode === "detail"}
+                                          value={calendarParams.leadColumns.channel}
+                                        />
+                                      </FormField>
+                                    </div>
+                                  </div>
                                 ) : null}
                               </div>
                             ) : (
