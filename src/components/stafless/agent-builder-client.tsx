@@ -383,6 +383,10 @@ function getGoogleCalendarParams(step: ToolStepDraft) {
   };
 }
 
+function hasTelegramNotification(params: ReturnType<typeof getGoogleCalendarParams>) {
+  return params.ownerTelegramChatId.trim().length > 0;
+}
+
 function moveItem<T>(items: T[], index: number, direction: -1 | 1) {
   const nextIndex = index + direction;
 
@@ -2113,28 +2117,50 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                   <div className="space-y-4 rounded-[18px] border border-[#ece2d4] bg-white p-4">
                                     <div>
                                       <p className="text-sm font-semibold text-foreground">
-                                        Booking side effects
+                                        Optional side effects
                                       </p>
                                       <p className="text-sm text-muted-foreground">
-                                        Stafless Leads already records the tool result. Google Sheets sync is optional if the client still runs their workflow from a spreadsheet.
+                                        The calendar event and invite are the core action. Extra notifications and spreadsheet mirroring are optional.
                                       </p>
                                     </div>
                                     <div className="grid gap-4 md:grid-cols-2">
-                                      <FormField label="Owner Telegram chat ID">
-                                        <input
-                                          className={inputClassName}
-                                          onChange={(event) =>
-                                            updateToolStepParams(toolIndex, stepIndex, {
-                                              ownerTelegramChatId: event.target.value,
-                                            })
-                                          }
-                                          placeholder="For example: 471657882"
-                                          readOnly={mode === "detail"}
-                                          value={calendarParams.ownerTelegramChatId}
-                                        />
+                                      <FormField
+                                        label="Telegram owner notification"
+                                        hint="Turn this on only if someone should get a Telegram alert after a booked call."
+                                      >
+                                        <div className="space-y-3">
+                                          <label className="flex items-center gap-3 rounded-[16px] border border-[#ece2d4] bg-[#faf6f0] px-4 py-3 text-sm text-foreground">
+                                            <input
+                                              checked={hasTelegramNotification(calendarParams)}
+                                              disabled={mode === "detail"}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  ownerTelegramChatId: event.target.checked
+                                                    ? calendarParams.ownerTelegramChatId
+                                                    : "",
+                                                })
+                                              }
+                                              type="checkbox"
+                                            />
+                                            Send a Telegram notification after booking
+                                          </label>
+                                          {hasTelegramNotification(calendarParams) ? (
+                                            <input
+                                              className={inputClassName}
+                                              onChange={(event) =>
+                                                updateToolStepParams(toolIndex, stepIndex, {
+                                                  ownerTelegramChatId: event.target.value,
+                                                })
+                                              }
+                                              placeholder="Telegram chat ID"
+                                              readOnly={mode === "detail"}
+                                              value={calendarParams.ownerTelegramChatId}
+                                            />
+                                          ) : null}
+                                        </div>
                                       </FormField>
                                       <FormField
-                                        label="Google Sheets lead sync"
+                                        label="Google Sheets sync"
                                         hint="Turn this on only if booked calls should also be mirrored into a client spreadsheet."
                                       >
                                         <label className="flex items-center gap-3 rounded-[16px] border border-[#ece2d4] bg-[#faf6f0] px-4 py-3 text-sm text-foreground">
@@ -2148,7 +2174,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                             }
                                             type="checkbox"
                                           />
-                                          Also sync booked calls to Google Sheets
+                                          Mirror booked calls to Google Sheets
                                         </label>
                                       </FormField>
                                     </div>
@@ -2203,14 +2229,14 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                         </div>
                                         <div>
                                           <p className="text-sm font-semibold text-foreground">
-                                            Sheet column mapping
+                                            Spreadsheet column mapping
                                           </p>
                                           <p className="text-sm text-muted-foreground">
-                                            Match your Leads tab headers so booked calls log into the right columns.
+                                            Map only the columns your client actually uses. The first two fields are often business-specific, so rename them mentally to fit the workflow.
                                           </p>
                                         </div>
                                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                          <FormField label="Couple column">
+                                          <FormField label="Primary name column">
                                             <input
                                               className={inputClassName}
                                               onChange={(event) =>
@@ -2225,7 +2251,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                               value={calendarParams.leadColumns.coupleName}
                                             />
                                           </FormField>
-                                          <FormField label="Wedding date column">
+                                          <FormField label="Business date column">
                                             <input
                                               className={inputClassName}
                                               onChange={(event) =>
@@ -2300,7 +2326,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                               value={calendarParams.leadColumns.callTime}
                                             />
                                           </FormField>
-                                          <FormField label="Channel column">
+                                          <FormField label="Source channel column">
                                             <input
                                               className={inputClassName}
                                               onChange={(event) =>
@@ -2382,14 +2408,16 @@ function uniqueValues(values: Array<string | undefined | null>) {
                 >
                   {isSaving ? "Saving..." : agent ? "Save changes" : "Save draft"}
                 </button>
-                <button
-                  className={primaryButtonClassName}
-                  disabled={currentStep === wizardSteps.length - 1 || isSaving}
-                  onClick={handleNextStep}
-                  type="button"
-                >
-                  Next step
-                </button>
+                {currentStep < wizardSteps.length - 1 ? (
+                  <button
+                    className={primaryButtonClassName}
+                    disabled={isSaving}
+                    onClick={handleNextStep}
+                    type="button"
+                  >
+                    Next step
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : null}
