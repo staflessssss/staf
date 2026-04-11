@@ -14,12 +14,13 @@ import {
 import {
   ArrowDown,
   ArrowUp,
-  FlaskConical,
   Layers3,
-  MessageSquareQuote,
   Plus,
+  RotateCcw,
+  SendHorizontal,
   Settings2,
   Trash2,
+  X,
 } from "lucide-react";
 
 import {
@@ -125,10 +126,18 @@ type BuilderDraft = {
   toolBlocks: ToolDraft[];
 };
 
-type SandboxResult = {
+type TestChatResult = {
   message: string;
   promptPreview: string;
   usedTooling: string[];
+  conversationId?: string;
+};
+
+type TestChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  usedTooling?: string[];
 };
 
 type DeployReadinessResult = {
@@ -383,10 +392,6 @@ function getGoogleCalendarParams(step: ToolStepDraft) {
   };
 }
 
-function hasTelegramNotification(params: ReturnType<typeof getGoogleCalendarParams>) {
-  return params.ownerTelegramChatId.trim().length > 0;
-}
-
 function moveItem<T>(items: T[], index: number, direction: -1 | 1) {
   const nextIndex = index + direction;
 
@@ -488,14 +493,17 @@ export function AgentBuilderClient({
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(mode === "detail" ? 4 : 0);
   const [draft, setDraft] = useState<BuilderDraft>(() => createInitialDraft(tenant, agent));
+  const [savedDraftSnapshot, setSavedDraftSnapshot] = useState(() =>
+    JSON.stringify(createInitialDraft(tenant, agent)),
+  );
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [testMessage, setTestMessage] = useState(
-    "A new lead asks whether July 14 is available and wants a premium package overview.",
-  );
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [testContactId, setTestContactId] = useState(() => `test-chat-${Date.now()}`);
+  const [testMessage, setTestMessage] = useState("");
   const [isTesting, setIsTesting] = useState(false);
-  const [sandboxResult, setSandboxResult] = useState<SandboxResult | null>(null);
+  const [chatMessages, setChatMessages] = useState<TestChatMessage[]>([]);
   const [isCheckingDeploy, setIsCheckingDeploy] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployReadiness, setDeployReadiness] = useState<DeployReadinessResult | null>(null);
@@ -548,6 +556,7 @@ export function AgentBuilderClient({
       })),
     })),
   });
+  const isDirty = JSON.stringify(draft) !== savedDraftSnapshot;
 
   const checklistItems = [
     {
@@ -583,11 +592,16 @@ export function AgentBuilderClient({
       hint: "Tools define what the agent can do through connected integrations.",
     },
     {
-      label: sandboxResult ? "Sandbox test completed" : "Run a sandbox test before deploy",
-      done: Boolean(sandboxResult),
-      hint: sandboxResult
-        ? "The current draft has already produced a sandbox response."
-        : "Use the test box to verify how the draft responds before live deployment exists.",
+      label:
+        chatMessages.length > 0
+          ? "Test chat session is active"
+          : agent
+            ? "Open the test chat before deploy"
+            : "Save the agent before full-cycle testing",
+      done: chatMessages.length > 0,
+      hint: agent
+        ? "Use the right-side test chat to verify a real conversation cycle without sending live outbound messages."
+        : "Full-cycle testing uses the saved agent runtime, so save the draft first.",
     },
   ];
 
@@ -964,6 +978,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
       }
 
       setSuccess(agent ? "Draft changes saved." : "Agent draft created.");
+      setSavedDraftSnapshot(JSON.stringify(draft));
 
       if (!agent && result?.item?.id) {
         router.push(`/admin/clients/${tenant.id}/agents/${result.item.id}/edit`);
@@ -985,12 +1000,31 @@ function uniqueValues(values: Array<string | undefined | null>) {
     }
   }
 
-  async function runSandboxTest() {
+  async function sendTestChatMessage() {
+    const trimmedMessage = testMessage.trim();
+
+    if (!trimmedMessage) {
+      return;
+    }
+
+    if (!agent) {
+      setError("Save this draft first, then use the test chat against the saved agent.");
+      return;
+    }
+
     setIsTesting(true);
     setError(null);
     setSuccess(null);
 
     try {
+      const userMessage: TestChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        text: trimmedMessage,
+      };
+      setChatMessages((current) => [...current, userMessage]);
+      setTestMessage("");
+
       const response = await fetch("/api/agent/invoke", {
         method: "POST",
         headers: {
@@ -999,7 +1033,8 @@ function uniqueValues(values: Array<string | undefined | null>) {
         body: JSON.stringify({
           tenantId: tenant.id,
           agentId: agent?.id,
-          message: testMessage,
+          contactId: testContactId,
+          message: trimmedMessage,
           draft: {
             name: draft.name,
             persona: draft.persona,
@@ -1018,27 +1053,47 @@ function uniqueValues(values: Array<string | undefined | null>) {
       });
 
       const result = (await response.json().catch(() => null)) as
-        | { error?: string; item?: SandboxResult }
+        | { error?: string; item?: TestChatResult }
         | null;
 
       if (!response.ok || !result?.item) {
-        setError(result?.error || "Could not run the sandbox test.");
+        setChatMessages((current) => current.filter((message) => message.id !== userMessage.id));
+        setError(result?.error || "Could not run the test chat.");
         return;
       }
+      const item = result.item;
 
-      setSandboxResult(result.item);
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: item.conversationId
+            ? `assistant-${item.conversationId}-${current.length}`
+            : `assistant-${Date.now()}`,
+          role: "assistant",
+          text: item.message,
+          usedTooling: item.usedTooling,
+        },
+      ]);
       setDeployReadiness(null);
-      setSuccess("Sandbox response generated.");
+      setSuccess("Test chat updated.");
       setCurrentStep(4);
     } catch (testError) {
       setError(
         testError instanceof Error
           ? testError.message
-          : "Could not run the sandbox test.",
+          : "Could not run the test chat.",
       );
     } finally {
       setIsTesting(false);
     }
+  }
+
+  function resetTestChat() {
+    setChatMessages([]);
+    setTestMessage("");
+    setTestContactId(`test-chat-${Date.now()}`);
+    setSuccess("Started a fresh test chat session.");
+    setError(null);
   }
 
   function handleNextStep() {
@@ -1143,6 +1198,35 @@ function uniqueValues(values: Array<string | undefined | null>) {
       {success ? (
         <div className="rounded-[20px] border border-[#b9dec8] bg-[#eef8f1] px-4 py-3 text-sm text-[#157347]">
           {success}
+        </div>
+      ) : null}
+      {mode !== "detail" ? (
+        <div className="sticky top-4 z-20 flex items-center justify-between gap-3 rounded-[20px] border border-border bg-white/95 px-4 py-3 shadow-[0_10px_24px_rgba(31,23,40,0.08)] backdrop-blur">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {isDirty ? "Unsaved changes" : "All changes saved"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Save the current draft before testing or deploying the latest behavior.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              className={secondaryButtonClassName}
+              onClick={() => setIsChatOpen(true)}
+              type="button"
+            >
+              Open test chat
+            </button>
+            <button
+              className={primaryButtonClassName}
+              disabled={isSaving || !isDirty}
+              onClick={saveDraft}
+              type="button"
+            >
+              {isSaving ? "Saving..." : agent ? "Save changes" : "Save draft"}
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -2123,42 +2207,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                         The calendar event and invite are the core action. Extra notifications and spreadsheet mirroring are optional.
                                       </p>
                                     </div>
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                      <FormField
-                                        label="Telegram owner notification"
-                                        hint="Turn this on only if someone should get a Telegram alert after a booked call."
-                                      >
-                                        <div className="space-y-3">
-                                          <label className="flex items-center gap-3 rounded-[16px] border border-[#ece2d4] bg-[#faf6f0] px-4 py-3 text-sm text-foreground">
-                                            <input
-                                              checked={hasTelegramNotification(calendarParams)}
-                                              disabled={mode === "detail"}
-                                              onChange={(event) =>
-                                                updateToolStepParams(toolIndex, stepIndex, {
-                                                  ownerTelegramChatId: event.target.checked
-                                                    ? calendarParams.ownerTelegramChatId
-                                                    : "",
-                                                })
-                                              }
-                                              type="checkbox"
-                                            />
-                                            Send a Telegram notification after booking
-                                          </label>
-                                          {hasTelegramNotification(calendarParams) ? (
-                                            <input
-                                              className={inputClassName}
-                                              onChange={(event) =>
-                                                updateToolStepParams(toolIndex, stepIndex, {
-                                                  ownerTelegramChatId: event.target.value,
-                                                })
-                                              }
-                                              placeholder="Telegram chat ID"
-                                              readOnly={mode === "detail"}
-                                              value={calendarParams.ownerTelegramChatId}
-                                            />
-                                          ) : null}
-                                        </div>
-                                      </FormField>
+                                    <div className="grid gap-4 md:grid-cols-1">
                                       <FormField
                                         label="Google Sheets sync"
                                         hint="Turn this on only if booked calls should also be mirrored into a client spreadsheet."
@@ -2433,13 +2482,6 @@ function uniqueValues(values: Array<string | undefined | null>) {
               {mode === "detail" ? (
                 <>
                   <button
-                    className={secondaryButtonClassName}
-                    onClick={runSandboxTest}
-                    type="button"
-                  >
-                    {isTesting ? "Testing..." : "Test agent"}
-                  </button>
-                  <button
                     className={primaryButtonClassName}
                     onClick={checkDeployReadiness}
                     type="button"
@@ -2458,25 +2500,11 @@ function uniqueValues(values: Array<string | undefined | null>) {
               ) : (
                 <>
                   <button
-                    className={secondaryButtonClassName}
-                    onClick={saveDraft}
-                    type="button"
-                  >
-                    {agent ? "Save changes" : "Save draft"}
-                  </button>
-                  <button
                     className={primaryButtonClassName}
                     onClick={() => setCurrentStep(4)}
                     type="button"
                   >
                     Continue to review
-                  </button>
-                  <button
-                    className={secondaryButtonClassName}
-                    onClick={runSandboxTest}
-                    type="button"
-                  >
-                    {isTesting ? "Testing..." : "Run sandbox test"}
                   </button>
                 </>
               )}
@@ -2512,38 +2540,34 @@ function uniqueValues(values: Array<string | undefined | null>) {
           </SurfaceCard>
 
           <SurfaceCard
-            title="Sandbox"
-            description="Test the draft in a safe lane before you commit the prompt and tools to live traffic."
+            title="Testing flow"
+            description="Use the right-side test chat for a real agent cycle without sending live outbound messages."
           >
             <div className="rounded-[20px] border border-border bg-[#faf6f0] p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <FlaskConical className="size-4 text-primary" />
-                Sandbox test prompt
+              <p className="text-sm leading-6 text-[#433a49]">
+                Open the test chat on the right to run the saved agent through a real conversation loop with memory and tool execution. It stays inside Stafless and does not send live outbound Gmail, Telegram, or other channel traffic.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  className={secondaryButtonClassName}
+                  onClick={() => setIsChatOpen((current) => !current)}
+                  type="button"
+                >
+                  {isChatOpen ? "Hide test chat" : "Open test chat"}
+                </button>
+                <button
+                  className={secondaryButtonClassName}
+                  disabled={!agent}
+                  onClick={resetTestChat}
+                  type="button"
+                >
+                  Start fresh chat
+                </button>
               </div>
-              <textarea
-                className={`${textareaClassName} mt-3`}
-                onChange={(event) => setTestMessage(event.target.value)}
-                readOnly={isTesting}
-                value={testMessage}
-              />
-              <div className="mt-4 flex items-start gap-3 rounded-[16px] border border-[#eadfce] bg-white px-4 py-3">
-                <MessageSquareQuote className="mt-1 size-4 text-primary" />
-                <p className="text-sm leading-6 text-[#433a49]">
-                  {sandboxResult?.message ??
-                    "Run a sandbox test to see how this draft responds before live deployment exists."}
+              {!agent ? (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Save the agent first, then the test chat will run against the saved runtime configuration.
                 </p>
-              </div>
-              {sandboxResult?.usedTooling.length ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {sandboxResult.usedTooling.map((toolName) => (
-                    <span
-                      key={toolName}
-                      className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-muted-foreground"
-                    >
-                      {toolName}
-                    </span>
-                  ))}
-                </div>
               ) : null}
               {deployReadiness ? (
                 <div className="mt-4 rounded-[16px] border border-border bg-white p-4">
@@ -2613,6 +2637,95 @@ function uniqueValues(values: Array<string | undefined | null>) {
           </pre>
         </SurfaceCard>
       </div>
+      {mode !== "detail" && isChatOpen ? (
+        <div className="fixed bottom-6 right-6 z-30 hidden w-[380px] overflow-hidden rounded-[24px] border border-border bg-white shadow-[0_24px_60px_rgba(31,23,40,0.18)] xl:flex xl:flex-col">
+          <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                {agent?.name || "Unsaved agent"}
+              </p>
+              <p className="text-xs text-muted-foreground">Test chat</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className={secondaryButtonClassName}
+                onClick={resetTestChat}
+                type="button"
+              >
+                <RotateCcw className="size-4" />
+              </button>
+              <button
+                className={secondaryButtonClassName}
+                onClick={() => setIsChatOpen(false)}
+                type="button"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+          <div className="max-h-[480px] min-h-[320px] space-y-3 overflow-y-auto bg-[#fcfaf6] px-5 py-4">
+            {chatMessages.length === 0 ? (
+              <div className="rounded-[18px] border border-dashed border-[#e5d8c8] bg-white px-4 py-6 text-sm leading-6 text-muted-foreground">
+                {agent
+                  ? "Start a conversation to test the real agent cycle with memory and tool execution."
+                  : "Save the agent first, then use this panel to test the full cycle."}
+              </div>
+            ) : (
+              chatMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={
+                    message.role === "user"
+                      ? "ml-8 rounded-[18px] bg-[#221b2d] px-4 py-3 text-sm leading-6 text-white"
+                      : "mr-8 rounded-[18px] border border-[#e5d8c8] bg-white px-4 py-3 text-sm leading-6 text-[#433a49]"
+                  }
+                >
+                  <p>{message.text}</p>
+                  {message.usedTooling?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {message.usedTooling.map((toolName) => (
+                        <span
+                          key={`${message.id}-${toolName}`}
+                          className="rounded-full border border-border bg-[#faf6f0] px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
+                        >
+                          {toolName}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="border-t border-border bg-white px-5 py-4">
+            <textarea
+              className={textareaClassName}
+              disabled={isTesting || !agent}
+              onChange={(event) => setTestMessage(event.target.value)}
+              placeholder={
+                agent
+                  ? "Type a test message for this agent..."
+                  : "Save the agent to enable full-cycle testing..."
+              }
+              value={testMessage}
+            />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                Uses a persistent internal test contact and does not send live outbound channel traffic.
+              </p>
+              <button
+                className={primaryButtonClassName}
+                disabled={isTesting || !agent || !testMessage.trim()}
+                onClick={sendTestChatMessage}
+                type="button"
+              >
+                <SendHorizontal className="mr-2 size-4" />
+                {isTesting ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -159,12 +159,12 @@ export function assessAgentReadiness(agent: AgentWithBuilderData): AgentReadines
         : "Any configured tool block must use valid tenant-owned integration steps.",
     },
     {
-      key: "sandbox",
-      label: "Sandbox testing can proceed",
+      key: "testing",
+      label: "Agent testing can proceed",
       done: sandboxExpectationReady,
       detail: sandboxExpectationReady
-        ? "This draft is structurally ready for sandbox verification."
-        : "Finish basics and channel selection before relying on sandbox feedback.",
+        ? "This draft is structurally ready for internal test-chat verification."
+        : "Finish basics and channel selection before relying on test-chat feedback.",
     },
   ];
 

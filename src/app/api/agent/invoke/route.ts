@@ -43,8 +43,9 @@ export async function POST(req: NextRequest) {
     const response = await invokeAgent({
       tenantId: parsed.data.tenantId,
       agentId: parsed.data.agentId,
+      allowDraftAgent: true,
       channel: agent.channel.type,
-      contactId: "sandbox-contact",
+      contactId: parsed.data.contactId ?? "sandbox-contact",
       message: parsed.data.message,
       promptPreview: buildSystemPrompt({
         ...draft,
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
   const response = await invokeAgent({
     tenantId: parsed.data.tenantId,
     channel: selectedChannel.type,
-    contactId: "sandbox-contact",
+    contactId: parsed.data.contactId ?? "sandbox-contact",
     message: parsed.data.message,
     promptPreview: buildSystemPrompt({
       name: parsed.data.draft.name,

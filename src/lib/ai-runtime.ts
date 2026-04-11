@@ -28,6 +28,7 @@ type LightweightToolBlock = {
 type InvokeAgentInput = {
   tenantId: string;
   agentId?: string;
+  allowDraftAgent?: boolean;
   channel: ChannelType | string;
   contactId: string;
   message: string;
@@ -361,13 +362,13 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     where: {
       id: input.agentId,
       tenantId: input.tenantId,
-      status: AgentStatus.ACTIVE,
+      ...(input.allowDraftAgent ? {} : { status: AgentStatus.ACTIVE }),
     },
     include: agentBuilderInclude,
   });
 
   if (!agent) {
-    throw new Error("Active deployed agent not found.");
+    throw new Error(input.allowDraftAgent ? "Saved agent not found." : "Active deployed agent not found.");
   }
 
   const runtimeBlocks = mapAgentToRuntimeBlocks(agent);

@@ -80,6 +80,7 @@ export type AgentDraftInput = z.infer<typeof agentDraftSchema>;
 export const sandboxInvokeSchema = z.object({
   tenantId: z.string().trim().min(1),
   agentId: z.string().trim().min(1).optional(),
+  contactId: z.string().trim().min(1).max(120).optional(),
   message: z.string().trim().min(1).max(4_000),
   draft: agentDraftSchema,
 });
