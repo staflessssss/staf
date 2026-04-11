@@ -48,3 +48,27 @@ export function parseSpreadsheetId(input: string) {
 
   return trimmed;
 }
+
+export function parseGoogleDriveFileId(input: string) {
+  const trimmed = input.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9-_]+)/,
+    /[?&]id=([a-zA-Z0-9-_]+)/,
+    /^https?:\/\/drive\.google\.com\/uc\?.*?[?&]id=([a-zA-Z0-9-_]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return trimmed;
+}

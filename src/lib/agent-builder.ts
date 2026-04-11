@@ -27,6 +27,33 @@ export const toolBlockSchema = z.object({
   steps: z.array(toolStepSchema).default([]),
 });
 
+export const channelConfigSchema = z
+  .object({
+    priceAttachmentFileId: z
+      .string()
+      .trim()
+      .max(500)
+      .optional()
+      .transform((value) => (value ? value : undefined)),
+    priceAttachmentFileName: z
+      .string()
+      .trim()
+      .max(240)
+      .optional()
+      .transform((value) => (value ? value : undefined)),
+    priceAttachmentMimeType: z
+      .string()
+      .trim()
+      .max(120)
+      .optional()
+      .transform((value) => (value ? value : undefined)),
+  })
+  .default({
+    priceAttachmentFileId: undefined,
+    priceAttachmentFileName: undefined,
+    priceAttachmentMimeType: undefined,
+  });
+
 export const agentDraftSchema = z.object({
   name: z.string().trim().min(1).max(120),
   persona: z.string().trim().min(1).max(10_000),
@@ -39,6 +66,11 @@ export const agentDraftSchema = z.object({
     .transform((value) => (value ? value : null)),
   channelId: z.string().trim().min(1),
   status: z.nativeEnum(AgentStatus).optional().default(AgentStatus.DRAFT),
+  channelConfig: channelConfigSchema.optional().default({
+    priceAttachmentFileId: undefined,
+    priceAttachmentFileName: undefined,
+    priceAttachmentMimeType: undefined,
+  }),
   knowledgeBlocks: z.array(knowledgeBlockSchema).default([]),
   toolBlocks: z.array(toolBlockSchema).default([]),
 });
@@ -81,6 +113,10 @@ export function mapAgentToDraft(agent: AgentWithBuilderData) {
     languagePreference: agent.languagePreference,
     status: agent.status,
     channelId: agent.channelId,
+    channelConfig:
+      agent.channelConfig && typeof agent.channelConfig === "object" && !Array.isArray(agent.channelConfig)
+        ? agent.channelConfig
+        : {},
     channel: agent.channel,
     knowledgeBlocks: agent.features
       .filter((feature) => feature.type === FeatureType.KNOWLEDGE)

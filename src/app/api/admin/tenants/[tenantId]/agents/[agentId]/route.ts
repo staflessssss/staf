@@ -103,6 +103,7 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
           tone: parsed.data.tone,
           languagePreference: parsed.data.languagePreference,
           status: parsed.data.status,
+          channelConfig: parsed.data.channelConfig as Prisma.InputJsonValue,
           features: {
             create: buildFeatureCreateInput(parsed.data),
           },

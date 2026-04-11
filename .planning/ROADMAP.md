@@ -18,6 +18,7 @@ The roadmap is organized around the product's actual operating model: secure mul
 | 4 | UI Foundation & Agent Builder UX | Define and implement the shared UI patterns, layout rules, and wizard UX needed before deeper agent-building work | Design foundation phase - supports later requirements | 5 |
 | 5 | Agent Builder Wizard | Enable operators to assemble, review, and test agents from flexible knowledge blocks and tools | AGNT-01, AGNT-02, AGNT-03, AGNT-04, AGNT-05 | 4 |
 | 6 | Deploy & Shared Runtime | Deploy agents and process incoming channel events through a shared tool-calling runtime | RUN-01, RUN-02, RUN-03, RUN-04, RUN-05 | 5 |
+| 6.1 | Runtime Boundary & Playbook Versioning | Introduce a safe v2 runtime boundary with agent versioning so deterministic playbook execution can evolve without breaking the first gold-reference client | Supports Phase 6 hardening and future builder universality | 4 |
 | 7 | Conversation Visibility & Client Reporting | Persist isolated conversations and expose useful views to admins and clients | CONV-01, CONV-02, CONV-03, CONV-04 | 4 |
 | 8 | Security, Reliability & Operational Clarity | Harden webhooks, credential handling, and failure visibility for production readiness | SECR-01, SECR-02, SECR-03 | 4 |
 
@@ -107,6 +108,18 @@ The roadmap is organized around the product's actual operating model: secure mul
 3. Operator can inspect recent conversations and agent activity from the admin surface.
 4. Client can view their own conversations and lead-relevant activity without seeing platform internals from other tenants.
 
+### Phase 6.1: Runtime Boundary & Playbook Versioning
+
+**Goal:** Add a safe runtime split between the current prompt-heavy path and a new deterministic playbook executor so the first production client can stay stable while the platform evolves toward a universal operator builder.
+
+**Requirements:** Supports Phase 6 runtime maturity and future builder scalability; no new requirement IDs introduced.
+
+**Success criteria:**
+1. `Agent` records carry a `playbookVersion` so existing gold-reference agents can remain on a stable legacy path while newer agents move to v2 execution.
+2. Runtime cleanly branches between legacy execution and v2 execution without changing the operator-facing builder flow yet.
+3. v2 runtime uses a minimal structured LLM decision contract to choose the next action instead of letting the model orchestrate the whole flow in free text.
+4. When a tool block is selected in v2, its steps execute deterministically in code and persist their results through the existing conversation/message trail.
+
 ### Phase 8: Security, Reliability & Operational Clarity
 
 **Goal:** Close the most important production-readiness gaps around safety and visibility.
@@ -124,6 +137,8 @@ The roadmap is organized around the product's actual operating model: secure mul
 - Phase 4 depends on Phase 3 because the UI/UX pass needs the real shapes of tenant connections and client setup flows.
 - Phase 5 depends on Phase 4 because the agent builder should be implemented on top of deliberate wizard UX, not retrofitted later.
 - Phase 6 depends on Phase 5 because deploy/runtime must consume the persisted builder output.
+- Phase 6.1 depends on Phase 6 because it hardens the runtime boundary after the first live tool and channel paths exist.
+- Phase 7 should begin after Phase 6.1 establishes a stable execution boundary worth exposing in operator/client views.
 - Phase 7 should begin only after Phase 6 produces real conversation data worth inspecting.
 - Phase 8 runs last in this milestone, but security checks should still influence implementation earlier when convenient.
 
@@ -139,4 +154,4 @@ Plans:
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
 ---
-*Last updated: 2026-04-07 after inserting dedicated UI foundation phase*
+*Last updated: 2026-04-11 after adding Phase 6.1 runtime boundary and playbook versioning subphase*

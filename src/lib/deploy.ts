@@ -102,7 +102,7 @@ function buildChannelDeployConfig(
         webhookSecret,
         channelConfig: {
           webhookPath: `/api/webhooks/gmail?agentId=${agent.id}`,
-          outboundMode: "gmail_relay_pending",
+          outboundMode: "gmail_api",
           channelType: agent.channel.type,
         },
       };

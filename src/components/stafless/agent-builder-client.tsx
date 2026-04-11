@@ -59,6 +59,7 @@ type SerializableAgent = {
   status: string;
   deployedAt: string | null;
   channelId: string;
+  channelConfig?: Record<string, unknown> | null;
   channel: ChannelConnection;
   features: (Feature & {
     steps: (Step & { integration: IntegrationConnection })[];
@@ -81,6 +82,12 @@ type ToolDraft = {
   name: string;
   description: string;
   steps: ToolStepDraft[];
+};
+
+type ChannelConfigDraft = {
+  priceAttachmentFileId: string;
+  priceAttachmentFileName: string;
+  priceAttachmentMimeType: string;
 };
 
 type SheetInspectionState = {
@@ -113,6 +120,7 @@ type BuilderDraft = {
   tone: string;
   languagePreference: string;
   channelId: string;
+  channelConfig: ChannelConfigDraft;
   knowledgeBlocks: KnowledgeDraft[];
   toolBlocks: ToolDraft[];
 };
@@ -389,6 +397,10 @@ function moveItem<T>(items: T[], index: number, direction: -1 | 1) {
 }
 
 function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgent): BuilderDraft {
+  const rawChannelConfig =
+    agent && "channelConfig" in agent && agent.channelConfig && typeof agent.channelConfig === "object"
+      ? (agent.channelConfig as Record<string, unknown>)
+      : {};
   const knowledgeBlocks =
     agent?.features
       .filter((feature) => feature.type === FeatureType.KNOWLEDGE)
@@ -421,6 +433,20 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
       agent?.channelId ??
       tenant.channelConnections.find((connection) => connection.status === "CONNECTED")?.id ??
       "",
+    channelConfig: {
+      priceAttachmentFileId:
+        typeof rawChannelConfig.priceAttachmentFileId === "string"
+          ? rawChannelConfig.priceAttachmentFileId
+          : "",
+      priceAttachmentFileName:
+        typeof rawChannelConfig.priceAttachmentFileName === "string"
+          ? rawChannelConfig.priceAttachmentFileName
+          : "",
+      priceAttachmentMimeType:
+        typeof rawChannelConfig.priceAttachmentMimeType === "string"
+          ? rawChannelConfig.priceAttachmentMimeType
+          : "",
+    },
     knowledgeBlocks: knowledgeBlocks.length > 0 ? knowledgeBlocks : sampleKnowledge,
     toolBlocks: toolBlocks.length > 0 ? toolBlocks : sampleTools,
   };
@@ -902,6 +928,11 @@ function uniqueValues(values: Array<string | undefined | null>) {
         tone: draft.tone,
         languagePreference: draft.languagePreference || undefined,
         channelId: draft.channelId,
+        channelConfig: {
+          priceAttachmentFileId: draft.channelConfig.priceAttachmentFileId || undefined,
+          priceAttachmentFileName: draft.channelConfig.priceAttachmentFileName || undefined,
+          priceAttachmentMimeType: draft.channelConfig.priceAttachmentMimeType || undefined,
+        },
         knowledgeBlocks: draft.knowledgeBlocks,
         toolBlocks: parseToolParams(draft.toolBlocks),
       };
@@ -971,6 +1002,11 @@ function uniqueValues(values: Array<string | undefined | null>) {
             tone: draft.tone,
             languagePreference: draft.languagePreference || undefined,
             channelId: draft.channelId,
+            channelConfig: {
+              priceAttachmentFileId: draft.channelConfig.priceAttachmentFileId || undefined,
+              priceAttachmentFileName: draft.channelConfig.priceAttachmentFileName || undefined,
+              priceAttachmentMimeType: draft.channelConfig.priceAttachmentMimeType || undefined,
+            },
             knowledgeBlocks: draft.knowledgeBlocks,
             toolBlocks: parseToolParams(draft.toolBlocks),
           },
@@ -1224,6 +1260,77 @@ function uniqueValues(values: Array<string | undefined | null>) {
                 })}
               </div>
             )}
+          </SurfaceCard>
+
+          <SurfaceCard
+            title="Sales assets"
+            description="Configure optional files the agent can attach when it sends pricing or offer details."
+          >
+            <div className="rounded-[20px] border border-border bg-[#faf6f0] p-5">
+              <div className="grid gap-5 md:grid-cols-2">
+                <FormField
+                  label="Pricing attachment"
+                  hint="Paste a Google Drive file ID or a share link. The runtime will extract the file ID automatically."
+                >
+                  <input
+                    className={inputClassName}
+                    onChange={(event) =>
+                      updateDraft("channelConfig", {
+                        ...draft.channelConfig,
+                        priceAttachmentFileId: event.target.value,
+                      })
+                    }
+                    placeholder="Drive file ID or URL"
+                    readOnly={mode === "detail"}
+                    value={draft.channelConfig.priceAttachmentFileId}
+                  />
+                </FormField>
+                <FormField
+                  label="Attachment label"
+                  hint="Optional. Helpful if you want the outgoing email attachment to have a nicer file name."
+                >
+                  <input
+                    className={inputClassName}
+                    onChange={(event) =>
+                      updateDraft("channelConfig", {
+                        ...draft.channelConfig,
+                        priceAttachmentFileName: event.target.value,
+                      })
+                    }
+                    placeholder="For example: Myndful Films Pricing Guide"
+                    readOnly={mode === "detail"}
+                    value={draft.channelConfig.priceAttachmentFileName}
+                  />
+                </FormField>
+              </div>
+              <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1fr)_240px]">
+                <FormField
+                  label="Mime type"
+                  hint="Optional. Leave blank unless you want to force the attachment content type."
+                >
+                  <input
+                    className={inputClassName}
+                    onChange={(event) =>
+                      updateDraft("channelConfig", {
+                        ...draft.channelConfig,
+                        priceAttachmentMimeType: event.target.value,
+                      })
+                    }
+                    placeholder="application/pdf or image/png"
+                    readOnly={mode === "detail"}
+                    value={draft.channelConfig.priceAttachmentMimeType}
+                  />
+                </FormField>
+                <div className="rounded-[16px] border border-[#eadfce] bg-white px-4 py-3">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#636563]">
+                    Runtime behavior
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-[#433a49]">
+                    When a sales reply includes pricing, Gmail can attach this asset automatically without turning the whole flow into a special hardcoded case.
+                  </p>
+                </div>
+              </div>
+            </div>
           </SurfaceCard>
 
           <SurfaceCard

@@ -38,12 +38,20 @@ type InvokeAgentInput = {
   toolBlocks?: LightweightToolBlock[];
 };
 
+type RuntimeAttachment = {
+  source?: "google_drive";
+  fileId: string;
+  fileName?: string;
+  mimeType?: string;
+};
+
 export type InvokeAgentResult = {
   message: string;
   promptPreview: string;
   usedTooling: string[];
   conversationId?: string;
   model?: string;
+  attachments?: RuntimeAttachment[];
 };
 
 function buildFallbackResponse(args: {
@@ -89,7 +97,112 @@ function renderHistory(messages: Awaited<ReturnType<typeof loadConversationHisto
 
       return `${message.role.toLowerCase()}: ${message.content}`;
     })
-    .join("\n");
+      .join("\n");
+}
+
+function buildSchedulingNudge(args: {
+  historyMessages: Awaited<ReturnType<typeof loadConversationHistory>>["messages"];
+  currentMessage: string;
+}) {
+  const current = args.currentMessage.toLowerCase();
+  const recentToolMessages = [...args.historyMessages]
+    .reverse()
+    .filter((message) => message.role === MessageRole.TOOL)
+    .slice(0, 4);
+
+  for (const message of recentToolMessages) {
+    const rawResult = message.toolResult;
+    if (!rawResult || typeof rawResult !== "object" || Array.isArray(rawResult)) {
+      continue;
+    }
+
+    const steps = "steps" in rawResult ? rawResult.steps : undefined;
+    if (!Array.isArray(steps)) {
+      continue;
+    }
+
+    for (const step of steps) {
+      if (!step || typeof step !== "object" || !("result" in step)) {
+        continue;
+      }
+
+      const result = step.result;
+      if (!result || typeof result !== "object" || Array.isArray(result)) {
+        continue;
+      }
+
+      const status = "status" in result ? String(result.status ?? "") : "";
+      const suggestedTimes =
+        "suggestedTimes" in result && Array.isArray(result.suggestedTimes)
+          ? result.suggestedTimes.map((value) => String(value).toLowerCase())
+          : [];
+
+      if (status !== "busy" || suggestedTimes.length === 0) {
+        continue;
+      }
+
+      const matchedSuggestion = suggestedTimes.find((time) => current.includes(time));
+      if (matchedSuggestion) {
+        return `Scheduling nudge:
+- The customer is choosing a previously offered alternative consultation slot (${matchedSuggestion}).
+- Call the booking tool now for that selected time instead of replying in prose.`;
+      }
+    }
+  }
+
+  return "";
+}
+
+function extractAttachments(
+  toolExecutions: Array<{
+    toolResult: unknown;
+  }>,
+) {
+  const attachments = new Map<string, RuntimeAttachment>();
+
+  for (const execution of toolExecutions) {
+    if (!execution.toolResult || typeof execution.toolResult !== "object" || Array.isArray(execution.toolResult)) {
+      continue;
+    }
+
+    const steps = "steps" in execution.toolResult ? execution.toolResult.steps : undefined;
+    if (!Array.isArray(steps)) {
+      continue;
+    }
+
+    for (const step of steps) {
+      if (!step || typeof step !== "object" || !("result" in step)) {
+        continue;
+      }
+
+      const result = step.result;
+      if (!result || typeof result !== "object" || Array.isArray(result)) {
+        continue;
+      }
+
+      const attachment = "attachment" in result ? result.attachment : undefined;
+      if (!attachment || typeof attachment !== "object" || Array.isArray(attachment)) {
+        continue;
+      }
+
+      const fileId = "fileId" in attachment ? String(attachment.fileId ?? "") : "";
+      if (!fileId) {
+        continue;
+      }
+
+      attachments.set(fileId, {
+        source:
+          "source" in attachment && attachment.source === "google_drive"
+            ? "google_drive"
+            : undefined,
+        fileId,
+        fileName: "fileName" in attachment ? String(attachment.fileName ?? "") || undefined : undefined,
+        mimeType: "mimeType" in attachment ? String(attachment.mimeType ?? "") || undefined : undefined,
+      });
+    }
+  }
+
+  return [...attachments.values()];
 }
 
 function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData) {
@@ -143,6 +256,7 @@ async function runModelInvocation(args: {
   input: InvokeAgentInput;
   promptPreview: string;
   historyText: string;
+  historyMessages: Awaited<ReturnType<typeof loadConversationHistory>>["messages"];
 }) {
   const toolExecutions: Array<{
     toolName: string;
@@ -172,6 +286,11 @@ async function runModelInvocation(args: {
     };
   }
 
+  const schedulingNudge = buildSchedulingNudge({
+    historyMessages: args.historyMessages,
+    currentMessage: args.input.message,
+  });
+
   const result = await generateText({
     model: openai(modelId),
     system: `${args.promptPreview}
@@ -181,14 +300,19 @@ Runtime rules:
 - Keep replies concise, operational, and tenant-safe.
 - Never invent integration results. Use tool outputs as the source of truth.
 - If the user asks for availability, booking, files, or spreadsheet actions, prefer tools before answering.
-- When the customer provides a date, preserve the exact day, month, and year. Prefer passing dates to tools in YYYY-MM-DD format.`,
-    prompt: `Conversation history:
-${args.historyText}
+- When the customer provides a date, preserve the exact day, month, and year. Prefer passing dates to tools in YYYY-MM-DD format.
+- If the customer chooses a specific consultation time, or accepts one of the alternatives you just offered, call the booking tool immediately instead of only replying in prose.
+- Never say a call is booked, reserved, confirmed, or that an invite is coming unless the booking tool has just succeeded in this turn.
+- If a calendar-check tool returned alternative times and the customer later confirms one of those options, treat that as booking intent and use the booking tool.`,
+      prompt: `Conversation history:
+  ${args.historyText}
+  
+  Current channel: ${args.input.channel}
+  Current contact: ${args.input.contactId}
+  Incoming customer message:
+  ${args.input.message}
 
-Current channel: ${args.input.channel}
-Current contact: ${args.input.contactId}
-Incoming customer message:
-${args.input.message}`,
+  ${schedulingNudge}`.trim(),
     ...(hasTools
       ? {
           tools,
@@ -263,11 +387,12 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
   ]);
 
   const modelResult = await runModelInvocation({
-    agent,
-    input,
-    promptPreview: runtimeBlocks.promptPreview,
-    historyText: renderHistory(history.messages),
-  });
+      agent,
+      input,
+      promptPreview: runtimeBlocks.promptPreview,
+      historyText: renderHistory(history.messages),
+      historyMessages: history.messages,
+    });
 
   if (modelResult.toolExecutions.length > 0) {
     await saveMessages(
@@ -297,6 +422,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     usedTooling: modelResult.toolExecutions.map((execution) => execution.toolName),
     conversationId: conversation.id,
     model: modelResult.modelId,
+    attachments: extractAttachments(modelResult.toolExecutions),
   };
 }
 
@@ -322,8 +448,27 @@ export async function handleIncomingEvent(args: {
     throw new Error("Active agent not found for incoming event.");
   }
 
-  const adapter = getChannelAdapter(args.channel);
-  const incoming = adapter.parseIncoming(args.payload as never);
+  const adapter = getChannelAdapter(args.channel) as {
+    parseIncoming: (payload: unknown) => {
+      contactId: string;
+      message: string;
+      messageId?: string;
+      threadId?: string;
+      subject?: string;
+    };
+    formatReply: (text: string, config?: unknown) => unknown;
+    sendReply: (params: {
+      credentials: string;
+      contactId: string;
+      message: string | { text: string; html?: string };
+      messageId?: string;
+      threadId?: string;
+      subject?: string;
+      attachments?: RuntimeAttachment[];
+      channelConfig?: unknown;
+    }) => Promise<unknown>;
+  };
+  const incoming = adapter.parseIncoming(args.payload);
 
   if (!incoming.contactId || !incoming.message) {
     return {
@@ -341,13 +486,18 @@ export async function handleIncomingEvent(args: {
     messageId: incoming.messageId,
   });
   const formattedReply = adapter.formatReply(result.message, agent.channelConfig);
+  const outboundMessage = Array.isArray(formattedReply)
+    ? formattedReply.join("\n\n")
+    : (formattedReply as string | { text: string; html?: string });
 
   const delivery = await adapter.sendReply({
     credentials: decrypt(agent.channel.credentialsEnc),
     contactId: incoming.contactId,
-    message: Array.isArray(formattedReply)
-      ? formattedReply.join("\n\n")
-      : formattedReply,
+    message: outboundMessage,
+    messageId: incoming.messageId,
+    threadId: incoming.threadId,
+    subject: incoming.subject,
+    attachments: result.attachments,
     channelConfig: agent.channelConfig,
   });
 

@@ -104,6 +104,7 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
           tone: parsed.data.tone,
           languagePreference: parsed.data.languagePreference,
           status: parsed.data.status,
+          channelConfig: parsed.data.channelConfig as Prisma.InputJsonValue,
           features: {
             create: buildFeatureCreateInput(parsed.data),
           },

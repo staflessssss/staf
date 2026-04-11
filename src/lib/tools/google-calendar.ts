@@ -842,18 +842,6 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
     };
   }
 
-  const checkResult = await runCheckCalendar(args, config);
-  if (checkResult.status !== "available") {
-    return {
-      ...checkResult,
-      action: args.action,
-      summary:
-        checkResult.status === "busy"
-          ? checkResult.summary
-          : `Booking stopped before event creation. ${checkResult.summary}`,
-    };
-  }
-
   const email = extractEmail(args);
   const coupleName = extractCoupleName(args);
   const weddingDate = extractWeddingDate(args);

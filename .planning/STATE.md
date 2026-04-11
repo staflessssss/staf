@@ -1,14 +1,14 @@
 # State: Stafless
 
 **Initialized:** 2026-04-07
-**Current status:** Phase 1 completed, Phase 2 completed at baseline, Phase 3 in progress, Phase 4 UI contract created, Phase 5 completed
+**Current status:** Phase 1 completed, Phase 2 completed at baseline, Phase 3 completed at baseline, Phase 4 UI contract created and partially implemented, Phase 5 completed, Phase 6 active with live runtime/client flows, Phase 6.1 next
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-04-07)
 
 **Core value:** An operator can quickly assemble and launch a reliable AI agent for a specific business without custom development, integration chaos, or exposing technical setup to the business client.
-**Current focus:** Phase 6 - Deploy & Shared Runtime
+**Current focus:** Phase 6.1 - Runtime Boundary & Playbook Versioning
 
 ## Current Milestone
 
@@ -16,7 +16,7 @@ Initial project bootstrap and architecture setup for the first usable Stafless v
 
 ## Next Recommended Action
 
-Start Phase 6 using the completed Phase 5 builder output as the source of truth for deploy and runtime work.
+Add `playbookVersion` and a safe legacy/v2 runtime split so the first gold-reference client can stay stable while deterministic playbook execution is introduced.
 
 ## Notes
 
@@ -40,7 +40,10 @@ Start Phase 6 using the completed Phase 5 builder output as the source of truth 
 - Phase 5 completed: admin can create/edit agent drafts, manage knowledge and tools, preview prompts, run sandbox tests, and check readiness for the next phase.
 - Phase 5 shipped multilingual-first behavior with an optional preferred response language instead of a single-language restriction.
 - `npm run prisma:generate`, `npm test`, `npm run lint`, and `npm run build` passed after the Phase 5 implementation.
-- Phase 6 should now focus on live deploy activation, shared runtime execution, channel event handling, and real tool execution against the persisted builder output.
+- Phase 6 progressed from builder-only deploy checks to real shared-runtime execution with tenant-scoped conversations, Telegram webhook replies, Google OAuth connections, and live Google Sheets / Google Calendar tool paths.
+- The first gold-reference client flow now exists as a real operator-built agent, but runtime behavior still mixes prompt-heavy orchestration with deterministic tool execution.
+- New architectural decision: before expanding templates or new integration families, the project should introduce `playbookVersion` and a safe v1/v2 runtime boundary so deterministic playbook execution can evolve without breaking the first live client.
+- Phase 6.1 is now the immediate focus: keep the current client stable, add a structured LLM decision boundary, and move selected tool-block execution into a deterministic runner.
 
 ---
-*Last updated: 2026-04-08 after completing Phase 5 Agent Builder Wizard*
+*Last updated: 2026-04-11 after reframing the next step as Phase 6.1 runtime boundary and playbook versioning*
