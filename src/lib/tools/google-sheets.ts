@@ -13,6 +13,7 @@ type SheetsExecutionArgs = {
   metadata?: Prisma.JsonValue | null;
   credentialsEnc?: string;
   date?: string;
+  location?: string;
 };
 
 type SheetsFilterConfig = {
@@ -113,6 +114,12 @@ function normalizeHeader(value: string) {
 
 function normalizeText(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function addUtcDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
 }
 
 function toIsoDate(date: Date) {
@@ -281,6 +288,36 @@ function getColumnIndex(headers: unknown[], lookupColumn: string) {
   return headers.findIndex(
     (header) => typeof header === "string" && normalizeHeader(header) === normalizeHeader(lookupColumn),
   );
+}
+
+function normalizeRegion(value: string) {
+  const normalized = normalizeText(value);
+
+  if (
+    normalized.includes("florida") ||
+    normalized === "fl" ||
+    normalized.includes("wedding in florida")
+  ) {
+    return "FL" as const;
+  }
+
+  if (
+    normalized.includes("north carolina") ||
+    normalized.includes("south carolina") ||
+    normalized.includes("georgia") ||
+    normalized.includes("charlotte") ||
+    normalized.includes("nc/sc/ga") ||
+    normalized.includes("nc, sc") ||
+    normalized.includes("wedding in nc, sc or ga")
+  ) {
+    return "NC_SC_GA" as const;
+  }
+
+  return null;
+}
+
+function inferRequestedRegion(request: string, location?: string) {
+  return normalizeRegion(location ?? "") ?? normalizeRegion(request);
 }
 
 function mapRowToObject(headers: unknown[], row: unknown[]) {
@@ -471,6 +508,101 @@ async function runSheetsLookup(args: SheetsExecutionArgs) {
       rowNumber: row.rowNumber,
       row: row.rowObject,
     }));
+
+  const dateColumn = resolvedFilters.find((filter) => filter.valueSource === "requested_date")?.column;
+  const statusColumn = headers.find(
+    (header) => typeof header === "string" && normalizeHeader(header) === "status",
+  );
+  const regionColumn = headers.find(
+    (header) => typeof header === "string" && normalizeHeader(header) === "region",
+  );
+  const requestedDate =
+    resolvedFilters.find((filter) => filter.valueSource === "requested_date")?.resolvedValue ?? null;
+  const requestedRegion =
+    typeof regionColumn === "string" ? inferRequestedRegion(args.request, args.location) : null;
+
+  if (
+    typeof requestedDate === "string" &&
+    typeof dateColumn === "string" &&
+    typeof statusColumn === "string" &&
+    typeof regionColumn === "string" &&
+    requestedRegion
+  ) {
+    const bookedCounts = new Map<string, number>();
+
+    for (const row of rows.slice(headerRowIndex + 1)) {
+      const rowObject = mapRowToObject(headers, row);
+      const normalizedDate = normalizeSheetDateValue(rowObject[dateColumn]);
+      const normalizedStatus = normalizeText(String(rowObject[statusColumn] ?? ""));
+      const normalizedRegion = normalizeRegion(String(rowObject[regionColumn] ?? ""));
+
+      if (!normalizedDate || !normalizedStatus.includes("booked") || !normalizedRegion) {
+        continue;
+      }
+
+      const key = `${normalizedDate}:${normalizedRegion}`;
+      bookedCounts.set(key, (bookedCounts.get(key) ?? 0) + 1);
+    }
+
+    const requestedCount = bookedCounts.get(`${requestedDate}:${requestedRegion}`) ?? 0;
+    const available = requestedRegion === "FL" ? requestedCount === 0 : requestedCount < 2;
+    const findNearestAvailableDate = (direction: -1 | 1) => {
+      let cursor = buildUtcDate(
+        Number(requestedDate.slice(0, 4)),
+        Number(requestedDate.slice(5, 7)) - 1,
+        Number(requestedDate.slice(8, 10)),
+      );
+
+      for (let dayOffset = 1; dayOffset <= 45; dayOffset += 1) {
+        cursor = addUtcDays(cursor, direction);
+        const candidateIso = toIsoDate(cursor);
+        const candidateCount = bookedCounts.get(`${candidateIso}:${requestedRegion}`) ?? 0;
+        const candidateAvailable = requestedRegion === "FL" ? candidateCount === 0 : candidateCount < 2;
+
+        if (candidateAvailable) {
+          return candidateIso;
+        }
+      }
+
+      return null;
+    };
+
+    const nearestAvailableDates = available
+      ? null
+      : {
+          before: findNearestAvailableDate(-1),
+          after: findNearestAvailableDate(1),
+        };
+    const suggestedDates = nearestAvailableDates
+      ? [nearestAvailableDates.before, nearestAvailableDates.after].filter(
+          (value): value is string => Boolean(value),
+        )
+      : [];
+
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live",
+      status: available ? "available" : "unavailable",
+      action: args.action,
+      operation: config.operation,
+      spreadsheetId: config.spreadsheetId,
+      spreadsheetTitle: metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
+      sheetName: config.sheetName,
+      requestedDate,
+      requestedRegion,
+      bookedCount: requestedCount,
+      matchedRows,
+      nearestAvailableDates,
+      suggestedDates,
+      summary: available
+        ? `Wedding date check: ${requestedDate} is available for ${requestedRegion}.`
+        : suggestedDates.length > 0
+          ? `Wedding date check: ${requestedDate} is unavailable for ${requestedRegion}. Offer these nearby dates right away: ${suggestedDates.join(", ")}.`
+          : `Wedding date check: ${requestedDate} is unavailable for ${requestedRegion} and no nearby replacement dates were found automatically.`,
+      params: args.params,
+      request: args.request,
+    };
+  }
 
   return {
     integration: "GOOGLE_SHEETS",

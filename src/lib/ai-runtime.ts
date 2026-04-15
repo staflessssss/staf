@@ -29,14 +29,17 @@ type InvokeAgentInput = {
   tenantId: string;
   agentId?: string;
   allowDraftAgent?: boolean;
+  testMode?: boolean;
   channel: ChannelType | string;
   contactId: string;
   message: string;
   messageId?: string;
+  contactEmail?: string;
   promptPreview?: string;
   languagePreference?: string | null;
   knowledgeBlocks?: LightweightKnowledgeBlock[];
   toolBlocks?: LightweightToolBlock[];
+  historyMessages?: RuntimeHistoryMessage[];
 };
 
 type RuntimeAttachment = {
@@ -53,6 +56,15 @@ export type InvokeAgentResult = {
   conversationId?: string;
   model?: string;
   attachments?: RuntimeAttachment[];
+  historyAppend?: RuntimeHistoryMessage[];
+};
+
+export type RuntimeHistoryMessage = {
+  role: MessageRole;
+  content: string;
+  toolName?: string | null;
+  toolResult?: unknown;
+  durationMs?: number;
 };
 
 function buildFallbackResponse(args: {
@@ -84,7 +96,7 @@ function buildFallbackResponse(args: {
     .join(" ");
 }
 
-function renderHistory(messages: Awaited<ReturnType<typeof loadConversationHistory>>["messages"]) {
+function renderHistory(messages: RuntimeHistoryMessage[]) {
   if (messages.length === 0) {
     return "No prior conversation history.";
   }
@@ -102,7 +114,7 @@ function renderHistory(messages: Awaited<ReturnType<typeof loadConversationHisto
 }
 
 function buildSchedulingNudge(args: {
-  historyMessages: Awaited<ReturnType<typeof loadConversationHistory>>["messages"];
+  historyMessages: RuntimeHistoryMessage[];
   currentMessage: string;
 }) {
   const current = args.currentMessage.toLowerCase();
@@ -135,14 +147,14 @@ function buildSchedulingNudge(args: {
       const status = "status" in result ? String(result.status ?? "") : "";
       const suggestedTimes =
         "suggestedTimes" in result && Array.isArray(result.suggestedTimes)
-          ? result.suggestedTimes.map((value) => String(value).toLowerCase())
+          ? result.suggestedTimes.map((value: unknown) => String(value).toLowerCase())
           : [];
 
       if (status !== "busy" || suggestedTimes.length === 0) {
         continue;
       }
 
-      const matchedSuggestion = suggestedTimes.find((time) => current.includes(time));
+      const matchedSuggestion = suggestedTimes.find((time: string) => current.includes(time));
       if (matchedSuggestion) {
         return `Scheduling nudge:
 - The customer is choosing a previously offered alternative consultation slot (${matchedSuggestion}).
@@ -152,6 +164,31 @@ function buildSchedulingNudge(args: {
   }
 
   return "";
+}
+
+function buildHistoryAppend(args: {
+  toolExecutions: Array<{
+    toolName: string;
+    toolResult: unknown;
+    durationMs?: number;
+  }>;
+  assistantText: string;
+}) {
+  return [
+    ...args.toolExecutions.map(
+      (execution): RuntimeHistoryMessage => ({
+        role: MessageRole.TOOL,
+        content: JSON.stringify(execution.toolResult),
+        toolName: execution.toolName,
+        toolResult: execution.toolResult,
+        durationMs: execution.durationMs,
+      }),
+    ),
+    {
+      role: MessageRole.ASSISTANT,
+      content: args.assistantText,
+    } satisfies RuntimeHistoryMessage,
+  ];
 }
 
 function extractAttachments(
@@ -257,7 +294,7 @@ async function runModelInvocation(args: {
   input: InvokeAgentInput;
   promptPreview: string;
   historyText: string;
-  historyMessages: Awaited<ReturnType<typeof loadConversationHistory>>["messages"];
+  historyMessages: RuntimeHistoryMessage[];
 }) {
   const toolExecutions: Array<{
     toolName: string;
@@ -267,6 +304,12 @@ async function runModelInvocation(args: {
   }> = [];
   const tools = resolveTools({
     agent: args.agent,
+    testMode: Boolean(args.input.testMode),
+    defaultEmail:
+      args.input.contactEmail ??
+      (String(args.input.channel).toUpperCase() === "GMAIL" && args.input.contactId.includes("@")
+        ? args.input.contactId
+        : undefined),
     onToolResult: (entry) => {
       toolExecutions.push(entry);
     },
@@ -304,12 +347,15 @@ Runtime rules:
 - When the customer provides a date, preserve the exact day, month, and year. Prefer passing dates to tools in YYYY-MM-DD format.
 - If the customer chooses a specific consultation time, or accepts one of the alternatives you just offered, call the booking tool immediately instead of only replying in prose.
 - Never say a call is booked, reserved, confirmed, or that an invite is coming unless the booking tool has just succeeded in this turn.
-- If a calendar-check tool returned alternative times and the customer later confirms one of those options, treat that as booking intent and use the booking tool.`,
+- If a calendar-check tool returned alternative times and the customer later confirms one of those options, treat that as booking intent and use the booking tool.
+- If a wedding-date availability tool returns that the requested date is unavailable and includes nearby replacement dates, proactively offer those nearby dates immediately instead of asking the customer to suggest a range.
+- If the current channel already provides the customer's email, treat it as known contact information and do not ask the customer to repeat it unless they want a different address used.`,
       prompt: `Conversation history:
   ${args.historyText}
   
   Current channel: ${args.input.channel}
   Current contact: ${args.input.contactId}
+  Known contact email: ${args.input.contactEmail ?? "not provided by channel"}
   Incoming customer message:
   ${args.input.message}
 
@@ -372,6 +418,29 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
   }
 
   const runtimeBlocks = mapAgentToRuntimeBlocks(agent);
+  if (input.testMode) {
+    const historyMessages = input.historyMessages ?? [];
+    const modelResult = await runModelInvocation({
+      agent,
+      input,
+      promptPreview: runtimeBlocks.promptPreview,
+      historyText: renderHistory(historyMessages),
+      historyMessages,
+    });
+
+    return {
+      message: modelResult.text,
+      promptPreview: runtimeBlocks.promptPreview,
+      usedTooling: modelResult.toolExecutions.map((execution) => execution.toolName),
+      model: modelResult.modelId,
+      attachments: extractAttachments(modelResult.toolExecutions),
+      historyAppend: buildHistoryAppend({
+        toolExecutions: modelResult.toolExecutions,
+        assistantText: modelResult.text,
+      }),
+    };
+  }
+
   const conversation = await ensureConversation({
     agentId: agent.id,
     contactId: input.contactId,
@@ -424,6 +493,10 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     conversationId: conversation.id,
     model: modelResult.modelId,
     attachments: extractAttachments(modelResult.toolExecutions),
+    historyAppend: buildHistoryAppend({
+      toolExecutions: modelResult.toolExecutions,
+      assistantText: modelResult.text,
+    }),
   };
 }
 
@@ -452,6 +525,7 @@ export async function handleIncomingEvent(args: {
   const adapter = getChannelAdapter(args.channel) as {
     parseIncoming: (payload: unknown) => {
       contactId: string;
+      contactEmail?: string;
       message: string;
       messageId?: string;
       threadId?: string;
@@ -483,6 +557,7 @@ export async function handleIncomingEvent(args: {
     agentId: agent.id,
     channel: args.channel,
     contactId: incoming.contactId,
+    contactEmail: incoming.contactEmail,
     message: incoming.message,
     messageId: incoming.messageId,
   });

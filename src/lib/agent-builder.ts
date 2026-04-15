@@ -5,6 +5,7 @@ import {
   ConnectionStatus,
   FeatureType,
   IntegrationConnection,
+  MessageRole,
   Prisma,
 } from "@prisma/client";
 import { z } from "zod";
@@ -82,7 +83,27 @@ export const sandboxInvokeSchema = z.object({
   agentId: z.string().trim().min(1).optional(),
   contactId: z.string().trim().min(1).max(120).optional(),
   message: z.string().trim().min(1).max(4_000),
-  draft: agentDraftSchema,
+  testMode: z.boolean().optional(),
+  history: z
+    .array(
+      z.object({
+        role: z.nativeEnum(MessageRole),
+        content: z.string(),
+        toolName: z.string().optional(),
+        toolResult: z.unknown().optional(),
+        durationMs: z.number().optional(),
+      }),
+    )
+    .optional(),
+  draft: agentDraftSchema.optional(),
+}).superRefine((value, ctx) => {
+  if (!value.agentId && !value.draft) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Either a saved agent or a draft config is required.",
+      path: ["draft"],
+    });
+  }
 });
 
 export type SandboxInvokeInput = z.infer<typeof sandboxInvokeSchema>;

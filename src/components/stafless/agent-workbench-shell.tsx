@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChannelConnection, Feature, FeatureType, IntegrationConnection } from "@prisma/client";
 import type { ReactNode } from "react";
 
+import { AgentTestChatDrawer } from "@/components/stafless/agent-test-chat-drawer";
 import {
   HighlightPanel,
   MetricStrip,
@@ -116,6 +117,13 @@ export function AgentWorkbenchShell({
             <Link href={`/admin/clients/${tenant.id}`} className={secondaryButtonClassName}>
               Back to client
             </Link>
+            {mode === "detail" && agent ? (
+              <AgentTestChatDrawer
+                agentId={agent.id}
+                agentName={agent.name}
+                tenantId={tenant.id}
+              />
+            ) : null}
             {mode === "detail" && agent ? (
               <Link
                 href={`/admin/clients/${tenant.id}/agents/${agent.id}/edit`}

@@ -20,6 +20,8 @@ type CalendarExecutionArgs = {
   location?: string;
   email?: string;
   channel?: string;
+  testMode?: boolean;
+  defaultEmail?: string;
 };
 
 type SchedulingIntent = "date_availability" | "check_calendar" | "book_call";
@@ -464,6 +466,10 @@ function extractEmail(args: CalendarExecutionArgs) {
     return args.email;
   }
 
+  if (args.defaultEmail) {
+    return args.defaultEmail;
+  }
+
   const match = args.request.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
   return match?.[0] ?? "";
 }
@@ -655,19 +661,14 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
   }
 
   const calendar = createCalendarClient(args.credentialsEnc);
-  const events = await listEventsForDate({
+  const exactSlotBusy = await queryExactSlotBusy({
     calendar,
     calendarId: config.calendarId,
-    date: parsed.date,
-    timeZone: config.timeZone,
+    startTime: parsed.startTime,
+    endTime: parsed.endTime,
   });
-  const busySlots = parseBusySlots(events);
-  const [hours, minutes] = parsed.time.split(":").map(Number);
-  const requestedMinutes = hours * 60 + minutes;
-  const requestedEnd = requestedMinutes + config.slotDurationMinutes;
-  const hasConflict = busySlots.some((slot) => requestedMinutes < slot.end && requestedEnd > slot.start);
 
-  if (!hasConflict) {
+  if (exactSlotBusy.length === 0) {
     return {
       integration: "GOOGLE_CALENDAR",
       mode: "live",
@@ -682,28 +683,26 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
     };
   }
 
-  const suggestedTimes = findAlternativeTimes({
-    requestedMinutes,
-    busySlots,
-    config,
+  const events = await listEventsForDate({
+    calendar,
+    calendarId: config.calendarId,
+    date: parsed.date,
+    timeZone: config.timeZone,
   });
-
-  return {
-    integration: "GOOGLE_CALENDAR",
-    mode: "live",
-    status: "busy",
+  const busySlots = parseBusySlots(events);
+  const [hours, minutes] = parsed.time.split(":").map(Number);
+  const requestedMinutes = hours * 60 + minutes;
+  return buildBusyCalendarResponse({
     action: args.action,
     date: parsed.date,
     requestedTime: parsed.time,
-    suggestedTimes,
-    message: `${parsed.time} is busy. Available nearby: ${suggestedTimes.join(", ")}`,
-    summary:
-      suggestedTimes.length > 0
-        ? `Consultation slot ${parsed.time} is busy. Nearby openings: ${suggestedTimes.join(", ")}.`
-        : `Consultation slot ${parsed.time} is busy and no nearby openings were found in the working window.`,
+    requestedMinutes,
+    busySlots,
+    config,
     request: args.request,
     params: args.params,
-  };
+    mode: "live",
+  });
 }
 
 async function appendLeadRow(args: {
@@ -857,6 +856,68 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
     .join("\n");
 
   const calendar = createCalendarClient(args.credentialsEnc);
+  const exactSlotBusy = await queryExactSlotBusy({
+    calendar,
+    calendarId: config.calendarId,
+    startTime: parsed.startTime,
+    endTime: parsed.endTime,
+  });
+
+  if (exactSlotBusy.length > 0) {
+    const events = await listEventsForDate({
+      calendar,
+      calendarId: config.calendarId,
+      date: parsed.date,
+      timeZone: config.timeZone,
+    });
+    const busySlots = parseBusySlots(events);
+    const [hours, minutes] = parsed.time.split(":").map(Number);
+    const requestedMinutes = hours * 60 + minutes;
+
+    return buildBusyCalendarResponse({
+      action: args.action,
+      date: parsed.date,
+      requestedTime: parsed.time,
+      requestedMinutes,
+      busySlots,
+      config,
+      request: args.request,
+      params: args.params,
+      mode: args.testMode ? "test" : "live",
+    });
+  }
+
+  if (args.testMode) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "test",
+      status: "booked",
+      action: args.action,
+      date: parsed.date,
+      time: parsed.time,
+      startTime: parsed.startTime,
+      endTime: parsed.endTime,
+      email,
+      coupleName,
+      weddingDate,
+      location,
+      channel,
+      eventId: null,
+      meetLink: null,
+      leadLog: {
+        status: "skipped",
+        summary: "Test mode skips lead logging.",
+      },
+      telegramNotification: {
+        status: "skipped",
+        summary: "Test mode skips owner notifications.",
+      },
+      summary: `Test mode: this consultation slot could be booked for ${parsed.time} on ${formatHumanDate(parsed.date, config.timeZone)} without triggering live calendar or lead side effects.`,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
   const createdEvent = await calendar.events.insert({
     calendarId: config.calendarId,
     conferenceDataVersion: 1,
@@ -959,3 +1020,55 @@ export const calendarSchedulingTestHelpers = {
   validateSchedulingWindow,
   inferRequestedDate,
 };
+
+async function queryExactSlotBusy(args: {
+  calendar: ReturnType<typeof google.calendar>;
+  calendarId: string;
+  startTime: string;
+  endTime: string;
+}) {
+  const freebusy = await args.calendar.freebusy.query({
+    requestBody: {
+      timeMin: args.startTime,
+      timeMax: args.endTime,
+      items: [{ id: args.calendarId }],
+    },
+  });
+
+  return freebusy.data.calendars?.[args.calendarId]?.busy?.filter((entry) => entry.start && entry.end) ?? [];
+}
+
+function buildBusyCalendarResponse(args: {
+  action: string;
+  date: string;
+  requestedTime: string;
+  requestedMinutes: number;
+  busySlots: CalendarEventSummary[];
+  config: SchedulingConfig;
+  request: string;
+  params: Prisma.JsonValue;
+  mode: "live" | "test";
+}) {
+  const suggestedTimes = findAlternativeTimes({
+    requestedMinutes: args.requestedMinutes,
+    busySlots: args.busySlots,
+    config: args.config,
+  });
+
+  return {
+    integration: "GOOGLE_CALENDAR",
+    mode: args.mode,
+    status: "busy",
+    action: args.action,
+    date: args.date,
+    requestedTime: args.requestedTime,
+    suggestedTimes,
+    message: `${args.requestedTime} is busy. Available nearby: ${suggestedTimes.join(", ")}`,
+    summary:
+      suggestedTimes.length > 0
+        ? `Consultation slot ${args.requestedTime} is busy. Nearby openings: ${suggestedTimes.join(", ")}.`
+        : `Consultation slot ${args.requestedTime} is busy and no nearby openings were found in the working window.`,
+    request: args.request,
+    params: args.params,
+  };
+}

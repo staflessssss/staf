@@ -113,6 +113,9 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
       });
 
       return agent;
+    }, {
+      maxWait: 5_000,
+      timeout: 20_000,
     });
 
     return NextResponse.json(

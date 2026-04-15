@@ -112,6 +112,9 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
       });
 
       return agent;
+    }, {
+      maxWait: 5_000,
+      timeout: 20_000,
     });
 
     return NextResponse.json({

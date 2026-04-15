@@ -130,6 +130,10 @@ function convertMarkdownishToHtml(value: string) {
 }
 
 function isPricingReply(text: string) {
+  if (!text) {
+    return false;
+  }
+
   const normalized = text.toLowerCase();
 
   return (
@@ -353,8 +357,11 @@ export const gmailAdapterTestHelpers = {
 
 export const gmailAdapter = {
   parseIncoming: (payload: GmailIncomingPayload) => {
+    const contactEmail = String(payload.from ?? payload.contactId ?? "");
+
     return {
-      contactId: String(payload.contactId ?? payload.from ?? ""),
+      contactId: contactEmail,
+      contactEmail,
       message: String(payload.text ?? payload.message ?? payload.body ?? payload.html ?? ""),
       messageId: String(payload.messageId ?? payload.inReplyTo ?? payload.replyToMessageId ?? ""),
       threadId: String(payload.threadId ?? ""),

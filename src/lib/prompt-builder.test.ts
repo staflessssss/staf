@@ -29,6 +29,7 @@ test("buildSystemPrompt includes multilingual behavior, knowledge, and tools", (
   assert.match(prompt, /Agent identity: Studio Concierge/);
   assert.match(prompt, /Preferred default response language: Russian/);
   assert.match(prompt, /Channel: Instagram/);
+  assert.match(prompt, /Opening rule: In the first reply of a new conversation, warmly greet the customer, introduce yourself by name/i);
   assert.match(prompt, /Knowledge/);
   assert.match(prompt, /Tools/);
   assert.match(prompt, /Google Calendar: check calendar/);

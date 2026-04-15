@@ -14,13 +14,12 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  Bot,
   Layers3,
   Plus,
-  RotateCcw,
-  SendHorizontal,
+  Sparkles,
   Settings2,
   Trash2,
-  X,
 } from "lucide-react";
 
 import {
@@ -29,7 +28,6 @@ import {
   FormField,
   StatusBadge,
   SurfaceCard,
-  WizardStepper,
   inputClassName,
   primaryButtonClassName,
   selectClassName,
@@ -124,20 +122,6 @@ type BuilderDraft = {
   channelConfig: ChannelConfigDraft;
   knowledgeBlocks: KnowledgeDraft[];
   toolBlocks: ToolDraft[];
-};
-
-type TestChatResult = {
-  message: string;
-  promptPreview: string;
-  usedTooling: string[];
-  conversationId?: string;
-};
-
-type TestChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  usedTooling?: string[];
 };
 
 type DeployReadinessResult = {
@@ -499,11 +483,6 @@ export function AgentBuilderClient({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
-  const [testContactId, setTestContactId] = useState(() => `test-chat-${Date.now()}`);
-  const [testMessage, setTestMessage] = useState("");
-  const [isTesting, setIsTesting] = useState(false);
-  const [chatMessages, setChatMessages] = useState<TestChatMessage[]>([]);
   const [isCheckingDeploy, setIsCheckingDeploy] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployReadiness, setDeployReadiness] = useState<DeployReadinessResult | null>(null);
@@ -557,7 +536,6 @@ export function AgentBuilderClient({
     })),
   });
   const isDirty = JSON.stringify(draft) !== savedDraftSnapshot;
-
   const checklistItems = [
     {
       label: draft.name.trim() && draft.persona.trim() ? "Basics are defined" : "Complete the basics step",
@@ -593,17 +571,26 @@ export function AgentBuilderClient({
     },
     {
       label:
-        chatMessages.length > 0
-          ? "Test chat session is active"
-          : agent
-            ? "Open the test chat before deploy"
-            : "Save the agent before full-cycle testing",
-      done: chatMessages.length > 0,
-      hint: agent
-        ? "Use the right-side test chat to verify a real conversation cycle without sending live outbound messages."
-        : "Full-cycle testing uses the saved agent runtime, so save the draft first.",
+        mode === "detail"
+          ? "Use the test chat from the detail page before deploy"
+          : "Save the agent before full-cycle testing",
+      done: Boolean(agent),
+      hint:
+        mode === "detail"
+          ? "The detail page exposes the right-side test chat for a real conversation cycle."
+          : "Full-cycle testing lives on the saved agent detail page.",
     },
   ];
+  const completedChecklistCount = checklistItems.filter((item) => item.done).length;
+  const currentStepMeta = wizardSteps[currentStep];
+  const sectionCardClassName = (stepIndex: number) =>
+    currentStep === stepIndex
+      ? "border-0 bg-transparent p-0 shadow-none"
+      : "border-0 bg-transparent p-0 shadow-none";
+  const sectionCanvasClassName =
+    "rounded-[30px] bg-[linear-gradient(180deg,#fffdf9_0%,#f7efe2_100%)] p-6 ring-1 ring-[#e6d7c5] shadow-[0_16px_34px_rgba(31,23,40,0.05)]";
+  const softInfoPanelClassName =
+    "rounded-[18px] bg-[#fff9f1] p-4 ring-1 ring-[#eadccb]";
 
   function updateDraft<K extends keyof BuilderDraft>(key: K, value: BuilderDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -1000,102 +987,6 @@ function uniqueValues(values: Array<string | undefined | null>) {
     }
   }
 
-  async function sendTestChatMessage() {
-    const trimmedMessage = testMessage.trim();
-
-    if (!trimmedMessage) {
-      return;
-    }
-
-    if (!agent) {
-      setError("Save this draft first, then use the test chat against the saved agent.");
-      return;
-    }
-
-    setIsTesting(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const userMessage: TestChatMessage = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        text: trimmedMessage,
-      };
-      setChatMessages((current) => [...current, userMessage]);
-      setTestMessage("");
-
-      const response = await fetch("/api/agent/invoke", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tenantId: tenant.id,
-          agentId: agent?.id,
-          contactId: testContactId,
-          message: trimmedMessage,
-          draft: {
-            name: draft.name,
-            persona: draft.persona,
-            tone: draft.tone,
-            languagePreference: draft.languagePreference || undefined,
-            channelId: draft.channelId,
-            channelConfig: {
-              priceAttachmentFileId: draft.channelConfig.priceAttachmentFileId || undefined,
-              priceAttachmentFileName: draft.channelConfig.priceAttachmentFileName || undefined,
-              priceAttachmentMimeType: draft.channelConfig.priceAttachmentMimeType || undefined,
-            },
-            knowledgeBlocks: draft.knowledgeBlocks,
-            toolBlocks: parseToolParams(draft.toolBlocks),
-          },
-        }),
-      });
-
-      const result = (await response.json().catch(() => null)) as
-        | { error?: string; item?: TestChatResult }
-        | null;
-
-      if (!response.ok || !result?.item) {
-        setChatMessages((current) => current.filter((message) => message.id !== userMessage.id));
-        setError(result?.error || "Could not run the test chat.");
-        return;
-      }
-      const item = result.item;
-
-      setChatMessages((current) => [
-        ...current,
-        {
-          id: item.conversationId
-            ? `assistant-${item.conversationId}-${current.length}`
-            : `assistant-${Date.now()}`,
-          role: "assistant",
-          text: item.message,
-          usedTooling: item.usedTooling,
-        },
-      ]);
-      setDeployReadiness(null);
-      setSuccess("Test chat updated.");
-      setCurrentStep(4);
-    } catch (testError) {
-      setError(
-        testError instanceof Error
-          ? testError.message
-          : "Could not run the test chat.",
-      );
-    } finally {
-      setIsTesting(false);
-    }
-  }
-
-  function resetTestChat() {
-    setChatMessages([]);
-    setTestMessage("");
-    setTestContactId(`test-chat-${Date.now()}`);
-    setSuccess("Started a fresh test chat session.");
-    setError(null);
-  }
-
   function handleNextStep() {
     setCurrentStep((step) => Math.min(step + 1, wizardSteps.length - 1));
   }
@@ -1187,9 +1078,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
     }
 
   return (
-    <div className="mx-auto max-w-[1180px] space-y-8">
-      <WizardStepper currentStep={currentStep} steps={wizardSteps} />
-
+    <div className="mx-auto max-w-[1240px] space-y-8">
       {error ? (
         <div className="rounded-[20px] border border-[#efc4c1] bg-[#fff0ef] px-4 py-3 text-sm text-destructive">
           {error}
@@ -1212,13 +1101,6 @@ function uniqueValues(values: Array<string | undefined | null>) {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
-              className={secondaryButtonClassName}
-              onClick={() => setIsChatOpen(true)}
-              type="button"
-            >
-              Open test chat
-            </button>
-            <button
               className={primaryButtonClassName}
               disabled={isSaving || !isDirty}
               onClick={saveDraft}
@@ -1230,131 +1112,244 @@ function uniqueValues(values: Array<string | undefined | null>) {
         </div>
       ) : null}
 
-      <div className="space-y-8">
-        <div className="space-y-6">
-          <SurfaceCard
-            title="Basics"
-            description="Set the editorial voice and role of the agent before channels and tools add complexity."
-          >
-            <div className="grid gap-5 md:grid-cols-2">
-              <FormField
-                label="Agent name"
-                hint="Use a business-facing name the operator can scan quickly."
-              >
-                <input
-                  className={inputClassName}
-                  onChange={(event) => updateDraft("name", event.target.value)}
-                  readOnly={mode === "detail"}
-                  value={draft.name}
-                />
-              </FormField>
-              <FormField label="Tone">
-                <select
-                  className={selectClassName}
-                  disabled={mode === "detail"}
-                  onChange={(event) => updateDraft("tone", event.target.value)}
-                  value={draft.tone}
-                >
-                  <option value="friendly">Friendly</option>
-                  <option value="calm">Calm</option>
-                  <option value="premium">Premium</option>
-                  <option value="direct">Direct</option>
-                </select>
-              </FormField>
-              <FormField
-                label="Preferred response language"
-                hint="Optional. Leave blank to keep the agent multilingual-first."
-              >
-                <input
-                  className={inputClassName}
-                  onChange={(event) =>
-                    updateDraft("languagePreference", event.target.value)
-                  }
-                  placeholder="For example: Russian, English, Spanish"
-                  readOnly={mode === "detail"}
-                  value={draft.languagePreference}
-                />
-              </FormField>
+      <div className="rounded-[28px] border border-border bg-[linear-gradient(180deg,#fffaf4_0%,#f8efe3_100%)] p-5 shadow-[0_16px_38px_rgba(31,23,40,0.05)] sm:p-6">
+        <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr_0.8fr]">
+          <div className="rounded-[24px] border border-[#e6d7c5] bg-white/80 p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_10px_24px_rgba(199,92,42,0.22)]">
+                <Sparkles className="size-5" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                  Current step
+                </p>
+                <h3 className="text-xl font-semibold tracking-tight text-foreground">
+                  {currentStepMeta.title}
+                </h3>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {currentStepMeta.question}
+                </p>
+              </div>
             </div>
-            <div className="mt-5">
-              <FormField
-                label="Persona"
-                hint="Describe the role the agent should consistently inhabit."
-              >
-                <textarea
-                  className={textareaClassName}
-                  onChange={(event) => updateDraft("persona", event.target.value)}
-                  readOnly={mode === "detail"}
-                  value={draft.persona}
-                />
-              </FormField>
+          </div>
+          <div className="rounded-[24px] border border-[#e6d7c5] bg-white/80 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+              Build posture
+            </p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
+              {completedChecklistCount}/{checklistItems.length}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Signals already in place before we hand this agent real traffic.
+            </p>
+          </div>
+          <div className="rounded-[24px] border border-[#e6d7c5] bg-[#2b2235] p-5 text-[#f7efe4] shadow-[0_16px_32px_rgba(31,23,40,0.16)]">
+            <div className="flex items-start gap-3">
+              <Bot className="mt-0.5 size-5 text-[#f4c79b]" />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ccbda8]">
+                  Operator scope
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#f7efe4]">
+                  One tenant, one channel assignment, one controlled workbench. Keep the build sharp before moving into test chat and deploy.
+                </p>
+              </div>
             </div>
-          </SurfaceCard>
+          </div>
+        </div>
+      </div>
 
-          <SurfaceCard
-            title="Channel"
-            description="Bind the agent to one connected tenant channel. Unavailable channels stay visible so the rule is obvious."
-          >
-            {tenant.channelConnections.length === 0 ? (
-              <EmptyState
-                title="No channel available"
-                description="Connect at least one channel in the client portal before turning this draft into a real agent."
-                action={
-                  <Link
-                    href="/client/connections"
-                    className={secondaryButtonClassName}
+      <div className="grid gap-8 xl:grid-cols-[220px_minmax(0,1fr)_360px] xl:items-start">
+        <aside className="space-y-4 xl:sticky xl:top-24">
+          <div className="rounded-[28px] bg-[#1f1728] p-5 text-[#f6efe5] shadow-[0_18px_40px_rgba(31,23,40,0.18)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ccbda8]">
+              Builder flow
+            </p>
+            <div className="mt-4 space-y-2">
+              {wizardSteps.map((step, index) => {
+                const isActive = index === currentStep;
+                const isComplete = index < currentStep;
+
+                return (
+                  <button
+                    key={step.id}
+                    className={
+                      isActive
+                        ? "w-full rounded-[18px] bg-[#f4eadc] px-4 py-4 text-left text-[#1f1728] shadow-[0_8px_18px_rgba(0,0,0,0.08)]"
+                        : "w-full rounded-[18px] px-4 py-4 text-left text-[#f6efe5] ring-1 ring-white/10 transition hover:bg-white/5"
+                    }
+                    onClick={() => setCurrentStep(index)}
+                    type="button"
                   >
-                    Open client connections
-                  </Link>
-                }
-              />
-            ) : (
-              <div className="space-y-3">
-                {tenant.channelConnections.map((connection) => {
-                  const assignedAgentName = assignedChannels.get(connection.id);
-                  const isUnavailable =
-                    connection.status !== "CONNECTED" || Boolean(assignedAgentName);
-
-                  return (
-                    <label
-                      key={connection.id}
-                      className="flex cursor-pointer items-start gap-4 rounded-[20px] border border-border bg-[#faf6f0] p-5"
-                    >
-                      <input
-                        checked={draft.channelId === connection.id}
-                        className="mt-1"
-                        disabled={mode === "detail" || isUnavailable}
-                        name="channelId"
-                        onChange={() => updateDraft("channelId", connection.id)}
-                        type="radio"
-                      />
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-base font-semibold text-foreground">
-                            {connection.type}
-                          </p>
-                          <StatusBadge status={connection.status} />
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {assignedAgentName
-                            ? `Already assigned to ${assignedAgentName}.`
-                            : connection.status === "CONNECTED"
-                              ? "Ready for agent assignment."
-                              : "This channel must be connected before it can be assigned."}
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={
+                          isActive
+                            ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold"
+                            : isComplete
+                              ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f4c79b] text-[#1f1728] text-xs font-semibold"
+                              : "flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold"
+                        }
+                      >
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className={isActive ? "text-sm font-semibold" : "text-sm font-medium"}>
+                          {step.title}
+                        </p>
+                        <p
+                          className={
+                            isActive
+                              ? "mt-1 text-xs leading-5 text-[#5d5245]"
+                              : "mt-1 text-xs leading-5 text-[#ccbda8]"
+                          }
+                        >
+                          {step.question}
                         </p>
                       </div>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </SurfaceCard>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
 
-          <SurfaceCard
-            title="Sales assets"
-            description="Configure optional files the agent can attach when it sends pricing or offer details."
-          >
-            <div className="rounded-[20px] border border-border bg-[#faf6f0] p-5">
+        <div className="space-y-6">
+          {currentStep === 0 ? (
+            <SurfaceCard
+              className={sectionCardClassName(0)}
+              title="Basics"
+              description="Set the editorial voice and role of the agent before channels and tools add complexity."
+            >
+            <div className={sectionCanvasClassName}>
+              <div className="grid gap-5 md:grid-cols-2">
+                <FormField
+                  label="Agent name"
+                  hint="Use a business-facing name the operator can scan quickly."
+                >
+                  <input
+                    className={inputClassName}
+                    onChange={(event) => updateDraft("name", event.target.value)}
+                    readOnly={mode === "detail"}
+                    value={draft.name}
+                  />
+                </FormField>
+                <FormField label="Tone">
+                  <select
+                    className={selectClassName}
+                    disabled={mode === "detail"}
+                    onChange={(event) => updateDraft("tone", event.target.value)}
+                    value={draft.tone}
+                  >
+                    <option value="friendly">Friendly</option>
+                    <option value="calm">Calm</option>
+                    <option value="premium">Premium</option>
+                    <option value="direct">Direct</option>
+                  </select>
+                </FormField>
+                <FormField
+                  label="Preferred response language"
+                  hint="Optional. Leave blank to keep the agent multilingual-first."
+                >
+                  <input
+                    className={inputClassName}
+                    onChange={(event) =>
+                      updateDraft("languagePreference", event.target.value)
+                    }
+                    placeholder="For example: Russian, English, Spanish"
+                    readOnly={mode === "detail"}
+                    value={draft.languagePreference}
+                  />
+                </FormField>
+              </div>
+              <div className="mt-5">
+                <FormField
+                  label="Persona"
+                  hint="Describe the role the agent should consistently inhabit."
+                >
+                  <textarea
+                    className={textareaClassName}
+                    onChange={(event) => updateDraft("persona", event.target.value)}
+                    readOnly={mode === "detail"}
+                    value={draft.persona}
+                  />
+                </FormField>
+              </div>
+            </div>
+            </SurfaceCard>
+          ) : null}
+
+          {currentStep === 1 ? (
+            <>
+              <SurfaceCard
+                className={sectionCardClassName(1)}
+                title="Channel"
+                description="Bind the agent to one connected tenant channel. Unavailable channels stay visible so the rule is obvious."
+              >
+            <div className={sectionCanvasClassName}>
+              {tenant.channelConnections.length === 0 ? (
+                <EmptyState
+                  title="No channel available"
+                  description="Connect at least one channel in the client portal before turning this draft into a real agent."
+                  action={
+                    <Link
+                      href="/client/connections"
+                      className={secondaryButtonClassName}
+                    >
+                      Open client connections
+                    </Link>
+                  }
+                />
+              ) : (
+                <div className="space-y-3">
+                  {tenant.channelConnections.map((connection) => {
+                    const assignedAgentName = assignedChannels.get(connection.id);
+                    const isUnavailable =
+                      connection.status !== "CONNECTED" || Boolean(assignedAgentName);
+
+                    return (
+                      <label
+                        key={connection.id}
+                        className="flex cursor-pointer items-start gap-4 rounded-[22px] bg-white/78 p-5 ring-1 ring-[#ece0d2]"
+                      >
+                        <input
+                          checked={draft.channelId === connection.id}
+                          className="mt-1"
+                          disabled={mode === "detail" || isUnavailable}
+                          name="channelId"
+                          onChange={() => updateDraft("channelId", connection.id)}
+                          type="radio"
+                        />
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-base font-semibold text-foreground">
+                              {connection.type}
+                            </p>
+                            <StatusBadge status={connection.status} />
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {assignedAgentName
+                              ? `Already assigned to ${assignedAgentName}.`
+                              : connection.status === "CONNECTED"
+                                ? "Ready for agent assignment."
+                                : "This channel must be connected before it can be assigned."}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+              </SurfaceCard>
+
+              <SurfaceCard
+                className={sectionCardClassName(1)}
+                title="Sales assets"
+                description="Configure optional files the agent can attach when it sends pricing or offer details."
+              >
+            <div className={sectionCanvasClassName}>
               <div className="grid gap-5 md:grid-cols-2">
                 <FormField
                   label="Pricing attachment"
@@ -1409,7 +1404,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                     value={draft.channelConfig.priceAttachmentMimeType}
                   />
                 </FormField>
-                <div className="rounded-[16px] border border-[#eadfce] bg-white px-4 py-3">
+                <div className={softInfoPanelClassName}>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#636563]">
                     Runtime behavior
                   </p>
@@ -1419,29 +1414,34 @@ function uniqueValues(values: Array<string | undefined | null>) {
                 </div>
               </div>
             </div>
-          </SurfaceCard>
+              </SurfaceCard>
+            </>
+          ) : null}
 
-          <SurfaceCard
-            title="Knowledge"
-            description="Knowledge blocks stay free-form and editorial instead of collapsing into rigid templates."
-            action={
-              mode === "detail" ? null : (
-                <button
-                  className={secondaryButtonClassName}
-                  onClick={addKnowledgeBlock}
-                  type="button"
-                >
-                  <Plus className="mr-2 size-4" />
-                  Add knowledge block
-                </button>
-              )
-            }
-          >
-            <div className="space-y-4">
+          {currentStep === 2 ? (
+            <SurfaceCard
+              className={sectionCardClassName(2)}
+              title="Knowledge"
+              description="Knowledge blocks stay free-form and editorial instead of collapsing into rigid templates."
+              action={
+                mode === "detail" ? null : (
+                  <button
+                    className={secondaryButtonClassName}
+                    onClick={addKnowledgeBlock}
+                    type="button"
+                  >
+                    <Plus className="mr-2 size-4" />
+                    Add knowledge block
+                  </button>
+                )
+              }
+            >
+            <div className={sectionCanvasClassName}>
+              <div className="space-y-4">
               {draft.knowledgeBlocks.map((block, index) => (
                 <div
                   key={`${block.name}-${index}`}
-                  className="rounded-[20px] border border-border bg-[#faf6f0] p-5"
+                  className="rounded-[26px] bg-white/78 p-6 ring-1 ring-[#ece0d2]"
                 >
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold text-foreground">
@@ -1524,30 +1524,35 @@ function uniqueValues(values: Array<string | undefined | null>) {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
-          </SurfaceCard>
+            </SurfaceCard>
+          ) : null}
 
-          <SurfaceCard
-            title="Tools"
-            description="Tool rows represent real business actions backed by tenant integrations."
-            action={
-              mode === "detail" ? null : (
-                <button
-                  className={secondaryButtonClassName}
-                  onClick={addToolBlock}
-                  type="button"
-                >
-                  <Plus className="mr-2 size-4" />
-                  Add tool
-                </button>
-              )
-            }
-          >
-            <div className="space-y-4">
+          {currentStep === 3 ? (
+            <SurfaceCard
+              className={sectionCardClassName(3)}
+              title="Tools"
+              description="Tool rows represent real business actions backed by tenant integrations."
+              action={
+                mode === "detail" ? null : (
+                  <button
+                    className={secondaryButtonClassName}
+                    onClick={addToolBlock}
+                    type="button"
+                  >
+                    <Plus className="mr-2 size-4" />
+                    Add tool
+                  </button>
+                )
+              }
+            >
+            <div className={sectionCanvasClassName}>
+              <div className="space-y-5">
               {draft.toolBlocks.map((tool, toolIndex) => (
                 <div
                   key={`${tool.name}-${toolIndex}`}
-                  className="rounded-[24px] border border-border bg-white p-6 shadow-[0_10px_24px_rgba(31,23,40,0.04)]"
+                  className="rounded-[30px] bg-[linear-gradient(180deg,#fffefb_0%,#fbf4ea_100%)] p-6 ring-1 ring-[#dfcfbb]"
                 >
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <p className="font-semibold text-foreground">Tool block {toolIndex + 1}</p>
@@ -1607,7 +1612,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                         value={tool.description}
                       />
                     </FormField>
-                    <div className="space-y-4 border-t border-[#ece2d4] pt-5">
+                    <div className="space-y-5 border-t border-[#e8d8c5] pt-6">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-semibold text-foreground">Executable steps</p>
                         {mode !== "detail" ? (
@@ -1655,7 +1660,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                         return (
                           <div
                             key={`${step.integrationId}-${stepIndex}`}
-                            className="rounded-[20px] border border-[#e8ddcf] bg-[#fcfaf6] p-5 shadow-[0_8px_18px_rgba(31,23,40,0.03)]"
+                            className="border-l-[3px] border-[#c75c2a] pl-5 pr-0 py-2"
                           >
                             <div className="mb-4 flex items-center justify-between gap-3">
                               <p className="text-sm font-semibold text-foreground">
@@ -1758,7 +1763,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                               </FormField>
                             </div>
                             {isGoogleSheets ? (
-                              <div className="mt-5 space-y-5 border-t border-[#ece2d4] pt-5">
+                              <div className="mt-6 space-y-6 border-t border-[#eadbc8] pt-6">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
                                     <p className="text-sm font-semibold text-foreground">
@@ -1942,7 +1947,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                   {sheetParams.filters.map((filter, filterIndex) => (
                                     <div
                                       key={`${filter.column}-${filterIndex}`}
-                                      className="space-y-3 rounded-[16px] border border-[#ece2d4] bg-white p-4"
+                                      className="space-y-3 rounded-[18px] bg-white/75 p-4 ring-1 ring-[#eee1d1]"
                                     >
                                       <div className="grid gap-4 md:grid-cols-3">
                                         <FormField label="Column">
@@ -2059,7 +2064,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                 ) : null}
                               </div>
                             ) : isGoogleCalendar ? (
-                              <div className="mt-5 space-y-5 border-t border-[#ece2d4] pt-5">
+                              <div className="mt-6 space-y-6 border-t border-[#eadbc8] pt-6">
                                 <div>
                                   <p className="text-sm font-semibold text-foreground">
                                     Google Calendar event
@@ -2171,8 +2176,8 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                 <p className="text-sm text-muted-foreground">
                                   Working days are currently fixed to Monday-Friday. Consultation rules still respect the 9 AM - 2 PM ET policy from the prompt.
                                 </p>
-                                <div className="grid gap-4 md:grid-cols-3">
-                                  <div className="rounded-[16px] border border-[#ece2d4] bg-white p-4">
+                                <div className="grid gap-3 md:grid-cols-3">
+                                  <div className="rounded-[18px] bg-white/72 p-4 ring-1 ring-[#ecdfd0]">
                                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
                                       Attendees
                                     </p>
@@ -2180,7 +2185,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                       Customer email from the tool call
                                     </p>
                                   </div>
-                                  <div className="rounded-[16px] border border-[#ece2d4] bg-white p-4">
+                                  <div className="rounded-[18px] bg-white/72 p-4 ring-1 ring-[#ecdfd0]">
                                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
                                       Conference data
                                     </p>
@@ -2188,7 +2193,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                       Google Meet
                                     </p>
                                   </div>
-                                  <div className="rounded-[16px] border border-[#ece2d4] bg-white p-4">
+                                  <div className="rounded-[18px] bg-white/72 p-4 ring-1 ring-[#ecdfd0]">
                                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
                                       Send updates
                                     </p>
@@ -2198,7 +2203,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                   </div>
                                 </div>
                                 {calendarParams.operation === "book_call" ? (
-                                  <div className="space-y-4 rounded-[18px] border border-[#ece2d4] bg-white p-4">
+                                  <div className="space-y-4 rounded-[20px] bg-white/72 p-4 ring-1 ring-[#ecdfd0]">
                                     <div>
                                       <p className="text-sm font-semibold text-foreground">
                                         Optional side effects
@@ -2212,7 +2217,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                         label="Google Sheets sync"
                                         hint="Turn this on only if booked calls should also be mirrored into a client spreadsheet."
                                       >
-                                        <label className="flex items-center gap-3 rounded-[16px] border border-[#ece2d4] bg-[#faf6f0] px-4 py-3 text-sm text-foreground">
+                                        <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-3 text-sm text-foreground ring-1 ring-[#eadccc]">
                                           <input
                                             checked={calendarParams.syncLeadToSheets}
                                             disabled={mode === "detail"}
@@ -2243,7 +2248,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                               value={calendarParams.leadSheetName}
                                             />
                                           </FormField>
-                                          <div className="rounded-[16px] border border-[#ece2d4] bg-[#faf6f0] px-4 py-3 text-sm text-muted-foreground">
+                                          <div className="rounded-[16px] bg-[#faf3e9] px-4 py-3 text-sm text-muted-foreground ring-1 ring-[#eadccc]">
                                             Stafless still keeps its own lead record even when this sync is enabled.
                                           </div>
                                         </div>
@@ -2435,11 +2440,55 @@ function uniqueValues(values: Array<string | undefined | null>) {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
-          </SurfaceCard>
+            </SurfaceCard>
+          ) : null}
+
+          {currentStep === 4 ? (
+            <div className="rounded-[32px] bg-[linear-gradient(180deg,#fffdf9_0%,#f7efe2_100%)] p-8 ring-1 ring-[#e6d7c5] shadow-[0_18px_40px_rgba(31,23,40,0.06)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                Final pass
+              </p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
+                Review the operator surface, then launch with confidence
+              </h2>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-muted-foreground">
+                This step is intentionally quieter. The detailed checklist, deploy posture, and prompt shape all live in the right rail so the last decision feels focused instead of buried under another form.
+              </p>
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                <div className="rounded-[20px] bg-white/78 p-5 ring-1 ring-[#ece0d2]">
+                  <p className="text-sm font-semibold text-foreground">Builder status</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {isDirty
+                      ? "There are unsaved edits. Save once before moving into full-cycle testing."
+                      : "This draft is in sync with the latest saved builder state."}
+                  </p>
+                </div>
+                <div className="rounded-[20px] bg-white/78 p-5 ring-1 ring-[#ece0d2]">
+                  <p className="text-sm font-semibold text-foreground">Test path</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Use the detail-page test chat for a realistic conversation cycle without live outbound side effects.
+                  </p>
+                </div>
+                <div className="rounded-[20px] bg-white/78 p-5 ring-1 ring-[#ece0d2]">
+                  <p className="text-sm font-semibold text-foreground">Prompt shape</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Keep the preview readable enough that an operator can sanity-check tone, rules, and tool posture quickly.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {mode !== "detail" ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-border bg-[#fcfaf6] px-5 py-4 shadow-[0_10px_24px_rgba(31,23,40,0.04)]">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Wizard navigation</p>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Move step by step, then save before opening the detail-page test chat.
+                </p>
+              </div>
               <button
                 className={secondaryButtonClassName}
                 disabled={currentStep === 0 || isSaving}
@@ -2472,10 +2521,11 @@ function uniqueValues(values: Array<string | undefined | null>) {
           ) : null}
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[0.88fr_1.12fr]">
+        <div className="space-y-6 xl:sticky xl:top-24">
           <SurfaceCard
-            title="Review and launch"
-            description="Keep launch actions close to the draft, then drop into testing before deployment."
+            className="border-[#dccab6] bg-[linear-gradient(180deg,#fffdf9_0%,#f7ede1_100%)]"
+            title="Operator review"
+            description="Readiness, launch posture, and tenant context stay together so the last pass feels deliberate instead of procedural."
           >
             <Checklist items={checklistItems} />
             <div className="mt-6 flex flex-wrap gap-3">
@@ -2540,33 +2590,17 @@ function uniqueValues(values: Array<string | undefined | null>) {
           </SurfaceCard>
 
           <SurfaceCard
+            className="bg-[#fcfaf6]"
             title="Testing flow"
-            description="Use the right-side test chat for a real agent cycle without sending live outbound messages."
+            description="The draft work happens here. The real conversation cycle belongs to the saved agent detail view."
           >
             <div className="rounded-[20px] border border-border bg-[#faf6f0] p-5">
               <p className="text-sm leading-6 text-[#433a49]">
-                Open the test chat on the right to run the saved agent through a real conversation loop with memory and tool execution. It stays inside Stafless and does not send live outbound Gmail, Telegram, or other channel traffic.
+                Full-cycle testing now belongs on the saved agent detail page. Open the detail view to use the right-side test chat with persistent memory and tool execution.
               </p>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  className={secondaryButtonClassName}
-                  onClick={() => setIsChatOpen((current) => !current)}
-                  type="button"
-                >
-                  {isChatOpen ? "Hide test chat" : "Open test chat"}
-                </button>
-                <button
-                  className={secondaryButtonClassName}
-                  disabled={!agent}
-                  onClick={resetTestChat}
-                  type="button"
-                >
-                  Start fresh chat
-                </button>
-              </div>
               {!agent ? (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  Save the agent first, then the test chat will run against the saved runtime configuration.
+                  Save the agent first, then continue testing from the detail page.
                 </p>
               ) : null}
               {deployReadiness ? (
@@ -2627,106 +2661,31 @@ function uniqueValues(values: Array<string | undefined | null>) {
             </div>
           </SurfaceCard>
         </div>
+      </div>
 
-        <SurfaceCard
-          title="Prompt preview"
-          description="Review the composed system prompt after the builder config is in place, instead of keeping it pinned beside the form."
-        >
-          <pre className="overflow-x-auto rounded-[20px] border border-border bg-[#221b2d] p-5 font-mono text-[13px] leading-6 text-[#f4f1ea]">
+      <SurfaceCard
+        className="bg-[#f8f3ea]"
+        title="Prompt preview"
+        description="Review the composed system prompt in a readable inspection view before testing or deploy."
+      >
+        <div className="rounded-[24px] bg-white p-4 ring-1 ring-[#e7dccd] shadow-[0_12px_24px_rgba(31,23,40,0.04)]">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#eee3d6] px-2 pb-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">System prompt</p>
+              <p className="text-xs text-muted-foreground">
+                Live builder output for this agent configuration
+              </p>
+            </div>
+            <span className="rounded-full bg-[#f6efe5] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f6458] ring-1 ring-[#eadccc]">
+              Read only
+            </span>
+          </div>
+          <pre className="max-h-[520px] overflow-auto rounded-[20px] bg-[#fcfaf7] px-5 py-5 font-mono text-[12px] leading-6 text-[#2d2437]">
             {promptPreview}
           </pre>
-        </SurfaceCard>
-      </div>
-      {mode !== "detail" && isChatOpen ? (
-        <div className="fixed bottom-6 right-6 z-30 hidden w-[380px] overflow-hidden rounded-[24px] border border-border bg-white shadow-[0_24px_60px_rgba(31,23,40,0.18)] xl:flex xl:flex-col">
-          <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                {agent?.name || "Unsaved agent"}
-              </p>
-              <p className="text-xs text-muted-foreground">Test chat</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className={secondaryButtonClassName}
-                onClick={resetTestChat}
-                type="button"
-              >
-                <RotateCcw className="size-4" />
-              </button>
-              <button
-                className={secondaryButtonClassName}
-                onClick={() => setIsChatOpen(false)}
-                type="button"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          </div>
-          <div className="max-h-[480px] min-h-[320px] space-y-3 overflow-y-auto bg-[#fcfaf6] px-5 py-4">
-            {chatMessages.length === 0 ? (
-              <div className="rounded-[18px] border border-dashed border-[#e5d8c8] bg-white px-4 py-6 text-sm leading-6 text-muted-foreground">
-                {agent
-                  ? "Start a conversation to test the real agent cycle with memory and tool execution."
-                  : "Save the agent first, then use this panel to test the full cycle."}
-              </div>
-            ) : (
-              chatMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={
-                    message.role === "user"
-                      ? "ml-8 rounded-[18px] bg-[#221b2d] px-4 py-3 text-sm leading-6 text-white"
-                      : "mr-8 rounded-[18px] border border-[#e5d8c8] bg-white px-4 py-3 text-sm leading-6 text-[#433a49]"
-                  }
-                >
-                  <p>{message.text}</p>
-                  {message.usedTooling?.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {message.usedTooling.map((toolName) => (
-                        <span
-                          key={`${message.id}-${toolName}`}
-                          className="rounded-full border border-border bg-[#faf6f0] px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
-                        >
-                          {toolName}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-          <div className="border-t border-border bg-white px-5 py-4">
-            <textarea
-              className={textareaClassName}
-              disabled={isTesting || !agent}
-              onChange={(event) => setTestMessage(event.target.value)}
-              placeholder={
-                agent
-                  ? "Type a test message for this agent..."
-                  : "Save the agent to enable full-cycle testing..."
-              }
-              value={testMessage}
-            />
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground">
-                Uses a persistent internal test contact and does not send live outbound channel traffic.
-              </p>
-              <button
-                className={primaryButtonClassName}
-                disabled={isTesting || !agent || !testMessage.trim()}
-                onClick={sendTestChatMessage}
-                type="button"
-              >
-                <SendHorizontal className="mr-2 size-4" />
-                {isTesting ? "Sending..." : "Send"}
-              </button>
-            </div>
-          </div>
         </div>
-      ) : null}
-    </div>
+      </SurfaceCard>
+      </div>
   );
 }
 

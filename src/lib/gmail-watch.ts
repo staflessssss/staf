@@ -1,0 +1,501 @@
+import { ChannelType, ConnectionStatus, Prisma } from "@prisma/client";
+import { google } from "googleapis";
+
+import { handleIncomingEvent } from "@/lib/ai-runtime";
+import { createGoogleOAuthClientFromEncryptedCredentials } from "@/lib/google-api-client";
+import { db } from "@/lib/db";
+
+type GmailWatchMetadata = {
+  topicName?: string;
+  historyId?: string;
+  expiration?: string;
+  registeredAt?: string;
+  lastNotificationAt?: string;
+  lastProcessedAt?: string;
+  lastError?: string | null;
+};
+
+type PubSubPushEnvelope = {
+  message?: {
+    data?: string;
+    messageId?: string;
+    publishTime?: string;
+  };
+  subscription?: string;
+};
+
+type GmailPushPayload = {
+  emailAddress?: string;
+  historyId?: string;
+};
+
+type ParsedGmailInboundMessage = {
+  from: string;
+  text: string;
+  messageId: string;
+  threadId: string;
+  subject: string;
+  gmailMessageId: string;
+};
+
+function getGmailPubSubTopic() {
+  return process.env.GMAIL_PUBSUB_TOPIC?.trim() || "";
+}
+
+function getPubSubWebhookSecret() {
+  return process.env.GMAIL_PUBSUB_WEBHOOK_SECRET?.trim() || "";
+}
+
+function asObject(value: Prisma.JsonValue | null | undefined) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, Prisma.JsonValue>;
+}
+
+function getWatchMetadata(metadata: Prisma.JsonValue | null | undefined): GmailWatchMetadata {
+  const parsed = asObject(metadata);
+  const watch = parsed?.gmailWatch;
+
+  if (!watch || typeof watch !== "object" || Array.isArray(watch)) {
+    return {};
+  }
+
+  const value = watch as Record<string, unknown>;
+
+  return {
+    topicName: typeof value.topicName === "string" ? value.topicName : undefined,
+    historyId: typeof value.historyId === "string" ? value.historyId : undefined,
+    expiration: typeof value.expiration === "string" ? value.expiration : undefined,
+    registeredAt: typeof value.registeredAt === "string" ? value.registeredAt : undefined,
+    lastNotificationAt: typeof value.lastNotificationAt === "string" ? value.lastNotificationAt : undefined,
+    lastProcessedAt: typeof value.lastProcessedAt === "string" ? value.lastProcessedAt : undefined,
+    lastError: typeof value.lastError === "string" ? value.lastError : value.lastError === null ? null : undefined,
+  };
+}
+
+function mergeWatchMetadata(
+  metadata: Prisma.JsonValue | null | undefined,
+  patch: Partial<GmailWatchMetadata>,
+): Prisma.InputJsonValue {
+  const parsed = asObject(metadata);
+  const existingWatch = getWatchMetadata(metadata);
+
+  return {
+    ...(parsed ?? {}),
+    gmailWatch: {
+      ...existingWatch,
+      ...patch,
+    },
+  };
+}
+
+function decodePubSubPayload(envelope: PubSubPushEnvelope): GmailPushPayload | null {
+  const data = envelope.message?.data;
+
+  if (!data) {
+    return null;
+  }
+
+  try {
+    const decoded = Buffer.from(data, "base64").toString("utf8");
+    return JSON.parse(decoded) as GmailPushPayload;
+  } catch {
+    return null;
+  }
+}
+
+function compareHistoryIds(left?: string, right?: string) {
+  if (!left && !right) return 0;
+  if (!left) return -1;
+  if (!right) return 1;
+
+  const a = BigInt(left);
+  const b = BigInt(right);
+
+  if (a === b) return 0;
+  return a > b ? 1 : -1;
+}
+
+function normalizeHeaderValue(headers: Array<{ name?: string | null; value?: string | null }> | undefined, name: string) {
+  const match = headers?.find((header) => header.name?.toLowerCase() === name.toLowerCase());
+  return String(match?.value ?? "").trim();
+}
+
+function decodeBase64Url(input?: string | null) {
+  if (!input) {
+    return "";
+  }
+
+  return Buffer.from(input.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+}
+
+function stripHtml(html: string) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function pickMessageBody(payload?: {
+  mimeType?: string | null;
+  body?: { data?: string | null };
+  parts?: unknown[];
+}): string {
+  if (!payload) {
+    return "";
+  }
+
+  if (payload.mimeType === "text/plain") {
+    return decodeBase64Url(payload.body?.data);
+  }
+
+  if (payload.mimeType === "text/html") {
+    return stripHtml(decodeBase64Url(payload.body?.data));
+  }
+
+  const parts = Array.isArray(payload.parts) ? payload.parts : [];
+
+  for (const part of parts) {
+    if (!part || typeof part !== "object" || Array.isArray(part)) {
+      continue;
+    }
+
+    const nested = pickMessageBody(part as { mimeType?: string | null; body?: { data?: string | null }; parts?: unknown[] });
+    if (nested.trim()) {
+      return nested;
+    }
+  }
+
+  return decodeBase64Url(payload.body?.data);
+}
+
+function extractEmailAddress(value: string) {
+  const match = value.match(/<([^>]+)>/);
+  if (match?.[1]) {
+    return match[1].trim().toLowerCase();
+  }
+
+  return value.trim().toLowerCase();
+}
+
+function isInboundCustomerMessage(args: {
+  mailboxEmail: string;
+  from: string;
+  labelIds?: string[] | null;
+}) {
+  const labels = args.labelIds ?? [];
+  const sender = extractEmailAddress(args.from);
+  const mailbox = args.mailboxEmail.trim().toLowerCase();
+
+  if (!sender || !mailbox) {
+    return false;
+  }
+
+  if (labels.includes("SENT") || labels.includes("DRAFT")) {
+    return false;
+  }
+
+  if (sender === mailbox) {
+    return false;
+  }
+
+  return true;
+}
+
+async function updateChannelWatchMetadata(channelId: string, patch: Partial<GmailWatchMetadata>) {
+  const current = await db.channelConnection.findUnique({
+    where: { id: channelId },
+    select: { metadata: true },
+  });
+
+  await db.channelConnection.update({
+    where: { id: channelId },
+    data: {
+      metadata: mergeWatchMetadata(current?.metadata, patch),
+    },
+  });
+}
+
+async function fetchHistoryMessages(args: {
+  credentialsEnc: string;
+  mailboxEmail: string;
+  startHistoryId: string;
+}) {
+  const auth = createGoogleOAuthClientFromEncryptedCredentials(args.credentialsEnc);
+  const gmail = google.gmail({ version: "v1", auth });
+  const ids = new Set<string>();
+  let pageToken: string | undefined;
+
+  do {
+    const response = await gmail.users.history.list({
+      userId: "me",
+      startHistoryId: args.startHistoryId,
+      historyTypes: ["messageAdded"],
+      pageToken,
+      maxResults: 100,
+    });
+
+    for (const historyRecord of response.data.history ?? []) {
+      for (const entry of historyRecord.messagesAdded ?? []) {
+        const id = entry.message?.id;
+        if (id) {
+          ids.add(id);
+        }
+      }
+    }
+
+    pageToken = response.data.nextPageToken ?? undefined;
+  } while (pageToken);
+
+  const results: ParsedGmailInboundMessage[] = [];
+
+  for (const id of ids) {
+    const response = await gmail.users.messages.get({
+      userId: "me",
+      id,
+      format: "full",
+    });
+
+    const data = response.data;
+    const headers = data.payload?.headers ?? [];
+    const from = normalizeHeaderValue(headers, "From");
+    const subject = normalizeHeaderValue(headers, "Subject");
+    const rfcMessageId = normalizeHeaderValue(headers, "Message-ID");
+    const text = pickMessageBody(data.payload as never) || String(data.snippet ?? "");
+
+    if (
+      !isInboundCustomerMessage({
+        mailboxEmail: args.mailboxEmail,
+        from,
+        labelIds: data.labelIds ?? undefined,
+      })
+    ) {
+      continue;
+    }
+
+    results.push({
+      from: extractEmailAddress(from),
+      text,
+      messageId: rfcMessageId,
+      threadId: String(data.threadId ?? ""),
+      subject,
+      gmailMessageId: String(data.id ?? id),
+    });
+  }
+
+  return results;
+}
+
+export async function registerGmailWatchForChannel(args: {
+  channelId: string;
+  credentialsEnc: string;
+}) {
+  const topicName = getGmailPubSubTopic();
+
+  if (!topicName) {
+    return {
+      ok: false,
+      mode: "skipped",
+      reason: "gmail_pubsub_topic_missing",
+    };
+  }
+
+  const auth = createGoogleOAuthClientFromEncryptedCredentials(args.credentialsEnc);
+  const gmail = google.gmail({ version: "v1", auth });
+
+  try {
+    const response = await gmail.users.watch({
+      userId: "me",
+      requestBody: {
+        topicName,
+        labelIds: ["INBOX"],
+        labelFilterAction: "include",
+      },
+    });
+
+    const patch: Partial<GmailWatchMetadata> = {
+      topicName,
+      historyId: String(response.data.historyId ?? ""),
+      expiration: response.data.expiration ? String(response.data.expiration) : undefined,
+      registeredAt: new Date().toISOString(),
+      lastError: null,
+    };
+
+    await updateChannelWatchMetadata(args.channelId, patch);
+
+    return {
+      ok: true,
+      mode: "gmail_watch",
+      ...patch,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "gmail_watch_failed";
+
+    await updateChannelWatchMetadata(args.channelId, {
+      lastError: message,
+    });
+
+    return {
+      ok: false,
+      mode: "gmail_watch",
+      reason: message,
+    };
+  }
+}
+
+export async function processGmailPubSubNotification(args: {
+  envelope: PubSubPushEnvelope;
+}) {
+  const payload = decodePubSubPayload(args.envelope);
+
+  if (!payload?.emailAddress || !payload.historyId) {
+    return {
+      ok: false,
+      reason: "invalid_pubsub_payload",
+    };
+  }
+
+  const gmailChannels = await db.channelConnection.findMany({
+    where: {
+      type: ChannelType.GMAIL,
+      status: ConnectionStatus.CONNECTED,
+    },
+    include: {
+      agents: {
+        where: {
+          status: "ACTIVE",
+        },
+        take: 1,
+      },
+    },
+  });
+
+  const channel = gmailChannels.find((item) => {
+    const metadata = asObject(item.metadata);
+    return String(metadata?.email ?? "").trim().toLowerCase() === payload.emailAddress?.trim().toLowerCase();
+  });
+
+  if (!channel) {
+    return {
+      ok: true,
+      status: "ignored_unknown_mailbox",
+      emailAddress: payload.emailAddress,
+    };
+  }
+
+  const watchMetadata = getWatchMetadata(channel.metadata);
+  const comparison = compareHistoryIds(payload.historyId, watchMetadata.historyId);
+
+  if (comparison <= 0) {
+    return {
+      ok: true,
+      status: "ignored_stale_notification",
+      emailAddress: payload.emailAddress,
+      historyId: payload.historyId,
+    };
+  }
+
+  await updateChannelWatchMetadata(channel.id, {
+    lastNotificationAt: new Date().toISOString(),
+  });
+
+  if (!watchMetadata.historyId) {
+    await updateChannelWatchMetadata(channel.id, {
+      historyId: payload.historyId,
+      lastProcessedAt: new Date().toISOString(),
+      lastError: null,
+    });
+
+    return {
+      ok: true,
+      status: "cursor_initialized",
+      emailAddress: payload.emailAddress,
+      historyId: payload.historyId,
+    };
+  }
+
+  try {
+    const messages = await fetchHistoryMessages({
+      credentialsEnc: channel.credentialsEnc,
+      mailboxEmail: payload.emailAddress,
+      startHistoryId: watchMetadata.historyId,
+    });
+
+    const agent = channel.agents[0] ?? null;
+
+    if (agent) {
+      for (const message of messages) {
+        await handleIncomingEvent({
+          agentId: agent.id,
+          channel: ChannelType.GMAIL,
+          payload: {
+            from: message.from,
+            text: message.text,
+            messageId: message.messageId,
+            threadId: message.threadId,
+            subject: message.subject,
+          },
+        });
+      }
+    }
+
+    await updateChannelWatchMetadata(channel.id, {
+      historyId: payload.historyId,
+      lastProcessedAt: new Date().toISOString(),
+      lastError: null,
+    });
+
+    return {
+      ok: true,
+      status: agent ? "processed" : "processed_no_active_agent",
+      processedCount: messages.length,
+      emailAddress: payload.emailAddress,
+      historyId: payload.historyId,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "gmail_pubsub_processing_failed";
+
+    if (message.includes("Requested entity was not found") || message.includes("startHistoryId")) {
+      await updateChannelWatchMetadata(channel.id, {
+        historyId: payload.historyId,
+        lastProcessedAt: new Date().toISOString(),
+        lastError: "gmail_history_cursor_reset",
+      });
+
+      return {
+        ok: true,
+        status: "history_cursor_reset",
+        emailAddress: payload.emailAddress,
+        historyId: payload.historyId,
+      };
+    }
+
+    await updateChannelWatchMetadata(channel.id, {
+      lastError: message,
+    });
+
+    throw error;
+  }
+}
+
+export function assertPubSubWebhookSecret(token?: string | null) {
+  const expected = getPubSubWebhookSecret();
+
+  if (!expected) {
+    return true;
+  }
+
+  return token === expected;
+}

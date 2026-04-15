@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   agentBuilderInclude,
-  mapAgentToDraft,
+  type SandboxInvokeInput,
   sandboxInvokeSchema,
 } from "@/lib/agent-builder";
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
@@ -21,9 +21,10 @@ export async function POST(req: NextRequest) {
 
   const json = await req.json().catch(() => null);
   const parsed = sandboxInvokeSchema.safeParse(json);
+  const testMode = true;
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid sandbox payload." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid test chat payload." }, { status: 400 });
   }
 
   if (parsed.data.agentId) {
@@ -39,31 +40,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
 
-    const draft = mapAgentToDraft(agent);
     const response = await invokeAgent({
       tenantId: parsed.data.tenantId,
       agentId: parsed.data.agentId,
       allowDraftAgent: true,
+      testMode,
       channel: agent.channel.type,
-      contactId: parsed.data.contactId ?? "sandbox-contact",
+      contactId: parsed.data.contactId ?? "test-chat-contact",
       message: parsed.data.message,
-      promptPreview: buildSystemPrompt({
-        ...draft,
-        channel: agent.channel,
-      }),
-      languagePreference: draft.languagePreference,
-      knowledgeBlocks: draft.knowledgeBlocks,
-      toolBlocks: draft.toolBlocks.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        steps: tool.steps.map((step) => ({
-          action: step.action,
-          integrationType: step.integrationType,
-        })),
-      })),
+      historyMessages: coerceHistoryMessages(parsed.data),
     });
 
     return NextResponse.json({ item: response });
+  }
+
+  if (!parsed.data.draft) {
+    return NextResponse.json({ error: "Draft config is required for unsaved testing." }, { status: 400 });
   }
 
   const selectedChannel = await db.channelConnection.findFirst({
@@ -76,7 +68,7 @@ export async function POST(req: NextRequest) {
 
   if (!selectedChannel) {
     return NextResponse.json(
-      { error: "Select a tenant channel before sandbox testing." },
+      { error: "Select a tenant channel before test-chat runs." },
       { status: 400 },
     );
   }
@@ -99,9 +91,11 @@ export async function POST(req: NextRequest) {
 
   const response = await invokeAgent({
     tenantId: parsed.data.tenantId,
+    testMode,
     channel: selectedChannel.type,
-    contactId: parsed.data.contactId ?? "sandbox-contact",
+    contactId: parsed.data.contactId ?? "test-chat-contact",
     message: parsed.data.message,
+    historyMessages: coerceHistoryMessages(parsed.data),
     promptPreview: buildSystemPrompt({
       name: parsed.data.draft.name,
       persona: parsed.data.draft.persona,
@@ -131,4 +125,26 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ item: response });
+}
+
+function coerceHistoryMessages(input: SandboxInvokeInput) {
+  if (!Array.isArray((input as SandboxInvokeInput & { history?: unknown[] }).history)) {
+    return [];
+  }
+
+  return (input as SandboxInvokeInput & {
+    history?: Array<{
+      role: "USER" | "ASSISTANT" | "TOOL";
+      content: string;
+      toolName?: string;
+      toolResult?: unknown;
+      durationMs?: number;
+    }>;
+  }).history!.map((message) => ({
+    role: message.role,
+    content: message.content,
+    toolName: message.toolName,
+    toolResult: message.toolResult,
+    durationMs: message.durationMs,
+  }));
 }

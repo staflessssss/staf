@@ -16,6 +16,8 @@ type ToolExecutionLog = {
 
 type ResolveToolsArgs = {
   agent: AgentWithBuilderData;
+  testMode?: boolean;
+  defaultEmail?: string;
   onToolResult?: (entry: ToolExecutionLog) => void;
 };
 
@@ -58,6 +60,8 @@ async function executeIntegrationStep(args: {
   location?: string;
   email?: string;
   channel?: string;
+  testMode?: boolean;
+  defaultEmail?: string;
 }) {
   switch (args.integrationType) {
     case IntegrationType.GOOGLE_CALENDAR:
@@ -87,7 +91,7 @@ function buildToolDescription(feature: AgentWithBuilderData["features"][number])
   return [feature.description, ...stepDescriptions].filter(Boolean).join(" ");
 }
 
-export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
+export function resolveTools({ agent, testMode, defaultEmail, onToolResult }: ResolveToolsArgs) {
   return agent.features
     .filter((feature) => feature.type === FeatureType.TOOL)
     .reduce<ToolSet>((acc, feature, index) => {
@@ -175,6 +179,8 @@ export function resolveTools({ agent, onToolResult }: ResolveToolsArgs) {
               location,
               email,
               channel,
+              defaultEmail,
+              testMode,
             });
 
             steps.push({

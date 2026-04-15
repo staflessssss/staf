@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { upsertChannelConnection, upsertIntegrationConnection } from "@/lib/connection-store";
+import { db } from "@/lib/db";
+import { registerGmailWatchForChannel } from "@/lib/gmail-watch";
 import { fetchGoogleProfile, exchangeGoogleCode, verifyGoogleState } from "@/lib/google-oauth";
 
 function buildRedirect(baseUrl: URL, redirectTo: string, params: Record<string, string>) {
@@ -70,6 +72,27 @@ export async function GET(request: Request) {
         channel: "gmail",
       },
     });
+
+    const gmailChannel = await db.channelConnection.findUnique({
+      where: {
+        tenantId_type: {
+          tenantId: statePayload.tenantId,
+          type: ChannelType.GMAIL,
+        },
+      },
+      select: {
+        id: true,
+        credentialsEnc: true,
+        metadata: true,
+      },
+    });
+
+    if (gmailChannel) {
+      await registerGmailWatchForChannel({
+        channelId: gmailChannel.id,
+        credentialsEnc: gmailChannel.credentialsEnc,
+      });
+    }
 
     for (const integrationType of [
       IntegrationType.GOOGLE_CALENDAR,

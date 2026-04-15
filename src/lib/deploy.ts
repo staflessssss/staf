@@ -6,6 +6,7 @@ import { AgentWithBuilderData } from "@/lib/agent-builder";
 import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { registerGmailWatchForChannel } from "@/lib/gmail-watch";
 
 type ReadinessItem = {
   key: string;
@@ -68,11 +69,15 @@ function hasValidTools(agent: AgentWithBuilderData) {
 function buildChannelDeployConfig(
   agent: AgentWithBuilderData,
   webhookSecret = randomBytes(24).toString("hex"),
-) {
+): {
+  webhookSecret: string;
+  channelConfig: Prisma.JsonObject;
+} {
   const publicBaseUrl =
     process.env.APP_BASE_URL?.trim() || process.env.NEXTAUTH_URL?.trim() || "";
   const isPublicHttpsUrl =
     publicBaseUrl.startsWith("https://") && !publicBaseUrl.includes("localhost");
+  const gmailPubSubSecret = process.env.GMAIL_PUBSUB_WEBHOOK_SECRET?.trim() || "";
 
   switch (agent.channel.type) {
     case ChannelType.TELEGRAM:
@@ -102,6 +107,14 @@ function buildChannelDeployConfig(
         webhookSecret,
         channelConfig: {
           webhookPath: `/api/webhooks/gmail?agentId=${agent.id}`,
+          pubsubWebhookPath: gmailPubSubSecret
+            ? `/api/webhooks/gmail/pubsub?token=${gmailPubSubSecret}`
+            : "/api/webhooks/gmail/pubsub",
+          pubsubWebhookUrl: isPublicHttpsUrl
+            ? gmailPubSubSecret
+              ? `${publicBaseUrl}/api/webhooks/gmail/pubsub?token=${gmailPubSubSecret}`
+              : `${publicBaseUrl}/api/webhooks/gmail/pubsub`
+            : null,
           outboundMode: "gmail_api",
           channelType: agent.channel.type,
         },
@@ -208,9 +221,11 @@ export async function deployAgent(agent: AgentWithBuilderData): Promise<DeploySt
   }
 
   const deployment = buildChannelDeployConfig(agent);
-  let channelConfig = deployment.channelConfig;
+  let channelConfig: Prisma.JsonObject = { ...deployment.channelConfig };
+  const webhookUrl =
+    typeof channelConfig.webhookUrl === "string" ? channelConfig.webhookUrl : null;
 
-  if (agent.channel.type === ChannelType.TELEGRAM && channelConfig.webhookUrl) {
+  if (agent.channel.type === ChannelType.TELEGRAM && webhookUrl) {
     const credentials = decrypt(agent.channel.credentialsEnc);
     const botToken = parseTelegramBotToken(credentials);
 
@@ -220,13 +235,26 @@ export async function deployAgent(agent: AgentWithBuilderData): Promise<DeploySt
 
     await registerTelegramWebhook({
       credentials,
-      webhookUrl: channelConfig.webhookUrl,
+      webhookUrl,
       secretToken: deployment.webhookSecret,
     });
 
     channelConfig = {
       ...channelConfig,
       webhookRegistration: "registered",
+    };
+  }
+
+  if (agent.channel.type === ChannelType.GMAIL) {
+    const watch = await registerGmailWatchForChannel({
+      channelId: agent.channel.id,
+      credentialsEnc: agent.channel.credentialsEnc,
+    });
+
+    channelConfig = {
+      ...channelConfig,
+      inboundMode: watch.ok ? "gmail_watch_pubsub" : "gmail_watch_pending",
+      gmailWatch: watch,
     };
   }
 
