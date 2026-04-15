@@ -15,10 +15,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col bg-[#f5f3ee] px-6 py-6 md:flex">
         <div className="mb-8 flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-xl bg-[#8d4b00] text-white">
-            S
+            B
           </div>
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight">Stafless</h1>
+            <h1 className="text-xl font-extrabold tracking-tight">Behalfy</h1>
             <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#1b1c19]/55">
               Operator Console
             </p>

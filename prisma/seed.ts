@@ -24,7 +24,7 @@ async function main() {
       email,
       hashedPassword,
       role: UserRole.ADMIN,
-      name: "Stafless Admin",
+      name: "Behalfy Admin",
     },
   });
 }

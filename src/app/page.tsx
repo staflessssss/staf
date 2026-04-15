@@ -12,7 +12,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-              Stafless
+              Behalfy
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
               Operator-managed AI platform for service businesses

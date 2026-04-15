@@ -18,7 +18,7 @@ export default async function ClientLayout({
   children: ReactNode;
 }) {
   const session = await requireClientSession();
-  const userEmail = session.user.email ?? "client@stafless.local";
+  const userEmail = session.user.email ?? "client@behalfy.local";
   const userInitial = userEmail.charAt(0).toUpperCase();
 
   return (
@@ -26,7 +26,7 @@ export default async function ClientLayout({
       <header className="fixed top-0 z-40 w-full bg-[rgba(251,249,244,0.82)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1920px] items-center justify-between px-6 py-6 md:px-10 xl:px-12">
           <div className="flex items-center gap-8 xl:gap-12">
-            <span className="text-2xl font-bold tracking-tight text-[#1b1c19]">Stafless</span>
+            <span className="text-2xl font-bold tracking-tight text-[#1b1c19]">Behalfy</span>
             <div className="hidden md:block">
               <SurfaceNav items={clientNav} variant="topbar" />
             </div>
@@ -47,7 +47,7 @@ export default async function ClientLayout({
 
       <aside className="fixed left-0 top-0 hidden h-screen w-64 flex-col bg-[#f5f3ee] px-6 pb-6 pt-28 xl:flex">
         <div className="mb-8 px-2">
-          <h2 className="text-xl font-black uppercase tracking-tight text-[#1b1c19]">Stafless</h2>
+          <h2 className="text-xl font-black uppercase tracking-tight text-[#1b1c19]">Behalfy</h2>
           <p className="mt-1 text-xs font-semibold uppercase tracking-[0.28em] text-[#1b1c19]/50">
             Business Portal
           </p>

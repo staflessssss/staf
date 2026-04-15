@@ -38,7 +38,7 @@ export const channelDefinitions: ChannelDefinition[] = [
       "Click Connect Google Account below.",
       "Choose the Google account you want to use for this business.",
       "Approve access for Gmail and the related Google services.",
-      "Return to Stafless after the connection is complete.",
+      "Return to Behalfy after the connection is complete.",
     ],
     notes: [
       "The same Google account can also unlock Google Calendar, Google Sheets, and Google Drive.",
@@ -55,7 +55,7 @@ export const channelDefinitions: ChannelDefinition[] = [
       "Prepare the Instagram account you want to connect.",
       "Make sure you are signing in to the correct business account.",
       "Click Connect Instagram and confirm access.",
-      "After that, new messages can be routed into Stafless.",
+      "After that, new messages can be routed into Behalfy.",
     ],
   },
   {

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stafless",
+  title: "Behalfy",
   description: "Operator-managed AI agents for small and medium businesses.",
 };
 

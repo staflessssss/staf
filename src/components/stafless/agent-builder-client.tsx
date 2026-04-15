@@ -2249,7 +2249,7 @@ function uniqueValues(values: Array<string | undefined | null>) {
                                             />
                                           </FormField>
                                           <div className="rounded-[16px] bg-[#faf3e9] px-4 py-3 text-sm text-muted-foreground ring-1 ring-[#eadccc]">
-                                            Stafless still keeps its own lead record even when this sync is enabled.
+                                            Behalfy still keeps its own lead record even when this sync is enabled.
                                           </div>
                                         </div>
                                         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px]">

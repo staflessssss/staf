@@ -22,7 +22,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <div className="w-full max-w-md rounded-[32px] border border-border bg-[rgba(255,255,255,0.86)] p-8 shadow-[0_24px_80px_rgba(31,23,40,0.12)]">
         <div className="mb-8 space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-            Stafless
+            Behalfy
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Login
