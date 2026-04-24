@@ -6,6 +6,7 @@ import {
   createGoogleOAuthClientFromEncryptedCredentials,
   parseGoogleDriveFileId,
 } from "@/lib/google-api-client";
+import { readMessageBehaviorConfig } from "@/lib/channels/message-behavior";
 
 const DEFAULT_PRICING_ATTACHMENT_FILE_ID = "1m3EBiPTnIVq-8i2qD-3CMMKJ6UfYgZxi";
 const DEFAULT_PRICING_ATTACHMENT_FILE_NAME = "Myndful Films Pricing Guide";
@@ -24,6 +25,10 @@ type GmailIncomingPayload =
       references?: string;
       inReplyTo?: string;
       replyToMessageId?: string;
+      gmailMessageId?: string;
+      timestamp?: string | number;
+      receivedAt?: string | number;
+      internalDate?: string | number;
     }
   | Record<string, unknown>;
 
@@ -44,6 +49,7 @@ type GmailSendReplyParams = {
   contactId: string;
   message:
     | string
+    | string[]
     | {
         text: string;
         html?: string;
@@ -76,6 +82,34 @@ function asObject(value: unknown) {
   }
 
   return value as Record<string, unknown>;
+}
+
+function parseInboundTimestamp(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const millis = value > 1_000_000_000_000 ? value : value * 1000;
+    const parsed = new Date(millis);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const numeric = Number(value.trim());
+    if (Number.isFinite(numeric)) {
+      const millis = numeric > 1_000_000_000_000 ? numeric : numeric * 1000;
+      const parsedNumeric = new Date(millis);
+      if (!Number.isNaN(parsedNumeric.getTime())) {
+        return parsedNumeric;
+      }
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  return undefined;
 }
 
 function parseChannelConfig(config: unknown): GmailChannelConfig {
@@ -127,6 +161,36 @@ function convertMarkdownishToHtml(value: string) {
   });
 
   return html;
+}
+
+function stripQuotedReply(text: string) {
+  if (!text) {
+    return "";
+  }
+
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalized.split("\n");
+  const kept: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (/^on .+ wrote:$/i.test(trimmed)) {
+      break;
+    }
+
+    if (/^from:\s+/i.test(trimmed) || /^sent:\s+/i.test(trimmed) || /^subject:\s+/i.test(trimmed)) {
+      break;
+    }
+
+    if (trimmed.startsWith(">")) {
+      break;
+    }
+
+    kept.push(line);
+  }
+
+  return kept.join("\n").trim();
 }
 
 function isPricingReply(text: string) {
@@ -206,7 +270,7 @@ function buildHtmlPart(html: string) {
 
 function buildMimeMessage(args: {
   to: string;
-  subject: string;
+  subject?: string;
   text: string;
   html?: string;
   attachments?: GmailDeliveryAttachment[];
@@ -215,8 +279,11 @@ function buildMimeMessage(args: {
   const headers = [
     "MIME-Version: 1.0",
     `To: ${args.to}`,
-    `Subject: ${encodeHeaderText(args.subject)}`,
   ];
+
+  if (args.subject?.trim()) {
+    headers.push(`Subject: ${encodeHeaderText(args.subject.trim())}`);
+  }
 
   if (args.messageId?.trim()) {
     headers.push(`In-Reply-To: ${args.messageId.trim()}`);
@@ -335,9 +402,27 @@ function collectAutoAttachments(args: {
   return [...dedupe.values()];
 }
 
+function collectDeliveryAttachments(args: {
+  text: string;
+  attachments?: GmailAttachmentDescriptor[];
+  channelConfig?: unknown;
+}) {
+  const messageBehavior = readMessageBehaviorConfig(args.channelConfig);
+
+  if (!messageBehavior.allowAttachments) {
+    return [];
+  }
+
+  return collectAutoAttachments(args);
+}
+
 function normalizeReplyMessage(message: GmailSendReplyParams["message"], config: GmailChannelConfig) {
-  const text = typeof message === "string" ? message : message.text;
-  const html = typeof message === "string" ? undefined : message.html;
+  const text = Array.isArray(message)
+    ? message.join("\n\n")
+    : typeof message === "string"
+      ? message
+      : message.text;
+  const html = Array.isArray(message) || typeof message === "string" ? undefined : message.html;
   const withPricingBlock = appendPricingBlock(text, config);
   const withSignature = appendSignature(withPricingBlock, config);
 
@@ -352,20 +437,28 @@ export const gmailAdapterTestHelpers = {
   appendPricingBlock,
   appendSignature,
   collectAutoAttachments,
+  collectDeliveryAttachments,
   isPricingReply,
+  stripQuotedReply,
 };
 
 export const gmailAdapter = {
   parseIncoming: (payload: GmailIncomingPayload) => {
     const contactEmail = String(payload.from ?? payload.contactId ?? "");
+    const rawMessage = String(payload.text ?? payload.message ?? payload.body ?? payload.html ?? "");
+    const cleanedMessage = stripQuotedReply(rawMessage);
 
     return {
       contactId: contactEmail,
       contactEmail,
-      message: String(payload.text ?? payload.message ?? payload.body ?? payload.html ?? ""),
+      message: cleanedMessage || rawMessage,
       messageId: String(payload.messageId ?? payload.inReplyTo ?? payload.replyToMessageId ?? ""),
+      gmailMessageId: String(payload.gmailMessageId ?? ""),
       threadId: String(payload.threadId ?? ""),
       subject: String(payload.subject ?? ""),
+      eventTimestamp: parseInboundTimestamp(
+        payload.timestamp ?? payload.receivedAt ?? payload.internalDate,
+      ),
     };
   },
   formatReply: (text: string, config?: unknown) => {
@@ -377,7 +470,7 @@ export const gmailAdapter = {
     const gmail = google.gmail({ version: "v1", auth });
     const parsedConfig = parseChannelConfig(params.channelConfig);
     const reply = normalizeReplyMessage(params.message, parsedConfig);
-    const attachmentDescriptors = collectAutoAttachments({
+    const attachmentDescriptors = collectDeliveryAttachments({
       text: reply.text,
       attachments: params.attachments,
       channelConfig: params.channelConfig,
@@ -399,7 +492,7 @@ export const gmailAdapter = {
 
     const raw = buildMimeMessage({
       to: params.contactId,
-      subject: params.subject?.trim() || "Re: Your inquiry",
+      subject: params.subject?.trim() || undefined,
       text: reply.text,
       html: reply.html,
       attachments,

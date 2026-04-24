@@ -5,6 +5,7 @@ import { telegramAdapter } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { createGoogleOAuthClientFromEncryptedCredentials } from "@/lib/google-api-client";
+import { isValidTimezone } from "@/lib/timezones";
 
 type CalendarExecutionArgs = {
   tenantId: string;
@@ -29,10 +30,25 @@ type SchedulingIntent = "date_availability" | "check_calendar" | "book_call";
 type SchedulingConfig = {
   calendarId: string;
   timeZone: string;
+  availabilityDateSource: "request_date" | "time_text" | "literal";
+  availabilityDateValue: string;
+  bookingDateSource: "request_date" | "time_text" | "literal";
+  bookingDateValue: string;
+  bookingTimeSource: "time_text" | "literal";
+  bookingTimeValue: string;
+  inviteEmailSource: "customer_email" | "default_email" | "literal";
+  inviteEmailValue: string;
   slotDurationMinutes: number;
   businessWindowStartHour: number;
   businessWindowEndHour: number;
   businessDays: number[];
+  checkConflictsBeforeBooking: boolean;
+  inviteCustomerByEmail: boolean;
+  createMeetLink: boolean;
+  reminderEnabled: boolean;
+  reminderMinutesBefore: number;
+  eventSummaryTemplate: string;
+  eventDescriptionTemplate: string;
   ownerTelegramChatId?: string;
   syncLeadToSheets: boolean;
   leadSpreadsheetId?: string;
@@ -83,6 +99,12 @@ function normalizeText(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function normalizeTimeSelectionText(value: string) {
+  return normalizeText(value)
+    .replace(/\b(\d{1,2})\s*[-.]\s*(\d{2})\b/g, "$1:$2")
+    .replace(/\b(\d{1,2})\s+(\d{2})\b/g, "$1:$2");
+}
+
 function inferIntent(action: string) {
   const normalized = normalizeText(action);
 
@@ -121,6 +143,23 @@ function parseCalendarConfig(params: Prisma.JsonValue, metadata?: Prisma.JsonVal
       asString(integrationMetadata?.email) ||
       "primary",
     timeZone: asString(config?.timeZone) || "America/New_York",
+    availabilityDateSource:
+      config?.availabilityDateSource === "time_text" || config?.availabilityDateSource === "literal"
+        ? config.availabilityDateSource
+        : "request_date",
+    availabilityDateValue: asString(config?.availabilityDateValue),
+    bookingDateSource:
+      config?.bookingDateSource === "time_text" || config?.bookingDateSource === "literal"
+        ? config.bookingDateSource
+        : "request_date",
+    bookingDateValue: asString(config?.bookingDateValue),
+    bookingTimeSource: config?.bookingTimeSource === "literal" ? "literal" : "time_text",
+    bookingTimeValue: asString(config?.bookingTimeValue),
+    inviteEmailSource:
+      config?.inviteEmailSource === "default_email" || config?.inviteEmailSource === "literal"
+        ? config.inviteEmailSource
+        : "customer_email",
+    inviteEmailValue: asString(config?.inviteEmailValue),
     slotDurationMinutes: asNumber(config?.slotDurationMinutes, 30),
     businessWindowStartHour: asNumber(config?.businessWindowStartHour, 9),
     businessWindowEndHour: asNumber(config?.businessWindowEndHour, 14),
@@ -128,6 +167,24 @@ function parseCalendarConfig(params: Prisma.JsonValue, metadata?: Prisma.JsonVal
       Array.isArray(config?.businessDays) && config.businessDays.every((value) => typeof value === "number")
         ? (config.businessDays as number[])
         : [1, 2, 3, 4, 5],
+    checkConflictsBeforeBooking:
+      typeof config?.checkConflictsBeforeBooking === "boolean"
+        ? config.checkConflictsBeforeBooking
+        : true,
+    inviteCustomerByEmail:
+      typeof config?.inviteCustomerByEmail === "boolean"
+        ? config.inviteCustomerByEmail
+        : true,
+    createMeetLink:
+      typeof config?.createMeetLink === "boolean" ? config.createMeetLink : true,
+    reminderEnabled:
+      typeof config?.reminderEnabled === "boolean" ? config.reminderEnabled : false,
+    reminderMinutesBefore: asNumber(config?.reminderMinutesBefore, 30),
+    eventSummaryTemplate:
+      asString(config?.eventSummaryTemplate) || "Consultation call with {{coupleName}}",
+    eventDescriptionTemplate:
+      asString(config?.eventDescriptionTemplate) ||
+      "Wedding date: {{weddingDate}}\nLocation: {{location}}\nChannel: {{channel}}",
     ownerTelegramChatId: asString(config?.ownerTelegramChatId) || undefined,
     syncLeadToSheets:
       typeof config?.syncLeadToSheets === "boolean"
@@ -145,6 +202,86 @@ function parseCalendarConfig(params: Prisma.JsonValue, metadata?: Prisma.JsonVal
       callTime: asString(asObject(config?.leadColumns)?.callTime, "call_time"),
       email: asString(asObject(config?.leadColumns)?.email, "email"),
       channel: asString(asObject(config?.leadColumns)?.channel, "channel"),
+    },
+  };
+}
+
+function applyTemplate(
+  template: string,
+  values: Record<string, string>,
+) {
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, rawKey: string) => {
+    const key = rawKey.trim();
+    return values[key] ?? "";
+  });
+}
+
+function buildCalendarInsertPayload(args: {
+  tenantId: string;
+  config: SchedulingConfig;
+  parsed: ParsedSchedulingRequest;
+  email: string;
+  coupleName: string;
+  weddingDate: string;
+  location: string;
+  channel: string;
+}) {
+  const templateValues = {
+    coupleName: args.coupleName,
+    weddingDate: args.weddingDate,
+    location: args.location,
+    channel: args.channel,
+    email: args.email,
+    date: args.parsed.date,
+    time: args.parsed.time,
+  };
+  const summary = applyTemplate(args.config.eventSummaryTemplate, templateValues)
+    .replace(/\s+/g, " ")
+    .trim();
+  const description = applyTemplate(args.config.eventDescriptionTemplate, templateValues)
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim();
+
+  return {
+    conferenceDataVersion: args.config.createMeetLink ? 1 : 0,
+    requestBody: {
+      summary,
+      description,
+      start: {
+        dateTime: args.parsed.startTime,
+        timeZone: args.config.timeZone,
+      },
+      end: {
+        dateTime: args.parsed.endTime,
+        timeZone: args.config.timeZone,
+      },
+      attendees:
+        args.config.inviteCustomerByEmail && args.email ? [{ email: args.email }] : [],
+      ...(args.config.createMeetLink
+        ? {
+            conferenceData: {
+              createRequest: {
+                requestId: `${args.tenantId}-${Date.now()}`,
+                conferenceSolutionKey: {
+                  type: "hangoutsMeet",
+                },
+              },
+            },
+          }
+        : {}),
+      reminders: args.config.reminderEnabled
+        ? {
+            useDefault: false,
+            overrides: [
+              {
+                method: "email",
+                minutes: Math.max(0, Math.floor(args.config.reminderMinutesBefore)),
+              },
+            ],
+          }
+        : { useDefault: true },
     },
   };
 }
@@ -274,9 +411,11 @@ function inferRequestedDate(request: string, explicitDate?: string) {
 }
 
 function parseTimeFromText(text: string) {
+  const normalized = normalizeTimeSelectionText(text);
   const patterns = [
     /\b(\d{1,2}):(\d{2})\s*(am|pm)\b/i,
     /\b(\d{1,2})\s*(am|pm)\b/i,
+    /\b(\d{1,2})[:\-.\s](\d{2})\b/i,
     /(?:\bat\b|\bfor\b|\bfrom\b)\s+(\d{1,2}):(\d{2})\b/i,
     /(?:\bat\b|\bfor\b|\bfrom\b)\s+(\d{1,2})\b/i,
   ];
@@ -287,7 +426,7 @@ function parseTimeFromText(text: string) {
   let matched = false;
 
   for (const pattern of patterns) {
-    const match = text.match(pattern);
+    const match = normalized.match(pattern);
 
     if (!match) {
       continue;
@@ -347,48 +486,54 @@ function getTimeZoneOffsetString(dateIso: string, timeZone: string) {
 function parseSchedulingRequest(args: {
   request: string;
   timeText?: string;
+  explicitDate?: string;
   timeZone: string;
   slotDurationMinutes: number;
   referenceDate?: Date;
 }) {
-  const source = normalizeText(args.timeText || args.request);
+  const source = normalizeTimeSelectionText(args.timeText || args.request);
   const reference = args.referenceDate ?? new Date();
   const base = getTimeZoneParts(reference, args.timeZone);
-  let targetDate = new Date(Date.UTC(base.year, base.month - 1, base.day));
+  const hasExplicitDate = Boolean(args.explicitDate && /^\d{4}-\d{2}-\d{2}$/.test(args.explicitDate));
+  let targetDate = hasExplicitDate
+    ? new Date(`${args.explicitDate}T00:00:00Z`)
+    : new Date(Date.UTC(base.year, base.month - 1, base.day));
 
-  if (source.includes("day after tomorrow")) {
-    targetDate = addUtcDays(targetDate, 2);
-  } else if (source.includes("tomorrow")) {
-    targetDate = addUtcDays(targetDate, 1);
-  } else if (source.includes("today")) {
-    targetDate = targetDate;
-  } else {
-    const foundWeekday = Object.entries(weekdayMap).find(([label]) => source.includes(label));
-
-    if (foundWeekday) {
-      let diff = foundWeekday[1] - targetDate.getUTCDay();
-      if (diff <= 0) {
-        diff += 7;
-      }
-      targetDate = addUtcDays(targetDate, diff);
+  if (!hasExplicitDate) {
+    if (source.includes("day after tomorrow")) {
+      targetDate = addUtcDays(targetDate, 2);
+    } else if (source.includes("tomorrow")) {
+      targetDate = addUtcDays(targetDate, 1);
+    } else if (source.includes("today")) {
+      targetDate = targetDate;
     } else {
-      const namedMonthMatch = source.match(
-        /\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/u,
-      );
-      const isoMatch = source.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+      const foundWeekday = Object.entries(weekdayMap).find(([label]) => source.includes(label));
 
-      if (namedMonthMatch) {
-        const month = monthMap[namedMonthMatch[1]];
-        const day = Number(namedMonthMatch[2]);
-        const year = namedMonthMatch[3] ? Number(namedMonthMatch[3]) : base.year;
-        targetDate = new Date(Date.UTC(year, month - 1, day));
-        if (!namedMonthMatch[3] && targetDate < new Date(Date.UTC(base.year, base.month - 1, base.day))) {
-          targetDate = new Date(Date.UTC(year + 1, month - 1, day));
+      if (foundWeekday) {
+        let diff = foundWeekday[1] - targetDate.getUTCDay();
+        if (diff <= 0) {
+          diff += 7;
         }
-      } else if (isoMatch) {
-        targetDate = new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+        targetDate = addUtcDays(targetDate, diff);
       } else {
-        return null;
+        const namedMonthMatch = source.match(
+          /\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/u,
+        );
+        const isoMatch = source.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+
+        if (namedMonthMatch) {
+          const month = monthMap[namedMonthMatch[1]];
+          const day = Number(namedMonthMatch[2]);
+          const year = namedMonthMatch[3] ? Number(namedMonthMatch[3]) : base.year;
+          targetDate = new Date(Date.UTC(year, month - 1, day));
+          if (!namedMonthMatch[3] && targetDate < new Date(Date.UTC(base.year, base.month - 1, base.day))) {
+            targetDate = new Date(Date.UTC(year + 1, month - 1, day));
+          }
+        } else if (isoMatch) {
+          targetDate = new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+        } else {
+          return null;
+        }
       }
     }
   }
@@ -422,12 +567,13 @@ function validateSchedulingWindow(parsed: ParsedSchedulingRequest, config: Sched
   const endMinutes = startMinutes + config.slotDurationMinutes;
   const minMinutes = config.businessWindowStartHour * 60;
   const maxMinutes = config.businessWindowEndHour * 60;
+  const businessDayLabel = businessDayOptionsForMessage(config.businessDays);
 
   if (!config.businessDays.includes(weekday)) {
     return {
       ok: false,
       reason: "outside_business_days",
-      summary: "Consultation calls are only available Monday through Friday.",
+      summary: `Consultation calls are only available on ${businessDayLabel}.`,
     };
   }
 
@@ -435,11 +581,57 @@ function validateSchedulingWindow(parsed: ParsedSchedulingRequest, config: Sched
     return {
       ok: false,
       reason: "outside_business_hours",
-      summary: `Consultation calls are only available between ${config.businessWindowStartHour}:00 and ${config.businessWindowEndHour}:00 ET.`,
+      summary: `Consultation calls are only available between ${String(config.businessWindowStartHour).padStart(2, "0")}:00 and ${String(config.businessWindowEndHour).padStart(2, "0")}:00 (${config.timeZone}).`,
     };
   }
 
   return { ok: true } as const;
+}
+
+function validateBusinessDate(dateIso: string, config: SchedulingConfig) {
+  const [year, month, day] = dateIso.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.getUTCDay();
+
+  if (!config.businessDays.includes(weekday)) {
+    return {
+      ok: false,
+      reason: "outside_business_days",
+      summary: `Consultation calls are only available on ${businessDayOptionsForMessage(config.businessDays)}.`,
+    };
+  }
+
+  return { ok: true } as const;
+}
+
+function businessDayOptionsForMessage(days: number[]) {
+  const labels = days
+    .map((day) =>
+      ({
+        0: "Sunday",
+        1: "Monday",
+        2: "Tuesday",
+        3: "Wednesday",
+        4: "Thursday",
+        5: "Friday",
+        6: "Saturday",
+      })[day],
+    )
+    .filter((label): label is string => Boolean(label));
+
+  if (labels.length === 0) {
+    return "the configured business days";
+  }
+
+  if (labels.length === 1) {
+    return labels[0];
+  }
+
+  if (labels.length === 2) {
+    return `${labels[0]} and ${labels[1]}`;
+  }
+
+  return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}`;
 }
 
 function formatHumanDate(dateIso: string, timeZone: string) {
@@ -472,6 +664,99 @@ function extractEmail(args: CalendarExecutionArgs) {
 
   const match = args.request.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
   return match?.[0] ?? "";
+}
+
+function resolveAvailabilityDate(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (config.availabilityDateSource === "literal" && /^\d{4}-\d{2}-\d{2}$/.test(config.availabilityDateValue)) {
+    return config.availabilityDateValue;
+  }
+
+  if (config.availabilityDateSource === "time_text") {
+    return inferRequestedDate(args.timeText || args.request);
+  }
+
+  return args.date || inferRequestedDate(args.request);
+}
+
+function resolveBookingDate(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (config.bookingDateSource === "literal" && /^\d{4}-\d{2}-\d{2}$/.test(config.bookingDateValue)) {
+    return config.bookingDateValue;
+  }
+
+  if (config.bookingDateSource === "time_text") {
+    return inferRequestedDate(args.timeText || args.request);
+  }
+
+  return args.date || inferRequestedDate(args.request);
+}
+
+function resolveBookingTimeText(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (config.bookingTimeSource === "literal" && config.bookingTimeValue.trim()) {
+    return config.bookingTimeValue.trim();
+  }
+
+  return args.timeText || args.request;
+}
+
+function resolveInviteEmail(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (config.inviteEmailSource === "literal") {
+    return config.inviteEmailValue.trim();
+  }
+
+  if (config.inviteEmailSource === "default_email") {
+    return args.defaultEmail ?? "";
+  }
+
+  return extractEmail(args);
+}
+
+function getCalendarBindingMisconfiguration(args: {
+  action: string;
+  config: SchedulingConfig;
+}) {
+  if (!args.config.timeZone.trim() || !isValidTimezone(args.config.timeZone.trim())) {
+    return "This Google Calendar function needs a valid IANA timezone.";
+  }
+
+  if (
+    args.action === "check_calendar" &&
+    args.config.availabilityDateSource === "literal" &&
+    !/^\d{4}-\d{2}-\d{2}$/.test(args.config.availabilityDateValue)
+  ) {
+    return "This Google Calendar function needs a fixed availability date in YYYY-MM-DD format.";
+  }
+
+  if (args.action === "book_call") {
+    if (
+      args.config.bookingDateSource === "literal" &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(args.config.bookingDateValue)
+    ) {
+      return "This Google Calendar booking function needs a fixed booking date in YYYY-MM-DD format.";
+    }
+
+    if (
+      args.config.bookingTimeSource === "literal" &&
+      !parseTimeFromText(args.config.bookingTimeValue)
+    ) {
+      return "This Google Calendar booking function needs a fixed booking time in HH:MM or am/pm format.";
+    }
+
+    if (
+      args.config.inviteEmailSource === "literal" &&
+      !args.config.inviteEmailValue.trim()
+    ) {
+      return "This Google Calendar booking function needs a fixed invite email address.";
+    }
+
+    if (
+      args.config.inviteEmailSource === "literal" &&
+      !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(args.config.inviteEmailValue.trim())
+    ) {
+      return "This Google Calendar booking function needs a valid fixed invite email address.";
+    }
+  }
+
+  return null;
 }
 
 function extractCoupleName(args: CalendarExecutionArgs) {
@@ -584,6 +869,21 @@ async function runDateAvailabilityLookup(args: CalendarExecutionArgs, config: Sc
     };
   }
 
+  const businessDateValidation = validateBusinessDate(requestedDate, config);
+  if (!businessDateValidation.ok) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: businessDateValidation.reason,
+      action: args.action,
+      calendarId: config.calendarId,
+      date: requestedDate,
+      summary: businessDateValidation.summary,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
   const calendar = createCalendarClient(args.credentialsEnc);
   const offset = getTimeZoneOffsetString(requestedDate, config.timeZone);
   const freebusy = await calendar.freebusy.query({
@@ -614,6 +914,23 @@ async function runDateAvailabilityLookup(args: CalendarExecutionArgs, config: Sc
 }
 
 async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  const misconfiguration = getCalendarBindingMisconfiguration({
+    action: args.action,
+    config,
+  });
+
+  if (misconfiguration) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live_unavailable",
+      status: "misconfigured",
+      action: args.action,
+      summary: misconfiguration,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
   if (!args.credentialsEnc) {
     return {
       integration: "GOOGLE_CALENDAR",
@@ -626,14 +943,26 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
     };
   }
 
+  const requestedDate = resolveAvailabilityDate(args, config);
   const parsed = parseSchedulingRequest({
     request: args.request,
     timeText: args.timeText,
+    explicitDate: requestedDate ?? undefined,
     timeZone: config.timeZone,
     slotDurationMinutes: config.slotDurationMinutes,
   });
 
   if (!parsed) {
+    if (requestedDate) {
+      return runDateAvailabilityLookup(
+        {
+          ...args,
+          date: requestedDate,
+        },
+        config,
+      );
+    }
+
     return {
       integration: "GOOGLE_CALENDAR",
       mode: "live",
@@ -686,7 +1015,7 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
   const events = await listEventsForDate({
     calendar,
     calendarId: config.calendarId,
-    date: parsed.date,
+    date: requestedDate ?? parsed.date,
     timeZone: config.timeZone,
   });
   const busySlots = parseBusySlots(events);
@@ -795,6 +1124,23 @@ async function sendOwnerTelegramNotification(args: {
 }
 
 async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  const misconfiguration = getCalendarBindingMisconfiguration({
+    action: args.action,
+    config,
+  });
+
+  if (misconfiguration) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live_unavailable",
+      status: "misconfigured",
+      action: args.action,
+      summary: misconfiguration,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
   if (!args.credentialsEnc) {
     return {
       integration: "GOOGLE_CALENDAR",
@@ -807,9 +1153,11 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
     };
   }
 
+  const bookingDate = resolveBookingDate(args, config);
   const parsed = parseSchedulingRequest({
     request: args.request,
-    timeText: args.timeText,
+    timeText: resolveBookingTimeText(args, config),
+    explicitDate: bookingDate ?? undefined,
     timeZone: config.timeZone,
     slotDurationMinutes: config.slotDurationMinutes,
   });
@@ -841,29 +1189,23 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
     };
   }
 
-  const email = extractEmail(args);
+  const email = resolveInviteEmail(args, config);
   const coupleName = extractCoupleName(args);
   const weddingDate = extractWeddingDate(args);
   const location = extractLocation(args);
   const channel = args.channel ?? "gmail";
-  const summary = `Consultation Call with ${coupleName}${weddingDate ? ` - Wedding ${weddingDate}` : ""}`;
-  const description = [
-    weddingDate ? `Wedding date: ${weddingDate}` : "",
-    location ? `Location: ${location}` : "",
-    channel ? `Channel: ${channel}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
 
   const calendar = createCalendarClient(args.credentialsEnc);
-  const exactSlotBusy = await queryExactSlotBusy({
-    calendar,
-    calendarId: config.calendarId,
-    startTime: parsed.startTime,
-    endTime: parsed.endTime,
-  });
+  const exactSlotBusy = config.checkConflictsBeforeBooking
+    ? await queryExactSlotBusy({
+        calendar,
+        calendarId: config.calendarId,
+        startTime: parsed.startTime,
+        endTime: parsed.endTime,
+      })
+    : [];
 
-  if (exactSlotBusy.length > 0) {
+  if (config.checkConflictsBeforeBooking && exactSlotBusy.length > 0) {
     const events = await listEventsForDate({
       calendar,
       calendarId: config.calendarId,
@@ -920,29 +1262,17 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
 
   const createdEvent = await calendar.events.insert({
     calendarId: config.calendarId,
-    conferenceDataVersion: 1,
     sendUpdates: "all",
-    requestBody: {
-      summary,
-      description,
-      start: {
-        dateTime: parsed.startTime,
-        timeZone: config.timeZone,
-      },
-      end: {
-        dateTime: parsed.endTime,
-        timeZone: config.timeZone,
-      },
-      attendees: email ? [{ email }] : [],
-      conferenceData: {
-        createRequest: {
-          requestId: `${args.tenantId}-${Date.now()}`,
-          conferenceSolutionKey: {
-            type: "hangoutsMeet",
-          },
-        },
-      },
-    },
+    ...buildCalendarInsertPayload({
+      tenantId: args.tenantId,
+      config,
+      parsed,
+      email,
+      coupleName,
+      weddingDate,
+      location,
+      channel,
+    }),
   });
 
   const leadLog = await appendLeadRow({
@@ -1019,6 +1349,7 @@ export const calendarSchedulingTestHelpers = {
   parseSchedulingRequest,
   validateSchedulingWindow,
   inferRequestedDate,
+  buildCalendarInsertPayload,
 };
 
 async function queryExactSlotBusy(args: {

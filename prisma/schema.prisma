@@ -130,6 +130,7 @@ model Agent {
   channel       ChannelConnection @relation(fields: [channelId], references: [id])
   features      Feature[]
   conversations Conversation[]
+  delayedDeliveries DelayedDelivery[]
 
   @@unique([channelId])
 }
@@ -183,6 +184,7 @@ model Conversation {
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
   agent     Agent              @relation(fields: [agentId], references: [id])
+  delayedDeliveries DelayedDelivery[]
   messages  Message[]
 
   @@unique([agentId, contactId])
@@ -212,4 +214,39 @@ enum ConversationStatus {
   ACTIVE
   CLOSED
   ESCALATED
+}
+
+model DelayedDelivery {
+  id             String                @id @default(cuid())
+  agentId         String
+  conversationId  String
+  kind            DelayedDeliveryKind
+  status          DelayedDeliveryStatus @default(PENDING)
+  dueAt           DateTime
+  payload         Json?
+  attempts        Int                   @default(0)
+  error           String?
+  lastAttemptAt   DateTime?
+  sentAt          DateTime?
+  canceledAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  agent           Agent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  conversation    Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([status, dueAt])
+  @@index([conversationId, kind, status])
+}
+
+enum DelayedDeliveryKind {
+  BUFFERED_REPLY
+  FOLLOW_UP
+}
+
+enum DelayedDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  CANCELED
+  FAILED
 }

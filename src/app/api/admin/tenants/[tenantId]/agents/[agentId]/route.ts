@@ -5,7 +5,9 @@ import {
   agentBuilderInclude,
   agentDraftSchema,
   buildFeatureCreateInput,
+  getChannelConfigObject,
   getToolIntegrationIds,
+  mergeBuilderChannelConfig,
   serializeBuilderAgent,
   validateBuilderReferences,
 } from "@/lib/agent-builder";
@@ -43,6 +45,9 @@ export async function GET(_: Request, context: AgentRouteContext) {
       promptPreview: buildSystemPrompt({
         ...serializeBuilderAgent(agent).draft,
         channel: agent.channel,
+        channelBehavior: getChannelConfigObject(agent.channelConfig).channelBehavior as never,
+        conversationPlaybook: getChannelConfigObject(agent.channelConfig).conversationPlaybook as never,
+        prompting: getChannelConfigObject(agent.channelConfig).prompting as never,
       }),
     },
   });
@@ -67,7 +72,7 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
 
   const existingAgent = await db.agent.findFirst({
     where: { id: agentId, tenantId },
-    select: { id: true },
+    select: { id: true, channelConfig: true },
   });
 
   if (!existingAgent) {
@@ -103,7 +108,10 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
           tone: parsed.data.tone,
           languagePreference: parsed.data.languagePreference,
           status: parsed.data.status,
-          channelConfig: parsed.data.channelConfig as Prisma.InputJsonValue,
+          channelConfig: mergeBuilderChannelConfig(
+            existingAgent.channelConfig,
+            parsed.data.channelConfig,
+          ),
           features: {
             create: buildFeatureCreateInput(parsed.data),
           },
@@ -123,6 +131,9 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
         promptPreview: buildSystemPrompt({
           ...serializeBuilderAgent(item).draft,
           channel: item.channel,
+          channelBehavior: getChannelConfigObject(item.channelConfig).channelBehavior as never,
+          conversationPlaybook: getChannelConfigObject(item.channelConfig).conversationPlaybook as never,
+          prompting: getChannelConfigObject(item.channelConfig).prompting as never,
         }),
       },
     });

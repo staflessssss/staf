@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { AgentBuilderWorkspace } from "@/components/stafless/agent-builder";
+import { AgentCreateFlow } from "@/components/stafless/agent-create-flow";
 import { AgentWorkbenchShell } from "@/components/stafless/agent-workbench-shell";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
@@ -33,7 +33,7 @@ export default async function CreateAgentPage({
 
   return (
     <AgentWorkbenchShell mode="create" tenant={tenant}>
-      <AgentBuilderWorkspace mode="create" tenant={tenant} />
+      <AgentCreateFlow tenant={tenant} />
     </AgentWorkbenchShell>
   );
 }

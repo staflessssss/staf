@@ -45,10 +45,10 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
       <label className="block space-y-2">
-        <span className="text-sm font-semibold text-foreground">Email</span>
+        <span className="text-sm font-semibold text-[#181836]">Email</span>
         <input
           autoComplete="email"
-          className="w-full rounded-[20px] border border-input bg-white px-4 py-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-4 focus:ring-ring/10"
+          className="w-full rounded-[18px] border border-[#d8d6fe] bg-[#f8f8ff] px-4 py-3 text-sm text-[#181836] outline-none transition placeholder:text-[#5c5c7e]/60 focus:border-[#4648d4]/40 focus:bg-white focus:ring-4 focus:ring-[#4648d4]/10"
           name="email"
           onChange={(event) => setEmail(event.target.value)}
           required
@@ -57,10 +57,10 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         />
       </label>
       <label className="block space-y-2">
-        <span className="text-sm font-semibold text-foreground">Password</span>
+        <span className="text-sm font-semibold text-[#181836]">Password</span>
         <input
           autoComplete="current-password"
-          className="w-full rounded-[20px] border border-input bg-white px-4 py-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-4 focus:ring-ring/10"
+          className="w-full rounded-[18px] border border-[#d8d6fe] bg-[#f8f8ff] px-4 py-3 text-sm text-[#181836] outline-none transition placeholder:text-[#5c5c7e]/60 focus:border-[#4648d4]/40 focus:bg-white focus:ring-4 focus:ring-[#4648d4]/10"
           name="password"
           onChange={(event) => setPassword(event.target.value)}
           required
@@ -69,12 +69,12 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         />
       </label>
       {error ? (
-        <div className="rounded-[20px] border border-[#efc4c1] bg-[#fff0ef] px-4 py-3 text-sm text-destructive">
+        <div className="rounded-[18px] bg-[#fff0ef] px-4 py-3 text-sm text-destructive ring-1 ring-[#efc4c1]">
           {error}
         </div>
       ) : null}
       <button
-        className="w-full rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-[#b85427] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl bg-[linear-gradient(135deg,#4648d4_0%,#6063ee_100%)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(70,72,212,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={isPending}
         type="submit"
       >

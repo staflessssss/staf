@@ -91,6 +91,46 @@ function buildToolDescription(feature: AgentWithBuilderData["features"][number])
   return [feature.description, ...stepDescriptions].filter(Boolean).join(" ");
 }
 
+function extractCanonicalToolFields(steps: Array<{
+  result: unknown;
+}>) {
+  let canonicalDate: string | undefined;
+  let canonicalTime: string | undefined;
+
+  for (const step of steps) {
+    const result = step.result;
+    if (!result || typeof result !== "object" || Array.isArray(result)) {
+      continue;
+    }
+
+    const typedResult = result as Record<string, unknown>;
+
+    if (
+      !canonicalDate &&
+      typeof typedResult.date === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(typedResult.date)
+    ) {
+      canonicalDate = typedResult.date;
+    }
+
+    if (!canonicalTime) {
+      if (typeof typedResult.time === "string" && /^\d{2}:\d{2}$/.test(typedResult.time)) {
+        canonicalTime = typedResult.time;
+      } else if (
+        typeof typedResult.requestedTime === "string" &&
+        /^\d{2}:\d{2}$/.test(typedResult.requestedTime)
+      ) {
+        canonicalTime = typedResult.requestedTime;
+      }
+    }
+  }
+
+  return {
+    canonicalDate,
+    canonicalTime,
+  };
+}
+
 export function resolveTools({ agent, testMode, defaultEmail, onToolResult }: ResolveToolsArgs) {
   return agent.features
     .filter((feature) => feature.type === FeatureType.TOOL)
@@ -191,11 +231,16 @@ export function resolveTools({ agent, testMode, defaultEmail, onToolResult }: Re
             });
           }
 
+          const { canonicalDate, canonicalTime } = extractCanonicalToolFields(steps);
           const output = {
             feature: feature.name,
             request,
-            ...(date ? { date } : {}),
-            ...(timeText ? { timeText } : {}),
+            ...(canonicalDate ? { date: canonicalDate } : date ? { date } : {}),
+            ...(canonicalTime
+              ? { timeText: timeText ?? canonicalTime, canonicalTime }
+              : timeText
+                ? { timeText }
+                : {}),
             ...(coupleName ? { coupleName } : {}),
             ...(weddingDate ? { weddingDate } : {}),
             ...(location ? { location } : {}),
@@ -214,8 +259,12 @@ export function resolveTools({ agent, testMode, defaultEmail, onToolResult }: Re
             toolName: feature.name,
             toolInput: {
               request,
-              ...(date ? { date } : {}),
-              ...(timeText ? { timeText } : {}),
+              ...(canonicalDate ? { date: canonicalDate } : date ? { date } : {}),
+              ...(canonicalTime
+                ? { timeText: timeText ?? canonicalTime, canonicalTime }
+                : timeText
+                  ? { timeText }
+                  : {}),
               ...(coupleName ? { coupleName } : {}),
               ...(weddingDate ? { weddingDate } : {}),
               ...(location ? { location } : {}),
@@ -233,3 +282,7 @@ export function resolveTools({ agent, testMode, defaultEmail, onToolResult }: Re
       return acc;
     }, {});
 }
+
+export const toolResolutionTestHelpers = {
+  extractCanonicalToolFields,
+};

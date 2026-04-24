@@ -13,24 +13,62 @@ type SheetsExecutionArgs = {
   metadata?: Prisma.JsonValue | null;
   credentialsEnc?: string;
   date?: string;
+  timeText?: string;
+  coupleName?: string;
+  weddingDate?: string;
   location?: string;
+  email?: string;
+  channel?: string;
 };
+
+type SheetsValueSource =
+  | "literal"
+  | "requested_date"
+  | "user_message"
+  | "time_text"
+  | "couple_name"
+  | "wedding_date"
+  | "location"
+  | "email"
+  | "channel";
 
 type SheetsFilterConfig = {
   column: string;
   operator: "equals" | "not_equals" | "contains" | "is_empty" | "is_not_empty";
-  valueSource: "literal" | "requested_date" | "user_message";
+  valueSource: SheetsValueSource;
   value?: string;
 };
 
-type SheetsLookupConfig = {
-  operation: "get_rows";
+type SheetsColumnMappingConfig = {
+  column: string;
+  valueSource: SheetsValueSource;
+  value?: string;
+};
+
+type SheetsBaseConfig = {
+  operation: "get_rows" | "append_row" | "update_rows";
   spreadsheetId?: string;
   spreadsheetTitle?: string;
   sheetName?: string;
   headerRow: number;
+};
+
+type SheetsLookupConfig = SheetsBaseConfig & {
+  operation: "get_rows";
   combineFilters: "AND" | "OR";
   filters: SheetsFilterConfig[];
+};
+
+type SheetsAppendConfig = SheetsBaseConfig & {
+  operation: "append_row";
+  columnMappings: SheetsColumnMappingConfig[];
+};
+
+type SheetsUpdateConfig = SheetsBaseConfig & {
+  operation: "update_rows";
+  combineFilters: "AND" | "OR";
+  filters: SheetsFilterConfig[];
+  columnMappings: SheetsColumnMappingConfig[];
 };
 
 const monthMap: Record<string, number> = {
@@ -238,7 +276,17 @@ function parseFilterConfig(value: Prisma.JsonValue): SheetsFilterConfig | null {
       : "equals";
   const valueSource =
     typeof filter.valueSource === "string" &&
-    ["literal", "requested_date", "user_message"].includes(filter.valueSource)
+    [
+      "literal",
+      "requested_date",
+      "user_message",
+      "time_text",
+      "couple_name",
+      "wedding_date",
+      "location",
+      "email",
+      "channel",
+    ].includes(filter.valueSource)
       ? (filter.valueSource as SheetsFilterConfig["valueSource"])
       : "literal";
 
@@ -250,15 +298,48 @@ function parseFilterConfig(value: Prisma.JsonValue): SheetsFilterConfig | null {
   };
 }
 
-function parseSheetsLookupConfig(
+function parseColumnMappingConfig(value: Prisma.JsonValue): SheetsColumnMappingConfig | null {
+  const mapping = asObject(value);
+
+  if (!mapping || typeof mapping.column !== "string" || !mapping.column.trim()) {
+    return null;
+  }
+
+  const valueSource =
+    typeof mapping.valueSource === "string" &&
+    [
+      "literal",
+      "requested_date",
+      "user_message",
+      "time_text",
+      "couple_name",
+      "wedding_date",
+      "location",
+      "email",
+      "channel",
+    ].includes(mapping.valueSource)
+      ? (mapping.valueSource as SheetsColumnMappingConfig["valueSource"])
+      : "literal";
+
+  return {
+    column: mapping.column,
+    valueSource,
+    value: typeof mapping.value === "string" ? mapping.value : "",
+  };
+}
+
+function parseSheetsBaseConfig(
   params: Prisma.JsonValue,
   metadata?: Prisma.JsonValue | null,
-): SheetsLookupConfig {
+): SheetsBaseConfig {
   const config = asObject(params);
   const integrationMetadata = asObject(metadata);
 
   return {
-    operation: "get_rows",
+    operation:
+      config?.operation === "append_row" || config?.operation === "update_rows"
+        ? config.operation
+        : "get_rows",
     spreadsheetId: parseSpreadsheetId(
       typeof config?.spreadsheetId === "string"
         ? config.spreadsheetId
@@ -271,11 +352,61 @@ function parseSheetsLookupConfig(
     sheetName: typeof config?.sheetName === "string" ? config.sheetName : undefined,
     headerRow:
       typeof config?.headerRow === "number" && config.headerRow > 0 ? config.headerRow : 1,
+  };
+}
+
+function parseSheetsLookupConfig(
+  params: Prisma.JsonValue,
+  metadata?: Prisma.JsonValue | null,
+): SheetsLookupConfig {
+  const base = parseSheetsBaseConfig(params, metadata);
+  const config = asObject(params);
+
+  return {
+    ...base,
+    operation: "get_rows",
     combineFilters:
       typeof config?.combineFilters === "string" && config.combineFilters === "OR" ? "OR" : "AND",
     filters: asArray(config?.filters)
       .map((filter) => parseFilterConfig(filter))
       .filter((filter): filter is SheetsFilterConfig => Boolean(filter)),
+  };
+}
+
+function parseSheetsAppendConfig(
+  params: Prisma.JsonValue,
+  metadata?: Prisma.JsonValue | null,
+): SheetsAppendConfig {
+  const base = parseSheetsBaseConfig(params, metadata);
+  const config = asObject(params);
+
+  return {
+    ...base,
+    operation: "append_row",
+    columnMappings: asArray(config?.columnMappings)
+      .map((mapping) => parseColumnMappingConfig(mapping))
+      .filter((mapping): mapping is SheetsColumnMappingConfig => Boolean(mapping)),
+  };
+}
+
+function parseSheetsUpdateConfig(
+  params: Prisma.JsonValue,
+  metadata?: Prisma.JsonValue | null,
+): SheetsUpdateConfig {
+  const base = parseSheetsBaseConfig(params, metadata);
+  const config = asObject(params);
+
+  return {
+    ...base,
+    operation: "update_rows",
+    combineFilters:
+      typeof config?.combineFilters === "string" && config.combineFilters === "OR" ? "OR" : "AND",
+    filters: asArray(config?.filters)
+      .map((filter) => parseFilterConfig(filter))
+      .filter((filter): filter is SheetsFilterConfig => Boolean(filter)),
+    columnMappings: asArray(config?.columnMappings)
+      .map((mapping) => parseColumnMappingConfig(mapping))
+      .filter((mapping): mapping is SheetsColumnMappingConfig => Boolean(mapping)),
   };
 }
 
@@ -330,20 +461,89 @@ function mapRowToObject(headers: unknown[], row: unknown[]) {
   }, {});
 }
 
-function resolveFilterValue(args: {
-  filter: SheetsFilterConfig;
+async function loadSheetSnapshot(args: {
+  sheets: Awaited<ReturnType<typeof createSheetsClient>>;
+  config: SheetsBaseConfig;
+}) {
+  const metadata = await args.sheets.spreadsheets.get({
+    spreadsheetId: args.config.spreadsheetId,
+    fields: "properties.title",
+  });
+  const valuesResponse = await args.sheets.spreadsheets.values.get({
+    spreadsheetId: args.config.spreadsheetId,
+    range: `'${args.config.sheetName?.replace(/'/g, "''")}'`,
+    valueRenderOption: "UNFORMATTED_VALUE",
+    dateTimeRenderOption: "FORMATTED_STRING",
+  });
+  const rows = valuesResponse.data.values ?? [];
+  const headerRowIndex = Math.max(args.config.headerRow - 1, 0);
+  const headers = rows[headerRowIndex] ?? [];
+
+  return {
+    metadata,
+    rows,
+    headerRowIndex,
+    headers,
+  };
+}
+
+function getMissingColumns(headers: unknown[], columns: string[]) {
+  return columns.filter((column) => getColumnIndex(headers, column) === -1);
+}
+
+function buildMappedRowValues(args: {
+  headers: unknown[];
+  mappings: Array<SheetsColumnMappingConfig & { resolvedValue: string | null }>;
+  baseRow?: unknown[];
+}) {
+  const rowValues = Array.isArray(args.baseRow)
+    ? [...args.baseRow]
+    : Array.from({ length: args.headers.length }, () => "");
+
+  args.mappings.forEach((mapping) => {
+    const columnIndex = getColumnIndex(args.headers, mapping.column);
+
+    if (columnIndex !== -1) {
+      rowValues[columnIndex] = mapping.resolvedValue ?? "";
+    }
+  });
+
+  return rowValues;
+}
+
+function resolveSheetValue(args: {
+  valueSource: SheetsValueSource;
+  value?: string;
   request: string;
   date?: string;
+  timeText?: string;
+  coupleName?: string;
+  weddingDate?: string;
+  location?: string;
+  email?: string;
+  channel?: string;
 }) {
-  switch (args.filter.valueSource) {
+  switch (args.valueSource) {
     case "requested_date": {
       const requestedDate = inferRequestedDate(args.request, args.date);
       return requestedDate ? toIsoDate(requestedDate) : null;
     }
     case "user_message":
       return args.request;
+    case "time_text":
+      return args.timeText ?? null;
+    case "couple_name":
+      return args.coupleName ?? null;
+    case "wedding_date":
+      return args.weddingDate ?? null;
+    case "location":
+      return args.location ?? null;
+    case "email":
+      return args.email ?? null;
+    case "channel":
+      return args.channel ?? null;
     default:
-      return args.filter.value ?? "";
+      return args.value ?? "";
   }
 }
 
@@ -424,10 +624,17 @@ async function runSheetsLookup(args: SheetsExecutionArgs) {
 
   const resolvedFilters = config.filters.map((filter) => ({
     ...filter,
-    resolvedValue: resolveFilterValue({
-      filter,
+    resolvedValue: resolveSheetValue({
+      valueSource: filter.valueSource,
+      value: filter.value,
       request: args.request,
       date: args.date,
+      timeText: args.timeText,
+      coupleName: args.coupleName,
+      weddingDate: args.weddingDate,
+      location: args.location,
+      email: args.email,
+      channel: args.channel,
     }),
   }));
 
@@ -630,6 +837,273 @@ async function runSheetsLookup(args: SheetsExecutionArgs) {
   };
 }
 
+async function runSheetsAppend(args: SheetsExecutionArgs) {
+  const config = parseSheetsAppendConfig(args.params, args.metadata);
+
+  if (!args.credentialsEnc) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_credentials",
+      action: args.action,
+      summary: "This Google Sheets integration does not have usable OAuth credentials.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (!config.spreadsheetId || !config.sheetName) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "misconfigured",
+      action: args.action,
+      summary: "This Google Sheets action needs a spreadsheet and a sheet tab before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (config.columnMappings.length === 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_mappings",
+      action: args.action,
+      summary: "This Google Sheets action needs at least one column mapping before it can append a row.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const sheets = await createSheetsClient(args.credentialsEnc);
+  const snapshot = await loadSheetSnapshot({ sheets, config });
+  const missingColumns = getMissingColumns(
+    snapshot.headers,
+    config.columnMappings.map((mapping) => mapping.column),
+  );
+
+  if (missingColumns.length > 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live",
+      status: "column_not_found",
+      action: args.action,
+      spreadsheetId: config.spreadsheetId,
+      spreadsheetTitle: snapshot.metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
+      sheetName: config.sheetName,
+      missingColumns,
+      summary: `Columns not found: ${missingColumns.join(", ")}.`,
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const resolvedMappings = config.columnMappings.map((mapping) => ({
+    ...mapping,
+    resolvedValue: resolveSheetValue({
+      valueSource: mapping.valueSource,
+      value: mapping.value,
+      request: args.request,
+      date: args.date,
+      timeText: args.timeText,
+      coupleName: args.coupleName,
+      weddingDate: args.weddingDate,
+      location: args.location,
+      email: args.email,
+      channel: args.channel,
+    }),
+  }));
+
+  const rowValues = buildMappedRowValues({
+    headers: snapshot.headers,
+    mappings: resolvedMappings,
+  });
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: config.spreadsheetId,
+    range: `'${config.sheetName.replace(/'/g, "''")}'`,
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: {
+      values: [rowValues],
+    },
+  });
+
+  return {
+    integration: "GOOGLE_SHEETS",
+    mode: "live",
+    status: "row_appended",
+    action: args.action,
+    operation: config.operation,
+    spreadsheetId: config.spreadsheetId,
+    spreadsheetTitle: snapshot.metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
+    sheetName: config.sheetName,
+    summary: "Google Sheets appended a new row successfully.",
+    params: args.params,
+    request: args.request,
+  };
+}
+
+async function runSheetsUpdate(args: SheetsExecutionArgs) {
+  const config = parseSheetsUpdateConfig(args.params, args.metadata);
+
+  if (!args.credentialsEnc) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_credentials",
+      action: args.action,
+      summary: "This Google Sheets integration does not have usable OAuth credentials.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (!config.spreadsheetId || !config.sheetName) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "misconfigured",
+      action: args.action,
+      summary: "This Google Sheets action needs a spreadsheet and a sheet tab before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (config.filters.length === 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_filters",
+      action: args.action,
+      summary: "This Google Sheets update action needs at least one row condition before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (config.columnMappings.length === 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_mappings",
+      action: args.action,
+      summary: "This Google Sheets update action needs at least one column mapping before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const lookupResult = await runSheetsLookup(args);
+  if (typeof lookupResult !== "object" || lookupResult == null || Array.isArray(lookupResult)) {
+    return lookupResult;
+  }
+
+  if (!("matchedRows" in lookupResult) || !Array.isArray(lookupResult.matchedRows)) {
+    return lookupResult;
+  }
+
+  if (!lookupResult.matchedRows.length) {
+    return {
+      ...lookupResult,
+      operation: config.operation,
+      status: "not_found",
+      summary: "Google Sheets update found no matching rows to change.",
+    };
+  }
+
+  const sheets = await createSheetsClient(args.credentialsEnc);
+  const snapshot = await loadSheetSnapshot({ sheets, config });
+  const missingColumns = getMissingColumns(
+    snapshot.headers,
+    [
+      ...config.filters.map((filter) => filter.column),
+      ...config.columnMappings.map((mapping) => mapping.column),
+    ],
+  );
+
+  if (missingColumns.length > 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live",
+      status: "column_not_found",
+      action: args.action,
+      spreadsheetId: config.spreadsheetId,
+      spreadsheetTitle: snapshot.metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
+      sheetName: config.sheetName,
+      missingColumns,
+      summary: `Columns not found: ${missingColumns.join(", ")}.`,
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const resolvedMappings = config.columnMappings.map((mapping) => ({
+    ...mapping,
+    resolvedValue: resolveSheetValue({
+      valueSource: mapping.valueSource,
+      value: mapping.value,
+      request: args.request,
+      date: args.date,
+      timeText: args.timeText,
+      coupleName: args.coupleName,
+      weddingDate: args.weddingDate,
+      location: args.location,
+      email: args.email,
+      channel: args.channel,
+    }),
+  }));
+
+  for (const matchedRow of lookupResult.matchedRows as Array<{ rowNumber: number }>) {
+    const rowIndex = matchedRow.rowNumber - 1;
+    const baseRow = snapshot.rows[rowIndex] ?? [];
+    const nextRow = buildMappedRowValues({
+      headers: snapshot.headers,
+      mappings: resolvedMappings,
+      baseRow,
+    });
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: config.spreadsheetId,
+      range: `'${config.sheetName.replace(/'/g, "''")}'!${matchedRow.rowNumber}:${matchedRow.rowNumber}`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [nextRow],
+      },
+    });
+  }
+
+  return {
+    integration: "GOOGLE_SHEETS",
+    mode: "live",
+    status: "rows_updated",
+    action: args.action,
+    operation: config.operation,
+    spreadsheetId: config.spreadsheetId,
+    spreadsheetTitle: snapshot.metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
+    sheetName: config.sheetName,
+    updatedRows: lookupResult.matchedRows.length,
+    summary: `Google Sheets updated ${lookupResult.matchedRows.length} matching row(s).`,
+    params: args.params,
+    request: args.request,
+  };
+}
+
 export async function executeGoogleSheetsStep(args: SheetsExecutionArgs) {
+  const operation =
+    asObject(args.params)?.operation === "append_row" || asObject(args.params)?.operation === "update_rows"
+      ? (asObject(args.params)?.operation as "append_row" | "update_rows")
+      : "get_rows";
+
+  if (operation === "append_row") {
+    return runSheetsAppend(args);
+  }
+
+  if (operation === "update_rows") {
+    return runSheetsUpdate(args);
+  }
+
   return runSheetsLookup(args);
 }

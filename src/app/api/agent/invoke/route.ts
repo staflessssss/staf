@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   agentBuilderInclude,
+  deriveToolBlocksFromDraft,
+  resolvePromptingIdentity,
   type SandboxInvokeInput,
   sandboxInvokeSchema,
 } from "@/lib/agent-builder";
@@ -58,6 +60,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Draft config is required for unsaved testing." }, { status: 400 });
   }
 
+  const derivedToolBlocks = deriveToolBlocksFromDraft(parsed.data.draft);
+
   const selectedChannel = await db.channelConnection.findFirst({
     where: {
       id: parsed.data.draft.channelId,
@@ -79,7 +83,7 @@ export async function POST(req: NextRequest) {
         where: {
           tenantId: parsed.data.tenantId,
           id: {
-            in: parsed.data.draft.toolBlocks.flatMap((tool) =>
+            in: derivedToolBlocks.flatMap((tool) =>
               tool.steps.map((step) => step.integrationId),
             ),
           },
@@ -88,6 +92,12 @@ export async function POST(req: NextRequest) {
       })
     ).map((integration) => [integration.id, integration.type]),
   );
+  const promptingIdentity = resolvePromptingIdentity({
+    prompting: parsed.data.draft.channelConfig.prompting,
+    persona: parsed.data.draft.persona,
+    tone: parsed.data.draft.tone,
+    languagePreference: parsed.data.draft.languagePreference ?? null,
+  });
 
   const response = await invokeAgent({
     tenantId: parsed.data.tenantId,
@@ -98,12 +108,27 @@ export async function POST(req: NextRequest) {
     historyMessages: coerceHistoryMessages(parsed.data),
     promptPreview: buildSystemPrompt({
       name: parsed.data.draft.name,
-      persona: parsed.data.draft.persona,
-      tone: parsed.data.draft.tone,
-      languagePreference: parsed.data.draft.languagePreference ?? null,
+      persona: promptingIdentity.persona,
+      tone: promptingIdentity.tone,
+      languagePreference: promptingIdentity.languagePreference,
       channel: selectedChannel,
+      prompting: parsed.data.draft.channelConfig.prompting,
       knowledgeBlocks: parsed.data.draft.knowledgeBlocks,
-      toolBlocks: parsed.data.draft.toolBlocks.map((tool) => ({
+      functionBlocks: parsed.data.draft.channelConfig.functionBlocks?.map((fn) => ({
+        name: fn.name,
+        description: fn.description,
+        active: fn.active,
+        parameters: fn.parameters,
+        reactionAction: fn.reactionAction,
+        postAction: fn.postAction,
+        disableDelayedMessages: fn.disableDelayedMessages,
+        resultTargets: fn.resultTargets,
+        steps: fn.steps.map((step) => ({
+          action: step.action,
+          integrationType: integrationMap.get(step.integrationId),
+        })),
+      })),
+      toolBlocks: derivedToolBlocks.map((tool) => ({
         name: tool.name,
         description: tool.description,
         steps: tool.steps.map((step) => ({
@@ -112,9 +137,9 @@ export async function POST(req: NextRequest) {
         })),
       })),
     }),
-    languagePreference: parsed.data.draft.languagePreference ?? null,
+    languagePreference: promptingIdentity.languagePreference,
     knowledgeBlocks: parsed.data.draft.knowledgeBlocks,
-    toolBlocks: parsed.data.draft.toolBlocks.map((tool) => ({
+    toolBlocks: derivedToolBlocks.map((tool) => ({
       name: tool.name,
       description: tool.description,
       steps: tool.steps.map((step) => ({

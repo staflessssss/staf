@@ -36,6 +36,7 @@ type ParsedGmailInboundMessage = {
   threadId: string;
   subject: string;
   gmailMessageId: string;
+  internalDate: number;
 };
 
 function getGmailPubSubTopic() {
@@ -66,8 +67,18 @@ function getWatchMetadata(metadata: Prisma.JsonValue | null | undefined): GmailW
 
   return {
     topicName: typeof value.topicName === "string" ? value.topicName : undefined,
-    historyId: typeof value.historyId === "string" ? value.historyId : undefined,
-    expiration: typeof value.expiration === "string" ? value.expiration : undefined,
+    historyId:
+      typeof value.historyId === "string"
+        ? value.historyId
+        : typeof value.historyId === "number"
+          ? String(value.historyId)
+          : undefined,
+    expiration:
+      typeof value.expiration === "string"
+        ? value.expiration
+        : typeof value.expiration === "number"
+          ? String(value.expiration)
+          : undefined,
     registeredAt: typeof value.registeredAt === "string" ? value.registeredAt : undefined,
     lastNotificationAt: typeof value.lastNotificationAt === "string" ? value.lastNotificationAt : undefined,
     lastProcessedAt: typeof value.lastProcessedAt === "string" ? value.lastProcessedAt : undefined,
@@ -116,6 +127,15 @@ function compareHistoryIds(left?: string, right?: string) {
 
   if (a === b) return 0;
   return a > b ? 1 : -1;
+}
+
+function getIsoTimestamp(value?: string) {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function normalizeHeaderValue(headers: Array<{ name?: string | null; value?: string | null }> | undefined, name: string) {
@@ -292,10 +312,75 @@ async function fetchHistoryMessages(args: {
       threadId: String(data.threadId ?? ""),
       subject,
       gmailMessageId: String(data.id ?? id),
+      internalDate: Number(data.internalDate ?? 0),
     });
   }
 
   return results;
+}
+
+async function fetchRecentInboxMessages(args: {
+  credentialsEnc: string;
+  mailboxEmail: string;
+  afterIso?: string;
+}) {
+  const auth = createGoogleOAuthClientFromEncryptedCredentials(args.credentialsEnc);
+  const gmail = google.gmail({ version: "v1", auth });
+  const afterEpochSeconds = args.afterIso ? Math.max(0, Math.floor(Date.parse(args.afterIso) / 1000) - 120) : 0;
+  const query = afterEpochSeconds > 0 ? `in:inbox after:${afterEpochSeconds}` : "in:inbox newer_than:2d";
+  const list = await gmail.users.messages.list({
+    userId: "me",
+    q: query,
+    maxResults: 25,
+  });
+
+  const results: ParsedGmailInboundMessage[] = [];
+
+  for (const item of list.data.messages ?? []) {
+    if (!item.id) {
+      continue;
+    }
+
+    const response = await gmail.users.messages.get({
+      userId: "me",
+      id: item.id,
+      format: "full",
+    });
+
+    const data = response.data;
+    const headers = data.payload?.headers ?? [];
+    const from = normalizeHeaderValue(headers, "From");
+    const subject = normalizeHeaderValue(headers, "Subject");
+    const rfcMessageId = normalizeHeaderValue(headers, "Message-ID");
+    const text = pickMessageBody(data.payload as never) || String(data.snippet ?? "");
+    const internalDate = Number(data.internalDate ?? 0);
+
+    if (
+      !isInboundCustomerMessage({
+        mailboxEmail: args.mailboxEmail,
+        from,
+        labelIds: data.labelIds ?? undefined,
+      })
+    ) {
+      continue;
+    }
+
+    if (args.afterIso && internalDate > 0 && internalDate < Date.parse(args.afterIso)) {
+      continue;
+    }
+
+    results.push({
+      from: extractEmailAddress(from),
+      text,
+      messageId: rfcMessageId,
+      threadId: String(data.threadId ?? ""),
+      subject,
+      gmailMessageId: String(data.id ?? item.id),
+      internalDate,
+    });
+  }
+
+  return results.sort((left, right) => left.internalDate - right.internalDate);
 }
 
 export async function registerGmailWatchForChannel(args: {
@@ -382,10 +467,32 @@ export async function processGmailPubSubNotification(args: {
     },
   });
 
-  const channel = gmailChannels.find((item) => {
-    const metadata = asObject(item.metadata);
-    return String(metadata?.email ?? "").trim().toLowerCase() === payload.emailAddress?.trim().toLowerCase();
-  });
+  const matchingChannels = gmailChannels
+    .filter((item) => {
+      const metadata = asObject(item.metadata);
+      return String(metadata?.email ?? "").trim().toLowerCase() === payload.emailAddress?.trim().toLowerCase();
+    })
+    .sort((left, right) => {
+      const leftWatch = getWatchMetadata(left.metadata);
+      const rightWatch = getWatchMetadata(right.metadata);
+      const registeredDelta =
+        getIsoTimestamp(rightWatch.registeredAt) - getIsoTimestamp(leftWatch.registeredAt);
+
+      if (registeredDelta !== 0) {
+        return registeredDelta;
+      }
+
+      const processedDelta =
+        getIsoTimestamp(rightWatch.lastProcessedAt) - getIsoTimestamp(leftWatch.lastProcessedAt);
+
+      if (processedDelta !== 0) {
+        return processedDelta;
+      }
+
+      return getIsoTimestamp(String(right.updatedAt)) - getIsoTimestamp(String(left.updatedAt));
+    });
+
+  const channel = matchingChannels[0];
 
   if (!channel) {
     return {
@@ -411,32 +518,17 @@ export async function processGmailPubSubNotification(args: {
     lastNotificationAt: new Date().toISOString(),
   });
 
+  const agent = channel.agents[0] ?? null;
+
   if (!watchMetadata.historyId) {
-    await updateChannelWatchMetadata(channel.id, {
-      historyId: payload.historyId,
-      lastProcessedAt: new Date().toISOString(),
-      lastError: null,
-    });
-
-    return {
-      ok: true,
-      status: "cursor_initialized",
-      emailAddress: payload.emailAddress,
-      historyId: payload.historyId,
-    };
-  }
-
-  try {
-    const messages = await fetchHistoryMessages({
+    const recoveredMessages = await fetchRecentInboxMessages({
       credentialsEnc: channel.credentialsEnc,
       mailboxEmail: payload.emailAddress,
-      startHistoryId: watchMetadata.historyId,
+      afterIso: watchMetadata.registeredAt ?? watchMetadata.lastNotificationAt,
     });
 
-    const agent = channel.agents[0] ?? null;
-
     if (agent) {
-      for (const message of messages) {
+      for (const message of recoveredMessages) {
         await handleIncomingEvent({
           agentId: agent.id,
           channel: ChannelType.GMAIL,
@@ -446,6 +538,69 @@ export async function processGmailPubSubNotification(args: {
             messageId: message.messageId,
             threadId: message.threadId,
             subject: message.subject,
+            gmailMessageId: message.gmailMessageId,
+          },
+        });
+      }
+    }
+
+    await updateChannelWatchMetadata(channel.id, {
+      historyId: payload.historyId,
+      lastProcessedAt: new Date().toISOString(),
+      lastError: null,
+    });
+
+    return {
+      ok: true,
+      status:
+        recoveredMessages.length > 0
+          ? agent
+            ? "cursor_initialized_with_recovery"
+            : "cursor_initialized_recovery_no_active_agent"
+          : "cursor_initialized",
+      processedCount: recoveredMessages.length,
+      emailAddress: payload.emailAddress,
+      historyId: payload.historyId,
+    };
+  }
+
+  try {
+    const previousLastProcessedAt = watchMetadata.lastProcessedAt;
+    const messages = await fetchHistoryMessages({
+      credentialsEnc: channel.credentialsEnc,
+      mailboxEmail: payload.emailAddress,
+      startHistoryId: watchMetadata.historyId,
+    });
+
+    const recoveredMessages =
+      messages.length === 0
+        ? await fetchRecentInboxMessages({
+            credentialsEnc: channel.credentialsEnc,
+            mailboxEmail: payload.emailAddress,
+            afterIso: previousLastProcessedAt,
+          })
+        : [];
+    const combinedMessages = [...messages, ...recoveredMessages].filter(
+      (message, index, all) =>
+        all.findIndex(
+          (candidate) =>
+            candidate.gmailMessageId === message.gmailMessageId ||
+            (candidate.messageId && candidate.messageId === message.messageId),
+        ) === index,
+    );
+
+    if (agent) {
+      for (const message of combinedMessages) {
+        await handleIncomingEvent({
+          agentId: agent.id,
+          channel: ChannelType.GMAIL,
+          payload: {
+            from: message.from,
+            text: message.text,
+            messageId: message.messageId,
+            threadId: message.threadId,
+            subject: message.subject,
+            gmailMessageId: message.gmailMessageId,
           },
         });
       }
@@ -460,7 +615,7 @@ export async function processGmailPubSubNotification(args: {
     return {
       ok: true,
       status: agent ? "processed" : "processed_no_active_agent",
-      processedCount: messages.length,
+      processedCount: combinedMessages.length,
       emailAddress: payload.emailAddress,
       historyId: payload.historyId,
     };

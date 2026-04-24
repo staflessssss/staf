@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { handleIncomingEvent } from "@/lib/ai-runtime";
 import { db } from "@/lib/db";
+import {
+  ensureBufferedDeliveryExecution,
+  scheduleDelayedDeliverySweepBackground,
+} from "@/lib/delayed-delivery-background";
 
 export async function POST(req: NextRequest) {
   const agentId = req.nextUrl.searchParams.get("agentId");
@@ -31,7 +35,7 @@ export async function POST(req: NextRequest) {
   const secretHeader = req.headers.get("x-telegram-bot-api-secret-token");
   const isLocalDev = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
 
-  if (agent.webhookSecret && secretHeader !== agent.webhookSecret && !isLocalDev) {
+  if (!isLocalDev && (!agent.webhookSecret || secretHeader !== agent.webhookSecret)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -47,6 +51,8 @@ export async function POST(req: NextRequest) {
       channel: "TELEGRAM",
       payload,
     });
+    await ensureBufferedDeliveryExecution(result);
+    scheduleDelayedDeliverySweepBackground();
 
     return NextResponse.json(result);
   } catch (error) {

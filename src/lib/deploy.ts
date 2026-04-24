@@ -2,7 +2,7 @@ import { randomBytes } from "crypto";
 
 import { AgentStatus, ChannelType, Prisma } from "@prisma/client";
 
-import { AgentWithBuilderData } from "@/lib/agent-builder";
+import { AgentWithBuilderData, mergeChannelConfig } from "@/lib/agent-builder";
 import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
@@ -107,6 +107,7 @@ function buildChannelDeployConfig(
         webhookSecret,
         channelConfig: {
           webhookPath: `/api/webhooks/gmail?agentId=${agent.id}`,
+          webhookAuthHeaderName: "x-stafless-webhook-secret",
           pubsubWebhookPath: gmailPubSubSecret
             ? `/api/webhooks/gmail/pubsub?token=${gmailPubSubSecret}`
             : "/api/webhooks/gmail/pubsub",
@@ -130,18 +131,20 @@ function buildChannelDeployConfig(
 }
 
 export function assessAgentReadiness(agent: AgentWithBuilderData): AgentReadinessReport {
-  const basicsReady = Boolean(agent.name.trim() && agent.persona.trim() && agent.tone.trim());
+  const settingsAndPromptingReady = Boolean(
+    agent.name.trim() && agent.persona.trim() && agent.tone.trim(),
+  );
   const channelReady = agent.channel.status === "CONNECTED";
   const knowledgeReady = hasValidKnowledge(agent);
   const toolsReady = hasValidTools(agent);
-  const sandboxExpectationReady = basicsReady && channelReady;
+  const sandboxExpectationReady = settingsAndPromptingReady && channelReady;
 
   const items: ReadinessItem[] = [
     {
       key: "basics",
-      label: "Basics are complete",
-      done: basicsReady,
-      detail: basicsReady
+      label: "Settings and prompting are complete",
+      done: settingsAndPromptingReady,
+      detail: settingsAndPromptingReady
         ? "Name, persona, and tone are defined."
         : "Complete the agent name, persona, and tone before handoff.",
     },
@@ -163,13 +166,13 @@ export function assessAgentReadiness(agent: AgentWithBuilderData): AgentReadines
     },
     {
       key: "tools",
-      label: "Tool configuration is valid",
+      label: "Function configuration is valid",
       done: toolsReady,
       detail: toolsReady
         ? agent.features.some((feature) => feature.type === "TOOL")
-          ? "Tool blocks and integration-backed steps are configured."
-          : "No tools are configured yet, which is acceptable for a reply-only first deployment."
-        : "Any configured tool block must use valid tenant-owned integration steps.",
+          ? "Functions and integration-backed execution steps are configured."
+          : "No functions are configured yet, which is acceptable for a reply-only first deployment."
+        : "Any configured function must use valid tenant-owned integration steps.",
     },
     {
       key: "testing",
@@ -177,7 +180,7 @@ export function assessAgentReadiness(agent: AgentWithBuilderData): AgentReadines
       done: sandboxExpectationReady,
       detail: sandboxExpectationReady
         ? "This draft is structurally ready for internal test-chat verification."
-        : "Finish basics and channel selection before relying on test-chat feedback.",
+        : "Finish settings, prompting, and channel selection before relying on test-chat feedback.",
     },
   ];
 
@@ -201,7 +204,7 @@ export function getDeployStatus(agent: AgentWithBuilderData): DeployStatusResult
     ...readiness,
     deployed: false,
     nextStatus: readiness.ready ? AgentStatus.ACTIVE : agent.status,
-    channelConfig: deployment.channelConfig,
+    channelConfig: mergeChannelConfig(agent.channelConfig, deployment.channelConfig),
     message: readiness.ready
       ? "This agent is ready to deploy."
       : "Resolve the readiness gaps before deploying this agent.",
@@ -221,7 +224,7 @@ export async function deployAgent(agent: AgentWithBuilderData): Promise<DeploySt
   }
 
   const deployment = buildChannelDeployConfig(agent);
-  let channelConfig: Prisma.JsonObject = { ...deployment.channelConfig };
+  let channelConfig = mergeChannelConfig(agent.channelConfig, deployment.channelConfig);
   const webhookUrl =
     typeof channelConfig.webhookUrl === "string" ? channelConfig.webhookUrl : null;
 

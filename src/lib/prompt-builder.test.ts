@@ -1,15 +1,79 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildSystemPrompt } from "@/lib/prompt-builder";
+import { buildRuntimeExecutionPolicy, buildSystemPrompt } from "@/lib/prompt-builder";
 
-test("buildSystemPrompt includes multilingual behavior, knowledge, and tools", () => {
+test("buildSystemPrompt includes multilingual behavior, playbook, channel behavior, knowledge, and functions", () => {
   const prompt = buildSystemPrompt({
     name: "Studio Concierge",
     persona: "A premium front-desk operator",
     tone: "calm",
     languagePreference: "Russian",
     channel: { type: "INSTAGRAM" },
+    prompting: {
+      persona: "Moon-style studio assistant",
+      tone: "premium",
+      languagePreference: "Russian",
+      instruction:
+        "You are the AI assistant for the studio. Reply briefly, clearly, and keep the dialog moving.",
+      showContactIdentity: true,
+      showChannelContext: false,
+      notes: "Keep operator visibility in mind.",
+    },
+    channelBehavior: {
+      preset: "instagram_recommended",
+      responseLength: "short",
+      messageFormat: "split_into_2_3_messages",
+      tonePace: "fast",
+      ctaStyle: "offer_options",
+      emojiUsage: "limited",
+      bufferDelaySeconds: 1,
+      useSignature: false,
+      useRichFormatting: false,
+      allowAttachments: false,
+      followUpEnabled: true,
+      followUpRules: [
+        {
+          delayDays: 0,
+          delayHours: 4,
+          delayMinutes: 0,
+          sendLimit: "once_per_dialog",
+          outOfHoursBehavior: "send_immediately_ignore_schedule",
+          instruction: "Checking in in case you still need pricing details.",
+        },
+      ],
+      notes: "Keep it quick.",
+    },
+    conversationPlaybook: {
+      preset: "beauty_salon_lead_capture",
+      primaryGoal: "capture_lead",
+      successAction: "qualified_lead_created",
+      openingStrategy: "ask_two_things_together",
+      openingFields: ["customer_name", "service_needed"],
+      discoveryFields: [
+        "customer_name",
+        "service_needed",
+        "preferred_date",
+        "preferred_time",
+        "location_or_branch",
+      ],
+      discoveryOrder: [
+        "customer_name",
+        "service_needed",
+        "preferred_date",
+        "preferred_time",
+        "location_or_branch",
+      ],
+      minInfoBeforeAvailability: ["service_needed", "preferred_date", "preferred_time"],
+      minInfoBeforePricing: ["service_needed"],
+      pricingBehavior: "after_qualification",
+      unavailableBehavior: "offer_nearest_alternatives_automatically",
+      bookingBehavior: "request_confirmation_before_booking",
+      afterFaqBehavior: "return_to_qualification",
+      conversationMomentum: "end_with_next_step_or_question",
+      fallbackBehavior: "ask_a_clarifying_question",
+      notes: "Ask what service they want before talking about specialists.",
+    },
     knowledgeBlocks: [
       {
         name: "Services",
@@ -29,8 +93,61 @@ test("buildSystemPrompt includes multilingual behavior, knowledge, and tools", (
   assert.match(prompt, /Agent identity: Studio Concierge/);
   assert.match(prompt, /Preferred default response language: Russian/);
   assert.match(prompt, /Channel: Instagram/);
-  assert.match(prompt, /Opening rule: In the first reply of a new conversation, warmly greet the customer, introduce yourself by name/i);
+  assert.match(prompt, /Prompting/);
+  assert.match(prompt, /Persona: Moon-style studio assistant/);
+  assert.match(prompt, /Tone: premium/);
+  assert.match(prompt, /Instruction:\nYou are the AI assistant for the studio/);
+  assert.match(prompt, /Show client identity in runtime context: yes/);
+  assert.match(prompt, /Show channel context in runtime prompt: no/);
+  assert.match(prompt, /Operator notes: Keep operator visibility in mind\./);
+  assert.match(prompt, /Channel behavior/);
+  assert.match(prompt, /Conversation playbook/);
+  assert.match(
+    prompt,
+    /Opening rule: In the first reply of a new conversation, greet the customer naturally/i,
+  );
+  assert.match(prompt, /Emoji rule: Use only these emojis when needed: 🤍 ✨ 🎥/);
+  assert.match(prompt, /Primary goal: capture_lead/);
+  assert.match(prompt, /Playbook runtime guidance/);
+  assert.match(prompt, /Opening strategy: Ask Two Things Together\./);
+  assert.match(
+    prompt,
+    /Availability gate: Do not check availability until you know service needed, preferred date, preferred time\./,
+  );
+  assert.match(
+    prompt,
+    /Pricing gate: After Qualification\. Do not send pricing before you know service needed\./,
+  );
+  assert.match(prompt, /After FAQ: Return To Qualification\./);
+  assert.match(prompt, /Response length: short/);
+  assert.match(prompt, /Message buffer delay \(seconds\): 1/);
+  assert.match(prompt, /Follow-up enabled: yes/);
   assert.match(prompt, /Knowledge/);
-  assert.match(prompt, /Tools/);
+  assert.match(prompt, /When to use: What the studio offers/);
+  assert.match(prompt, /Knowledge: Wedding films and highlight edits\./);
+  assert.match(prompt, /Functions/);
   assert.match(prompt, /Google Calendar: check calendar/);
+  assert.match(prompt, /Runtime execution policy/);
+  assert.match(prompt, /Never invent integration results/);
+});
+
+test("buildSystemPrompt defaults prompting visibility flags to no when not configured", () => {
+  const prompt = buildSystemPrompt({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channel: { type: "TELEGRAM" },
+  });
+
+  assert.match(prompt, /Show client identity in runtime context: no/);
+  assert.match(prompt, /Show channel context in runtime prompt: no/);
+  assert.match(prompt, /Instruction: none configured/);
+});
+
+test("buildRuntimeExecutionPolicy exposes shared live-prompt rules in one place", () => {
+  const policy = buildRuntimeExecutionPolicy();
+
+  assert.match(policy, /Use configured tools when they materially help/);
+  assert.match(policy, /Never say a call is booked, reserved, confirmed/);
+  assert.match(policy, /If the current channel already provides the customer's email/);
 });

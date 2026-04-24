@@ -49,38 +49,38 @@
 }
 
 :root {
-  --background: #f4f1ea;
-  --foreground: #1f1728;
+  --background: #fcf8ff;
+  --foreground: #181836;
   --card: #ffffff;
-  --card-foreground: #1f1728;
+  --card-foreground: #181836;
   --popover: #ffffff;
-  --popover-foreground: #1f1728;
-  --primary: #c75c2a;
-  --primary-foreground: #fffaf5;
-  --secondary: #f7f2e9;
-  --secondary-foreground: #1f1728;
-  --muted: #efe9df;
-  --muted-foreground: #6b6575;
-  --accent: #e8e1d4;
-  --accent-foreground: #1f1728;
+  --popover-foreground: #181836;
+  --primary: #4648d4;
+  --primary-foreground: #ffffff;
+  --secondary: #efecff;
+  --secondary-foreground: #181836;
+  --muted: #e8e5ff;
+  --muted-foreground: #5c5c7e;
+  --accent: #e8e5ff;
+  --accent-foreground: #181836;
   --destructive: #b42318;
-  --border: #d8d0c2;
-  --input: #d8d0c2;
-  --ring: #c75c2a;
+  --border: #d8d6fe;
+  --input: #d8d6fe;
+  --ring: #4648d4;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 1rem;
-  --sidebar: #e8e1d4;
-  --sidebar-foreground: #1f1728;
-  --sidebar-primary: #c75c2a;
-  --sidebar-primary-foreground: #fffaf5;
-  --sidebar-accent: #f4ede1;
-  --sidebar-accent-foreground: #1f1728;
-  --sidebar-border: #d8d0c2;
-  --sidebar-ring: #c75c2a;
+  --sidebar: #efecff;
+  --sidebar-foreground: #181836;
+  --sidebar-primary: #4648d4;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8e5ff;
+  --sidebar-accent-foreground: #181836;
+  --sidebar-border: #d8d6fe;
+  --sidebar-ring: #4648d4;
 }
 
 .dark {
@@ -124,13 +124,14 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 30%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent 20%);
+      radial-gradient(circle at top left, rgba(192, 193, 255, 0.36), transparent 28%),
+      radial-gradient(circle at top right, rgba(191, 243, 101, 0.12), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent 20%);
   }
   html {
     @apply font-sans;
   }
   ::selection {
-    background: rgba(199, 92, 42, 0.18);
+    background: rgba(70, 72, 212, 0.18);
   }
 }

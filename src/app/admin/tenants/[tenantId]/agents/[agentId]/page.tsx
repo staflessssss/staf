@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { AgentBuilderWorkspace } from "@/components/stafless/agent-builder";
 import { AgentWorkbenchShell } from "@/components/stafless/agent-workbench-shell";
+import { AgentWorkspace } from "@/components/stafless/agent-workspace";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 
@@ -47,8 +47,8 @@ export default async function AgentDetailPage({
   if (!tenant || !agent) notFound();
 
   return (
-    <AgentWorkbenchShell agent={agent} mode="detail" tenant={tenant}>
-      <AgentBuilderWorkspace agent={agent} mode="detail" tenant={tenant} />
+    <AgentWorkbenchShell agent={agent} mode="edit" tenant={tenant}>
+      <AgentWorkspace agent={agent} tenant={tenant} />
     </AgentWorkbenchShell>
   );
 }

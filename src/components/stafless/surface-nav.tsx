@@ -40,16 +40,16 @@ export function SurfaceNav({
             className={cn(
               "transition",
               variant === "sidebar" &&
-                "rounded-xl px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.22em]",
+                "rounded-[16px] px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.22em]",
               variant === "topbar" &&
                 "border-b-2 border-transparent pb-1 text-sm font-medium",
               isActive
                 ? variant === "sidebar"
-                  ? "translate-x-1 rounded-xl bg-white text-[#8d4b00] shadow-sm"
-                  : "border-[#8d4b00] text-[#8d4b00]"
+                  ? "bg-white text-[#4648d4] shadow-[0_10px_24px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70"
+                  : "border-[#4648d4] text-[#4648d4]"
                 : variant === "sidebar"
-                  ? "text-[#1b1c19]/70 hover:bg-[#eae8e3]"
-                  : "text-[#1b1c19]/60 hover:text-[#8d4b00]",
+                  ? "text-[#5c5c7e] hover:bg-[#f5f2ff] hover:text-[#181836]"
+                  : "text-[#5c5c7e] hover:text-[#4648d4]",
             )}
           >
             {item.label}

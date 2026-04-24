@@ -9,6 +9,7 @@ export type RuntimeHistoryMessage = {
   toolName?: string | null;
   toolInput?: Prisma.JsonValue | null;
   toolResult?: Prisma.JsonValue | null;
+  model?: string | null;
   createdAt: Date;
 };
 
@@ -90,6 +91,7 @@ export async function loadConversationHistory(agentId: string, contactId: string
         toolName: message.toolName,
         toolInput: message.toolInput,
         toolResult: message.toolResult,
+        model: message.model,
         createdAt: message.createdAt,
       })) ?? [],
   };

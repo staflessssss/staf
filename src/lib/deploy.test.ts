@@ -128,3 +128,37 @@ test("assessAgentReadiness allows deploys without tools for reply-only agents", 
   assert.equal(report.ready, true);
   assert.equal(report.items.find((item) => item.key === "tools")?.done, true);
 });
+
+test("getDeployStatus keeps Instagram webhook paths free of embedded secrets", async () => {
+  const { getDeployStatus } = await import("@/lib/deploy");
+  const fixture = createAgentFixture();
+  fixture.channel.type = ChannelType.INSTAGRAM;
+  fixture.webhookSecret = "preview-secret";
+
+  const report = getDeployStatus(fixture);
+  const channelConfig =
+    report.channelConfig && typeof report.channelConfig === "object" && !Array.isArray(report.channelConfig)
+      ? (report.channelConfig as Record<string, unknown>)
+      : {};
+
+  assert.equal(channelConfig.webhookPath, "/api/webhooks/instagram?agentId=agent-1");
+});
+
+test("getDeployStatus keeps Gmail webhook paths authenticated for the relay boundary", async () => {
+  const { getDeployStatus } = await import("@/lib/deploy");
+  const fixture = createAgentFixture();
+  fixture.channel.type = ChannelType.GMAIL;
+  fixture.webhookSecret = "preview-secret";
+
+  const report = getDeployStatus(fixture);
+  const channelConfig =
+    report.channelConfig && typeof report.channelConfig === "object" && !Array.isArray(report.channelConfig)
+      ? (report.channelConfig as Record<string, unknown>)
+      : {};
+
+  assert.equal(
+    channelConfig.webhookPath,
+    "/api/webhooks/gmail?agentId=agent-1",
+  );
+  assert.equal(channelConfig.webhookAuthHeaderName, "x-stafless-webhook-secret");
+});

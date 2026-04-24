@@ -51,7 +51,7 @@ function countAgentBlocks(agent?: ShellAgent) {
 
   return {
     knowledgeCount: features.filter((feature) => feature.type === FeatureType.KNOWLEDGE).length,
-    toolCount: features.filter((feature) => feature.type === FeatureType.TOOL).length,
+    functionCount: features.filter((feature) => feature.type === FeatureType.TOOL).length,
   };
 }
 
@@ -62,7 +62,7 @@ export function AgentWorkbenchShell({
   children,
 }: {
   tenant: ShellTenant;
-  mode: "create" | "edit" | "detail";
+  mode: "create" | "edit";
   agent?: ShellAgent;
   children: ReactNode;
 }) {
@@ -76,20 +76,16 @@ export function AgentWorkbenchShell({
   const availableChannels = connectedChannels.filter(
     (connection) => !assignedChannelIds.has(connection.id) || connection.id === agent?.channel?.id,
   );
-  const { knowledgeCount, toolCount } = countAgentBlocks(agent);
+  const { knowledgeCount, functionCount } = countAgentBlocks(agent);
 
   const pageTitle =
     mode === "create"
       ? `Build an agent for ${tenant.name}`
-      : mode === "edit"
-        ? `Refine ${agent?.name ?? "agent"}`
-        : agent?.name ?? "Agent workbench";
+      : `${agent?.name ?? "Agent"} workspace`;
   const pageDescription =
     mode === "create"
       ? "Shape the persona, channel, knowledge, and tools in one focused workspace before you ever hit deploy."
-      : mode === "edit"
-        ? "Tune the current draft, pressure-test the tool stack, and keep deploy posture clear while you iterate."
-        : "Review the live configuration, prompt shape, and operator-facing readiness of this agent in one place.";
+      : "Configure the current agent through modular admin sections instead of replaying the full creation wizard.";
 
   return (
     <div className="space-y-8">
@@ -108,7 +104,7 @@ export function AgentWorkbenchShell({
       </div>
 
       <PageHeader
-        eyebrow={mode === "create" ? "Agent Builder" : mode === "edit" ? "Edit Agent" : "Agent Detail"}
+        eyebrow={mode === "create" ? "Create Agent" : "Agent Workspace"}
         title={pageTitle}
         description={pageDescription}
         badge={agent ? <StatusBadge status={agent.status} /> : undefined}
@@ -117,28 +113,12 @@ export function AgentWorkbenchShell({
             <Link href={`/admin/clients/${tenant.id}`} className={secondaryButtonClassName}>
               Back to client
             </Link>
-            {mode === "detail" && agent ? (
+            {mode === "edit" && agent ? (
               <AgentTestChatDrawer
                 agentId={agent.id}
                 agentName={agent.name}
                 tenantId={tenant.id}
               />
-            ) : null}
-            {mode === "detail" && agent ? (
-              <Link
-                href={`/admin/clients/${tenant.id}/agents/${agent.id}/edit`}
-                className={secondaryButtonClassName}
-              >
-                Edit configuration
-              </Link>
-            ) : null}
-            {mode === "edit" && agent ? (
-              <Link
-                href={`/admin/clients/${tenant.id}/agents/${agent.id}`}
-                className={secondaryButtonClassName}
-              >
-                View detail
-              </Link>
             ) : null}
           </>
         }
@@ -157,7 +137,7 @@ export function AgentWorkbenchShell({
           {
             label: "Connected integrations",
             value: connectedIntegrations.length,
-            detail: "Available to bind into tool steps",
+            detail: "Available to bind into function execution steps",
           },
           {
             label: mode === "create" ? "Planned knowledge blocks" : "Knowledge blocks",
@@ -165,9 +145,9 @@ export function AgentWorkbenchShell({
             detail: "Business context that shapes replies",
           },
           {
-            label: mode === "create" ? "Planned tool blocks" : "Tool blocks",
-            value: toolCount,
-            detail: "Operator actions the model can invoke",
+            label: mode === "create" ? "Planned functions" : "Functions",
+            value: functionCount,
+            detail: "Business actions the agent can invoke",
           },
         ]}
       />
@@ -176,15 +156,15 @@ export function AgentWorkbenchShell({
         <HighlightPanel
           eyebrow="Tenant context"
           title={`${tenant.name} operator workspace`}
-          description="This workbench is scoped to one client tenant. Channel assignment remains one-channel-per-agent, and all tools stay isolated to this client's connected integrations."
-          meta={`${tenant.slug}${tenant.timezone ? ` • ${tenant.timezone}` : ""}`}
+          description="This workbench is scoped to one client tenant. Channel assignment remains one-channel-per-agent, and every function stays isolated to this client's connected integrations."
+          meta={`${tenant.slug}${tenant.timezone ? ` - ${tenant.timezone}` : ""}`}
         />
         <SurfaceCard title="Workbench focus" description="Keep the operator in flow while editing.">
           <div className="space-y-4 text-sm leading-6 text-muted-foreground">
             <p>
               {mode === "create"
                 ? "Start from one available channel, then layer just enough knowledge and tooling for the first live use case."
-                : "Use this page as the single source of truth for draft quality, tool coverage, and deploy readiness."}
+                : "Use this page as the single source of truth for workspace posture, action coverage, and deploy readiness."}
             </p>
             <div className="space-y-2">
               <p className="font-semibold text-foreground">Current channel posture</p>
@@ -208,3 +188,4 @@ export function AgentWorkbenchShell({
     </div>
   );
 }
+

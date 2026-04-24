@@ -2,15 +2,15 @@ import {
   ChannelConnection,
   Feature,
   IntegrationConnection,
+  Prisma,
   Step,
 } from "@prisma/client";
 
-import { AgentBuilderClient } from "@/components/stafless/agent-builder-client";
-
-type BuilderTenant = {
+export type SerializableEditorTenant = {
   id: string;
   name: string;
   slug: string;
+  timezone?: string | null;
   channelConnections: ChannelConnection[];
   integrationConnections: IntegrationConnection[];
   agents?: Array<{
@@ -20,7 +20,7 @@ type BuilderTenant = {
   }>;
 };
 
-type BuilderAgent = {
+export type SerializableEditorAgent = {
   id: string;
   name: string;
   persona: string;
@@ -29,36 +29,26 @@ type BuilderAgent = {
   status: string;
   deployedAt: Date | null;
   channelId: string;
+  channelConfig?: Prisma.JsonValue | null;
   channel: ChannelConnection;
   features: (Feature & {
     steps: (Step & { integration: IntegrationConnection })[];
   })[];
 };
 
-export function AgentBuilderWorkspace({
-  tenant,
-  mode,
-  agent,
-}: {
-  tenant: BuilderTenant;
-  mode: "create" | "edit" | "detail";
-  agent?: BuilderAgent;
-}) {
-  return (
-    <AgentBuilderClient
-      agent={
-        agent
-          ? {
-              ...agent,
-              deployedAt: agent.deployedAt?.toISOString() ?? null,
-            }
-          : undefined
-      }
-      mode={mode}
-      tenant={{
-        ...tenant,
-        agents: tenant.agents ?? [],
-      }}
-    />
-  );
+export function serializeEditorAgent(agent?: SerializableEditorAgent) {
+  if (!agent) {
+    return undefined;
+  }
+
+  return {
+    ...agent,
+    channelConfig:
+      agent.channelConfig &&
+      typeof agent.channelConfig === "object" &&
+      !Array.isArray(agent.channelConfig)
+        ? agent.channelConfig
+        : null,
+    deployedAt: agent.deployedAt?.toISOString() ?? null,
+  };
 }

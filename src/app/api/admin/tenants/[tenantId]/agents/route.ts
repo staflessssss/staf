@@ -5,7 +5,9 @@ import {
   agentBuilderInclude,
   agentDraftSchema,
   buildFeatureCreateInput,
+  getChannelConfigObject,
   getToolIntegrationIds,
+  mergeBuilderChannelConfig,
   serializeBuilderAgent,
   validateBuilderReferences,
 } from "@/lib/agent-builder";
@@ -49,6 +51,9 @@ export async function GET(_: Request, context: TenantAgentsRouteContext) {
       promptPreview: buildSystemPrompt({
         ...serializeBuilderAgent(agent).draft,
         channel: agent.channel,
+        channelBehavior: getChannelConfigObject(agent.channelConfig).channelBehavior as never,
+        conversationPlaybook: getChannelConfigObject(agent.channelConfig).conversationPlaybook as never,
+        prompting: getChannelConfigObject(agent.channelConfig).prompting as never,
       }),
     })),
   });
@@ -104,7 +109,7 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
           tone: parsed.data.tone,
           languagePreference: parsed.data.languagePreference,
           status: parsed.data.status,
-          channelConfig: parsed.data.channelConfig as Prisma.InputJsonValue,
+          channelConfig: mergeBuilderChannelConfig(null, parsed.data.channelConfig),
           features: {
             create: buildFeatureCreateInput(parsed.data),
           },
@@ -125,6 +130,9 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
           promptPreview: buildSystemPrompt({
             ...serializeBuilderAgent(item).draft,
             channel: item.channel,
+            channelBehavior: getChannelConfigObject(item.channelConfig).channelBehavior as never,
+            conversationPlaybook: getChannelConfigObject(item.channelConfig).conversationPlaybook as never,
+            prompting: getChannelConfigObject(item.channelConfig).prompting as never,
           }),
         },
       },

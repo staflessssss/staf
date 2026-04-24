@@ -6,5 +6,5 @@ export default async function AdminClientAgentEditRedirect({
   params: Promise<{ clientId: string; agentId: string }>;
 }) {
   const { clientId, agentId } = await params;
-  redirect(`/admin/tenants/${clientId}/agents/${agentId}/edit`);
+  redirect(`/admin/tenants/${clientId}/agents/${agentId}`);
 }
