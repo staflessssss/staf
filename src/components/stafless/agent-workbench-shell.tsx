@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChannelConnection, Feature, FeatureType, IntegrationConnection } from "@prisma/client";
+import { ChannelConnection, Feature, FeatureType, IntegrationConnection, type Prisma } from "@prisma/client";
 import type { ReactNode } from "react";
 
 import { AgentTestChatDrawer } from "@/components/stafless/agent-test-chat-drawer";
@@ -33,6 +33,7 @@ type ShellAgent = {
   status: string;
   deployedAt: Date | string | null;
   channel?: ChannelConnection | null;
+  channelConfig?: Prisma.JsonValue | null;
   features?: Feature[];
 };
 
@@ -48,10 +49,17 @@ function formatDateTime(value: Date | string | null | undefined) {
 
 function countAgentBlocks(agent?: ShellAgent) {
   const features = agent?.features ?? [];
+  const rawChannelConfig =
+    agent && "channelConfig" in agent && agent.channelConfig && typeof agent.channelConfig === "object"
+      ? (agent.channelConfig as Record<string, unknown>)
+      : {};
+  const functionBlocks = Array.isArray(rawChannelConfig.functionBlocks)
+    ? rawChannelConfig.functionBlocks
+    : [];
 
   return {
     knowledgeCount: features.filter((feature) => feature.type === FeatureType.KNOWLEDGE).length,
-    functionCount: features.filter((feature) => feature.type === FeatureType.TOOL).length,
+    functionCount: functionBlocks.length,
   };
 }
 
