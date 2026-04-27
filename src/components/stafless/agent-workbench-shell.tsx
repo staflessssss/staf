@@ -95,6 +95,46 @@ export function AgentWorkbenchShell({
       ? "Shape the persona, channel, knowledge, and tools in one focused workspace before you ever hit deploy."
       : "Configure the current agent through modular admin sections instead of replaying the full creation wizard.";
 
+  if (mode === "edit" && agent) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <Link href="/admin/clients" className="transition hover:text-foreground">
+                Clients
+              </Link>
+              <span>/</span>
+              <Link href={`/admin/clients/${tenant.id}`} className="transition hover:text-foreground">
+                {tenant.name}
+              </Link>
+              <span>/</span>
+              <span className="font-medium text-foreground">{agent.name}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                {agent.name}
+              </h1>
+              <StatusBadge status={agent.status} />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link href={`/admin/clients/${tenant.id}`} className={secondaryButtonClassName}>
+              Back to client
+            </Link>
+            <AgentTestChatDrawer
+              agentId={agent.id}
+              agentName={agent.name}
+              tenantId={tenant.id}
+            />
+          </div>
+        </div>
+
+        {children}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
