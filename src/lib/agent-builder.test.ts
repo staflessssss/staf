@@ -8,6 +8,7 @@ import {
   buildMultilingualGuidance,
   formatEnumLabel,
   getToolIntegrationIds,
+  mapAgentToDraft,
   normalizeAgentSettings,
   normalizePromptingConfig,
   resolvePromptingIdentity,
@@ -26,7 +27,7 @@ test("agentDraftSchema normalizes empty language preference to null", () => {
   assert.equal(parsed.status, AgentStatus.DRAFT);
 });
 
-test("buildFeatureCreateInput preserves knowledge before tools and creates tool steps", () => {
+test("buildFeatureCreateInput creates only KNOWLEDGE features", () => {
   const input = agentDraftSchema.parse({
     name: "Studio Concierge",
     persona: "Helpful assistant",
@@ -56,14 +57,46 @@ test("buildFeatureCreateInput preserves knowledge before tools and creates tool 
 
   const features = buildFeatureCreateInput(input);
 
-  assert.equal(features.length, 2);
+  assert.equal(features.length, 1);
   assert.equal(features[0]?.type, FeatureType.KNOWLEDGE);
   assert.equal(features[0]?.sortOrder, 0);
-  assert.equal(features[1]?.type, FeatureType.TOOL);
-  assert.equal(features[1]?.sortOrder, 1);
+  assert.equal(features[0]?.knowledgeContent, "Wedding films and highlight edits.");
+  assert.equal(features.some((feature) => feature.type === FeatureType.TOOL), false);
+  assert.equal("steps" in features[0]!, false);
+});
 
-  const createdSteps = features[1]?.steps;
-  assert.ok(createdSteps && "create" in createdSteps);
+test("buildFeatureCreateInput ignores channelConfig.functionBlocks for Feature writes", () => {
+  const input = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      functionBlocks: [
+        {
+          name: "Calendar check",
+          description: "Verify availability",
+          active: true,
+          parameters: [],
+          reactionAction: "ai_agent_decides",
+          postAction: "continue_dialog",
+          disableDelayedMessages: false,
+          resultTargets: [],
+          steps: [
+            {
+              integrationId: "integration-1",
+              action: "check calendar",
+              params: {},
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  const features = buildFeatureCreateInput(input);
+
+  assert.deepEqual(features, []);
 });
 
 test("getToolIntegrationIds returns unique ids only", () => {
@@ -93,6 +126,98 @@ test("getToolIntegrationIds returns unique ids only", () => {
   });
 
   assert.deepEqual(getToolIntegrationIds(input), ["integration-1"]);
+});
+
+test("getToolIntegrationIds reads from channelConfig.functionBlocks", () => {
+  const input = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      functionBlocks: [
+        {
+          name: "Calendar check",
+          description: "Verify availability",
+          active: true,
+          parameters: [],
+          reactionAction: "ai_agent_decides",
+          postAction: "continue_dialog",
+          disableDelayedMessages: false,
+          resultTargets: [],
+          steps: [
+            {
+              integrationId: "int1",
+              action: "check calendar",
+              params: {},
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(getToolIntegrationIds(input), ["int1"]);
+});
+
+test("mapAgentToDraft exposes functionBlocks from channelConfig", () => {
+  const createAgent = (
+    channelConfig: Parameters<typeof mapAgentToDraft>[0]["channelConfig"],
+  ): Parameters<typeof mapAgentToDraft>[0] =>
+    ({
+      id: "agent-1",
+      tenantId: "tenant-1",
+      name: "Studio Concierge",
+      persona: "Helpful assistant",
+      tone: "friendly",
+      languagePreference: null,
+      status: AgentStatus.DRAFT,
+      channelId: "channel-1",
+      channelConfig,
+      channel: null,
+      features: [],
+    }) as unknown as Parameters<typeof mapAgentToDraft>[0];
+
+  const draft = mapAgentToDraft(
+    createAgent({
+      functionBlocks: [
+        {
+          name: "fn1",
+          description: "Create a row",
+          active: true,
+          parameters: [],
+          reactionAction: "ai_agent_decides",
+          postAction: "continue_dialog",
+          disableDelayedMessages: false,
+          resultTargets: [
+            {
+              type: "integration_step",
+              label: "Sheet row",
+              primaryStepId: "s1",
+            },
+          ],
+          steps: [
+            {
+              id: "s1",
+              integrationId: "integration-1",
+              action: "append row",
+              params: "{}",
+            },
+          ],
+        },
+      ],
+    }),
+  );
+
+  assert.equal(draft.functionBlocks.length, 1);
+  assert.equal(draft.functionBlocks[0]?.name, "fn1");
+  assert.equal(draft.functionBlocks[0]?.steps[0]?.id, "s1");
+  assert.equal(draft.functionBlocks[0]?.resultTargets[0]?.primaryStepId, "s1");
+  assert.equal((draft as any).toolBlocks, undefined);
+  assert.equal("toolBlocks" in draft, false);
+
+  assert.deepEqual(mapAgentToDraft(createAgent(null)).functionBlocks, []);
+  assert.deepEqual(mapAgentToDraft(createAgent({})).functionBlocks, []);
 });
 
 test("buildMultilingualGuidance defaults to multilingual-first behavior", () => {

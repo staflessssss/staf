@@ -3,10 +3,13 @@ import {
   ChannelConnection,
   ChannelType,
   ConnectionStatus,
+  Feature,
   FeatureType,
   IntegrationConnection,
   MessageRole,
   Prisma,
+  PrismaClient,
+  Step,
 } from "@prisma/client";
 import { z } from "zod";
 
@@ -260,6 +263,7 @@ export type FunctionParameterConfig = {
 export type FunctionResultTargetConfig = {
   type: (typeof functionResultTargetTypeOptions)[number];
   label: string;
+  primaryStepId?: string;
 };
 
 export type FunctionBlockConfig = {
@@ -272,6 +276,7 @@ export type FunctionBlockConfig = {
   disableDelayedMessages: boolean;
   resultTargets: FunctionResultTargetConfig[];
   steps: Array<{
+    id?: string;
     integrationId: string;
     action: string;
     params: Record<string, unknown> | string;
@@ -860,6 +865,11 @@ export const functionParameterSchema = z.object({
 export const functionResultTargetSchema = z.object({
   type: z.enum(functionResultTargetTypeOptions).default("integration_step"),
   label: z.string().trim().min(1).max(160),
+  primaryStepId: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
 });
 
 export const functionBlockSchema = z.object({
@@ -874,6 +884,11 @@ export const functionBlockSchema = z.object({
   steps: z
     .array(
       z.object({
+        id: z
+          .string()
+          .trim()
+          .optional()
+          .transform((value) => (value ? value : undefined)),
         integrationId: z.string().trim().min(1),
         action: z.string().trim().min(1).max(120),
         params: z.union([z.record(z.string(), z.unknown()), z.string().trim()]).default({}),
@@ -1232,15 +1247,25 @@ export function normalizeFunctionBlock(
               typeof target?.label === "string" && target.label.trim()
                 ? target.label.trim()
                 : "Result target",
+            primaryStepId:
+              typeof target?.primaryStepId === "string" && target.primaryStepId.trim()
+                ? target.primaryStepId.trim()
+                : undefined,
           }))
       : base.resultTargets,
     steps: Array.isArray(value?.steps)
       ? value.steps
           .filter(
-            (step): step is { integrationId: string; action: string; params: Record<string, unknown> | string } =>
+            (step): step is {
+              id?: string;
+              integrationId: string;
+              action: string;
+              params: Record<string, unknown> | string;
+            } =>
               Boolean(step && typeof step === "object" && !Array.isArray(step)),
           )
           .map((step) => ({
+            id: typeof step.id === "string" && step.id.trim() ? step.id.trim() : undefined,
             integrationId: typeof step.integrationId === "string" ? step.integrationId : "",
             action: typeof step.action === "string" ? step.action : "",
             params:
@@ -1357,12 +1382,40 @@ export type AgentWithBuilderData = Prisma.AgentGetPayload<{
   include: typeof agentBuilderInclude;
 }>;
 
+export type HydratedToolStep = Pick<
+  Step,
+  "id" | "featureId" | "integrationId" | "action" | "params" | "sortOrder" | "createdAt" | "updatedAt"
+> & {
+  integration: IntegrationConnection;
+};
+
+export type HydratedToolFeature = Pick<
+  Feature,
+  "id" | "agentId" | "name" | "description" | "type" | "sortOrder" | "createdAt" | "updatedAt"
+> & {
+  type: "TOOL";
+  steps: HydratedToolStep[];
+};
+
 export function getChannelConfigObject(value: Prisma.JsonValue | null | undefined): Prisma.JsonObject {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
 
   return { ...(value as Prisma.JsonObject) };
+}
+
+function normalizeFunctionStepParams(value: Record<string, unknown> | string): Prisma.JsonValue {
+  if (typeof value !== "string") {
+    return value as Prisma.JsonValue;
+  }
+
+  try {
+    const parsed = JSON.parse(value || "{}");
+    return parsed && typeof parsed === "object" ? (parsed as Prisma.JsonValue) : {};
+  } catch {
+    return {};
+  }
 }
 
 export function mergeBuilderChannelConfig(
@@ -1415,6 +1468,8 @@ export function mergeChannelConfig(
 }
 
 export function mapAgentToDraft(agent: AgentWithBuilderData) {
+  const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
+
   return {
     id: agent.id,
     tenantId: agent.tenantId,
@@ -1424,11 +1479,13 @@ export function mapAgentToDraft(agent: AgentWithBuilderData) {
     languagePreference: agent.languagePreference,
     status: agent.status,
     channelId: agent.channelId,
-    channelConfig:
-      agent.channelConfig && typeof agent.channelConfig === "object" && !Array.isArray(agent.channelConfig)
-        ? agent.channelConfig
-        : {},
+    channelConfig: rawChannelConfig,
     channel: agent.channel,
+    functionBlocks: normalizeFunctionBlocks(
+      Array.isArray(rawChannelConfig.functionBlocks)
+        ? (rawChannelConfig.functionBlocks as Partial<FunctionBlockConfig>[])
+        : [],
+    ),
     knowledgeBlocks: agent.features
       .filter((feature) => feature.type === FeatureType.KNOWLEDGE)
       .map((feature) => ({
@@ -1438,23 +1495,126 @@ export function mapAgentToDraft(agent: AgentWithBuilderData) {
         knowledgeContent: feature.knowledgeContent ?? "",
         sortOrder: feature.sortOrder,
       })),
-    toolBlocks: agent.features
-      .filter((feature) => feature.type === FeatureType.TOOL)
-      .map((feature) => ({
-        id: feature.id,
-        name: feature.name,
-        description: feature.description,
-        sortOrder: feature.sortOrder,
-        steps: feature.steps.map((step) => ({
-          id: step.id,
-          integrationId: step.integrationId,
-          integrationType: step.integration.type,
-          action: step.action,
-          params: step.params,
-          sortOrder: step.sortOrder,
-        })),
-      })),
   };
+}
+
+export function deriveFunctionBlocksFromAgent(agent: AgentWithBuilderData) {
+  const rawChannelConfig =
+    agent.channelConfig && typeof agent.channelConfig === "object" && !Array.isArray(agent.channelConfig)
+      ? (agent.channelConfig as Record<string, unknown>)
+      : {};
+
+  const toolBlocks = agent.features
+    .filter((feature) => feature.type === FeatureType.TOOL)
+    .map((feature) => ({
+      name: feature.name,
+      description: feature.description,
+      steps: feature.steps.map((step) => ({
+        integrationId: step.integrationId,
+        action: step.action,
+        params: step.params,
+      })),
+    }));
+
+  return normalizeFunctionBlocks(
+    rawChannelConfig.functionBlocks &&
+      Array.isArray(rawChannelConfig.functionBlocks)
+      ? (rawChannelConfig.functionBlocks as Partial<FunctionBlockConfig>[])
+      : toolBlocks.map((tool) =>
+          toolBlockToFunctionBlock({
+            name: tool.name,
+            description: tool.description,
+            steps: tool.steps.map((step) => ({
+              integrationId: step.integrationId,
+              action: step.action,
+              params:
+                step.params &&
+                typeof step.params === "object" &&
+                !Array.isArray(step.params)
+                  ? step.params
+                  : {},
+            })),
+          }),
+        ),
+  );
+}
+
+export async function hydrateFunctionBlocksForRuntime(
+  agent: Pick<AgentWithBuilderData, "id" | "tenantId" | "channelConfig">,
+  database: PrismaClient,
+): Promise<HydratedToolFeature[]> {
+  const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
+  const functionBlocks = normalizeFunctionBlocks(
+    Array.isArray(rawChannelConfig.functionBlocks)
+      ? (rawChannelConfig.functionBlocks as Partial<FunctionBlockConfig>[])
+      : [],
+  );
+
+  if (functionBlocks.length === 0) {
+    return [];
+  }
+
+  const integrationIds = Array.from(
+    new Set(
+      functionBlocks.flatMap((block) =>
+        block.steps
+          .map((step) => step.integrationId.trim())
+          .filter((integrationId) => integrationId.length > 0),
+      ),
+    ),
+  );
+
+  const integrations =
+    integrationIds.length > 0
+      ? await database.integrationConnection.findMany({
+          where: {
+            tenantId: agent.tenantId,
+            id: { in: integrationIds },
+          },
+        })
+      : [];
+
+  const integrationsById = new Map(integrations.map((integration) => [integration.id, integration]));
+  const now = new Date();
+
+  return functionBlocks.map((block, blockIndex) => {
+    const featureId = `synthetic:fb:${blockIndex}`;
+
+    return {
+      id: featureId,
+      agentId: agent.id,
+      name: block.name,
+      description: block.description,
+      type: FeatureType.TOOL,
+      sortOrder: blockIndex,
+      createdAt: now,
+      updatedAt: now,
+      steps: block.steps.flatMap((step, stepIndex) => {
+        const integration = integrationsById.get(step.integrationId);
+
+        if (!integration) {
+          console.warn(
+            `[hydrateFunctionBlocksForRuntime] Agent ${agent.id} skipped step ${blockIndex}:${stepIndex} because integration ${step.integrationId} was not found for tenant ${agent.tenantId}.`,
+          );
+          return [];
+        }
+
+        return [
+          {
+            id: step.id ?? `synthetic:step:${blockIndex}:${stepIndex}`,
+            featureId,
+            integrationId: step.integrationId,
+            action: step.action,
+            params: normalizeFunctionStepParams(step.params),
+            sortOrder: stepIndex,
+            createdAt: now,
+            updatedAt: now,
+            integration,
+          },
+        ];
+      }),
+    };
+  });
 }
 
 export function serializeBuilderAgent(agent: AgentWithBuilderData) {
@@ -1470,7 +1630,6 @@ export function serializeBuilderAgent(agent: AgentWithBuilderData) {
 }
 
 export function buildFeatureCreateInput(input: AgentDraftInput): Prisma.FeatureCreateWithoutAgentInput[] {
-  const toolBlocks = deriveToolBlocksFromDraft(input);
   const knowledgeFeatures: Prisma.FeatureCreateWithoutAgentInput[] =
     input.knowledgeBlocks.map((block, index) => ({
       name: block.name,
@@ -1480,27 +1639,7 @@ export function buildFeatureCreateInput(input: AgentDraftInput): Prisma.FeatureC
       knowledgeContent: block.knowledgeContent,
     }));
 
-  const toolFeatures: Prisma.FeatureCreateWithoutAgentInput[] =
-    toolBlocks.map((block, featureIndex) => ({
-      name: block.name,
-      description: block.description,
-      type: FeatureType.TOOL,
-      sortOrder: input.knowledgeBlocks.length + featureIndex,
-      steps: {
-        create: block.steps.map((step, stepIndex) => ({
-          integration: {
-            connect: {
-              id: step.integrationId,
-            },
-          },
-          action: step.action,
-          params: step.params as Prisma.InputJsonValue,
-          sortOrder: stepIndex,
-        })),
-      },
-    }));
-
-  return [...knowledgeFeatures, ...toolFeatures];
+  return knowledgeFeatures;
 }
 
 export function getToolIntegrationIds(input: AgentDraftInput) {
