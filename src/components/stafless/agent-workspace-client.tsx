@@ -63,7 +63,6 @@ import {
   normalizeFunctionBlocks,
   normalizePromptingConfig,
   PromptingConfig,
-  toolBlockToFunctionBlock,
 } from "@/lib/agent-builder";
 import {
   getDefaultGoogleCalendarParams,
@@ -455,33 +454,10 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
           knowledgeContent: feature.knowledgeContent ?? "",
         }),
       ) ?? [];
-  const toolBlocks =
-    agent?.features
-      .filter((feature) => feature.type === FeatureType.TOOL)
-      .map((feature) => ({
-        name: feature.name,
-        description: feature.description,
-        steps: feature.steps.map((step) => ({
-          integrationId: step.integrationId,
-          action: step.action,
-          params: JSON.stringify(step.params ?? {}, null, 2),
-        })),
-      })) ?? [];
   const functionBlocks = normalizeFunctionBlocks(
-    rawChannelConfig.functionBlocks &&
-      Array.isArray(rawChannelConfig.functionBlocks)
+    Array.isArray(rawChannelConfig.functionBlocks)
       ? (rawChannelConfig.functionBlocks as Partial<FunctionDraft>[])
-      : toolBlocks.map((tool) =>
-          toolBlockToFunctionBlock({
-            name: tool.name,
-            description: tool.description,
-            steps: tool.steps.map((step) => ({
-              integrationId: step.integrationId,
-              action: step.action,
-              params: safeParseJsonObject(step.params),
-            })),
-          }),
-        ),
+      : [],
   ).map(withFunctionUiIds);
   const promptingConfig = normalizePromptingConfig(
     rawChannelConfig.prompting &&
