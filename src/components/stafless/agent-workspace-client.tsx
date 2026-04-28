@@ -57,7 +57,6 @@ import {
   ConversationPlaybookConfig,
   discoveryFieldOptions,
   DiscoveryField,
-  getChannelBehaviorPresetConfig,
   getConversationPlaybookPreset,
   getDefaultChannelBehaviorConfig,
   normalizeChannelBehavior,
@@ -944,16 +943,6 @@ export function AgentWorkspaceClient({
     updateDraft("channelConfig", {
       ...draft.channelConfig,
       conversationPlaybook: nextPreset,
-    });
-  }
-
-  function applyChannelBehaviorPreset(
-    preset: ChannelBehaviorConfig["preset"],
-    channelType: ChannelConnection["type"] | null | undefined,
-  ) {
-    updateDraft("channelConfig", {
-      ...draft.channelConfig,
-      channelBehavior: getChannelBehaviorPresetConfig(preset, channelType ?? null),
     });
   }
 
@@ -2153,8 +2142,6 @@ export function AgentWorkspaceClient({
               onAgentSettingsChange={updateAgentSettings}
               onNameChange={(value) => updateDraft("name", value)}
               onStatusChange={(status) => updateDraft("status", status)}
-              sectionCanvasClassName={sectionCanvasClassName}
-              softInfoPanelClassName={softInfoPanelClassName}
               status={draft.status}
               tenantTimezone={tenant.timezone}
             />
@@ -2225,7 +2212,6 @@ export function AgentWorkspaceClient({
               persona={draft.persona}
               promptingInstruction={draft.channelConfig.prompting.instruction ?? ""}
               promptingNotes={draft.channelConfig.prompting.notes ?? ""}
-              sectionCanvasClassName={sectionCanvasClassName}
               showChannelContext={draft.channelConfig.prompting.showChannelContext}
               showContactIdentity={draft.channelConfig.prompting.showContactIdentity}
               tone={draft.tone}
@@ -2276,10 +2262,7 @@ export function AgentWorkspaceClient({
             <WorkspaceMessagesSection
               channelBehavior={draft.channelConfig.channelBehavior}
               isReadOnlyMode={isReadOnlyMode}
-              onApplyPreset={applyChannelBehaviorPreset}
               onUpdateChannelBehavior={updateChannelBehavior}
-              selectedChannel={selectedChannel}
-              softInfoPanelClassName={softInfoPanelClassName}
             />
           ) : null}
 
@@ -2414,9 +2397,14 @@ export function AgentWorkspaceClient({
           ) : null}
         </div>
 
+        {shouldShowWorkspaceReviewRail ? (
         <div className={isWideWorkbenchStep ? "space-y-6 xl:col-span-2" : "space-y-6 xl:sticky xl:top-24"}>
           <SurfaceCard
-            className="border-[#dccab6] bg-[linear-gradient(180deg,#fffdf9_0%,#f7ede1_100%)]"
+            className={
+              isWorkspaceMode
+                ? "border-[#e6ebf2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                : "border-[#dccab6] bg-[linear-gradient(180deg,#fffdf9_0%,#f7ede1_100%)]"
+            }
             title={isWorkspaceMode ? "Workspace review" : "Operator review"}
             description={
               isWorkspaceMode
@@ -2475,7 +2463,7 @@ export function AgentWorkspaceClient({
               )}
             </div>
             <div className="mt-6 space-y-3">
-              <div className="flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3">
+              <div className={isWorkspaceMode ? "flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3" : "flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3"}>
                 <Layers3 className="size-4 text-primary" />
                 <div>
                   <p className="text-sm font-semibold text-foreground">{tenant.name}</p>

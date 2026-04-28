@@ -1,8 +1,9 @@
 import { AgentStatus } from "@prisma/client";
+import { Bot, CircleAlert, CircleQuestionMark } from "lucide-react";
 
 import {
   FormField,
-  SurfaceCard,
+  ToggleSwitch,
   inputClassName,
   selectClassName,
 } from "@/components/stafless/foundation";
@@ -19,6 +20,15 @@ const dayLabels: Record<AgentSettingsConfig["weeklySchedule"][number]["day"], st
   sunday: "Sun",
 };
 
+const sectionTitleClassName = "text-[18px] font-semibold tracking-[-0.02em] text-[#111827]";
+const settingRowClassName =
+  "rounded-[14px] border border-[#dbe3ef] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.02)]";
+const disabledFieldClassName = "bg-[#f8fafc] text-muted-foreground";
+const mutedTextClassName = "text-sm leading-6 text-[#667085]";
+const cardHeadingClassName = "text-base font-semibold text-[#111827]";
+const scheduleTimeInputClassName =
+  "w-full rounded-[10px] border border-[#dde3ee] bg-white px-3 py-2 text-center text-sm text-[#344054] outline-none transition focus:border-[#6c63ff] focus:ring-4 focus:ring-[#6c63ff]/10 disabled:bg-[#f8fafc] disabled:text-[#98a2b3]";
+
 function hasInvalidScheduleWindow(agentSettings: AgentSettingsConfig) {
   return agentSettings.weeklySchedule.some(
     (window) => window.enabled && window.start >= window.end,
@@ -33,8 +43,6 @@ export function WorkspaceSettingsSection({
   onNameChange,
   onStatusChange,
   onAgentSettingsChange,
-  sectionCanvasClassName,
-  softInfoPanelClassName,
 }: {
   name: string;
   status: AgentStatus;
@@ -43,196 +51,212 @@ export function WorkspaceSettingsSection({
   onNameChange: (value: string) => void;
   onStatusChange: (status: AgentStatus) => void;
   onAgentSettingsChange: (patch: Partial<AgentSettingsConfig>) => void;
-  sectionCanvasClassName: string;
-  softInfoPanelClassName: string;
 }) {
   const scheduleHasInvalidWindow = hasInvalidScheduleWindow(agentSettings);
   const timezoneOptions = getTimezoneOptions({
     selectedTimezone: agentSettings.timezone,
     tenantTimezone,
   });
+  const agentIsActive = status === AgentStatus.ACTIVE;
 
   return (
-    <SurfaceCard
-      className="rounded-[30px] bg-[linear-gradient(180deg,#fffdf9_0%,#f7efe2_100%)] shadow-[0_16px_34px_rgba(31,23,40,0.05)]"
-      title="Settings"
-      description="Operational identity, launch posture, and default runtime behavior live here."
-    >
-      <div className={sectionCanvasClassName}>
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_320px]">
-          <div className="space-y-5">
-            <div className="rounded-[22px] bg-white/80 p-5 ring-1 ring-[#eadccc]">
-              <div className="grid gap-5 md:grid-cols-2">
-                <FormField
-                  label="Agent name"
-                  hint="Use a business-facing name the operator can scan quickly."
-                >
+    <div className="mx-auto w-full max-w-[720px] space-y-9">
+      <section className="space-y-6">
+        <div className="flex items-start justify-between gap-4 border-b border-[#e8edf5] pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-[18px] font-semibold tracking-[-0.02em] text-[#101828]">
+                Settings
+              </h1>
+              <CircleQuestionMark className="size-4 text-[#98a2b3]" />
+            </div>
+            <p className="mt-2 max-w-[560px] text-sm leading-6 text-[#667085]">
+              Configure the agent identity, activation state, timezone, and weekly work schedule.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h2 className={sectionTitleClassName}>General settings</h2>
+
+          <div className={settingRowClassName}>
+            <div className="flex items-start gap-4">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-[12px] border border-[#e6ebf2] bg-[#f8fafc] text-[#344054]">
+                <Bot className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <FormField label="Name">
                   <input
                     className={inputClassName}
                     onChange={(event) => onNameChange(event.target.value)}
                     value={name}
                   />
                 </FormField>
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-foreground">Bot status</p>
-                  <label className="flex items-center justify-between rounded-[18px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
-                    <div>
-                      <p className="font-semibold text-foreground">Agent active</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        Toggle between live operation and paused posture.
-                      </p>
-                    </div>
-                    <input
-                      checked={status === AgentStatus.ACTIVE}
-                      onChange={(event) =>
-                        onStatusChange(event.target.checked ? AgentStatus.ACTIVE : AgentStatus.PAUSED)
-                      }
-                      type="checkbox"
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <div className="rounded-[22px] bg-white/80 p-5 ring-1 ring-[#eadccc]">
-                <label className="flex items-center justify-between gap-4 rounded-[18px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
-                  <div>
-                    <p className="font-semibold text-foreground">Default chat state</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      If enabled, the agent auto-starts new dialogs from the first user message.
-                    </p>
-                  </div>
-                  <input
-                    checked={agentSettings.defaultChatEnabled}
-                    onChange={(event) =>
-                      onAgentSettingsChange({ defaultChatEnabled: event.target.checked })
-                    }
-                    type="checkbox"
-                  />
-                </label>
-              </div>
-
-              <div className="rounded-[22px] bg-white/80 p-5 ring-1 ring-[#eadccc]">
-                <FormField
-                  label="Timezone"
-                  hint={
-                    tenantTimezone
-                      ? `Tenant default: ${tenantTimezone}`
-                      : "Set the working timezone used for schedule interpretation."
-                  }
-                >
-                  <select
-                    className={selectClassName}
-                    onChange={(event) =>
-                      onAgentSettingsChange({ timezone: event.target.value })
-                    }
-                    value={agentSettings.timezone}
-                  >
-                    {timezoneOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-              </div>
-            </div>
-
-            <div className="rounded-[22px] bg-white/80 p-5 ring-1 ring-[#eadccc]">
-              <div className="mb-4 flex items-center justify-between gap-4 rounded-[18px] bg-[#faf3e9] px-4 py-4 ring-1 ring-[#eadccc]">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Schedule</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Use this only when the agent should not operate 24/7.
-                  </p>
-                </div>
-                <input
-                  checked={agentSettings.scheduleEnabled}
-                  onChange={(event) =>
-                    onAgentSettingsChange({ scheduleEnabled: event.target.checked })
-                  }
-                  type="checkbox"
-                />
-              </div>
-
-              <div className="space-y-3">
-                {scheduleHasInvalidWindow ? (
-                  <div className="rounded-[18px] border border-[#f0d2c7] bg-[#fff5f1] px-4 py-3 text-sm text-[#7f3f2a]">
-                    Each active day must end later than it starts.
-                  </div>
-                ) : null}
-                {agentSettings.weeklySchedule.map((window, index) => (
-                  <div
-                    key={window.day}
-                    className="grid gap-3 rounded-[18px] bg-[#fff9f1] px-4 py-4 ring-1 ring-[#eadccc] md:grid-cols-[84px_100px_minmax(0,1fr)_20px_minmax(0,1fr)] md:items-center"
-                  >
-                    <p className="text-sm font-semibold text-foreground">{dayLabels[window.day]}</p>
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <input
-                        checked={window.enabled}
-                        onChange={(event) =>
-                          onAgentSettingsChange({
-                            weeklySchedule: agentSettings.weeklySchedule.map((item, itemIndex) =>
-                              itemIndex === index ? { ...item, enabled: event.target.checked } : item,
-                            ),
-                          })
-                        }
-                        type="checkbox"
-                      />
-                      Active
-                    </label>
-                    <input
-                      className={`${inputClassName} ${!agentSettings.scheduleEnabled || !window.enabled ? "bg-[#f8f3eb]" : ""}`}
-                      disabled={!agentSettings.scheduleEnabled || !window.enabled}
-                      onChange={(event) =>
-                        onAgentSettingsChange({
-                          weeklySchedule: agentSettings.weeklySchedule.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, start: event.target.value } : item,
-                          ),
-                        })
-                      }
-                      type="time"
-                      value={window.start}
-                    />
-                    <span className="text-center text-sm text-muted-foreground">-</span>
-                    <input
-                      className={`${inputClassName} ${!agentSettings.scheduleEnabled || !window.enabled ? "bg-[#f8f3eb]" : ""}`}
-                      disabled={!agentSettings.scheduleEnabled || !window.enabled}
-                      onChange={(event) =>
-                        onAgentSettingsChange({
-                          weeklySchedule: agentSettings.weeklySchedule.map((item, itemIndex) =>
-                            itemIndex === index ? { ...item, end: event.target.value } : item,
-                          ),
-                        })
-                      }
-                      type="time"
-                      value={window.end}
-                    />
-                  </div>
-                ))}
               </div>
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className={softInfoPanelClassName}>
-              <p className="text-sm font-semibold text-foreground">What belongs here</p>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-                <li>Agent identity and live status.</li>
-                <li>Whether the agent auto-starts new dialogs.</li>
-                <li>Timezone and optional weekly operating schedule.</li>
-              </ul>
+          <div className={settingRowClassName}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className={cardHeadingClassName}>Bot status</p>
+                <p className={mutedTextClassName}>
+                  Activate or pause this agent for incoming dialogs.
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={agentIsActive}
+                onCheckedChange={(checked) =>
+                  onStatusChange(checked ? AgentStatus.ACTIVE : AgentStatus.PAUSED)
+                }
+              />
             </div>
-            <div className={softInfoPanelClassName}>
-              <p className="text-sm font-semibold text-foreground">What stays elsewhere</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Persona and tone stay in Prompting. Conversation strategy stays in Playbook. Message pacing and follow-up behavior stay in Messages.
-              </p>
+          </div>
+
+          <div className={settingRowClassName}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className={cardHeadingClassName}>Default chat state</p>
+                <p className={mutedTextClassName}>
+                  New dialogs will start enabled by default when this toggle is on.
+                </p>
+              </div>
+              <ToggleSwitch
+                checked={agentSettings.defaultChatEnabled}
+                onCheckedChange={(checked) =>
+                  onAgentSettingsChange({ defaultChatEnabled: checked })
+                }
+              />
             </div>
+          </div>
+
+          <div className={settingRowClassName}>
+            <FormField
+              label="Timezone"
+              hint={
+                tenantTimezone
+                  ? `Tenant default: ${tenantTimezone}`
+                  : "Set the working timezone used for schedule interpretation."
+              }
+            >
+              <select
+                className={selectClassName}
+                onChange={(event) => onAgentSettingsChange({ timezone: event.target.value })}
+                value={agentSettings.timezone}
+              >
+                {timezoneOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </FormField>
           </div>
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className={sectionTitleClassName}>Schedule</h2>
+
+        <div className={settingRowClassName}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <p className={cardHeadingClassName}>Enable schedule</p>
+              <p className={mutedTextClassName}>
+                Configure automatic activation windows for this agent.
+              </p>
+              <p className={mutedTextClassName}>
+                Selected times are interpreted in the agent timezone.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={agentSettings.scheduleEnabled}
+              onCheckedChange={(checked) =>
+                onAgentSettingsChange({ scheduleEnabled: checked })
+              }
+            />
+          </div>
+
+          {scheduleHasInvalidWindow ? (
+            <div className="mt-4 rounded-[12px] border border-[#f0d2c7] bg-[#fff5f1] px-4 py-3 text-sm text-[#7f3f2a]">
+              <div className="flex items-start gap-3">
+                <CircleAlert className="mt-0.5 size-4 shrink-0" />
+                <span>Each active day must end later than it starts.</span>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-5 space-y-3">
+            {agentSettings.weeklySchedule.map((window, index) => (
+              <div
+                key={window.day}
+                className="rounded-[12px] border border-[#e5e7eb] bg-white px-4 py-4"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-[#111827]">{dayLabels[window.day]}</p>
+                    <p className="text-sm text-[#667085]">Active day window</p>
+                  </div>
+                  <ToggleSwitch
+                    checked={window.enabled}
+                    disabled={!agentSettings.scheduleEnabled}
+                    onCheckedChange={(checked) =>
+                      onAgentSettingsChange({
+                        weeklySchedule: agentSettings.weeklySchedule.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, enabled: checked } : item,
+                        ),
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="mt-4 flex items-center gap-4">
+                  <input
+                    className={`${scheduleTimeInputClassName} ${!agentSettings.scheduleEnabled || !window.enabled ? disabledFieldClassName : ""}`}
+                    disabled={!agentSettings.scheduleEnabled || !window.enabled}
+                    onChange={(event) =>
+                      onAgentSettingsChange({
+                        weeklySchedule: agentSettings.weeklySchedule.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, start: event.target.value } : item,
+                        ),
+                      })
+                    }
+                    type="time"
+                    value={window.start}
+                  />
+
+                  <span className="text-[#667085]">–</span>
+
+                  <input
+                    className={`${scheduleTimeInputClassName} ${!agentSettings.scheduleEnabled || !window.enabled ? disabledFieldClassName : ""}`}
+                    disabled={!agentSettings.scheduleEnabled || !window.enabled}
+                    onChange={(event) =>
+                      onAgentSettingsChange({
+                        weeklySchedule: agentSettings.weeklySchedule.map((item, itemIndex) =>
+                          itemIndex === index ? { ...item, end: event.target.value } : item,
+                        ),
+                      })
+                    }
+                    type="time"
+                    value={window.end}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="border-t border-[#edf1f6] pt-6">
+        <div className="flex justify-end">
+          <button
+            className="inline-flex items-center justify-center rounded-[10px] border border-[#f97066] px-4 py-2 text-sm font-medium text-[#d92d20] transition hover:bg-[#fff5f4]"
+            type="button"
+          >
+            Delete agent
+          </button>
+        </div>
       </div>
-    </SurfaceCard>
+    </div>
   );
 }

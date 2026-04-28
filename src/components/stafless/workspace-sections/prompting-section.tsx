@@ -1,10 +1,16 @@
+import { Expand, Sparkles } from "lucide-react";
+
 import {
   FormField,
-  SurfaceCard,
   inputClassName,
-  selectClassName,
   textareaClassName,
 } from "@/components/stafless/foundation";
+
+const rowClassName = "rounded-[16px] border border-[#e6ebf2] bg-white px-4 py-4";
+const secondaryButtonClassName =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-[10px] border border-[#d7def0] bg-white px-4 py-2 text-sm font-medium text-[#344054] transition hover:bg-[#f8fafc]";
+const accentButtonClassName =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-[10px] bg-[#6c63ff] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#5b52f5]";
 
 export function WorkspacePromptingSection({
   tone,
@@ -21,7 +27,6 @@ export function WorkspacePromptingSection({
   onPromptingNotesChange,
   onShowContactIdentityChange,
   onShowChannelContextChange,
-  sectionCanvasClassName,
 }: {
   tone: string;
   languagePreference: string;
@@ -37,33 +42,78 @@ export function WorkspacePromptingSection({
   onPromptingNotesChange: (value: string) => void;
   onShowContactIdentityChange: (value: boolean) => void;
   onShowChannelContextChange: (value: boolean) => void;
-  sectionCanvasClassName: string;
 }) {
   return (
-    <SurfaceCard
-      className="rounded-[30px] bg-[linear-gradient(180deg,#fffdf9_0%,#f7efe2_100%)] shadow-[0_16px_34px_rgba(31,23,40,0.05)]"
-      title="Prompting"
-      description="Persona, tone, and language now live in their own section instead of hiding inside a mixed basics step."
-    >
-      <div className={sectionCanvasClassName}>
-        <FormField
-          label="Instruction"
-          hint="Explain who the agent is, how it should speak, and what matters most in the dialog."
-        >
-          <textarea
-            className={textareaClassName}
-            onChange={(event) => onPromptingInstructionChange(event.target.value)}
-            placeholder="For example: You are the operator-facing AI assistant for this business. Reply briefly, clearly, and professionally. Identify the customer's need, keep the conversation moving, and never invent confirmed actions."
-            value={promptingInstruction}
-          />
-        </FormField>
-        <div className="mt-5 grid gap-4">
-          <div className="rounded-[20px] bg-white/80 p-5 ring-1 ring-[#eadccc]">
+    <div className="mx-auto max-w-[1040px] space-y-8">
+      <section className="space-y-6">
+        <div className="border-b border-[#edf1f6] pb-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-3">
+              <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-foreground">
+                Prompting
+              </h2>
+              <p className="max-w-[700px] text-sm leading-6 text-muted-foreground">
+                Define the core instruction layer and what runtime context the
+                model is allowed to see.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          <FormField
+            label="Instruction"
+            hint="Explain who the agent is, how it should speak, and what matters most in the dialog."
+          >
+            <div className="relative">
+              <textarea
+                className={`${textareaClassName} min-h-[170px] resize-none pr-12 pb-12`}
+                onChange={(event) => onPromptingInstructionChange(event.target.value)}
+                placeholder="For example: You are the operator-facing AI assistant for this business. Reply briefly, clearly, and professionally. Identify the customer's need, keep the conversation moving, and never invent confirmed actions."
+                value={promptingInstruction}
+              />
+              <button
+                aria-label="Expand instruction"
+                className="absolute bottom-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-[#d7def0] bg-white text-[#667085] transition hover:bg-[#f8fafc]"
+                type="button"
+              >
+                <Expand className="size-3.5" />
+              </button>
+            </div>
+          </FormField>
+
+          <div className="flex flex-wrap gap-3">
+            <button className={accentButtonClassName} type="button">
+              <Sparkles className="size-4" />
+              AI polish
+            </button>
+            <button className={secondaryButtonClassName} type="button">
+              Edit agent
+            </button>
+          </div>
+
+          <div>
+            <a
+              className="text-sm font-medium text-[#6c63ff] underline underline-offset-4 transition hover:text-[#5b52f5]"
+              href="#"
+            >
+              Prompt templates
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="rounded-[20px] border border-[#e6ebf2] bg-[#fbfcfe] p-4">
+          <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-foreground">Client identity visibility</p>
+                <h4 className="text-sm font-semibold text-foreground">
+                  Contact identity visibility
+                </h4>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Let the model see the client identifier from the active channel when it helps personalize replies.
+                  Show the contact number or nickname to the model when it helps
+                  personalize replies.
                 </p>
               </div>
               <input
@@ -73,13 +123,17 @@ export function WorkspacePromptingSection({
                 type="checkbox"
               />
             </div>
-          </div>
-          <div className="rounded-[20px] bg-white/80 p-5 ring-1 ring-[#eadccc]">
+
+            <hr className="border-[#edf1f6]" />
+
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-foreground">Messenger visibility</p>
+                <h4 className="text-sm font-semibold text-foreground">
+                  Messenger visibility
+                </h4>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Let the prompt mention which channel the conversation came from, so the agent can adapt phrasing to the surface.
+                  Show the active channel to the model so it can adapt phrasing
+                  to the conversation surface.
                 </p>
               </div>
               <input
@@ -91,18 +145,16 @@ export function WorkspacePromptingSection({
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="space-y-5 border-t border-[#edf1f6] pt-6">
         <div className="grid gap-5 md:grid-cols-2">
           <FormField label="Tone">
-            <select
-              className={selectClassName}
+            <input
+              className={inputClassName}
               onChange={(event) => onToneChange(event.target.value)}
               value={tone}
-            >
-              <option value="friendly">Friendly</option>
-              <option value="calm">Calm</option>
-              <option value="premium">Premium</option>
-              <option value="direct">Direct</option>
-            </select>
+            />
           </FormField>
           <FormField
             label="Preferred response language"
@@ -116,19 +168,19 @@ export function WorkspacePromptingSection({
             />
           </FormField>
         </div>
-        <div className="mt-5">
-          <FormField
-            label="Persona"
-            hint="Describe the role the agent should consistently inhabit."
-          >
-            <textarea
-              className={textareaClassName}
-              onChange={(event) => onPersonaChange(event.target.value)}
-              value={persona}
-            />
-          </FormField>
-        </div>
-        <div className="mt-5">
+
+        <FormField
+          label="Persona"
+          hint="Describe the role the agent should consistently inhabit."
+        >
+          <textarea
+            className={textareaClassName}
+            onChange={(event) => onPersonaChange(event.target.value)}
+            value={persona}
+          />
+        </FormField>
+
+        <div className={rowClassName}>
           <FormField
             label="Operator notes"
             hint="Optional. Keep private notes here if the operator wants extra prompt-layer guidance without changing playbook logic."
@@ -141,33 +193,7 @@ export function WorkspacePromptingSection({
             />
           </FormField>
         </div>
-        <div className="mt-5 rounded-[20px] bg-white/70 p-5 ring-1 ring-[#eadccc]">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d7762]">
-            Prompt identity layer
-          </p>
-          <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Prompting defines who the agent is. Playbook defines how it moves the conversation. Messages defines how replies arrive in-channel.
-          </p>
-          <div className="mt-4 rounded-[16px] bg-[#fcfaf7] px-4 py-4 ring-1 ring-[#eee3d6]">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8d7762]">
-              Preview effect
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[#433a49]">
-              This section now controls:
-              {" "}
-              instruction,
-              {" "}
-              persona,
-              {" "}
-              tone,
-              {" "}
-              preferred language,
-              {" "}
-              and whether runtime prompt context includes the client identity and current channel.
-            </p>
-          </div>
-        </div>
-      </div>
-    </SurfaceCard>
+      </section>
+    </div>
   );
 }

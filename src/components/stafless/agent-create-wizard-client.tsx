@@ -1605,7 +1605,6 @@ export function AgentCreateWizardClient({
                 persona={draft.persona}
                 promptingInstruction={draft.channelConfig.prompting.instruction ?? ""}
                 promptingNotes={draft.channelConfig.prompting.notes ?? ""}
-                sectionCanvasClassName={sectionCanvasClassName}
                 showChannelContext={draft.channelConfig.prompting.showChannelContext}
                 showContactIdentity={draft.channelConfig.prompting.showContactIdentity}
                 tone={draft.tone}
