@@ -129,7 +129,7 @@ test("channels section only selects connected and unassigned channels", async ()
   assert.equal(selectedLabels.length, 1);
   assert.equal(chooseButtons.length, 1);
   assert.equal(connectLinks.length, 1);
-  assert.equal(connectLinks[0]?.props?.href, "/client/connections/instagram");
+  assert.equal(connectLinks[0]?.props?.href, "/admin/clients/tenant-1/connections/instagram");
 
   chooseButtons[0]?.props?.onClick?.();
 
@@ -170,7 +170,10 @@ test("channels section treats disconnected and assigned channels as non-selectab
   assert.equal(connectLinks.length, 2);
   assert.deepEqual(
     connectLinks.map((link) => link.props?.href).sort(),
-    ["/client/connections/instagram", "/client/connections/telegram"],
+    [
+      "/admin/clients/tenant-1/connections/instagram",
+      "/admin/clients/tenant-1/connections/telegram",
+    ],
   );
   assert.match(allText, /Переподключить/);
   assert.match(allText, /Уже используется: Other agent/);

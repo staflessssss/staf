@@ -81,6 +81,7 @@ export function WorkspaceChannelsSection({
   selectedChannelId,
   assignedChannels,
   isReadOnlyMode,
+  tenantId,
   onSelectChannel,
 }: {
   channelConnections: ChannelConnection[];
@@ -104,7 +105,7 @@ export function WorkspaceChannelsSection({
             title="Нет подключенных каналов"
             description="Клиент должен подключить канал в своем workspace, после этого его можно выбрать для агента."
             action={
-              <Link href="/client/connections" className={secondaryButtonClassName}>
+              <Link href={`/admin/clients/${tenantId}/connections`} className={secondaryButtonClassName}>
                 Открыть подключения
               </Link>
             }
@@ -171,14 +172,14 @@ export function WorkspaceChannelsSection({
                     ) : !connection && !isPlannedOnly ? (
                       <Link
                         className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`/client/connections/${item.connectionKey}`}
+                        href={`/admin/clients/${tenantId}/connections/${item.connectionKey}`}
                       >
                         {item.connectLabel}
                       </Link>
                     ) : connection && !isConnected && !isPlannedOnly ? (
                       <Link
                         className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`/client/connections/${item.connectionKey}`}
+                        href={`/admin/clients/${tenantId}/connections/${item.connectionKey}`}
                       >
                         {item.connectLabel}
                       </Link>
