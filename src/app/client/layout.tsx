@@ -30,7 +30,7 @@ export default async function ClientLayout({
         </div>
         <SurfaceNav items={clientNav} variant="sidebar" />
         <div className="mt-auto pt-6">
-          <LogoutButton className="inline-flex w-full items-center justify-center rounded-xl border border-[#d8d6fe]/70 bg-white px-4 py-3 text-[11px] font-bold uppercase tracking-[0.22em] text-[#181836] transition hover:bg-[#f6f5ff]" />
+          <LogoutButton variant="sidebar" />
         </div>
       </aside>
 
