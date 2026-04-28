@@ -3,10 +3,57 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { FunctionBlockConfig } from "@/lib/agent-builder";
+
 const createWizardPath = resolve(
   process.cwd(),
   "src/components/stafless/agent-create-wizard-client.tsx",
 );
+
+const functionBlockFixture: FunctionBlockConfig = {
+  name: "Lead capture",
+  description: "Capture and route a lead.",
+  active: true,
+  parameters: [
+    {
+      name: "email",
+      type: "email",
+      instruction: "Customer email",
+      allowedValues: [],
+      required: true,
+    },
+  ],
+  reactionAction: "ai_agent_decides",
+  postAction: "continue_dialog",
+  disableDelayedMessages: false,
+  resultTargets: [
+    {
+      type: "google_sheets",
+      label: "Lead sheet",
+      primaryStepId: "step_persisted",
+    },
+  ],
+  steps: [
+    {
+      id: "step_persisted",
+      integrationId: "integration_sheets",
+      action: "append lead",
+      params: "{}",
+    },
+    {
+      integrationId: "integration_calendar",
+      action: "check availability",
+      params: "{}",
+    },
+  ],
+};
+
+async function loadCreateWizardSerializers() {
+  const React = await import("react");
+  (globalThis as typeof globalThis & { React: typeof React }).React = React;
+
+  return import("@/components/stafless/agent-create-wizard-client");
+}
 
 test("agent create wizard stays create-only and does not retain hidden workspace deploy scaffolding", () => {
   const source = readFileSync(createWizardPath, "utf8");
@@ -44,4 +91,22 @@ test("agent create wizard seeds draft and saved snapshot from one initial draft 
   assert.match(source, /const initialDraft = useMemo\(\(\) => createInitialDraft\(tenant, agent\), \[agent, tenant\]\)/);
   assert.match(source, /const \[draft, setDraft\] = useState<BuilderDraft>\(initialDraft\)/);
   assert.match(source, /const \[savedDraftSnapshot, setSavedDraftSnapshot\] = useState\(\(\) => JSON\.stringify\(initialDraft\)\)/);
+});
+
+test("agent create wizard function draft UI ids round-trip without dropping persisted ids", async () => {
+  const { stripFunctionUiIds, withFunctionUiIds } = await loadCreateWizardSerializers();
+  const draft = withFunctionUiIds(functionBlockFixture);
+  const [stripped] = stripFunctionUiIds([draft]);
+
+  assert.ok(draft.uiId);
+  assert.ok(draft.parameters[0]?.uiId);
+  assert.ok(draft.resultTargets[0]?.uiId);
+  assert.ok(draft.steps[0]?.uiId);
+  assert.equal(stripped.resultTargets[0]?.primaryStepId, "step_persisted");
+  assert.equal(stripped.steps[0]?.id, "step_persisted");
+  assert.equal(stripped.steps[1]?.id, undefined);
+  assert.equal("uiId" in stripped, false);
+  assert.equal("uiId" in stripped.parameters[0], false);
+  assert.equal("uiId" in stripped.resultTargets[0], false);
+  assert.equal("uiId" in stripped.steps[0], false);
 });

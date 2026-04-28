@@ -112,6 +112,7 @@ type KnowledgeDraft = {
 
 type ToolStepDraft = {
   uiId: string;
+  id?: string;
   integrationId: string;
   action: string;
   params: string;
@@ -258,7 +259,7 @@ function createDraftUiId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function withFunctionUiIds(fn: FunctionBlockConfig): FunctionDraft {
+export function withFunctionUiIds(fn: FunctionBlockConfig): FunctionDraft {
   return {
     ...fn,
     uiId: createDraftUiId("fn"),
@@ -271,9 +272,8 @@ function withFunctionUiIds(fn: FunctionBlockConfig): FunctionDraft {
       uiId: createDraftUiId("target"),
     })),
     steps: fn.steps.map((step) => ({
+      ...step,
       uiId: createDraftUiId("step"),
-      integrationId: step.integrationId,
-      action: step.action,
       params:
         typeof step.params === "string"
           ? step.params
@@ -282,30 +282,12 @@ function withFunctionUiIds(fn: FunctionBlockConfig): FunctionDraft {
   };
 }
 
-function stripFunctionUiIds(functionBlocks: FunctionDraft[]): FunctionBlockConfig[] {
-  return functionBlocks.map((fn) => ({
-    name: fn.name,
-    description: fn.description,
-    active: fn.active,
-    disableDelayedMessages: fn.disableDelayedMessages,
-    reactionAction: fn.reactionAction,
-    postAction: fn.postAction,
-    parameters: fn.parameters.map((parameter) => ({
-      name: parameter.name,
-      type: parameter.type,
-      instruction: parameter.instruction,
-      allowedValues: parameter.allowedValues,
-      required: parameter.required,
-    })),
-    resultTargets: fn.resultTargets.map((target) => ({
-      type: target.type,
-      label: target.label,
-    })),
-    steps: fn.steps.map(({ integrationId, action, params }) => ({
-      integrationId,
-      action,
-      params,
-    })),
+export function stripFunctionUiIds(functionBlocks: FunctionDraft[]): FunctionBlockConfig[] {
+  return functionBlocks.map(({ uiId, parameters, resultTargets, steps, ...fn }) => ({
+    ...fn,
+    parameters: parameters.map(({ uiId, ...parameter }) => parameter),
+    resultTargets: resultTargets.map(({ uiId, ...target }) => target),
+    steps: steps.map(({ uiId, ...step }) => step),
   }));
 }
 
