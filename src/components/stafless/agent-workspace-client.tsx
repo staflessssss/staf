@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AgentStatus,
@@ -13,9 +14,18 @@ import {
 } from "@prisma/client";
 import {
   Bot,
+  BookOpen,
+  Boxes,
+  FlaskConical,
+  LayoutDashboard,
   Layers3,
+  MessageSquare,
+  PenSquare,
+  Radio,
   Sparkles,
   Settings2,
+  Shield,
+  Workflow,
 } from "lucide-react";
 
 import {
@@ -220,83 +230,113 @@ type WorkspaceSectionId =
   | "test"
   | "activity";
 
+function isWorkspaceSectionId(value: string): value is WorkspaceSectionId {
+  return [
+    "overview",
+    "settings",
+    "prompting",
+    "channels",
+    "playbook",
+    "messages",
+    "control",
+    "functions",
+    "knowledge",
+    "integrations",
+    "test",
+    "activity",
+  ].includes(value);
+}
+
 const workspaceSections: Array<{
   id: WorkspaceSectionId;
   title: string;
   description: string;
   kind: "live" | "coming_soon";
+  icon: typeof Sparkles;
 }> = [
   {
     id: "overview",
     title: "Overview",
     description: "Status, readiness, and the fastest way to orient around this agent.",
     kind: "live",
+    icon: LayoutDashboard,
   },
   {
     id: "settings",
     title: "Settings",
     description: "Operational identity, posture, and base agent settings.",
     kind: "live",
+    icon: Settings2,
   },
   {
     id: "prompting",
     title: "Prompting",
     description: "Persona, tone, language, and the direct instruction layer.",
     kind: "live",
+    icon: PenSquare,
   },
   {
     id: "channels",
     title: "Channels",
     description: "Assignment and channel behavior for the live delivery surface.",
     kind: "live",
+    icon: Radio,
   },
   {
     id: "playbook",
     title: "Playbook",
     description: "How the agent leads the conversation toward the business outcome.",
     kind: "live",
+    icon: Workflow,
   },
   {
     id: "messages",
     title: "Messages",
     description: "Reply pacing, split-message behavior, and follow-up posture.",
     kind: "live",
+    icon: MessageSquare,
   },
   {
     id: "control",
     title: "Control",
     description: "Memory windows, intervention rules, and runtime stop/resume behavior.",
     kind: "live",
+    icon: Shield,
   },
   {
     id: "functions",
     title: "Functions",
     description: "Business actions and their integration-backed execution paths.",
     kind: "live",
+    icon: Boxes,
   },
   {
     id: "knowledge",
     title: "Knowledge",
     description: "Business facts, edge cases, and reusable context blocks.",
     kind: "live",
+    icon: BookOpen,
   },
   {
     id: "integrations",
     title: "Integrations",
     description: "Connected systems that functions and channels depend on.",
     kind: "live",
+    icon: Layers3,
   },
   {
     id: "test",
     title: "Test",
     description: "Operator-safe simulation before this agent touches live traffic.",
     kind: "live",
+    icon: FlaskConical,
   },
   {
     id: "activity",
     title: "Activity",
     description: "Recent runtime movement, dialogs, and operator-facing diagnostics.",
     kind: "coming_soon",
+    icon: Sparkles,
   },
 ];
 
@@ -627,15 +667,22 @@ function findFunctionStepPosition(functionBlocks: FunctionDraft[], stepUiId: str
 export function AgentWorkspaceClient({
   tenant,
   agent,
+  initialWorkspaceSection,
 }: {
   tenant: SerializableTenant;
   agent?: SerializableAgent;
+  initialWorkspaceSection?: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const isWorkspaceMode = true;
   const isReadOnlyMode = false;
   const [currentStep, setCurrentStep] = useState(0);
-  const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSectionId>("overview");
+  const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSectionId>(
+    initialWorkspaceSection && isWorkspaceSectionId(initialWorkspaceSection)
+      ? initialWorkspaceSection
+      : "overview",
+  );
   const [draft, setDraft] = useState<BuilderDraft>(() => createInitialDraft(tenant, agent));
   const [savedDraftSnapshot, setSavedDraftSnapshot] = useState(() =>
     JSON.stringify(createInitialDraft(tenant, agent)),
@@ -647,6 +694,12 @@ export function AgentWorkspaceClient({
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployReadiness, setDeployReadiness] = useState<DeployReadinessResult | null>(null);
   const [sheetInspectors, setSheetInspectors] = useState<Record<string, SheetInspectionState>>({});
+
+  useEffect(() => {
+    if (initialWorkspaceSection && isWorkspaceSectionId(initialWorkspaceSection)) {
+      setWorkspaceSection(initialWorkspaceSection);
+    }
+  }, [initialWorkspaceSection]);
   const draftRef = useRef(draft);
 
   useEffect(() => {
@@ -822,16 +875,20 @@ export function AgentWorkspaceClient({
   const selectedWorkspaceSection = workspaceSections.find(
     (section) => section.id === workspaceSection,
   ) ?? workspaceSections[0];
-  const currentStepMeta = {
-    title: selectedWorkspaceSection.title,
-    question: selectedWorkspaceSection.description,
-  };
-  const isWideWorkbenchStep = workspaceSection === "messages";
+  const shouldShowWorkspaceReviewRail =
+    isWorkspaceMode &&
+    workspaceSection !== "settings" &&
+    workspaceSection !== "prompting" &&
+    workspaceSection !== "messages";
+  const isWideWorkbenchStep =
+    workspaceSection === "messages" ||
+    workspaceSection === "settings" ||
+    workspaceSection === "prompting";
   const sectionCardClassName = () => "border-0 bg-transparent p-0 shadow-none";
   const sectionCanvasClassName =
-    "rounded-[30px] bg-[linear-gradient(180deg,#fffdf9_0%,#f7efe2_100%)] p-6 ring-1 ring-[#e6d7c5] shadow-[0_16px_34px_rgba(31,23,40,0.05)]";
+    "rounded-[16px] border border-[#e6ebf2] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
   const softInfoPanelClassName =
-    "rounded-[18px] bg-[#fff9f1] p-4 ring-1 ring-[#eadccb]";
+    "rounded-[14px] border border-[#e6ebf2] bg-[#fafcff] p-4";
   const liveWorkspaceSections = new Set<WorkspaceSectionId>([
     "settings",
     "prompting",
@@ -877,6 +934,7 @@ export function AgentWorkspaceClient({
 
   function activateWorkspaceSection(sectionId: WorkspaceSectionId) {
     setWorkspaceSection(sectionId);
+    router.replace(`${pathname}?section=${sectionId}`, { scroll: false });
   }
 
   function applyConversationPlaybookPreset(
@@ -1722,7 +1780,7 @@ export function AgentWorkspaceClient({
     }
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-8">
+    <div className="mx-auto max-w-[1720px] space-y-6">
       {error ? (
         <div className="rounded-[20px] border border-[#efc4c1] bg-[#fff0ef] px-4 py-3 text-sm text-destructive">
           {error}
@@ -1767,27 +1825,28 @@ export function AgentWorkspaceClient({
         </div>
       ) : null}
 
-      <div className="rounded-[30px] border border-[#e5d3be] bg-[linear-gradient(180deg,#fffaf4_0%,#f5e7d6_100%)] p-5 shadow-[0_16px_36px_rgba(31,23,40,0.05)] sm:p-6">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_220px_220px]">
-          <div className="rounded-[24px] bg-white/80 px-5 py-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
-            <div className="flex items-start gap-4">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#201627] text-[#f7efe4] shadow-[0_10px_20px_rgba(31,23,40,0.18)]">
-                <Sparkles className="size-4" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d7762]">
-                  {isWorkspaceMode ? "Current workspace section" : "Current workbench step"}
-                </p>
-                <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-[#201627]">
-                  {currentStepMeta.title}
-                </h3>
-                <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5d5245]">
-                  {currentStepMeta.question}
-                </p>
+      {!isWorkspaceMode ? (
+        <div className="rounded-[30px] border border-[#e5d3be] bg-[linear-gradient(180deg,#fffaf4_0%,#f5e7d6_100%)] p-5 shadow-[0_16px_36px_rgba(31,23,40,0.05)] sm:p-6">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_220px_220px]">
+            <div className="rounded-[24px] bg-white/80 px-5 py-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
+              <div className="flex items-start gap-4">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#201627] text-[#f7efe4] shadow-[0_10px_20px_rgba(31,23,40,0.18)]">
+                  <Sparkles className="size-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d7762]">
+                    Current workbench step
+                  </p>
+                  <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-[#201627]">
+                    {selectedWorkspaceSection.title}
+                  </h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5d5245]">
+                    {selectedWorkspaceSection.description}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="rounded-[24px] bg-white/80 p-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
+            <div className="rounded-[24px] bg-white/80 p-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8d7762]">
                 Build posture
               </p>
@@ -1798,7 +1857,7 @@ export function AgentWorkspaceClient({
                 Signals already in place before this agent touches real traffic.
               </p>
             </div>
-          <div className="rounded-[24px] bg-white/80 p-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
+            <div className="rounded-[24px] bg-white/80 p-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8d7762]">
                 Operator scope
               </p>
@@ -1809,22 +1868,108 @@ export function AgentWorkspaceClient({
                 <Bot className="size-3.5" />
                 Operator managed
               </div>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       <div
         className={
           isWideWorkbenchStep
-            ? "grid gap-8 xl:grid-cols-[220px_minmax(0,1fr)] xl:items-start"
-            : "grid gap-8 xl:grid-cols-[220px_minmax(0,1fr)_340px] xl:items-start"
+            ? isWorkspaceMode
+              ? "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
+              : "grid gap-6 xl:grid-cols-[220px_minmax(0,760px)] xl:items-start"
+            : isWorkspaceMode
+              ? shouldShowWorkspaceReviewRail
+                ? "grid gap-6 xl:grid-cols-[minmax(0,1040px)_320px] xl:items-start"
+                : "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
+              : "grid gap-6 xl:grid-cols-[220px_minmax(0,760px)_320px] xl:items-start"
         }
       >
+        {!isWorkspaceMode ? (
         <aside className="space-y-4 xl:sticky xl:top-24">
-          <div className="rounded-[30px] bg-[#1f1728] p-5 text-[#f6efe5] shadow-[0_18px_40px_rgba(31,23,40,0.18)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#ccbda8]">
+          <div
+            className={
+              isWorkspaceMode
+                ? "rounded-[16px] border border-[#e6ebf2] bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                : "rounded-[30px] bg-[#1f1728] p-5 text-[#f6efe5] shadow-[0_18px_40px_rgba(31,23,40,0.18)]"
+            }
+          >
+            <p
+              className={
+                isWorkspaceMode
+                  ? "px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[#8090ab]"
+                  : "text-xs font-semibold uppercase tracking-[0.24em] text-[#ccbda8]"
+              }
+            >
               {isWorkspaceMode ? "Agent workspace" : "Builder flow"}
             </p>
+            {isWorkspaceMode ? (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-[12px] bg-[#f8fafc] px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {agent?.name ?? draft.name}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-[#8090ab]">
+                        {tenant.name}
+                      </p>
+                    </div>
+                    {agent ? <StatusBadge status={agent.status} /> : null}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {workspaceSections.map((step) => {
+                    const isActive = workspaceSection === step.id;
+                    const isComingSoon = step.kind === "coming_soon";
+                    const Icon = step.icon;
+
+                    return (
+                      <Link
+                        key={step.id}
+                        className={
+                          isActive
+                            ? "flex w-full items-start gap-3 rounded-[12px] border border-[#dfe6f1] bg-[#f6f8fb] px-3 py-3 text-left"
+                            : "flex w-full items-start gap-3 rounded-[12px] px-3 py-3 text-left transition hover:bg-[#f8fafc]"
+                        }
+                        href={`${pathname}?section=${step.id}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          activateWorkspaceSection(step.id);
+                        }}
+                      >
+                        <div
+                          className={
+                            isActive
+                              ? "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#5b5cf0] text-white"
+                              : "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-[#dfe6f1] bg-white text-[#7a879d]"
+                          }
+                        >
+                          <Icon className="size-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p
+                            className={
+                              isActive
+                                ? "text-sm font-semibold text-foreground"
+                                : "text-sm font-medium text-[#475467]"
+                            }
+                          >
+                            {step.title}
+                          </p>
+                          {isComingSoon ? (
+                            <span className="mt-1 inline-flex rounded-full border border-[#e6ebf2] bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#8090ab]">
+                              Soon
+                            </span>
+                          ) : null}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
             <div className="mt-4 space-y-2">
               {(isWorkspaceMode ? workspaceSections : wizardSteps).map((step, index) => {
                 const isActive = isWorkspaceMode
@@ -1840,9 +1985,13 @@ export function AgentWorkspaceClient({
                   <button
                     key={step.id}
                     className={
-                      isActive
-                        ? "w-full rounded-[20px] bg-[#f4eadc] px-4 py-4 text-left text-[#1f1728] shadow-[0_10px_22px_rgba(0,0,0,0.10)]"
-                        : "w-full rounded-[20px] px-4 py-4 text-left text-[#f6efe5] ring-1 ring-white/10 transition hover:bg-white/6"
+                      isWorkspaceMode
+                        ? isActive
+                          ? "w-full rounded-[12px] border border-[#dfe6f1] bg-[#f6f8fb] px-3 py-3 text-left text-foreground"
+                          : "w-full rounded-[12px] px-3 py-3 text-left text-[#5c6880] transition hover:bg-[#f8fafc]"
+                        : isActive
+                          ? "w-full rounded-[20px] bg-[#f4eadc] px-4 py-4 text-left text-[#1f1728] shadow-[0_10px_22px_rgba(0,0,0,0.10)]"
+                          : "w-full rounded-[20px] px-4 py-4 text-left text-[#f6efe5] ring-1 ring-white/10 transition hover:bg-white/6"
                     }
                     onClick={() =>
                       isWorkspaceMode
@@ -1854,24 +2003,30 @@ export function AgentWorkspaceClient({
                     <div className="flex items-start gap-3">
                       <div
                         className={
-                          isActive
-                            ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold"
-                            : isComplete
-                              ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f4c79b] text-[#1f1728] text-xs font-semibold"
-                              : "flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-[#f6efe5]"
+                          isWorkspaceMode
+                            ? isActive
+                              ? "flex size-7 shrink-0 items-center justify-center rounded-full bg-[#5b5cf0] text-[11px] font-semibold text-white"
+                              : "flex size-7 shrink-0 items-center justify-center rounded-full border border-[#dfe6f1] bg-white text-[11px] font-semibold text-[#7a879d]"
+                            : isActive
+                              ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold"
+                              : isComplete
+                                ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f4c79b] text-[#1f1728] text-xs font-semibold"
+                                : "flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-[#f6efe5]"
                         }
                       >
                         {isWorkspaceMode ? step.title.charAt(0) : index + 1}
                       </div>
                       <div>
-                        <p className={isActive ? "text-sm font-semibold" : "text-sm font-medium"}>
+                        <p className={isWorkspaceMode ? (isActive ? "text-sm font-semibold text-foreground" : "text-sm font-medium text-[#475467]") : isActive ? "text-sm font-semibold" : "text-sm font-medium"}>
                           {step.title}
                         </p>
                         <p
                           className={
-                            isActive
-                              ? "mt-1 text-xs leading-5 text-[#5d5245]"
-                              : "mt-1 text-xs leading-5 text-[#ccbda8]"
+                            isWorkspaceMode
+                              ? "mt-1 text-xs leading-5 text-[#8090ab]"
+                              : isActive
+                                ? "mt-1 text-xs leading-5 text-[#5d5245]"
+                                : "mt-1 text-xs leading-5 text-[#ccbda8]"
                           }
                         >
                             {"question" in step ? step.question : step.description}
@@ -1887,8 +2042,10 @@ export function AgentWorkspaceClient({
                 );
               })}
             </div>
+            )}
           </div>
         </aside>
+        ) : null}
 
         <div className="space-y-6">
           {shouldShowWorkspaceOverview ? (
@@ -2326,7 +2483,7 @@ export function AgentWorkspaceClient({
                 </div>
               </div>
               {agent ? (
-                <div className="flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3">
+                <div className={isWorkspaceMode ? "flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3" : "flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3"}>
                   <Settings2 className="size-4 text-primary" />
                   <div>
                     <p className="text-sm font-semibold text-foreground">{agent.name}</p>
@@ -2348,35 +2505,38 @@ export function AgentWorkspaceClient({
           </SurfaceCard>
 
         </div>
+        ) : null}
       </div>
 
-      <SurfaceCard
-        className="bg-[#f8f3ea]"
-        title="Prompt preview"
-        description="Review the composed system prompt in a readable inspection view before testing or deploy."
-      >
-        <div className="rounded-[24px] bg-white p-4 ring-1 ring-[#e7dccd] shadow-[0_12px_24px_rgba(31,23,40,0.04)]">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#eee3d6] px-2 pb-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground">System prompt</p>
-              <p className="text-xs text-muted-foreground">
-                Live builder output for this agent configuration
-              </p>
+      {!isWorkspaceMode ? (
+        <SurfaceCard
+          className="bg-[#f8f3ea]"
+          title="Prompt preview"
+          description="Review the composed system prompt in a readable inspection view before testing or deploy."
+        >
+          <div className="rounded-[24px] bg-white p-4 ring-1 ring-[#e7dccd] shadow-[0_12px_24px_rgba(31,23,40,0.04)]">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#eee3d6] px-2 pb-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">System prompt</p>
+                <p className="text-xs text-muted-foreground">
+                  Live builder output for this agent configuration
+                </p>
+              </div>
+              <span className="rounded-full bg-[#f6efe5] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f6458] ring-1 ring-[#eadccc]">
+                Read only
+              </span>
             </div>
-            <span className="rounded-full bg-[#f6efe5] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f6458] ring-1 ring-[#eadccc]">
-              Read only
-            </span>
+            {parsedFunctionBlocks.errors.length ? (
+              <div className="mb-4 rounded-[18px] border border-[#f0d2c7] bg-[#fff5f1] px-4 py-3 text-sm text-[#7f3f2a]">
+                Fix invalid Functions configuration to restore the full prompt preview.
+              </div>
+            ) : null}
+            <pre className="max-h-[520px] overflow-auto rounded-[20px] bg-[#fcfaf7] px-5 py-5 font-mono text-[12px] leading-6 text-[#2d2437]">
+              {promptPreview}
+            </pre>
           </div>
-          {parsedFunctionBlocks.errors.length ? (
-            <div className="mb-4 rounded-[18px] border border-[#f0d2c7] bg-[#fff5f1] px-4 py-3 text-sm text-[#7f3f2a]">
-              Fix invalid Functions configuration to restore the full prompt preview.
-            </div>
-          ) : null}
-          <pre className="max-h-[520px] overflow-auto rounded-[20px] bg-[#fcfaf7] px-5 py-5 font-mono text-[12px] leading-6 text-[#2d2437]">
-            {promptPreview}
-          </pre>
-        </div>
-      </SurfaceCard>
+        </SurfaceCard>
+      ) : null}
       </div>
   );
 }

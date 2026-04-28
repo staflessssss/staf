@@ -7,13 +7,16 @@ import { db } from "@/lib/db";
 
 type AgentDetailPageProps = {
   params: Promise<{ tenantId: string; agentId: string }>;
+  searchParams?: Promise<{ section?: string }>;
 };
 
 export default async function AgentDetailPage({
   params,
+  searchParams,
 }: AgentDetailPageProps) {
   await requireAdminSession();
   const { tenantId, agentId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const tenant = await db.tenant.findUnique({
     where: { id: tenantId },
     include: {
@@ -48,7 +51,11 @@ export default async function AgentDetailPage({
 
   return (
     <AgentWorkbenchShell agent={agent} mode="edit" tenant={tenant}>
-      <AgentWorkspace agent={agent} tenant={tenant} />
+      <AgentWorkspace
+        agent={agent}
+        initialWorkspaceSection={resolvedSearchParams?.section}
+        tenant={tenant}
+      />
     </AgentWorkbenchShell>
   );
 }
