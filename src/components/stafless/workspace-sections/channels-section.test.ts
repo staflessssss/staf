@@ -15,6 +15,7 @@ type ReactNodeLike = {
   props?: Record<string, unknown> & {
     children?: unknown;
     disabled?: boolean;
+    href?: string;
     onClick?: () => void;
   };
 };
@@ -128,6 +129,7 @@ test("channels section only selects connected and unassigned channels", async ()
   assert.equal(selectedLabels.length, 1);
   assert.equal(chooseButtons.length, 1);
   assert.equal(connectLinks.length, 1);
+  assert.equal(connectLinks[0]?.props?.href, "/client/connections/instagram");
 
   chooseButtons[0]?.props?.onClick?.();
 
@@ -166,6 +168,10 @@ test("channels section treats disconnected and assigned channels as non-selectab
 
   assert.equal(buttons.length, 0);
   assert.equal(connectLinks.length, 2);
+  assert.deepEqual(
+    connectLinks.map((link) => link.props?.href).sort(),
+    ["/client/connections/instagram", "/client/connections/telegram"],
+  );
   assert.match(allText, /Переподключить/);
   assert.match(allText, /Уже используется: Other agent/);
   assert.equal(selected.length, 0);

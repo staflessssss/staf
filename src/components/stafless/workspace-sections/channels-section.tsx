@@ -19,6 +19,7 @@ type ChannelCatalogItem = {
   title: string;
   description: string;
   connectLabel: string;
+  connectionKey?: "gmail" | "telegram" | "instagram";
   icon: typeof Radio;
 };
 
@@ -28,6 +29,7 @@ const channelCatalog: ChannelCatalogItem[] = [
     title: "Gmail",
     description: "Подключите ИИ-агента к Gmail",
     connectLabel: "Подключить",
+    connectionKey: "gmail",
     icon: Mail,
   },
   {
@@ -35,6 +37,7 @@ const channelCatalog: ChannelCatalogItem[] = [
     title: "Telegram",
     description: "Подключите ИИ-агента к Telegram",
     connectLabel: "Подключить",
+    connectionKey: "telegram",
     icon: Send,
   },
   {
@@ -42,6 +45,7 @@ const channelCatalog: ChannelCatalogItem[] = [
     title: "Instagram",
     description: "Подключите ИИ-агента к Instagram",
     connectLabel: "Подключить",
+    connectionKey: "instagram",
     icon: Camera,
   },
   {
@@ -77,7 +81,6 @@ export function WorkspaceChannelsSection({
   selectedChannelId,
   assignedChannels,
   isReadOnlyMode,
-  tenantId,
   onSelectChannel,
 }: {
   channelConnections: ChannelConnection[];
@@ -101,8 +104,8 @@ export function WorkspaceChannelsSection({
             title="Нет подключенных каналов"
             description="Клиент должен подключить канал в своем workspace, после этого его можно выбрать для агента."
             action={
-              <Link href={`/admin/clients/${tenantId}`} className={secondaryButtonClassName}>
-                Открыть клиента
+              <Link href="/client/connections" className={secondaryButtonClassName}>
+                Открыть подключения
               </Link>
             }
           />
@@ -168,14 +171,14 @@ export function WorkspaceChannelsSection({
                     ) : !connection && !isPlannedOnly ? (
                       <Link
                         className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`/admin/clients/${tenantId}`}
+                        href={`/client/connections/${item.connectionKey}`}
                       >
                         {item.connectLabel}
                       </Link>
                     ) : connection && !isConnected && !isPlannedOnly ? (
                       <Link
                         className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`/admin/clients/${tenantId}`}
+                        href={`/client/connections/${item.connectionKey}`}
                       >
                         {item.connectLabel}
                       </Link>
