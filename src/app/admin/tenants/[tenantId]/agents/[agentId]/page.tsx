@@ -37,12 +37,6 @@ export default async function AgentDetailPage({
       channel: true,
       features: {
         orderBy: { sortOrder: "asc" },
-        include: {
-          steps: {
-            orderBy: { sortOrder: "asc" },
-            include: { integration: true },
-          },
-        },
       },
     },
   });

@@ -1,16 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { FeatureType } from "@prisma/client";
 
 import {
   type SerializableEditorAgent,
   serializeEditorAgent,
 } from "@/components/stafless/agent-editor-shared";
 import { type FunctionBlockConfig } from "@/lib/agent-builder";
-
-function asFeatures(features: unknown): SerializableEditorAgent["features"] {
-  return features as SerializableEditorAgent["features"];
-}
 
 function makeAgent(overrides: Partial<SerializableEditorAgent> = {}): SerializableEditorAgent {
   return {
@@ -37,30 +32,7 @@ function getSerializedFunctionBlocks(agent: SerializableEditorAgent) {
   return channelConfig.functionBlocks as FunctionBlockConfig[];
 }
 
-test("serializeEditorAgent returns empty functionBlocks when channelConfig functionBlocks is missing, even if legacy TOOL features exist", () => {
-  const functionBlocks = getSerializedFunctionBlocks(
-    makeAgent({
-      features: asFeatures([
-        {
-          type: FeatureType.TOOL,
-          name: "Calendar check",
-          description: "Verify availability",
-          steps: [
-            {
-              integrationId: "integration-1",
-              action: "check_calendar",
-              params: { window: "30d" },
-            },
-          ],
-        },
-      ]),
-    }),
-  );
-
-  assert.deepEqual(functionBlocks, []);
-});
-
-test("serializeEditorAgent preserves existing channelConfig functionBlocks and ignores legacy TOOL features", () => {
+test("serializeEditorAgent preserves existing channelConfig functionBlocks", () => {
   const existingFunctionBlocks: FunctionBlockConfig[] = [
     {
       name: "Existing function",
@@ -87,20 +59,6 @@ test("serializeEditorAgent preserves existing channelConfig functionBlocks and i
       channelConfig: {
         functionBlocks: existingFunctionBlocks,
       } as unknown as SerializableEditorAgent["channelConfig"],
-      features: asFeatures([
-        {
-          type: FeatureType.TOOL,
-          name: "Legacy function",
-          description: "Should not be used",
-          steps: [
-            {
-              integrationId: "integration-legacy",
-              action: "check_calendar",
-              params: {},
-            },
-          ],
-        },
-      ]),
     }),
   );
 

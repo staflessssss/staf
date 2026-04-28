@@ -10,7 +10,6 @@ import {
   FeatureType,
   IntegrationType,
   IntegrationConnection,
-  Step,
 } from "@prisma/client";
 import {
   Bot,
@@ -109,9 +108,7 @@ type SerializableAgent = {
   channelId: string;
   channelConfig?: Record<string, unknown> | null;
   channel: ChannelConnection;
-  features: (Feature & {
-    steps: (Step & { integration: IntegrationConnection })[];
-  })[];
+  features: Feature[];
 };
 
 type KnowledgeDraft = {

@@ -3,7 +3,6 @@ import {
   Feature,
   IntegrationConnection,
   Prisma,
-  Step,
 } from "@prisma/client";
 
 import {
@@ -36,9 +35,7 @@ export type SerializableEditorAgent = {
   channelId: string;
   channelConfig?: Prisma.JsonValue | null;
   channel: ChannelConnection;
-  features: (Feature & {
-    steps: (Step & { integration: IntegrationConnection })[];
-  })[];
+  features: Feature[];
 };
 
 function getChannelConfigObject(channelConfig: Prisma.JsonValue | null | undefined) {
