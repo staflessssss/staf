@@ -1538,18 +1538,9 @@ export function buildMultilingualGuidance(input: {
   channel?: Pick<ChannelConnection, "type"> | null;
 }) {
   const parts = [
-    "The agent must remain comfortable responding in the customer's language when possible.",
+    "The agent must reply in the customer's language by default and remain multilingual across the conversation.",
+    "If the customer switches languages or mixes languages, follow the customer's latest clear language choice while keeping the business voice consistent.",
   ];
-
-  if (input.languagePreference) {
-    parts.push(
-      `Preferred default response language: ${input.languagePreference}. Use it as the default business voice unless the customer clearly uses another language.`,
-    );
-  } else {
-    parts.push(
-      "No default response language is pinned. Match the customer's language and keep replies operationally clear.",
-    );
-  }
 
   if (input.channel?.type) {
     parts.push(`Primary business channel: ${formatEnumLabel(input.channel.type)}.`);

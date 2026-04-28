@@ -69,6 +69,17 @@ test("agent workspace blocks saving when Settings schedule windows are invalid",
   assert.match(source, /Fix invalid Settings schedule windows before saving this agent\./);
 });
 
+test("agent workspace clears hidden legacy prompting language and visibility fields on save", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.match(source, /const promptingForPayload = normalizePromptingConfig\(\{/);
+  assert.match(source, /languagePreference: null/);
+  assert.match(source, /showChannelContext: false/);
+  assert.match(source, /showContactIdentity: false/);
+  assert.match(source, /languagePreference: undefined/);
+  assert.match(source, /prompting: promptingForPayload/);
+});
+
 test("agent workspace function draft UI ids round-trip without dropping persisted ids", async () => {
   const { stripFunctionUiIds, withFunctionUiIds } = await loadWorkspaceSerializers();
   const draft = withFunctionUiIds(functionBlockFixture);

@@ -1552,11 +1552,17 @@ export function AgentWorkspaceClient({
     setSuccess(null);
 
     try {
+      const promptingForPayload = normalizePromptingConfig({
+        ...draft.channelConfig.prompting,
+        languagePreference: null,
+        showChannelContext: false,
+        showContactIdentity: false,
+      });
       const payload = {
         name: draft.name,
         persona: draft.persona,
         tone: draft.tone,
-        languagePreference: draft.languagePreference || undefined,
+        languagePreference: undefined,
         status: draft.status,
         channelId: draft.channelId,
         channelConfig: {
@@ -1566,7 +1572,7 @@ export function AgentWorkspaceClient({
           agentSettings: draft.channelConfig.agentSettings,
           channelBehavior: draft.channelConfig.channelBehavior,
           conversationPlaybook: draft.channelConfig.conversationPlaybook,
-          prompting: draft.channelConfig.prompting,
+          prompting: promptingForPayload,
           control: draft.channelConfig.control,
           functionBlocks: stripFunctionUiIds(draft.channelConfig.functionBlocks),
         },
@@ -1775,16 +1781,7 @@ export function AgentWorkspaceClient({
 
           {shouldShowWorkspacePrompting ? (
             <WorkspacePromptingSection
-              languagePreference={draft.languagePreference}
-              onLanguageChange={(value) => {
-                updateDraft("languagePreference", value);
-                updateChannelConfig({
-                  prompting: normalizePromptingConfig({
-                    ...draft.channelConfig.prompting,
-                    languagePreference: value,
-                  }),
-                });
-              }}
+              isReadOnlyMode={isReadOnlyMode}
               onPromptingInstructionChange={(value) =>
                 updateChannelConfig({
                   prompting: normalizePromptingConfig({
@@ -1798,22 +1795,6 @@ export function AgentWorkspaceClient({
                   prompting: normalizePromptingConfig({
                     ...draft.channelConfig.prompting,
                     notes: value,
-                  }),
-                })
-              }
-              onShowChannelContextChange={(value) =>
-                updateChannelConfig({
-                  prompting: normalizePromptingConfig({
-                    ...draft.channelConfig.prompting,
-                    showChannelContext: value,
-                  }),
-                })
-              }
-              onShowContactIdentityChange={(value) =>
-                updateChannelConfig({
-                  prompting: normalizePromptingConfig({
-                    ...draft.channelConfig.prompting,
-                    showContactIdentity: value,
                   }),
                 })
               }
@@ -1838,8 +1819,6 @@ export function AgentWorkspaceClient({
               persona={draft.persona}
               promptingInstruction={draft.channelConfig.prompting.instruction ?? ""}
               promptingNotes={draft.channelConfig.prompting.notes ?? ""}
-              showChannelContext={draft.channelConfig.prompting.showChannelContext}
-              showContactIdentity={draft.channelConfig.prompting.showContactIdentity}
               tone={draft.tone}
             />
           ) : null}

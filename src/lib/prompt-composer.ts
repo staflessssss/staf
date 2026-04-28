@@ -207,9 +207,6 @@ function renderPromptingSection(agent: AgentPromptInput) {
   return [
     `Persona: ${promptingIdentity.persona}`,
     `Tone: ${promptingIdentity.tone}`,
-    `Preferred language: ${promptingIdentity.languagePreference?.trim() || "multilingual-first"}`,
-    `Show client identity in runtime context: ${prompting.showContactIdentity ? "yes" : "no"}`,
-    `Show channel context in runtime prompt: ${prompting.showChannelContext ? "yes" : "no"}`,
     prompting.instruction ? `Instruction:\n${prompting.instruction}` : "Instruction: none configured",
     prompting.notes ? `Operator notes: ${prompting.notes}` : null,
   ]

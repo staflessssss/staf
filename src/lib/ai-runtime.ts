@@ -436,15 +436,9 @@ function buildRuntimeContextLines(args: {
   prompting: PromptingConfig;
   input: Pick<InvokeAgentInput, "channel" | "contactId" | "contactEmail">;
 }) {
-  return [
-    args.prompting.showChannelContext ? `Current channel: ${args.input.channel}` : null,
-    args.prompting.showContactIdentity ? `Current contact: ${args.input.contactId}` : null,
-    args.prompting.showContactIdentity
-      ? `Known contact email: ${args.input.contactEmail ?? "not provided by channel"}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  void args;
+
+  return "";
 }
 
 function getAntiSpamIntercept(args: {
@@ -512,9 +506,8 @@ function buildFallbackResponse(args: {
     .slice(0, 2)
     .map((block) => block.name)
     .filter(Boolean);
-  const opening = args.input.languagePreference
-    ? `I will keep the default business voice in ${args.input.languagePreference} when it fits, while staying ready to reply in the customer's language.`
-    : "I will stay multilingual-first and match the customer's language while keeping the business voice consistent.";
+  const opening =
+    "I will stay multilingual-first and match the customer's language while keeping the business voice consistent.";
   const toolSummary =
     args.usedTools.length > 0
       ? `I used the configured tools: ${args.usedTools.join(", ")}.`

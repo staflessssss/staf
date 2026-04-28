@@ -275,7 +275,7 @@ test("buildMultilingualGuidance defaults to multilingual-first behavior", () => 
   });
 
   assert.match(guidance, /customer's language/i);
-  assert.match(guidance, /No default response language is pinned/i);
+  assert.match(guidance, /remain multilingual/i);
   assert.match(guidance, /Telegram/);
 });
 

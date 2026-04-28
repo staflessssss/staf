@@ -41,7 +41,8 @@ test("invokeAgent sandbox mentions runtime tooling from functionBlocks", async (
     ],
   });
 
-  assert.match(result.message, /default business voice in English/i);
+  assert.match(result.message, /multilingual-first/i);
+  assert.doesNotMatch(result.message, /default business voice in English/i);
   assert.match(result.message, /shared runtime configuration/i);
   assert.match(result.message, /configured tools/i);
   assert.deepEqual(result.usedTooling, ["Calendar check"]);
@@ -293,7 +294,7 @@ test("getInboundConversationPolicy blocks replies outside the configured schedul
   assert.equal(policy, "waiting_for_schedule_window");
 });
 
-test("buildRuntimeContextLines respects prompting visibility flags", () => {
+test("buildRuntimeContextLines does not expose hidden prompting visibility flags", () => {
   const hidden = aiRuntimeTestHelpers.buildRuntimeContextLines({
     prompting: {
       instruction: null,
@@ -323,9 +324,7 @@ test("buildRuntimeContextLines respects prompting visibility flags", () => {
   });
 
   assert.equal(hidden, "");
-  assert.match(visible, /Current channel: INSTAGRAM/);
-  assert.match(visible, /Current contact: contact-1/);
-  assert.match(visible, /Known contact email: lead@example.com/);
+  assert.equal(visible, "");
 });
 
 test("handleIncomingEventWithDeps records inbound and does not auto-reply when manual activation is required", async () => {

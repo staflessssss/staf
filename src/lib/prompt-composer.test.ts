@@ -97,14 +97,15 @@ test("buildSystemPrompt includes multilingual behavior, playbook, channel behavi
   });
 
   assert.match(prompt, /Agent identity: Studio Concierge/);
-  assert.match(prompt, /Preferred default response language: Russian/);
+  assert.match(prompt, /reply in the customer's language by default/);
   assert.match(prompt, /Channel: Instagram/);
   assert.match(prompt, /Prompting/);
   assert.match(prompt, /Persona: Moon-style studio assistant/);
   assert.match(prompt, /Tone: premium/);
   assert.match(prompt, /Instruction:\nYou are the AI assistant for the studio/);
-  assert.match(prompt, /Show client identity in runtime context: yes/);
-  assert.match(prompt, /Show channel context in runtime prompt: no/);
+  assert.doesNotMatch(prompt, /Show client identity in runtime context/);
+  assert.doesNotMatch(prompt, /Show channel context in runtime prompt/);
+  assert.doesNotMatch(prompt, /Preferred language:/);
   assert.match(prompt, /Operator notes: Keep operator visibility in mind\./);
   assert.match(prompt, /Channel behavior/);
   assert.match(prompt, /Conversation playbook/);
@@ -145,9 +146,9 @@ test("buildSystemPrompt defaults prompting visibility flags to no when not confi
     channel: { type: "TELEGRAM" },
   });
 
-  assert.match(prompt, /Show client identity in runtime context: no/);
-  assert.match(prompt, /Show channel context in runtime prompt: no/);
   assert.match(prompt, /Instruction: none configured/);
+  assert.doesNotMatch(prompt, /Show client identity in runtime context/);
+  assert.doesNotMatch(prompt, /Show channel context in runtime prompt/);
 });
 
 test("buildRuntimeExecutionPolicy exposes shared live-prompt rules in one place", () => {
