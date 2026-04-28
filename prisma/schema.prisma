@@ -157,7 +157,6 @@ model Feature {
 
 enum FeatureType {
   KNOWLEDGE
-  TOOL
 }
 
 model Conversation {
