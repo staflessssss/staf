@@ -6,6 +6,51 @@ import {
   executeGoogleCalendarStep,
 } from "@/lib/tools/google-calendar";
 
+type SchedulingConfigFixture = Parameters<
+  typeof calendarSchedulingTestHelpers.validateSchedulingWindow
+>[1];
+
+function schedulingConfig(
+  overrides: Partial<SchedulingConfigFixture> = {},
+): SchedulingConfigFixture {
+  return {
+    calendarId: "primary",
+    timeZone: "America/New_York",
+    availabilityDateSource: "request_date",
+    availabilityDateValue: "",
+    bookingDateSource: "request_date",
+    bookingDateValue: "",
+    bookingTimeSource: "time_text",
+    bookingTimeValue: "",
+    inviteEmailSource: "customer_email",
+    inviteEmailValue: "",
+    slotDurationMinutes: 30,
+    businessWindowStartHour: 9,
+    businessWindowEndHour: 14,
+    businessDays: [1, 2, 3, 4, 5],
+    checkConflictsBeforeBooking: true,
+    inviteCustomerByEmail: true,
+    createMeetLink: true,
+    reminderEnabled: false,
+    reminderMinutesBefore: 30,
+    eventSummaryTemplate: "Consultation call with {{coupleName}}",
+    eventDescriptionTemplate:
+      "Wedding date: {{weddingDate}}\nLocation: {{location}}\nChannel: {{channel}}",
+    syncLeadToSheets: false,
+    leadHeaderRow: 1,
+    leadColumns: {
+      coupleName: "couple_name",
+      weddingDate: "wedding_date",
+      location: "location",
+      callDate: "call_date",
+      callTime: "call_time",
+      email: "email",
+      channel: "channel",
+    },
+    ...overrides,
+  };
+}
+
 test("parseSchedulingRequest parses relative consultation time in ET", () => {
   const parsed = calendarSchedulingTestHelpers.parseSchedulingRequest({
     request: "tomorrow at 10:30am works for us",
@@ -193,24 +238,14 @@ test("validateSchedulingWindow rejects weekend and outside-hour bookings", () =>
       startTime: "2026-04-11T10:00:00-04:00",
       endTime: "2026-04-11T10:30:00-04:00",
     },
-    {
+    schedulingConfig({
       calendarId: "primary",
       timeZone: "America/New_York",
       slotDurationMinutes: 30,
       businessWindowStartHour: 9,
       businessWindowEndHour: 14,
       businessDays: [1, 2, 3, 4, 5],
-      leadHeaderRow: 1,
-      leadColumns: {
-        coupleName: "couple_name",
-        weddingDate: "wedding_date",
-        location: "location",
-        callDate: "call_date",
-        callTime: "call_time",
-        email: "email",
-        channel: "channel",
-      },
-    },
+    }),
   );
   const late = calendarSchedulingTestHelpers.validateSchedulingWindow(
     {
@@ -219,24 +254,14 @@ test("validateSchedulingWindow rejects weekend and outside-hour bookings", () =>
       startTime: "2026-04-10T14:00:00-04:00",
       endTime: "2026-04-10T14:30:00-04:00",
     },
-    {
+    schedulingConfig({
       calendarId: "primary",
       timeZone: "America/New_York",
       slotDurationMinutes: 30,
       businessWindowStartHour: 9,
       businessWindowEndHour: 14,
       businessDays: [1, 2, 3, 4, 5],
-      leadHeaderRow: 1,
-      leadColumns: {
-        coupleName: "couple_name",
-        weddingDate: "wedding_date",
-        location: "location",
-        callDate: "call_date",
-        callTime: "call_time",
-        email: "email",
-        channel: "channel",
-      },
-    },
+    }),
   );
 
   assert.equal(weekend.ok, false);
@@ -251,24 +276,14 @@ test("validateSchedulingWindow uses configured business days and timezone in use
       startTime: "2026-04-10T10:00:00+03:00",
       endTime: "2026-04-10T10:30:00+03:00",
     },
-    {
+    schedulingConfig({
       calendarId: "primary",
       timeZone: "Europe/Moscow",
       slotDurationMinutes: 30,
       businessWindowStartHour: 10,
       businessWindowEndHour: 18,
       businessDays: [2, 4],
-      leadHeaderRow: 1,
-      leadColumns: {
-        coupleName: "couple_name",
-        weddingDate: "wedding_date",
-        location: "location",
-        callDate: "call_date",
-        callTime: "call_time",
-        email: "email",
-        channel: "channel",
-      },
-    },
+    }),
   );
   const early = calendarSchedulingTestHelpers.validateSchedulingWindow(
     {
@@ -277,24 +292,14 @@ test("validateSchedulingWindow uses configured business days and timezone in use
       startTime: "2026-04-09T09:00:00+03:00",
       endTime: "2026-04-09T09:30:00+03:00",
     },
-    {
+    schedulingConfig({
       calendarId: "primary",
       timeZone: "Europe/Moscow",
       slotDurationMinutes: 30,
       businessWindowStartHour: 10,
       businessWindowEndHour: 18,
       businessDays: [2, 4],
-      leadHeaderRow: 1,
-      leadColumns: {
-        coupleName: "couple_name",
-        weddingDate: "wedding_date",
-        location: "location",
-        callDate: "call_date",
-        callTime: "call_time",
-        email: "email",
-        channel: "channel",
-      },
-    },
+    }),
   );
 
   assert.equal(weekend.ok, false);
@@ -317,7 +322,7 @@ test("buildCalendarInsertPayload respects booking toggles and preserves template
     weddingDate: "2026-07-20",
     location: "Brooklyn",
     channel: "telegram",
-    config: {
+    config: schedulingConfig({
       calendarId: "primary",
       timeZone: "America/New_York",
       slotDurationMinutes: 60,
@@ -342,7 +347,7 @@ test("buildCalendarInsertPayload respects booking toggles and preserves template
         channel: "channel",
       },
       syncLeadToSheets: false,
-    },
+    }),
   });
 
   assert.equal(payload.conferenceDataVersion, 0);

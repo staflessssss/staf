@@ -7,10 +7,10 @@ import { db } from "@/lib/db";
 
 type AgentFindFirst = typeof db.agent.findFirst;
 
-function withMockedAgentFindFirst(mock: AgentFindFirst) {
+function withMockedAgentFindFirst(mock: () => Promise<unknown>) {
   const delegate = db.agent as unknown as { findFirst: AgentFindFirst };
   const original = delegate.findFirst;
-  delegate.findFirst = mock;
+  delegate.findFirst = mock as unknown as AgentFindFirst;
 
   return () => {
     delegate.findFirst = original;
