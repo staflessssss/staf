@@ -1,25 +1,12 @@
-import Link from "next/link";
 import { ChannelConnection, ChannelType } from "@prisma/client";
-import {
-  Camera,
-  Mail,
-  MessageCircle,
-  Radio,
-  Send,
-} from "lucide-react";
+import { Camera, Mail, MessageCircle, Radio, Send } from "lucide-react";
 
-import {
-  EmptyState,
-  SurfaceCard,
-  secondaryButtonClassName,
-} from "@/components/stafless/foundation";
+import { EmptyState, SurfaceCard } from "@/components/stafless/foundation";
 
 type ChannelCatalogItem = {
   type: ChannelType;
   title: string;
   description: string;
-  connectLabel: string;
-  connectionKey?: "gmail" | "telegram" | "instagram";
   icon: typeof Radio;
 };
 
@@ -27,32 +14,25 @@ const channelCatalog: ChannelCatalogItem[] = [
   {
     type: ChannelType.GMAIL,
     title: "Gmail",
-    description: "Подключите ИИ-агента к Gmail",
-    connectLabel: "Подключить",
-    connectionKey: "gmail",
+    description: "Use this agent in Gmail conversations.",
     icon: Mail,
   },
   {
     type: ChannelType.TELEGRAM,
     title: "Telegram",
-    description: "Подключите ИИ-агента к Telegram",
-    connectLabel: "Подключить",
-    connectionKey: "telegram",
+    description: "Use this agent in Telegram bot chats.",
     icon: Send,
   },
   {
     type: ChannelType.INSTAGRAM,
     title: "Instagram",
-    description: "Подключите ИИ-агента к Instagram",
-    connectLabel: "Подключить",
-    connectionKey: "instagram",
+    description: "Use this agent in Instagram Direct.",
     icon: Camera,
   },
   {
     type: ChannelType.WHATSAPP,
     title: "WhatsApp",
-    description: "Подключите ИИ-агента к WhatsApp",
-    connectLabel: "Скоро",
+    description: "WhatsApp support is not available yet.",
     icon: MessageCircle,
   },
 ];
@@ -81,7 +61,6 @@ export function WorkspaceChannelsSection({
   selectedChannelId,
   assignedChannels,
   isReadOnlyMode,
-  tenantId,
   onSelectChannel,
 }: {
   channelConnections: ChannelConnection[];
@@ -97,18 +76,13 @@ export function WorkspaceChannelsSection({
     <div>
       <SurfaceCard
         className="rounded-[24px] border-[#e1e7f0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-        title="Каналы"
-        description="Один агент работает только в одном подключенном канале."
+        title="Channels"
+        description="Choose one already connected channel for this agent."
       >
         {channelConnections.length === 0 ? (
           <EmptyState
-            title="Нет подключенных каналов"
-            description="Клиент должен подключить канал в своем workspace, после этого его можно выбрать для агента."
-            action={
-              <Link href={`/admin/clients/${tenantId}/connections`} className={secondaryButtonClassName}>
-                Открыть подключения
-              </Link>
-            }
+            title="No connected channels"
+            description="The client needs to connect a channel before you can assign one to this agent."
           />
         ) : null}
 
@@ -129,15 +103,15 @@ export function WorkspaceChannelsSection({
             const metadataLabel = readMetadataLabel(connection);
             const badgeLabel = isSelected
               ? isConnected
-                ? "Подключен"
-                : "Переподключить"
+                ? "Selected"
+                : "Disconnected"
               : assignedAgentName
-                ? "Занят"
+                ? "Assigned"
                 : isConnected
-                  ? "Подключен"
+                  ? "Connected"
                   : isPlannedOnly
-                    ? "Скоро"
-                    : "Не подключен";
+                    ? "Later"
+                    : "Not connected";
 
             return (
               <article
@@ -167,29 +141,19 @@ export function WorkspaceChannelsSection({
                         }}
                         type="button"
                       >
-                        Выбрать
+                        Select
                       </button>
-                    ) : !connection && !isPlannedOnly ? (
-                      <Link
-                        className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`/admin/clients/${tenantId}/connections/${item.connectionKey}`}
-                      >
-                        {item.connectLabel}
-                      </Link>
-                    ) : connection && !isConnected && !isPlannedOnly ? (
-                      <Link
-                        className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`/admin/clients/${tenantId}/connections/${item.connectionKey}`}
-                      >
-                        {item.connectLabel}
-                      </Link>
                     ) : isSelected ? (
                       <span className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef2ff] px-5 text-xs font-semibold text-[#5b53ea]">
-                        Выбран
+                        Selected
                       </span>
                     ) : (
                       <span className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef2f7] px-5 text-xs font-semibold text-[#98a2b3]">
-                        {assignedAgentName ? "Assigned" : item.connectLabel}
+                        {assignedAgentName
+                          ? "Assigned"
+                          : isPlannedOnly
+                            ? "Later"
+                            : "Not connected"}
                       </span>
                     )}
                     <span
@@ -199,7 +163,7 @@ export function WorkspaceChannelsSection({
                           ? "relative inline-flex h-7 w-12 items-center rounded-full border border-[#6c63ff] bg-[#6c63ff]"
                           : isSelected
                             ? "relative inline-flex h-7 w-12 items-center rounded-full border border-[#fecdca] bg-[#fee4e2]"
-                          : "relative inline-flex h-7 w-12 items-center rounded-full border border-[#e5ebf3] bg-[#edf1f6]"
+                            : "relative inline-flex h-7 w-12 items-center rounded-full border border-[#e5ebf3] bg-[#edf1f6]"
                       }
                     >
                       <span
@@ -224,7 +188,7 @@ export function WorkspaceChannelsSection({
                             ? "rounded-full bg-[#fee4e2] px-2.5 py-1 text-xs font-semibold text-[#b42318]"
                             : isConnected
                               ? "rounded-full bg-[#eef5ff] px-2.5 py-1 text-xs font-semibold text-[#175cd3]"
-                          : "rounded-full bg-[#eef2f7] px-2.5 py-1 text-xs font-semibold text-[#667085]"
+                              : "rounded-full bg-[#eef2f7] px-2.5 py-1 text-xs font-semibold text-[#667085]"
                       }
                     >
                       {badgeLabel}
@@ -236,7 +200,7 @@ export function WorkspaceChannelsSection({
                   ) : null}
                   {assignedAgentName ? (
                     <p className="text-xs font-semibold text-[#b42318]">
-                      Уже используется: {assignedAgentName}.
+                      Already used by {assignedAgentName}.
                     </p>
                   ) : null}
                 </div>

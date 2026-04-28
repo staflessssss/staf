@@ -14,8 +14,6 @@ type ReactNodeLike = {
   type?: unknown;
   props?: Record<string, unknown> & {
     children?: unknown;
-    disabled?: boolean;
-    href?: string;
     onClick?: () => void;
   };
 };
@@ -78,22 +76,16 @@ async function loadChannelsSection() {
   return import("@/components/stafless/workspace-sections/channels-section");
 }
 
-test("channels section does not expose Gmail pricing asset controls", () => {
+test("channels section stays selection-only and does not expose setup or asset controls", () => {
   const source = fs.readFileSync(channelsSectionPath, "utf8");
 
+  assert.match(source, /title="Channels"/);
+  assert.match(source, /Choose one already connected channel for this agent/);
   assert.doesNotMatch(source, /Pricing attachment/);
   assert.doesNotMatch(source, /Sales assets/);
   assert.doesNotMatch(source, /onPriceAttachment/);
-});
-
-test("channels section presents channel cards without admin setup instructions", () => {
-  const source = fs.readFileSync(channelsSectionPath, "utf8");
-
-  assert.match(source, /title="Каналы"/);
-  assert.match(source, /Один агент работает только в одном подключенном канале/);
-  assert.doesNotMatch(source, /Connection instructions/);
-  assert.doesNotMatch(source, /Client opens Connections/);
-  assert.doesNotMatch(source, /BotFather/);
+  assert.doesNotMatch(source, /href=|<Link|connections\/\[/);
+  assert.doesNotMatch(source, /Connection instructions|BotFather|Google OAuth/);
 });
 
 test("channels section only selects connected and unassigned channels", async () => {
@@ -101,6 +93,7 @@ test("channels section only selects connected and unassigned channels", async ()
   const selected: ChannelConnection[] = [];
   const telegram = createChannel("telegram-1", ChannelType.TELEGRAM, ConnectionStatus.CONNECTED);
   const gmail = createChannel("gmail-1", ChannelType.GMAIL, ConnectionStatus.CONNECTED);
+
   const tree = WorkspaceChannelsSection({
     channelConnections: [telegram, gmail],
     selectedChannelId: gmail.id,
@@ -113,23 +106,19 @@ test("channels section only selects connected and unassigned channels", async ()
   });
 
   const buttons = collectElements(tree, (element) => element.type === "button");
-  const connectLinks = collectElements(tree, (element) =>
-    textOf(element).includes("Подключить") &&
-    typeof element.props?.href === "string",
-  );
-  const chooseButtons = buttons.filter((button) => textOf(button).includes("Выбрать"));
+  const links = collectElements(tree, (element) => element.type === "a");
+  const chooseButtons = buttons.filter((button) => textOf(button).includes("Select"));
   const selectedLabels = collectElements(tree, (element) => element.type === "span").filter(
     (element) =>
-      textOf(element).includes("Выбран") &&
+      textOf(element).includes("Selected") &&
       typeof element.props?.className === "string" &&
       element.props.className.includes("h-9"),
   );
 
+  assert.equal(links.length, 0);
   assert.equal(buttons.length, 1);
   assert.equal(selectedLabels.length, 1);
   assert.equal(chooseButtons.length, 1);
-  assert.equal(connectLinks.length, 1);
-  assert.equal(connectLinks[0]?.props?.href, "/admin/clients/tenant-1/connections/instagram");
 
   chooseButtons[0]?.props?.onClick?.();
 
@@ -137,7 +126,7 @@ test("channels section only selects connected and unassigned channels", async ()
   assert.equal(selected[0]?.id, telegram.id);
 });
 
-test("channels section treats disconnected and assigned channels as non-selectable states", async () => {
+test("channels section does not provide actions for disconnected or assigned channels", async () => {
   const { WorkspaceChannelsSection } = await loadChannelsSection();
   const selected: ChannelConnection[] = [];
   const telegram = createChannel("telegram-1", ChannelType.TELEGRAM, ConnectionStatus.REVOKED);
@@ -161,21 +150,11 @@ test("channels section treats disconnected and assigned channels as non-selectab
 
   const allText = textOf(tree);
   const buttons = collectElements(tree, (element) => element.type === "button");
-  const connectLinks = collectElements(tree, (element) =>
-    textOf(element).includes("Подключить") &&
-    typeof element.props?.href === "string",
-  );
+  const links = collectElements(tree, (element) => element.type === "a");
 
   assert.equal(buttons.length, 0);
-  assert.equal(connectLinks.length, 2);
-  assert.deepEqual(
-    connectLinks.map((link) => link.props?.href).sort(),
-    [
-      "/admin/clients/tenant-1/connections/instagram",
-      "/admin/clients/tenant-1/connections/telegram",
-    ],
-  );
-  assert.match(allText, /Переподключить/);
-  assert.match(allText, /Уже используется: Other agent/);
+  assert.equal(links.length, 0);
+  assert.match(allText, /Disconnected/);
+  assert.match(allText, /Already used by Other agent/);
   assert.equal(selected.length, 0);
 });
