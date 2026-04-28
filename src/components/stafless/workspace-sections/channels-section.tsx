@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { ChannelConnection, ChannelType } from "@prisma/client";
 import {
-  BadgeCheck,
   Camera,
-  CircleAlert,
-  ExternalLink,
   Mail,
   MessageCircle,
   Radio,
@@ -13,7 +10,6 @@ import {
 
 import {
   EmptyState,
-  StatusBadge,
   SurfaceCard,
   secondaryButtonClassName,
 } from "@/components/stafless/foundation";
@@ -23,7 +19,6 @@ type ChannelCatalogItem = {
   title: string;
   description: string;
   connectLabel: string;
-  setupSteps: string[];
   icon: typeof Radio;
 };
 
@@ -31,52 +26,30 @@ const channelCatalog: ChannelCatalogItem[] = [
   {
     type: ChannelType.GMAIL,
     title: "Gmail",
-    description: "Connect the agent to inbound emails and threaded replies.",
-    connectLabel: "Connect Gmail",
+    description: "Подключите ИИ-агента к Gmail",
+    connectLabel: "Подключить",
     icon: Mail,
-    setupSteps: [
-      "Client opens Connections in their cabinet.",
-      "Client chooses Gmail and connects the correct Google account.",
-      "Google access also unlocks Calendar, Sheets, and Drive integrations.",
-      "Operator returns here and selects the connected Gmail channel for this agent.",
-    ],
   },
   {
     type: ChannelType.TELEGRAM,
     title: "Telegram",
-    description: "Connect the agent to a Telegram bot owned by the client business.",
-    connectLabel: "Connect Telegram",
+    description: "Подключите ИИ-агента к Telegram",
+    connectLabel: "Подключить",
     icon: Send,
-    setupSteps: [
-      "Client creates or opens the business bot through BotFather.",
-      "Client copies the bot token from BotFather.",
-      "Client pastes the token into Telegram in Connections.",
-      "Operator selects the connected Telegram channel and deploys the agent.",
-    ],
   },
   {
     type: ChannelType.INSTAGRAM,
     title: "Instagram",
-    description: "Connect the agent to Instagram Direct for a business account.",
-    connectLabel: "Connect Instagram",
+    description: "Подключите ИИ-агента к Instagram",
+    connectLabel: "Подключить",
     icon: Camera,
-    setupSteps: [
-      "Client confirms the account is an Instagram business account.",
-      "Client connects Instagram from Connections when Meta access is available.",
-      "Operator verifies the channel shows Connected here.",
-      "Operator selects Instagram and deploys the agent once webhook setup is ready.",
-    ],
   },
   {
     type: ChannelType.WHATSAPP,
     title: "WhatsApp",
-    description: "WhatsApp is reserved for a later channel expansion pass.",
-    connectLabel: "Unavailable",
+    description: "Подключите ИИ-агента к WhatsApp",
+    connectLabel: "Скоро",
     icon: MessageCircle,
-    setupSteps: [
-      "WhatsApp is intentionally out of the current v1 channel scope.",
-      "Do not assign production agents to WhatsApp until the roadmap adds it.",
-    ],
   },
 ];
 
@@ -106,8 +79,6 @@ export function WorkspaceChannelsSection({
   isReadOnlyMode,
   tenantId,
   onSelectChannel,
-  sectionCanvasClassName,
-  softInfoPanelClassName,
 }: {
   channelConnections: ChannelConnection[];
   selectedChannelId: string;
@@ -118,25 +89,20 @@ export function WorkspaceChannelsSection({
   sectionCanvasClassName: string;
   softInfoPanelClassName: string;
 }) {
-  const selectedChannel =
-    channelConnections.find((connection) => connection.id === selectedChannelId) ?? null;
-  const selectedCatalogItem =
-    channelCatalog.find((item) => item.type === selectedChannel?.type) ?? channelCatalog[0];
-
   return (
-    <>
+    <div>
       <SurfaceCard
         className="rounded-[24px] border-[#e1e7f0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-        title="Channels"
-        description="Choose the single connected channel this agent uses for live conversations."
+        title="Каналы"
+        description="Один агент работает только в одном подключенном канале."
       >
         {channelConnections.length === 0 ? (
           <EmptyState
-            title="No channel available"
-            description="Connect at least one tenant channel before turning this agent into a live delivery surface."
+            title="Нет подключенных каналов"
+            description="Клиент должен подключить канал в своем workspace, после этого его можно выбрать для агента."
             action={
               <Link href={`/admin/clients/${tenantId}`} className={secondaryButtonClassName}>
-                Open client workspace
+                Открыть клиента
               </Link>
             }
           />
@@ -159,15 +125,15 @@ export function WorkspaceChannelsSection({
             const metadataLabel = readMetadataLabel(connection);
             const badgeLabel = isSelected
               ? isConnected
-                ? "Selected"
-                : "Needs reconnection"
+                ? "Подключен"
+                : "Переподключить"
               : assignedAgentName
-                ? "Assigned"
+                ? "Занят"
                 : isConnected
-                  ? "Connected"
+                  ? "Подключен"
                   : isPlannedOnly
-                    ? "Later"
-                    : "Not connected";
+                    ? "Скоро"
+                    : "Не подключен";
 
             return (
               <article
@@ -197,25 +163,25 @@ export function WorkspaceChannelsSection({
                         }}
                         type="button"
                       >
-                        Choose
+                        Выбрать
                       </button>
                     ) : !connection && !isPlannedOnly ? (
-                      <a
+                      <Link
                         className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`#channel-setup-${item.type.toLowerCase()}`}
+                        href={`/admin/clients/${tenantId}`}
                       >
-                        Setup
-                      </a>
+                        {item.connectLabel}
+                      </Link>
                     ) : connection && !isConnected && !isPlannedOnly ? (
-                      <a
+                      <Link
                         className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
-                        href={`#channel-setup-${item.type.toLowerCase()}`}
+                        href={`/admin/clients/${tenantId}`}
                       >
-                        Setup
-                      </a>
+                        {item.connectLabel}
+                      </Link>
                     ) : isSelected ? (
                       <span className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef2ff] px-5 text-xs font-semibold text-[#5b53ea]">
-                        Selected
+                        Выбран
                       </span>
                     ) : (
                       <span className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef2f7] px-5 text-xs font-semibold text-[#98a2b3]">
@@ -266,12 +232,7 @@ export function WorkspaceChannelsSection({
                   ) : null}
                   {assignedAgentName ? (
                     <p className="text-xs font-semibold text-[#b42318]">
-                      Already assigned to {assignedAgentName}.
-                    </p>
-                  ) : null}
-                  {!connection && !isPlannedOnly ? (
-                    <p className="text-xs font-medium text-[#667085]">
-                      Open the setup instructions below before asking the client to connect this channel.
+                      Уже используется: {assignedAgentName}.
                     </p>
                   ) : null}
                 </div>
@@ -280,99 +241,6 @@ export function WorkspaceChannelsSection({
           })}
         </div>
       </SurfaceCard>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <section className={sectionCanvasClassName}>
-          <div className="flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[#f0efff] text-[#6c63ff]">
-              <BadgeCheck className="size-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#111827]">Selected channel</p>
-              <p className="mt-1 text-sm leading-6 text-[#667085]">
-                {selectedChannel?.status === "CONNECTED"
-                  ? `${selectedCatalogItem.title} is the only live channel assigned to this agent. Save changes after switching channels.`
-                  : selectedChannel
-                    ? `${selectedCatalogItem.title} is selected but not connected. Reconnect it or choose another connected channel before saving this agent.`
-                  : "Choose one connected channel before saving this agent."}
-              </p>
-              {selectedChannel ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <StatusBadge status={selectedChannel.status} />
-                  <span className="rounded-full border border-[#dbe3ef] bg-white px-3 py-1 text-xs font-semibold text-[#475467]">
-                    One agent per channel
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        <aside className={softInfoPanelClassName}>
-          <div className="flex items-start gap-3">
-            <CircleAlert className="mt-0.5 size-5 shrink-0 text-[#6c63ff]" />
-            <div>
-              <p className="text-sm font-semibold text-[#111827]">Switching channel</p>
-              <p className="mt-1 text-sm leading-6 text-[#667085]">
-                Changing the selected channel changes the live delivery surface. Save the agent and
-                redeploy before relying on inbound production traffic.
-              </p>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      <SurfaceCard
-        className="rounded-[24px] border-[#e1e7f0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-        title="Connection instructions"
-        description="Use these internal setup notes when a channel is not connected yet. Client credentials still belong in the client Connections surface."
-      >
-        <div className="grid gap-4 lg:grid-cols-2">
-          {channelCatalog.map((item) => {
-            const connection = getChannelConnection(channelConnections, item.type);
-            const Icon = item.icon;
-
-            return (
-              <div
-                key={`${item.type}-instructions`}
-                id={`channel-setup-${item.type.toLowerCase()}`}
-                className="rounded-[16px] border border-[#dbe3ef] bg-[#fcfdff] p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] border border-[#dbe3ef] bg-white text-[#6c63ff]">
-                    <Icon className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-[#111827]">{item.title}</p>
-                    <p className="text-xs text-[#667085]">
-                      {connection?.status === "CONNECTED"
-                        ? "Connection exists for this tenant."
-                        : "Connection required before assignment."}
-                    </p>
-                  </div>
-                </div>
-                <ol className="mt-4 space-y-2 text-sm leading-6 text-[#667085]">
-                  {item.setupSteps.map((step) => (
-                    <li key={step} className="flex gap-2">
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#6c63ff]" />
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-5">
-          <Link
-            href={`/admin/clients/${tenantId}`}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#344054] transition hover:text-[#6c63ff]"
-          >
-            Open client workspace
-            <ExternalLink className="size-4" />
-          </Link>
-        </div>
-      </SurfaceCard>
-    </>
+    </div>
   );
 }

@@ -85,13 +85,14 @@ test("channels section does not expose Gmail pricing asset controls", () => {
   assert.doesNotMatch(source, /onPriceAttachment/);
 });
 
-test("channels section presents channel cards and internal setup instructions", () => {
+test("channels section presents channel cards without admin setup instructions", () => {
   const source = fs.readFileSync(channelsSectionPath, "utf8");
 
-  assert.match(source, /Connection instructions/);
-  assert.match(source, /Client opens Connections in their cabinet/);
-  assert.match(source, /Client creates or opens the business bot through BotFather/);
-  assert.match(source, /only live channel assigned to this agent/i);
+  assert.match(source, /title="Каналы"/);
+  assert.match(source, /Один агент работает только в одном подключенном канале/);
+  assert.doesNotMatch(source, /Connection instructions/);
+  assert.doesNotMatch(source, /Client opens Connections/);
+  assert.doesNotMatch(source, /BotFather/);
 });
 
 test("channels section only selects connected and unassigned channels", async () => {
@@ -111,13 +112,14 @@ test("channels section only selects connected and unassigned channels", async ()
   });
 
   const buttons = collectElements(tree, (element) => element.type === "button");
-  const setupLinks = collectElements(tree, (element) => element.type === "a").filter((link) =>
-    textOf(link).includes("Setup"),
+  const connectLinks = collectElements(tree, (element) =>
+    textOf(element).includes("Подключить") &&
+    typeof element.props?.href === "string",
   );
-  const chooseButtons = buttons.filter((button) => textOf(button).includes("Choose"));
+  const chooseButtons = buttons.filter((button) => textOf(button).includes("Выбрать"));
   const selectedLabels = collectElements(tree, (element) => element.type === "span").filter(
     (element) =>
-      textOf(element).includes("Selected") &&
+      textOf(element).includes("Выбран") &&
       typeof element.props?.className === "string" &&
       element.props.className.includes("h-9"),
   );
@@ -125,7 +127,7 @@ test("channels section only selects connected and unassigned channels", async ()
   assert.equal(buttons.length, 1);
   assert.equal(selectedLabels.length, 1);
   assert.equal(chooseButtons.length, 1);
-  assert.equal(setupLinks.length, 1);
+  assert.equal(connectLinks.length, 1);
 
   chooseButtons[0]?.props?.onClick?.();
 
@@ -133,7 +135,7 @@ test("channels section only selects connected and unassigned channels", async ()
   assert.equal(selected[0]?.id, telegram.id);
 });
 
-test("channels section treats disconnected and assigned channels as non-selectable setup states", async () => {
+test("channels section treats disconnected and assigned channels as non-selectable states", async () => {
   const { WorkspaceChannelsSection } = await loadChannelsSection();
   const selected: ChannelConnection[] = [];
   const telegram = createChannel("telegram-1", ChannelType.TELEGRAM, ConnectionStatus.REVOKED);
@@ -157,14 +159,14 @@ test("channels section treats disconnected and assigned channels as non-selectab
 
   const allText = textOf(tree);
   const buttons = collectElements(tree, (element) => element.type === "button");
-  const setupLinks = collectElements(tree, (element) => element.type === "a").filter((link) =>
-    textOf(link).includes("Setup"),
+  const connectLinks = collectElements(tree, (element) =>
+    textOf(element).includes("Подключить") &&
+    typeof element.props?.href === "string",
   );
 
   assert.equal(buttons.length, 0);
-  assert.equal(setupLinks.length, 2);
-  assert.match(allText, /Needs reconnection/);
-  assert.match(allText, /Reconnect it or choose another connected channel before saving this agent/);
-  assert.match(allText, /Already assigned to Other agent/);
+  assert.equal(connectLinks.length, 2);
+  assert.match(allText, /Переподключить/);
+  assert.match(allText, /Уже используется: Other agent/);
   assert.equal(selected.length, 0);
 });
