@@ -3,13 +3,11 @@ import {
   ChannelConnection,
   ChannelType,
   ConnectionStatus,
-  Feature,
   FeatureType,
   IntegrationConnection,
   MessageRole,
   Prisma,
   PrismaClient,
-  Step,
 } from "@prisma/client";
 import { z } from "zod";
 
@@ -1364,19 +1362,23 @@ export type AgentWithBuilderData = Prisma.AgentGetPayload<{
   include: typeof agentBuilderInclude;
 }>;
 
-export type HydratedToolStep = Pick<
-  Step,
-  "id" | "featureId" | "integrationId" | "action" | "params" | "sortOrder" | "createdAt" | "updatedAt"
-> & {
+export type RuntimeToolStep = {
+  id: string;
+  functionId: string;
+  integrationId: string;
+  action: string;
+  params: Prisma.JsonValue;
+  sortOrder: number;
   integration: IntegrationConnection;
 };
 
-export type HydratedToolFeature = Pick<
-  Feature,
-  "id" | "agentId" | "name" | "description" | "type" | "sortOrder" | "createdAt" | "updatedAt"
-> & {
-  type: "TOOL";
-  steps: HydratedToolStep[];
+export type RuntimeToolFeature = {
+  id: string;
+  agentId: string;
+  name: string;
+  description: string;
+  sortOrder: number;
+  steps: RuntimeToolStep[];
 };
 
 export function getChannelConfigObject(value: Prisma.JsonValue | null | undefined): Prisma.JsonObject {
@@ -1524,7 +1526,7 @@ export function deriveFunctionBlocksFromAgent(agent: AgentWithBuilderData) {
 export async function hydrateFunctionBlocksForRuntime(
   agent: Pick<AgentWithBuilderData, "id" | "tenantId" | "channelConfig">,
   database: PrismaClient,
-): Promise<HydratedToolFeature[]> {
+): Promise<RuntimeToolFeature[]> {
   const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
   const functionBlocks = normalizeFunctionBlocks(
     Array.isArray(rawChannelConfig.functionBlocks)
@@ -1557,7 +1559,6 @@ export async function hydrateFunctionBlocksForRuntime(
       : [];
 
   const integrationsById = new Map(integrations.map((integration) => [integration.id, integration]));
-  const now = new Date();
 
   return functionBlocks.map((block, blockIndex) => {
     const featureId = `synthetic:fb:${blockIndex}`;
@@ -1567,10 +1568,7 @@ export async function hydrateFunctionBlocksForRuntime(
       agentId: agent.id,
       name: block.name,
       description: block.description,
-      type: FeatureType.TOOL,
       sortOrder: blockIndex,
-      createdAt: now,
-      updatedAt: now,
       steps: block.steps.flatMap((step, stepIndex) => {
         const integration = integrationsById.get(step.integrationId);
 
@@ -1584,13 +1582,11 @@ export async function hydrateFunctionBlocksForRuntime(
         return [
           {
             id: step.id ?? `synthetic:step:${blockIndex}:${stepIndex}`,
-            featureId,
+            functionId: featureId,
             integrationId: step.integrationId,
             action: step.action,
             params: normalizeFunctionStepParams(step.params),
             sortOrder: stepIndex,
-            createdAt: now,
-            updatedAt: now,
             integration,
           },
         ];

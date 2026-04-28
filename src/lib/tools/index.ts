@@ -2,7 +2,7 @@ import { IntegrationType, Prisma } from "@prisma/client";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
-import { type HydratedToolFeature } from "@/lib/agent-builder";
+import { type RuntimeToolFeature } from "@/lib/agent-builder";
 import { executeGoogleCalendarStep } from "@/lib/tools/google-calendar";
 import { executeGoogleDriveStep } from "@/lib/tools/google-drive";
 import { executeGoogleSheetsStep } from "@/lib/tools/google-sheets";
@@ -16,7 +16,7 @@ type ToolExecutionLog = {
 
 type ResolveToolsArgs = {
   tenantId: string;
-  toolFeatures: HydratedToolFeature[];
+  toolFeatures: RuntimeToolFeature[];
   testMode?: boolean;
   defaultEmail?: string;
   onToolResult?: (entry: ToolExecutionLog) => void;
@@ -84,7 +84,7 @@ async function executeIntegrationStep(args: {
   }
 }
 
-function buildToolDescription(feature: HydratedToolFeature) {
+function buildToolDescription(feature: RuntimeToolFeature) {
   const stepDescriptions = feature.steps.map((step) => {
     return `${step.integration.type}: ${step.action}`;
   });
