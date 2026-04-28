@@ -8,20 +8,20 @@ export type TierBType = (typeof tierBValues)[number];
 export type PrimaryDestinationType = TierAType | TierBType;
 export type DestinationTier = "A" | "B" | "C";
 
-export type LegacyFunctionTargetLike = {
+export type StoredFunctionTargetLike = {
   type: string;
   label: string;
   isPrimary?: boolean | null;
   primaryStepId?: string | null;
 };
 
-export type LegacyFunctionStepLike = FunctionBlockConfig["steps"][number] & {
+export type StoredFunctionStepLike = FunctionBlockConfig["steps"][number] & {
   id?: string | null;
 };
 
 export type StoredFunctionLike<
-  TTarget extends LegacyFunctionTargetLike = FunctionBlockConfig["resultTargets"][number],
-  TStep = LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike = FunctionBlockConfig["resultTargets"][number],
+  TStep = StoredFunctionStepLike,
   TParameter = FunctionBlockConfig["parameters"][number],
 > = Omit<FunctionBlockConfig, "parameters" | "resultTargets" | "steps"> & {
   parameters: TParameter[];
@@ -36,14 +36,14 @@ export type DestinationOption = {
   compatibility: boolean;
 };
 
-type PrimaryDestinationBase<TTarget extends LegacyFunctionTargetLike> = {
+type PrimaryDestinationBase<TTarget extends StoredFunctionTargetLike> = {
   label: string;
   sourceIndex: number;
   target: TTarget;
   primaryStepId?: string | null;
 };
 
-export type PrimaryDestinationView<TTarget extends LegacyFunctionTargetLike> =
+export type PrimaryDestinationView<TTarget extends StoredFunctionTargetLike> =
   | (PrimaryDestinationBase<TTarget> & {
       kind: "google_sheets";
       tier: "A";
@@ -71,8 +71,8 @@ export type PrimaryDestinationView<TTarget extends LegacyFunctionTargetLike> =
     });
 
 export type FunctionViewModel<
-  TTarget extends LegacyFunctionTargetLike = FunctionBlockConfig["resultTargets"][number],
-  TStep = LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike = FunctionBlockConfig["resultTargets"][number],
+  TStep = StoredFunctionStepLike,
   TParameter = FunctionBlockConfig["parameters"][number],
 > = {
   details: Pick<FunctionBlockConfig, "name" | "description" | "active">;
@@ -124,7 +124,7 @@ export function getResultTargetLabel(type: PrimaryDestinationType) {
   }
 }
 
-function cloneTargetWithPrimaryFlag<TTarget extends LegacyFunctionTargetLike>(
+function cloneTargetWithPrimaryFlag<TTarget extends StoredFunctionTargetLike>(
   target: TTarget,
   isPrimary: boolean,
 ) {
@@ -137,7 +137,7 @@ function cloneTargetWithPrimaryFlag<TTarget extends LegacyFunctionTargetLike>(
   return clone as TTarget;
 }
 
-function toPrimaryDestinationView<TTarget extends LegacyFunctionTargetLike>(
+function toPrimaryDestinationView<TTarget extends StoredFunctionTargetLike>(
   target: TTarget,
   sourceIndex: number,
 ): PrimaryDestinationView<TTarget> | null {
@@ -199,7 +199,7 @@ function toPrimaryDestinationView<TTarget extends LegacyFunctionTargetLike>(
   }
 }
 
-export function pickPrimary<TTarget extends LegacyFunctionTargetLike>(resultTargets: TTarget[]) {
+export function pickPrimary<TTarget extends StoredFunctionTargetLike>(resultTargets: TTarget[]) {
   const explicitPrimaryIndex = resultTargets.findIndex(
     (target) => target.isPrimary === true && classifyDestination(target.type) !== "C",
   );
@@ -231,13 +231,13 @@ export function pickPrimary<TTarget extends LegacyFunctionTargetLike>(resultTarg
   };
 }
 
-export function getPrimaryStoredTarget<TTarget extends LegacyFunctionTargetLike>(
+export function getPrimaryStoredTarget<TTarget extends StoredFunctionTargetLike>(
   resultTargets: TTarget[],
 ) {
   return pickPrimary(resultTargets).primary;
 }
 
-export function getOrderedResultTargets<TTarget extends LegacyFunctionTargetLike>(
+export function getOrderedResultTargets<TTarget extends StoredFunctionTargetLike>(
   resultTargets: TTarget[],
 ) {
   const { primary, secondaryBag } = pickPrimary(resultTargets);
@@ -245,7 +245,7 @@ export function getOrderedResultTargets<TTarget extends LegacyFunctionTargetLike
   return primary ? [primary, ...secondaryBag] : secondaryBag;
 }
 
-function ensureStepId<TStep extends LegacyFunctionStepLike>(step: TStep): TStep {
+function ensureStepId<TStep extends StoredFunctionStepLike>(step: TStep): TStep {
   if (typeof step.id === "string" && step.id.trim()) {
     return step;
   }
@@ -256,7 +256,7 @@ function ensureStepId<TStep extends LegacyFunctionStepLike>(step: TStep): TStep 
   };
 }
 
-function findStepIndexById<TStep extends LegacyFunctionStepLike>(
+function findStepIndexById<TStep extends StoredFunctionStepLike>(
   steps: TStep[],
   stepId?: string | null,
 ) {
@@ -268,8 +268,8 @@ function findStepIndexById<TStep extends LegacyFunctionStepLike>(
 }
 
 function resolvePrimaryStepId<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
 >(
   primary: TTarget,
   steps: TStep[],
@@ -300,8 +300,8 @@ function resolvePrimaryStepId<
 }
 
 export function loadViewModel<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
   TParameter,
 >(
   fn: StoredFunctionLike<TTarget, TStep, TParameter>,
@@ -348,8 +348,8 @@ export function loadViewModel<
 }
 
 export function saveViewModel<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
   TParameter,
 >(vm: FunctionViewModel<TTarget, TStep, TParameter>): StoredFunctionLike<TTarget, TStep, TParameter> {
   const primaryTarget = vm.resultDelivery.primary
@@ -392,7 +392,7 @@ export function saveViewModel<
   };
 }
 
-export function getDestinationSelectorOptions<TTarget extends LegacyFunctionTargetLike>({
+export function getDestinationSelectorOptions<TTarget extends StoredFunctionTargetLike>({
   currentTargets,
 }: {
   isNewFunction: boolean;
@@ -416,7 +416,7 @@ export function getDestinationSelectorOptions<TTarget extends LegacyFunctionTarg
     }));
 }
 
-function toPrimaryTarget<TTarget extends LegacyFunctionTargetLike>(
+function toPrimaryTarget<TTarget extends StoredFunctionTargetLike>(
   type: PrimaryDestinationType,
   currentTarget?: TTarget | null,
 ) {
@@ -429,7 +429,7 @@ function toPrimaryTarget<TTarget extends LegacyFunctionTargetLike>(
   } as TTarget;
 }
 
-function toDestinationViewFromType<TTarget extends LegacyFunctionTargetLike>(
+function toDestinationViewFromType<TTarget extends StoredFunctionTargetLike>(
   type: PrimaryDestinationType,
   target: TTarget,
   sourceIndex: number,
@@ -455,8 +455,8 @@ function replaceAtIndex<TItem>(items: TItem[], index: number, nextItem: TItem) {
 }
 
 export function createPrimaryDestination<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
   TParameter,
 >(
   vm: FunctionViewModel<TTarget, TStep, TParameter>,
@@ -498,8 +498,8 @@ export function createPrimaryDestination<
 }
 
 export function changePrimaryDestinationType<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
   TParameter,
 >(
   vm: FunctionViewModel<TTarget, TStep, TParameter>,
@@ -568,7 +568,7 @@ export function changePrimaryDestinationType<
 }
 
 export function updatePrimaryDestinationLabel<
-  TTarget extends LegacyFunctionTargetLike,
+  TTarget extends StoredFunctionTargetLike,
   TStep,
   TParameter,
 >(
@@ -597,8 +597,8 @@ export function updatePrimaryDestinationLabel<
 }
 
 export function updatePrimaryDestinationStep<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
   TParameter,
 >(
   vm: FunctionViewModel<TTarget, TStep, TParameter>,
@@ -632,7 +632,7 @@ export function updatePrimaryDestinationStep<
 }
 
 export function removePrimaryDestination<
-  TTarget extends LegacyFunctionTargetLike,
+  TTarget extends StoredFunctionTargetLike,
   TStep,
   TParameter,
 >(
@@ -651,8 +651,8 @@ export function removePrimaryDestination<
 }
 
 export function getLinkedPrimaryStep<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
   TParameter,
 >(vm: FunctionViewModel<TTarget, TStep, TParameter>) {
   const primary = vm.resultDelivery.primary;

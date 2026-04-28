@@ -6,14 +6,14 @@ import {
   agentDraftSchema,
   buildFeatureCreateInput,
   getChannelConfigObject,
-  getToolIntegrationIds,
+  getFunctionIntegrationIds,
   mergeAgentChannelConfig,
   serializeAgentConfig,
   validateAgentConfigReferences,
 } from "@/lib/agent-config";
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
-import { buildSystemPrompt } from "@/lib/prompt-builder";
+import { buildSystemPrompt } from "@/lib/prompt-composer";
 
 type AgentRouteContext = {
   params: Promise<{ tenantId: string; agentId: string }>;
@@ -79,7 +79,7 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
   }
 
-  const integrationIds = getToolIntegrationIds(parsed.data);
+  const integrationIds = getFunctionIntegrationIds(parsed.data);
 
   try {
     const item = await db.$transaction(async (tx) => {

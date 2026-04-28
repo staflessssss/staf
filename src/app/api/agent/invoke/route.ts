@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   agentConfigInclude,
-  functionBlocksToToolBlocks,
   normalizeFunctionBlocks,
   resolvePromptingIdentity,
   type SandboxInvokeInput,
@@ -12,7 +11,7 @@ import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { invokeAgent } from "@/lib/ai-runtime";
 import { db } from "@/lib/db";
 import { getOrderedResultTargets } from "@/lib/functions/destination-mapping";
-import { buildSystemPrompt } from "@/lib/prompt-builder";
+import { buildSystemPrompt } from "@/lib/prompt-composer";
 
 export async function POST(req: NextRequest) {
   const session = await requireAdminApiSession();
@@ -65,7 +64,6 @@ export async function POST(req: NextRequest) {
   const functionBlocks = normalizeFunctionBlocks(
     parsed.data.draft.channelConfig.functionBlocks ?? [],
   );
-  const derivedToolBlocks = functionBlocksToToolBlocks(functionBlocks);
 
   const selectedChannel = await db.channelConnection.findFirst({
     where: {
@@ -88,8 +86,8 @@ export async function POST(req: NextRequest) {
         where: {
           tenantId: parsed.data.tenantId,
           id: {
-            in: derivedToolBlocks.flatMap((tool) =>
-              tool.steps.map((step) => step.integrationId),
+            in: functionBlocks.flatMap((block) =>
+              block.steps.map((step) => step.integrationId),
             ),
           },
         },

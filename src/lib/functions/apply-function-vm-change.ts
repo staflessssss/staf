@@ -1,14 +1,14 @@
 import {
   FunctionViewModel,
-  LegacyFunctionStepLike,
-  LegacyFunctionTargetLike,
+  StoredFunctionStepLike,
+  StoredFunctionTargetLike,
   loadViewModel,
   saveViewModel,
   StoredFunctionLike,
 } from "@/lib/functions/destination-mapping";
 
 export type FunctionVmPatch<
-  TTarget extends LegacyFunctionTargetLike,
+  TTarget extends StoredFunctionTargetLike,
   TStep,
   TParameter,
 > = Pick<
@@ -25,8 +25,8 @@ export type FunctionVmPatch<
 >;
 
 export function applyFunctionVmChange<
-  TTarget extends LegacyFunctionTargetLike,
-  TStep extends LegacyFunctionStepLike,
+  TTarget extends StoredFunctionTargetLike,
+  TStep extends StoredFunctionStepLike,
   TParameter,
 >(
   currentFunction: StoredFunctionLike<TTarget, TStep, TParameter>,

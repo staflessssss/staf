@@ -6,14 +6,14 @@ import {
   agentDraftSchema,
   buildFeatureCreateInput,
   getChannelConfigObject,
-  getToolIntegrationIds,
+  getFunctionIntegrationIds,
   mergeAgentChannelConfig,
   serializeAgentConfig,
   validateAgentConfigReferences,
 } from "@/lib/agent-config";
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
-import { buildSystemPrompt } from "@/lib/prompt-builder";
+import { buildSystemPrompt } from "@/lib/prompt-composer";
 
 type TenantAgentsRouteContext = {
   params: Promise<{ tenantId: string }>;
@@ -85,7 +85,7 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
     return NextResponse.json({ error: "Tenant not found." }, { status: 404 });
   }
 
-  const integrationIds = getToolIntegrationIds(parsed.data);
+  const integrationIds = getFunctionIntegrationIds(parsed.data);
 
   try {
     const item = await db.$transaction(async (tx) => {

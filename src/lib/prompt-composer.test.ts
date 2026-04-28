@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildRuntimeExecutionPolicy, buildSystemPrompt } from "@/lib/prompt-builder";
+import { buildRuntimeExecutionPolicy, buildSystemPrompt } from "@/lib/prompt-composer";
 
 test("buildSystemPrompt includes multilingual behavior, playbook, channel behavior, knowledge, and functions", () => {
   const prompt = buildSystemPrompt({

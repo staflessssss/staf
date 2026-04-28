@@ -57,7 +57,7 @@ function renderFunctionSection(functionBlocks: NonNullable<AgentPromptInput["fun
                   parts.push(`allowed: ${parameter.allowedValues.join(", ")}`);
                 }
 
-                return `- ${parts.join(" — ")}`;
+                return `- ${parts.join(" - ")}`;
               })
               .join("\n")
           : "- No structured inputs configured yet.";

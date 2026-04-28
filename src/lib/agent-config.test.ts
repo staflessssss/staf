@@ -7,7 +7,7 @@ import {
   buildFeatureCreateInput,
   buildMultilingualGuidance,
   formatEnumLabel,
-  getToolIntegrationIds,
+  getFunctionIntegrationIds,
   mapAgentToDraft,
   normalizeAgentSettings,
   normalizePromptingConfig,
@@ -85,7 +85,7 @@ test("buildFeatureCreateInput ignores channelConfig.functionBlocks for Feature w
   assert.deepEqual(features, []);
 });
 
-test("getToolIntegrationIds reads from channelConfig.functionBlocks", () => {
+test("getFunctionIntegrationIds reads from channelConfig.functionBlocks", () => {
   const input = agentDraftSchema.parse({
     name: "Studio Concierge",
     persona: "Helpful assistant",
@@ -114,7 +114,7 @@ test("getToolIntegrationIds reads from channelConfig.functionBlocks", () => {
     },
   });
 
-  assert.deepEqual(getToolIntegrationIds(input), ["int1"]);
+  assert.deepEqual(getFunctionIntegrationIds(input), ["int1"]);
 });
 
 test("mapAgentToDraft exposes functionBlocks from channelConfig", () => {

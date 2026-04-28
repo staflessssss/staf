@@ -1142,13 +1142,6 @@ export const agentDraftSchema = z.object({
 
 export type AgentDraftInput = z.infer<typeof agentDraftSchema>;
 
-export function deriveToolBlocksFromDraft(
-  input: Pick<AgentDraftInput, "channelConfig">,
-) {
-  const functionBlocks = normalizeFunctionBlocks(input.channelConfig?.functionBlocks ?? []);
-  return functionBlocksToToolBlocks(functionBlocks);
-}
-
 export function getDefaultFunctionBlock(): FunctionBlockConfig {
   return {
     name: "New function",
@@ -1265,31 +1258,6 @@ export function normalizeFunctionBlocks(
   }
 
   return values.map((value) => normalizeFunctionBlock(value));
-}
-
-export function functionBlockToToolBlock(functionBlock: FunctionBlockConfig) {
-  return {
-    name: functionBlock.name,
-    description: functionBlock.description,
-    steps: functionBlock.steps.map((step) => ({
-      integrationId: step.integrationId,
-      action: step.action,
-      params:
-        typeof step.params === "string"
-          ? (() => {
-              try {
-                return JSON.parse(step.params || "{}");
-              } catch {
-                return {};
-              }
-            })()
-          : step.params,
-    })),
-  };
-}
-
-export function functionBlocksToToolBlocks(functionBlocks: FunctionBlockConfig[]) {
-  return functionBlocks.map((block) => functionBlockToToolBlock(block));
 }
 
 export const sandboxInvokeSchema = z.object({
@@ -1550,12 +1518,12 @@ export function buildFeatureCreateInput(input: AgentDraftInput): Prisma.FeatureC
   return knowledgeFeatures;
 }
 
-export function getToolIntegrationIds(input: AgentDraftInput) {
-  const toolBlocks = deriveToolBlocksFromDraft(input);
+export function getFunctionIntegrationIds(input: AgentDraftInput) {
+  const functionBlocks = normalizeFunctionBlocks(input.channelConfig?.functionBlocks ?? []);
 
   return Array.from(
     new Set(
-      toolBlocks.flatMap((block) => block.steps.map((step) => step.integrationId)),
+      functionBlocks.flatMap((block) => block.steps.map((step) => step.integrationId)),
     ),
   );
 }

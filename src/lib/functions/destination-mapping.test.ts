@@ -323,7 +323,7 @@ test("loadViewModel keeps primary linked to the correct duplicate-type step by i
   assert.equal(linked?.step.action, "second");
 });
 
-test("legacy fallback stays null when multiple steps match the same destination type", () => {
+test("ambiguous destination inference stays null when multiple steps match the same destination type", () => {
   const fixture = createFunctionFixture({
     resultTargets: [{ type: "google_sheets", label: "Sheets" }],
     steps: [

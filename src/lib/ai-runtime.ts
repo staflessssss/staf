@@ -1,4 +1,4 @@
-﻿import { openai } from "@ai-sdk/openai";
+import { openai } from "@ai-sdk/openai";
 import {
   AgentStatus,
   ChannelType,
@@ -16,12 +16,12 @@ import {
   ControlConfig,
   hydrateFunctionBlocksForRuntime,
   FunctionBlockConfig,
-  functionBlocksToToolBlocks,
   getDefaultControlConfig,
   getDefaultAgentSettingsConfig,
   getChannelConfigObject,
   normalizeAgentSettings,
   normalizeControlConfig,
+  normalizeFunctionBlocks,
   normalizePromptingConfig,
   PromptingConfig,
 } from "@/lib/agent-config";
@@ -29,7 +29,7 @@ import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
-import { buildSystemPrompt } from "@/lib/prompt-builder";
+import { buildSystemPrompt } from "@/lib/prompt-composer";
 import { resolveTools } from "@/lib/tools";
 import { readMessageBehaviorConfig } from "@/lib/channels/message-behavior";
 import { findNextAgentScheduleWindowStart, isWithinAgentSchedule } from "@/lib/agent-schedule";
@@ -45,19 +45,9 @@ type LightweightKnowledgeBlock = {
   knowledgeContent?: string | null;
 };
 
-type LightweightToolBlock = {
-  name: string;
-  description: string;
-  steps?: Array<{
-    action: string;
-    integrationType?: string;
-  }>;
-};
-
 type RuntimeBlocks = {
   promptPreview: string;
   knowledgeBlocks: LightweightKnowledgeBlock[];
-  toolBlocks: LightweightToolBlock[];
   toolFeatures: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>;
   agentSettings: AgentSettingsConfig;
   prompting: PromptingConfig;
@@ -797,6 +787,11 @@ function extractAttachments(
 async function mapAgentToRuntimeBlocks(agent: AgentWithConfigData): Promise<RuntimeBlocks> {
   const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
   const toolFeatures = await hydrateFunctionBlocksForRuntime(agent, db);
+  const functionBlocks = normalizeFunctionBlocks(
+    Array.isArray(rawChannelConfig.functionBlocks)
+      ? (rawChannelConfig.functionBlocks as Partial<FunctionBlockConfig>[])
+      : [],
+  );
   const knowledgeBlocks = agent.features
     .filter((feature) => feature.type === FeatureType.KNOWLEDGE)
     .map((feature) => ({
@@ -804,15 +799,6 @@ async function mapAgentToRuntimeBlocks(agent: AgentWithConfigData): Promise<Runt
       description: feature.description,
       knowledgeContent: feature.knowledgeContent,
     }));
-  const toolBlocks = toolFeatures.map((feature) => ({
-    name: feature.name,
-    description: feature.description,
-    steps: feature.steps.map((step) => ({
-      action: step.action,
-      integrationType: step.integration.type,
-    })),
-  }));
-
   return {
     promptPreview: buildSystemPrompt({
       name: agent.name,
@@ -839,9 +825,9 @@ async function mapAgentToRuntimeBlocks(agent: AgentWithConfigData): Promise<Runt
           ? (rawChannelConfig.prompting as never)
           : null,
       knowledgeBlocks,
+      functionBlocks,
     }),
     knowledgeBlocks,
-    toolBlocks,
     toolFeatures,
     agentSettings: getRuntimeAgentSettingsConfig(agent.channelConfig),
     prompting: getRuntimePromptingConfig(agent.channelConfig),
@@ -936,7 +922,7 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
 
 export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentResult> {
   if (!input.agentId) {
-    const sandboxToolBlocks = functionBlocksToToolBlocks(input.functionBlocks ?? []);
+    const sandboxFunctionBlocks = input.functionBlocks ?? [];
     const promptPreview =
       input.promptPreview ??
       buildSystemPrompt({
@@ -950,7 +936,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       });
     const usedTooling =
       input.message.toLowerCase().includes("available") || input.message.toLowerCase().includes("book")
-        ? sandboxToolBlocks.map((tool) => tool.name)
+        ? sandboxFunctionBlocks.map((fn) => fn.name)
         : [];
 
     return {
