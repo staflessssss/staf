@@ -35,6 +35,48 @@ test("invokeAgent sandbox mentions runtime tooling when configured", async () =>
   assert.deepEqual(result.usedTooling, ["Calendar check"]);
 });
 
+test("invokeAgent sandbox mentions runtime tooling from functionBlocks", async () => {
+  const result = await invokeAgent({
+    tenantId: "tenant-1",
+    channel: "INSTAGRAM",
+    contactId: "sandbox-contact",
+    message: "Is July 14 available?",
+    promptPreview: "preview",
+    languagePreference: "English",
+    knowledgeBlocks: [
+      {
+        name: "Services",
+        description: "Wedding films",
+        knowledgeContent: "We focus on weddings.",
+      },
+    ],
+    functionBlocks: [
+      {
+        name: "Calendar check",
+        description: "Verify date availability",
+        active: true,
+        parameters: [],
+        reactionAction: "ai_agent_decides",
+        postAction: "continue_dialog",
+        disableDelayedMessages: false,
+        resultTargets: [],
+        steps: [
+          {
+            integrationId: "integration-calendar",
+            action: "check calendar",
+            params: {},
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.match(result.message, /default business voice in English/i);
+  assert.match(result.message, /shared runtime configuration/i);
+  assert.match(result.message, /configured tools/i);
+  assert.deepEqual(result.usedTooling, ["Calendar check"]);
+});
+
 test("invokeAgent sandbox stays multilingual-first without tools", async () => {
   const result = await invokeAgent({
     tenantId: "tenant-1",

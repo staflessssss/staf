@@ -15,6 +15,8 @@ import {
   AgentWithBuilderData,
   ControlConfig,
   hydrateFunctionBlocksForRuntime,
+  FunctionBlockConfig,
+  functionBlocksToToolBlocks,
   getDefaultControlConfig,
   getDefaultAgentSettingsConfig,
   getChannelConfigObject,
@@ -78,6 +80,7 @@ type InvokeAgentInput = {
   promptPreview?: string;
   languagePreference?: string | null;
   knowledgeBlocks?: LightweightKnowledgeBlock[];
+  functionBlocks?: FunctionBlockConfig[];
   toolBlocks?: LightweightToolBlock[];
   historyMessages?: RuntimeHistoryMessage[];
 };
@@ -935,6 +938,9 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
 
 export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentResult> {
   if (!input.agentId) {
+    const sandboxToolBlocks = input.functionBlocks
+      ? functionBlocksToToolBlocks(input.functionBlocks)
+      : input.toolBlocks ?? [];
     const promptPreview =
       input.promptPreview ??
       buildSystemPrompt({
@@ -944,11 +950,11 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
         languagePreference: input.languagePreference ?? null,
         channel: { type: input.channel as ChannelType },
         knowledgeBlocks: input.knowledgeBlocks ?? [],
-        toolBlocks: input.toolBlocks ?? [],
+        functionBlocks: input.functionBlocks,
       });
     const usedTooling =
       input.message.toLowerCase().includes("available") || input.message.toLowerCase().includes("book")
-        ? (input.toolBlocks ?? []).map((tool) => tool.name)
+        ? sandboxToolBlocks.map((tool) => tool.name)
         : [];
 
     return {

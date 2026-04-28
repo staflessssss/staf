@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   agentBuilderInclude,
-  deriveToolBlocksFromDraft,
+  functionBlocksToToolBlocks,
+  normalizeFunctionBlocks,
   resolvePromptingIdentity,
   type SandboxInvokeInput,
   sandboxInvokeSchema,
@@ -61,7 +62,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Draft config is required for unsaved testing." }, { status: 400 });
   }
 
-  const derivedToolBlocks = deriveToolBlocksFromDraft(parsed.data.draft);
+  const functionBlocks = normalizeFunctionBlocks(
+    parsed.data.draft.channelConfig.functionBlocks ?? [],
+  );
+  const derivedToolBlocks = functionBlocksToToolBlocks(functionBlocks);
 
   const selectedChannel = await db.channelConnection.findFirst({
     where: {
@@ -107,6 +111,7 @@ export async function POST(req: NextRequest) {
     contactId: parsed.data.contactId ?? "test-chat-contact",
     message: parsed.data.message,
     historyMessages: coerceHistoryMessages(parsed.data),
+    functionBlocks,
     promptPreview: buildSystemPrompt({
       name: parsed.data.draft.name,
       persona: promptingIdentity.persona,
