@@ -43,7 +43,10 @@ import { WorkspaceMessagesSection } from "@/components/stafless/workspace-sectio
 import { WorkspaceOverviewSection } from "@/components/stafless/workspace-sections/overview-section";
 import { PlaybookSection } from "@/components/stafless/workspace-sections/playbook-section";
 import { WorkspacePromptingSection } from "@/components/stafless/workspace-sections/prompting-section";
-import { WorkspaceSettingsSection } from "@/components/stafless/workspace-sections/settings-section";
+import {
+  hasInvalidScheduleWindow,
+  WorkspaceSettingsSection,
+} from "@/components/stafless/workspace-sections/settings-section";
 import { WorkspaceTestSection } from "@/components/stafless/workspace-sections/test-section";
 import {
   AgentSettingsConfig,
@@ -1529,6 +1532,11 @@ export function AgentWorkspaceClient({
   async function saveDraft() {
     if (parsedFunctionBlocks.errors.length > 0) {
       setError("Fix invalid Functions configuration before saving this agent.");
+      return;
+    }
+
+    if (hasInvalidScheduleWindow(draft.channelConfig.agentSettings)) {
+      setError("Fix invalid Settings schedule windows before saving this agent.");
       return;
     }
 

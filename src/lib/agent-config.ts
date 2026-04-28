@@ -1084,7 +1084,11 @@ export const channelConfigSchema = z
         }
 
         value.weeklySchedule.forEach((window, index) => {
-          if (window.enabled && !isOrderedScheduleWindow(window.start, window.end)) {
+          if (
+            value.scheduleEnabled &&
+            window.enabled &&
+            !isOrderedScheduleWindow(window.start, window.end)
+          ) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               message: "Schedule end time must be later than start time.",
@@ -1131,7 +1135,7 @@ export const agentDraftSchema = z.object({
     .optional()
     .transform((value) => (value ? value : null)),
   channelId: z.string().trim().min(1),
-  status: z.nativeEnum(AgentStatus).optional().default(AgentStatus.DRAFT),
+  status: z.nativeEnum(AgentStatus).optional().default(AgentStatus.ACTIVE),
   channelConfig: channelConfigSchema.optional().default({
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,

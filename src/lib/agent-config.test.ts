@@ -24,7 +24,7 @@ test("agentDraftSchema normalizes empty language preference to null", () => {
   });
 
   assert.equal(parsed.languagePreference, null);
-  assert.equal(parsed.status, AgentStatus.DRAFT);
+  assert.equal(parsed.status, AgentStatus.ACTIVE);
 });
 
 test("buildFeatureCreateInput creates only KNOWLEDGE features", () => {

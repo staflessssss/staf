@@ -63,6 +63,13 @@ test("agent workspace blocks saving when Functions still contain invalid configu
   assert.match(source, /steps: steps\.map\(\(\{ uiId, \.\.\.step \}\) => step\),/);
 });
 
+test("agent workspace blocks saving when Settings schedule windows are invalid", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.match(source, /hasInvalidScheduleWindow\(draft\.channelConfig\.agentSettings\)/);
+  assert.match(source, /Fix invalid Settings schedule windows before saving this agent\./);
+});
+
 test("agent workspace function draft UI ids round-trip without dropping persisted ids", async () => {
   const { stripFunctionUiIds, withFunctionUiIds } = await loadWorkspaceSerializers();
   const draft = withFunctionUiIds(functionBlockFixture);

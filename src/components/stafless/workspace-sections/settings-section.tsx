@@ -29,7 +29,11 @@ const cardHeadingClassName = "text-base font-semibold text-[#111827]";
 const scheduleTimeInputClassName =
   "w-full rounded-[10px] border border-[#dde3ee] bg-white px-3 py-2 text-center text-sm text-[#344054] outline-none transition focus:border-[#6c63ff] focus:ring-4 focus:ring-[#6c63ff]/10 disabled:bg-[#f8fafc] disabled:text-[#98a2b3]";
 
-function hasInvalidScheduleWindow(agentSettings: AgentSettingsConfig) {
+export function hasInvalidScheduleWindow(agentSettings: AgentSettingsConfig) {
+  if (!agentSettings.scheduleEnabled) {
+    return false;
+  }
+
   return agentSettings.weeklySchedule.some(
     (window) => window.enabled && window.start >= window.end,
   );
@@ -58,6 +62,8 @@ export function WorkspaceSettingsSection({
     tenantTimezone,
   });
   const agentIsActive = status === AgentStatus.ACTIVE;
+  const canToggleBotStatus = status === AgentStatus.ACTIVE || status === AgentStatus.PAUSED;
+  const nonOperationalStatusLabel = status.toLowerCase().replace(/_/g, " ");
 
   return (
     <div className="mx-auto w-full max-w-[720px] space-y-9">
@@ -101,11 +107,14 @@ export function WorkspaceSettingsSection({
               <div className="space-y-1">
                 <p className={cardHeadingClassName}>Bot status</p>
                 <p className={mutedTextClassName}>
-                  Activate or pause this agent for incoming dialogs.
+                  {canToggleBotStatus
+                    ? "Activate or pause this agent for incoming dialogs."
+                    : `Current status is ${nonOperationalStatusLabel}; pause and resume become available when the agent is operational.`}
                 </p>
               </div>
               <ToggleSwitch
                 checked={agentIsActive}
+                disabled={!canToggleBotStatus}
                 onCheckedChange={(checked) =>
                   onStatusChange(checked ? AgentStatus.ACTIVE : AgentStatus.PAUSED)
                 }
@@ -225,7 +234,7 @@ export function WorkspaceSettingsSection({
                     value={window.start}
                   />
 
-                  <span className="text-[#667085]">–</span>
+                  <span className="text-[#667085]">to</span>
 
                   <input
                     className={`${scheduleTimeInputClassName} ${!agentSettings.scheduleEnabled || !window.enabled ? disabledFieldClassName : ""}`}
@@ -246,17 +255,6 @@ export function WorkspaceSettingsSection({
           </div>
         </div>
       </section>
-
-      <div className="border-t border-[#edf1f6] pt-6">
-        <div className="flex justify-end">
-          <button
-            className="inline-flex items-center justify-center rounded-[10px] border border-[#f97066] px-4 py-2 text-sm font-medium text-[#d92d20] transition hover:bg-[#fff5f4]"
-            type="button"
-          >
-            Delete agent
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChannelConnection } from "@prisma/client";
+import { AgentStatus, type ChannelConnection } from "@prisma/client";
 import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
@@ -61,7 +61,7 @@ export function AgentMinimalCreateForm({
           channelId,
           persona: getDefaultAgentPersona(tenant.name),
           tone: "friendly",
-          status: "DRAFT",
+          status: AgentStatus.ACTIVE,
           channelConfig: {
             functionBlocks: [],
           },
@@ -158,7 +158,7 @@ export function AgentMinimalCreateForm({
           <ArrowRight className="ml-2 size-4" />
         </button>
         <p className="text-xs leading-5 text-muted-foreground">
-          Creates a draft only. Nothing is deployed until readiness checks pass.
+          Creates an active agent that can be paused from Settings.
         </p>
       </div>
     </form>

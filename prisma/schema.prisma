@@ -118,7 +118,7 @@ model Agent {
   persona       String
   tone          String            @default("friendly")
   languagePreference String?
-  status        AgentStatus       @default(DRAFT)
+  status        AgentStatus       @default(ACTIVE)
   channelConfig Json?
   n8nWorkflowId String?
   webhookSecret String?
