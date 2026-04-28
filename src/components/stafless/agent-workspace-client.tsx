@@ -12,7 +12,6 @@ import {
   IntegrationConnection,
 } from "@prisma/client";
 import {
-  Bot,
   BookOpen,
   Boxes,
   FlaskConical,
@@ -30,14 +29,10 @@ import {
 import {
   Checklist,
   EmptyState,
-  FormField,
   StatusBadge,
   SurfaceCard,
-  inputClassName,
   primaryButtonClassName,
-  selectClassName,
   secondaryButtonClassName,
-  textareaClassName,
 } from "@/components/stafless/foundation";
 import { WorkspaceControlSection } from "@/components/stafless/workspace-sections/control-section";
 import { WorkspaceChannelsSection } from "@/components/stafless/workspace-sections/channels-section";
@@ -81,7 +76,6 @@ import {
   getGoogleSheetsActionForOperation,
   getGoogleSheetsParams,
 } from "@/lib/function-execution";
-import { buildSystemPrompt } from "@/lib/prompt-builder";
 
 type SerializableTenant = {
   id: string;
@@ -168,7 +162,7 @@ type SheetInspectionState = {
   }>;
 };
 
-type BuilderDraft = {
+type WorkspaceDraft = {
   name: string;
   persona: string;
   tone: string;
@@ -201,15 +195,6 @@ type DeployReadinessResult = {
     channelType?: string | null;
   } | null;
 };
-
-const wizardSteps = [
-  { id: "basics", title: "Basics", question: "Who is this agent?" },
-  { id: "channel", title: "Channel", question: "Where does it operate?" },
-  { id: "playbook", title: "Playbook", question: "How should it lead the conversation?" },
-  { id: "knowledge", title: "Knowledge", question: "What should it know?" },
-  { id: "functions", title: "Functions", question: "What business actions can it perform?" },
-  { id: "review", title: "Review", question: "Is it ready to test and deploy?" },
-];
 
 type WorkspaceSectionId =
   | "overview"
@@ -450,7 +435,7 @@ export function stripFunctionUiIds(functionBlocks: FunctionDraft[]): FunctionBlo
   }));
 }
 
-function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgent): BuilderDraft {
+function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgent): WorkspaceDraft {
   const rawChannelConfig =
     agent && "channelConfig" in agent && agent.channelConfig && typeof agent.channelConfig === "object"
       ? (agent.channelConfig as Record<string, unknown>)
@@ -667,15 +652,13 @@ export function AgentWorkspaceClient({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const isWorkspaceMode = true;
   const isReadOnlyMode = false;
-  const [currentStep, setCurrentStep] = useState(0);
   const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSectionId>(
     initialWorkspaceSection && isWorkspaceSectionId(initialWorkspaceSection)
       ? initialWorkspaceSection
       : "overview",
   );
-  const [draft, setDraft] = useState<BuilderDraft>(() => createInitialDraft(tenant, agent));
+  const [draft, setDraft] = useState<WorkspaceDraft>(() => createInitialDraft(tenant, agent));
   const [savedDraftSnapshot, setSavedDraftSnapshot] = useState(() =>
     JSON.stringify(createInitialDraft(tenant, agent)),
   );
@@ -768,33 +751,6 @@ export function AgentWorkspaceClient({
     [draft.channelConfig.functionBlocks, integrationById],
   );
 
-  const promptPreview = buildSystemPrompt({
-    name: draft.name,
-    persona: draft.persona,
-    tone: draft.tone,
-    languagePreference: draft.languagePreference || null,
-    channel: selectedChannel,
-    channelBehavior: draft.channelConfig.channelBehavior,
-    conversationPlaybook: draft.channelConfig.conversationPlaybook,
-    prompting: draft.channelConfig.prompting,
-    knowledgeBlocks: draft.knowledgeBlocks,
-    functionBlocks: draft.channelConfig.functionBlocks.map((fn) => ({
-      name: fn.name,
-      description: fn.description,
-      active: fn.active,
-      parameters: fn.parameters,
-      reactionAction: fn.reactionAction,
-      postAction: fn.postAction,
-      disableDelayedMessages: fn.disableDelayedMessages,
-      resultTargets: fn.resultTargets,
-      steps: fn.steps.map((step) => ({
-        integrationType:
-          connectedIntegrations.find((integration) => integration.id === step.integrationId)?.type ??
-          undefined,
-        action: step.action,
-      })),
-    })),
-  });
   const isDirty = JSON.stringify(draft) !== savedDraftSnapshot;
   const checklistItems = [
     {
@@ -843,14 +799,9 @@ export function AgentWorkspaceClient({
       hint: "Functions define what the agent can do; integrations remain the execution layer underneath.",
     },
     {
-      label: isWorkspaceMode
-        ? "Use the test chat from the workspace before deploy"
-        : "Save the agent before full-cycle testing",
+      label: "Use the test chat from the workspace before deploy",
       done: Boolean(agent),
-      hint:
-        isWorkspaceMode
-          ? "The workspace exposes the right-side test chat for a real conversation cycle."
-          : "Full-cycle testing lives on the saved agent workspace page.",
+      hint: "The workspace exposes the right-side test chat for a real conversation cycle.",
     },
   ];
   const completedChecklistCount = checklistItems.filter((item) => item.done).length;
@@ -858,7 +809,6 @@ export function AgentWorkspaceClient({
     (section) => section.id === workspaceSection,
   ) ?? workspaceSections[0];
   const shouldShowWorkspaceReviewRail =
-    isWorkspaceMode &&
     workspaceSection !== "settings" &&
     workspaceSection !== "prompting" &&
     workspaceSection !== "messages";
@@ -866,7 +816,6 @@ export function AgentWorkspaceClient({
     workspaceSection === "messages" ||
     workspaceSection === "settings" ||
     workspaceSection === "prompting";
-  const sectionCardClassName = () => "border-0 bg-transparent p-0 shadow-none";
   const sectionCanvasClassName =
     "rounded-[16px] border border-[#e6ebf2] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
   const softInfoPanelClassName =
@@ -883,25 +832,18 @@ export function AgentWorkspaceClient({
     "integrations",
     "test",
   ]);
-  const shouldShowWorkspaceOverview = isWorkspaceMode && workspaceSection === "overview";
-  const shouldShowWorkspaceSettings = isWorkspaceMode && workspaceSection === "settings";
-  const shouldShowWorkspacePrompting = isWorkspaceMode && workspaceSection === "prompting";
-  const shouldShowWorkspaceMessages = isWorkspaceMode && workspaceSection === "messages";
-  const shouldShowWorkspaceControl = isWorkspaceMode && workspaceSection === "control";
-  const shouldShowWorkspaceIntegrations = isWorkspaceMode && workspaceSection === "integrations";
-  const showCreateBasics = false;
-  const showCreateChannels = false;
-  const showCreatePlaybook = false;
-  const showCreateKnowledge = false;
-  const showCreateFunctions = false;
-  const showCreateReview = false;
-  const showWorkspaceChannels = isWorkspaceMode && workspaceSection === "channels";
-  const showWorkspacePlaybook = isWorkspaceMode && workspaceSection === "playbook";
-  const showWorkspaceKnowledge = isWorkspaceMode && workspaceSection === "knowledge";
-  const showWorkspaceFunctions = isWorkspaceMode && workspaceSection === "functions";
-  const showWorkspaceTest = isWorkspaceMode && workspaceSection === "test";
+  const shouldShowWorkspaceOverview = workspaceSection === "overview";
+  const shouldShowWorkspaceSettings = workspaceSection === "settings";
+  const shouldShowWorkspacePrompting = workspaceSection === "prompting";
+  const shouldShowWorkspaceMessages = workspaceSection === "messages";
+  const shouldShowWorkspaceControl = workspaceSection === "control";
+  const shouldShowWorkspaceIntegrations = workspaceSection === "integrations";
+  const showWorkspaceChannels = workspaceSection === "channels";
+  const showWorkspacePlaybook = workspaceSection === "playbook";
+  const showWorkspaceKnowledge = workspaceSection === "knowledge";
+  const showWorkspaceFunctions = workspaceSection === "functions";
+  const showWorkspaceTest = workspaceSection === "test";
   const shouldShowWorkspacePlaceholder =
-    isWorkspaceMode &&
     !shouldShowWorkspaceOverview &&
     !shouldShowWorkspaceSettings &&
     !shouldShowWorkspacePrompting &&
@@ -910,7 +852,7 @@ export function AgentWorkspaceClient({
     !shouldShowWorkspaceIntegrations &&
     !liveWorkspaceSections.has(workspaceSection);
 
-  function updateDraft<K extends keyof BuilderDraft>(key: K, value: BuilderDraft[K]) {
+  function updateDraft<K extends keyof WorkspaceDraft>(key: K, value: WorkspaceDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
@@ -1661,14 +1603,6 @@ export function AgentWorkspaceClient({
     }
   }
 
-  function handleNextStep() {
-    setCurrentStep((step) => Math.min(step + 1, wizardSteps.length - 1));
-  }
-
-  function handlePreviousStep() {
-    setCurrentStep((step) => Math.max(step - 1, 0));
-  }
-
   async function checkDeployReadiness() {
     if (!agent) {
       setError("Save this draft first, then open the workspace to check deployment readiness.");
@@ -1763,262 +1697,16 @@ export function AgentWorkspaceClient({
           {success}
         </div>
       ) : null}
-      {!isWorkspaceMode ? (
-        <div className="sticky top-4 z-20 flex items-center justify-between gap-4 rounded-[22px] border border-[#e2d4c3] bg-[rgba(255,250,243,0.92)] px-4 py-3 text-[#2d2130] shadow-[0_14px_32px_rgba(31,23,40,0.10)] backdrop-blur">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#201627] text-[#f7efe4] shadow-[0_10px_18px_rgba(31,23,40,0.16)]">
-              <Sparkles className="size-3.5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8c745b]">
-                Builder state
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[#201627]">
-                {isDirty ? "Unsaved changes" : "All changes saved"}
-              </p>
-              <p className="text-xs text-[#6d5b4d]">
-                Save before testing or deploying the latest behavior.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-full border border-[#eadccc] bg-[#fff6ea] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6d5c4d]">
-              Step {currentStep + 1} of {wizardSteps.length}
-            </span>
-            <button
-              className={primaryButtonClassName}
-              disabled={isSaving || !isDirty}
-              onClick={saveDraft}
-              type="button"
-            >
-              {isSaving ? "Saving..." : agent ? "Save changes" : "Save draft"}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {!isWorkspaceMode ? (
-        <div className="rounded-[30px] border border-[#e5d3be] bg-[linear-gradient(180deg,#fffaf4_0%,#f5e7d6_100%)] p-5 shadow-[0_16px_36px_rgba(31,23,40,0.05)] sm:p-6">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_220px_220px]">
-            <div className="rounded-[24px] bg-white/80 px-5 py-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
-              <div className="flex items-start gap-4">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#201627] text-[#f7efe4] shadow-[0_10px_20px_rgba(31,23,40,0.18)]">
-                  <Sparkles className="size-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d7762]">
-                    Current workbench step
-                  </p>
-                  <h3 className="mt-2 text-[1.55rem] font-semibold tracking-tight text-[#201627]">
-                    {selectedWorkspaceSection.title}
-                  </h3>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5d5245]">
-                    {selectedWorkspaceSection.description}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[24px] bg-white/80 p-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8d7762]">
-                Build posture
-              </p>
-              <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">
-                {completedChecklistCount}/{checklistItems.length}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Signals already in place before this agent touches real traffic.
-              </p>
-            </div>
-            <div className="rounded-[24px] bg-white/80 p-5 ring-1 ring-[#e6d7c5] shadow-[0_14px_28px_rgba(31,23,40,0.05)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#8d7762]">
-                Operator scope
-              </p>
-              <p className="mt-3 text-sm leading-7 text-[#4d4038]">
-                One tenant, one assigned channel, one controlled runtime path. Build sharply before testing and deploy.
-              </p>
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#f7efe2] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6d5c4d] ring-1 ring-[#eadccc]">
-                <Bot className="size-3.5" />
-                Operator managed
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       <div
         className={
           isWideWorkbenchStep
-            ? isWorkspaceMode
-              ? "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
-              : "grid gap-6 xl:grid-cols-[220px_minmax(0,760px)] xl:items-start"
-            : isWorkspaceMode
-              ? shouldShowWorkspaceReviewRail
-                ? "grid gap-6 xl:grid-cols-[minmax(0,1040px)_320px] xl:items-start"
-                : "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
-              : "grid gap-6 xl:grid-cols-[220px_minmax(0,760px)_320px] xl:items-start"
+            ? "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
+            : shouldShowWorkspaceReviewRail
+              ? "grid gap-6 xl:grid-cols-[minmax(0,1040px)_320px] xl:items-start"
+              : "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
         }
       >
-        {!isWorkspaceMode ? (
-        <aside className="space-y-4 xl:sticky xl:top-24">
-          <div
-            className={
-              isWorkspaceMode
-                ? "rounded-[16px] border border-[#e6ebf2] bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-                : "rounded-[30px] bg-[#1f1728] p-5 text-[#f6efe5] shadow-[0_18px_40px_rgba(31,23,40,0.18)]"
-            }
-          >
-            <p
-              className={
-                isWorkspaceMode
-                  ? "px-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[#8090ab]"
-                  : "text-xs font-semibold uppercase tracking-[0.24em] text-[#ccbda8]"
-              }
-            >
-              {isWorkspaceMode ? "Agent workspace" : "Builder flow"}
-            </p>
-            {isWorkspaceMode ? (
-              <div className="mt-4 space-y-3">
-                <div className="rounded-[12px] bg-[#f8fafc] px-3 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground">
-                        {agent?.name ?? draft.name}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-[#8090ab]">
-                        {tenant.name}
-                      </p>
-                    </div>
-                    {agent ? <StatusBadge status={agent.status} /> : null}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  {workspaceSections.map((step) => {
-                    const isActive = workspaceSection === step.id;
-                    const isComingSoon = step.kind === "coming_soon";
-                    const Icon = step.icon;
-
-                    return (
-                      <Link
-                        key={step.id}
-                        className={
-                          isActive
-                            ? "flex w-full items-start gap-3 rounded-[12px] border border-[#dfe6f1] bg-[#f6f8fb] px-3 py-3 text-left"
-                            : "flex w-full items-start gap-3 rounded-[12px] px-3 py-3 text-left transition hover:bg-[#f8fafc]"
-                        }
-                        href={`${pathname}?section=${step.id}`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          activateWorkspaceSection(step.id);
-                        }}
-                      >
-                        <div
-                          className={
-                            isActive
-                              ? "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#5b5cf0] text-white"
-                              : "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-[#dfe6f1] bg-white text-[#7a879d]"
-                          }
-                        >
-                          <Icon className="size-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p
-                            className={
-                              isActive
-                                ? "text-sm font-semibold text-foreground"
-                                : "text-sm font-medium text-[#475467]"
-                            }
-                          >
-                            {step.title}
-                          </p>
-                          {isComingSoon ? (
-                            <span className="mt-1 inline-flex rounded-full border border-[#e6ebf2] bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-[#8090ab]">
-                              Soon
-                            </span>
-                          ) : null}
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-            <div className="mt-4 space-y-2">
-              {(isWorkspaceMode ? workspaceSections : wizardSteps).map((step, index) => {
-                const isActive = isWorkspaceMode
-                  ? workspaceSection === step.id
-                  : index === currentStep;
-                const isComplete = !isWorkspaceMode && index < currentStep;
-                const isComingSoon =
-                  isWorkspaceMode &&
-                  "kind" in step &&
-                  step.kind === "coming_soon";
-
-                return (
-                  <button
-                    key={step.id}
-                    className={
-                      isWorkspaceMode
-                        ? isActive
-                          ? "w-full rounded-[12px] border border-[#dfe6f1] bg-[#f6f8fb] px-3 py-3 text-left text-foreground"
-                          : "w-full rounded-[12px] px-3 py-3 text-left text-[#5c6880] transition hover:bg-[#f8fafc]"
-                        : isActive
-                          ? "w-full rounded-[20px] bg-[#f4eadc] px-4 py-4 text-left text-[#1f1728] shadow-[0_10px_22px_rgba(0,0,0,0.10)]"
-                          : "w-full rounded-[20px] px-4 py-4 text-left text-[#f6efe5] ring-1 ring-white/10 transition hover:bg-white/6"
-                    }
-                    onClick={() =>
-                      isWorkspaceMode
-                        ? activateWorkspaceSection(step.id as WorkspaceSectionId)
-                        : setCurrentStep(index)
-                    }
-                    type="button"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={
-                          isWorkspaceMode
-                            ? isActive
-                              ? "flex size-7 shrink-0 items-center justify-center rounded-full bg-[#5b5cf0] text-[11px] font-semibold text-white"
-                              : "flex size-7 shrink-0 items-center justify-center rounded-full border border-[#dfe6f1] bg-white text-[11px] font-semibold text-[#7a879d]"
-                            : isActive
-                              ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold"
-                              : isComplete
-                                ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f4c79b] text-[#1f1728] text-xs font-semibold"
-                                : "flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-[#f6efe5]"
-                        }
-                      >
-                        {isWorkspaceMode ? step.title.charAt(0) : index + 1}
-                      </div>
-                      <div>
-                        <p className={isWorkspaceMode ? (isActive ? "text-sm font-semibold text-foreground" : "text-sm font-medium text-[#475467]") : isActive ? "text-sm font-semibold" : "text-sm font-medium"}>
-                          {step.title}
-                        </p>
-                        <p
-                          className={
-                            isWorkspaceMode
-                              ? "mt-1 text-xs leading-5 text-[#8090ab]"
-                              : isActive
-                                ? "mt-1 text-xs leading-5 text-[#5d5245]"
-                                : "mt-1 text-xs leading-5 text-[#ccbda8]"
-                          }
-                        >
-                            {"question" in step ? step.question : step.description}
-                          </p>
-                          {isComingSoon ? (
-                            <span className="mt-2 inline-flex rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#ccbda8]">
-                              Next
-                            </span>
-                          ) : null}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            )}
-          </div>
-        </aside>
-        ) : null}
-
         <div className="space-y-6">
           {shouldShowWorkspaceOverview ? (
             <WorkspaceOverviewSection
@@ -2039,7 +1727,7 @@ export function AgentWorkspaceClient({
             >
               <EmptyState
                 title={`${selectedWorkspaceSection.title} is the next workspace slice`}
-                description="This section now has a real home in the agent workspace IA. In this first migration pass we are keeping the underlying builder/runtime contract stable while carving out the permanent editing destinations one by one."
+                description="This section now has a real home in the agent workspace IA. The runtime contract stays stable while we move each operator control into its permanent destination."
               />
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 <div className={softInfoPanelClassName}>
@@ -2051,70 +1739,10 @@ export function AgentWorkspaceClient({
                 <div className={softInfoPanelClassName}>
                   <p className="text-sm font-semibold text-foreground">Current safe fallback</p>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    The current agent still runs from the saved builder configuration. This section is intentionally staged so we can move complex operator controls here without breaking the live runtime path.
+                    The current agent runs from the saved workspace configuration. This section is intentionally staged so we can move complex operator controls here without breaking the live runtime path.
                   </p>
                 </div>
               </div>
-            </SurfaceCard>
-          ) : null}
-
-          {showCreateBasics ? (
-            <SurfaceCard
-              className={sectionCardClassName()}
-              title="Basics"
-              description="Set the editorial voice and role of the agent before channels and functions add complexity."
-            >
-            <div className={sectionCanvasClassName}>
-              <div className="grid gap-5 md:grid-cols-2">
-                <FormField
-                  label="Agent name"
-                  hint="Use a business-facing name the operator can scan quickly."
-                >
-                  <input
-                    className={inputClassName}
-                    onChange={(event) => updateDraft("name", event.target.value)}
-                    value={draft.name}
-                  />
-                </FormField>
-                <FormField label="Tone">
-                  <select
-                    className={selectClassName}
-                    onChange={(event) => updateDraft("tone", event.target.value)}
-                    value={draft.tone}
-                  >
-                    <option value="friendly">Friendly</option>
-                    <option value="calm">Calm</option>
-                    <option value="premium">Premium</option>
-                    <option value="direct">Direct</option>
-                  </select>
-                </FormField>
-                <FormField
-                  label="Preferred response language"
-                  hint="Optional. Leave blank to keep the agent multilingual-first."
-                >
-                  <input
-                    className={inputClassName}
-                    onChange={(event) =>
-                      updateDraft("languagePreference", event.target.value)
-                    }
-                    placeholder="For example: Russian, English, Spanish"
-                    value={draft.languagePreference}
-                  />
-                </FormField>
-              </div>
-              <div className="mt-5">
-                <FormField
-                  label="Persona"
-                  hint="Describe the role the agent should consistently inhabit."
-                >
-                  <textarea
-                    className={textareaClassName}
-                    onChange={(event) => updateDraft("persona", event.target.value)}
-                    value={draft.persona}
-                  />
-                </FormField>
-              </div>
-            </div>
             </SurfaceCard>
           ) : null}
 
@@ -2201,7 +1829,7 @@ export function AgentWorkspaceClient({
             />
           ) : null}
 
-          {showCreateChannels || showWorkspaceChannels ? (
+          {showWorkspaceChannels ? (
             <WorkspaceChannelsSection
               assignedChannels={assignedChannels}
               channelConnections={tenant.channelConnections}
@@ -2258,7 +1886,7 @@ export function AgentWorkspaceClient({
             />
           ) : null}
 
-          {showCreatePlaybook || showWorkspacePlaybook ? (
+          {showWorkspacePlaybook ? (
             <PlaybookSection
               discoveryFieldLabels={discoveryFieldLabels}
               isReadOnlyMode={isReadOnlyMode}
@@ -2271,7 +1899,7 @@ export function AgentWorkspaceClient({
             />
           ) : null}
 
-          {showCreateKnowledge || showWorkspaceKnowledge ? (
+          {showWorkspaceKnowledge ? (
             <KnowledgeSection
               blocks={draft.knowledgeBlocks}
               isReadOnlyMode={isReadOnlyMode}
@@ -2290,7 +1918,7 @@ export function AgentWorkspaceClient({
             />
           ) : null}
 
-          {showCreateFunctions || showWorkspaceFunctions ? (
+          {showWorkspaceFunctions ? (
             <FunctionsSection
               connectedIntegrations={connectedIntegrations}
               functionBlocks={draft.channelConfig.functionBlocks}
@@ -2299,7 +1927,7 @@ export function AgentWorkspaceClient({
               getGoogleSheetsParams={getGoogleSheetsParams}
               integrationById={integrationById}
               isReadOnlyMode={isReadOnlyMode}
-              isWorkspaceMode={isWorkspaceMode}
+              isWorkspaceMode={true}
               onAddFunctionBlock={addFunctionBlock}
               onAddFunctionParameter={addFunctionParameter}
               onAddFunctionStep={addFunctionStep}
@@ -2323,7 +1951,7 @@ export function AgentWorkspaceClient({
               />
           ) : null}
 
-          {showCreateReview || showWorkspaceTest ? (
+          {showWorkspaceTest ? (
             <WorkspaceTestSection
               deployReadiness={deployReadiness}
               hasAgent={Boolean(agent)}
@@ -2340,60 +1968,14 @@ export function AgentWorkspaceClient({
             />
           ) : null}
 
-          {!isWorkspaceMode ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-border bg-[#fcfaf6] px-5 py-4 shadow-[0_10px_24px_rgba(31,23,40,0.04)]">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Wizard navigation</p>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  Move step by step, then save before opening workspace testing.
-                </p>
-              </div>
-              <button
-                className={secondaryButtonClassName}
-                disabled={currentStep === 0 || isSaving}
-                onClick={handlePreviousStep}
-                type="button"
-              >
-                Back
-              </button>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  className={secondaryButtonClassName}
-                  disabled={isSaving}
-                  onClick={saveDraft}
-                  type="button"
-                >
-                  {isSaving ? "Saving..." : agent ? "Save changes" : "Save draft"}
-                </button>
-                {currentStep < wizardSteps.length - 1 ? (
-                  <button
-                    className={primaryButtonClassName}
-                    disabled={isSaving}
-                    onClick={handleNextStep}
-                    type="button"
-                  >
-                    Next step
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
         </div>
 
         {shouldShowWorkspaceReviewRail ? (
         <div className={isWideWorkbenchStep ? "space-y-6 xl:col-span-2" : "space-y-6 xl:sticky xl:top-24"}>
           <SurfaceCard
-            className={
-              isWorkspaceMode
-                ? "border-[#e6ebf2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-                : "border-[#dccab6] bg-[linear-gradient(180deg,#fffdf9_0%,#f7ede1_100%)]"
-            }
-            title={isWorkspaceMode ? "Workspace review" : "Operator review"}
-            description={
-              isWorkspaceMode
-                ? "This rail stays constant while the center of the workspace changes, so the operator always has readiness, launch posture, and tenant context in view."
-                : "Readiness, launch posture, and tenant context stay together so the last pass feels deliberate instead of procedural."
-            }
+            className="border-[#e6ebf2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+            title="Workspace review"
+            description="This rail stays constant while the center of the workspace changes, so the operator always has readiness, launch posture, and tenant context in view."
           >
             <Checklist items={checklistItems} />
             <div className="mt-6 flex flex-wrap gap-3">
@@ -2415,7 +1997,7 @@ export function AgentWorkspaceClient({
                     {isDeploying ? "Deploying..." : "Deploy agent"}
                   </button>
                 </>
-              ) : isWorkspaceMode ? (
+              ) : (
                 <>
                   <button
                     className={secondaryButtonClassName}
@@ -2433,20 +2015,10 @@ export function AgentWorkspaceClient({
                     {isSaving ? "Saving..." : "Save changes"}
                   </button>
                 </>
-              ) : (
-                <>
-                  <button
-                    className={primaryButtonClassName}
-                    onClick={() => setCurrentStep(wizardSteps.length - 1)}
-                    type="button"
-                  >
-                    Continue to review
-                  </button>
-                </>
               )}
             </div>
             <div className="mt-6 space-y-3">
-              <div className={isWorkspaceMode ? "flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3" : "flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3"}>
+              <div className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3">
                 <Layers3 className="size-4 text-primary" />
                 <div>
                   <p className="text-sm font-semibold text-foreground">{tenant.name}</p>
@@ -2454,7 +2026,7 @@ export function AgentWorkspaceClient({
                 </div>
               </div>
               {agent ? (
-                <div className={isWorkspaceMode ? "flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3" : "flex items-center gap-3 rounded-[18px] border border-border bg-[#faf6f0] px-4 py-3"}>
+                <div className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3">
                   <Settings2 className="size-4 text-primary" />
                   <div>
                     <p className="text-sm font-semibold text-foreground">{agent.name}</p>
@@ -2478,36 +2050,6 @@ export function AgentWorkspaceClient({
         </div>
         ) : null}
       </div>
-
-      {!isWorkspaceMode ? (
-        <SurfaceCard
-          className="bg-[#f8f3ea]"
-          title="Prompt preview"
-          description="Review the composed system prompt in a readable inspection view before testing or deploy."
-        >
-          <div className="rounded-[24px] bg-white p-4 ring-1 ring-[#e7dccd] shadow-[0_12px_24px_rgba(31,23,40,0.04)]">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#eee3d6] px-2 pb-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground">System prompt</p>
-                <p className="text-xs text-muted-foreground">
-                  Live builder output for this agent configuration
-                </p>
-              </div>
-              <span className="rounded-full bg-[#f6efe5] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6f6458] ring-1 ring-[#eadccc]">
-                Read only
-              </span>
-            </div>
-            {parsedFunctionBlocks.errors.length ? (
-              <div className="mb-4 rounded-[18px] border border-[#f0d2c7] bg-[#fff5f1] px-4 py-3 text-sm text-[#7f3f2a]">
-                Fix invalid Functions configuration to restore the full prompt preview.
-              </div>
-            ) : null}
-            <pre className="max-h-[520px] overflow-auto rounded-[20px] bg-[#fcfaf7] px-5 py-5 font-mono text-[12px] leading-6 text-[#2d2437]">
-              {promptPreview}
-            </pre>
-          </div>
-        </SurfaceCard>
-      ) : null}
       </div>
   );
 }

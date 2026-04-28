@@ -44,7 +44,7 @@ export default async function AgentDetailPage({
   if (!tenant || !agent) notFound();
 
   return (
-    <AgentWorkbenchShell agent={agent} mode="edit" tenant={tenant}>
+    <AgentWorkbenchShell agent={agent} tenant={tenant}>
       <AgentWorkspace
         agent={agent}
         initialWorkspaceSection={resolvedSearchParams?.section}

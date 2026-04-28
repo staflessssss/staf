@@ -44,7 +44,7 @@ export function WorkspaceOverviewSection({
             {knowledgeCount} knowledge / {functionCount} actions
           </p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            The agent now has dedicated homes for behavior, delivery, control, and execution instead of living inside one replayed wizard.
+            The agent has dedicated homes for behavior, delivery, control, and execution.
           </p>
         </div>
         <div className="rounded-[20px] bg-white/80 p-5 ring-1 ring-[#eadccc]">
@@ -55,7 +55,7 @@ export function WorkspaceOverviewSection({
             {isDirty ? "Save the latest edits" : "Tune functions and control"}
           </p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Messages, control, integrations, and test are now section-based surfaces instead of side effects of the old builder flow.
+            Messages, control, integrations, and test are section-based surfaces with their own operating context.
           </p>
         </div>
       </div>
@@ -71,7 +71,7 @@ export function WorkspaceOverviewSection({
         <div className={softInfoPanelClassName}>
           <p className="text-sm font-semibold text-foreground">What this unlocks</p>
           <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
-            <li>New channels can land without reopening a giant mixed builder.</li>
+            <li>New channels can land as focused workspace sections.</li>
             <li>Integrations stay execution dependencies instead of leaking into every behavior screen.</li>
             <li>Functions can evolve into true business action contracts.</li>
           </ul>

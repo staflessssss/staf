@@ -1401,11 +1401,11 @@ export function FunctionsSection({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">
-                        {isWorkspaceMode ? "Legacy execution steps" : "Executable steps"}
+                        Execution steps
                       </p>
                       {isWorkspaceMode ? (
                         <p className="mt-1 text-sm text-[#667085]">
-                          Compatibility layer for old multi-step builder logic:{" "}
+                          Advanced multi-step wiring stays available for functions that need it:{" "}
                           {getFunctionMeta(fn)}.
                         </p>
                       ) : null}
