@@ -48,7 +48,6 @@ test("buildFeatureCreateInput creates only KNOWLEDGE features", () => {
   assert.equal(features[0]?.type, FeatureType.KNOWLEDGE);
   assert.equal(features[0]?.sortOrder, 0);
   assert.equal(features[0]?.knowledgeContent, "Wedding films and highlight edits.");
-  assert.equal(features.some((feature) => feature.type === FeatureType.TOOL), false);
   assert.equal("steps" in features[0]!, false);
 });
 

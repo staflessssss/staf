@@ -69,46 +69,25 @@ function createAgentFixture(): AgentWithBuilderData {
         knowledgeContent: "Wedding films and edits",
         createdAt: new Date(),
         updatedAt: new Date(),
-        steps: [],
-      },
-      {
-        id: "feature-t",
-        agentId: "agent-1",
-        name: "Calendar check",
-        description: "Check availability",
-        type: FeatureType.TOOL,
-        sortOrder: 1,
-        knowledgeContent: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        steps: [
-          {
-            id: "step-1",
-            featureId: "feature-t",
-            integrationId: "integration-1",
-            action: "check calendar",
-            params: {},
-            sortOrder: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            integration: {
-              id: "integration-1",
-              tenantId: "tenant-1",
-              type: IntegrationType.GOOGLE_CALENDAR,
-              status: ConnectionStatus.CONNECTED,
-              credentialsEnc: "enc",
-              metadata: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          },
-        ],
       },
     ],
   };
 }
 
-function createDbStub(fixture: ReturnType<typeof createAgentFixture>) {
+function createIntegration(tenantId = "tenant-1") {
+  return {
+    id: "integration-1",
+    tenantId,
+    type: IntegrationType.GOOGLE_CALENDAR,
+    status: ConnectionStatus.CONNECTED,
+    credentialsEnc: "enc",
+    metadata: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+function createDbStub(integration = createIntegration()) {
   return {
     integrationConnection: {
       findMany: async ({
@@ -116,20 +95,16 @@ function createDbStub(fixture: ReturnType<typeof createAgentFixture>) {
       }: {
         where: { tenantId: string; id: { in: string[] } };
       }) =>
-        fixture.features
-          .filter((feature) => feature.type === FeatureType.TOOL)
-          .flatMap((feature) => feature.steps.map((step) => step.integration))
-          .filter(
-            (integration) =>
-              integration.tenantId === where.tenantId && where.id.in.includes(integration.id),
-          ),
+        integration.tenantId === where.tenantId && where.id.in.includes(integration.id)
+          ? [integration]
+          : [],
     },
   } as never;
 }
 
 test("assessAgentReadiness reports ready draft when all builder essentials exist", async () => {
   const fixture = createAgentFixture();
-  const report = await assessAgentReadiness(fixture, createDbStub(fixture));
+  const report = await assessAgentReadiness(fixture, createDbStub());
 
   assert.equal(report.ready, true);
   assert.equal(report.status, "ready_for_phase_6");
@@ -138,9 +113,8 @@ test("assessAgentReadiness reports ready draft when all builder essentials exist
 
 test("assessAgentReadiness reports missing tool readiness when tool steps are invalid", async () => {
   const fixture = createAgentFixture();
-  fixture.features[1].steps[0].integration.tenantId = "other-tenant";
 
-  const report = await assessAgentReadiness(fixture, createDbStub(fixture));
+  const report = await assessAgentReadiness(fixture, createDbStub(createIntegration("other-tenant")));
 
   assert.equal(report.ready, false);
   assert.equal(report.status, "needs_changes");
@@ -152,13 +126,12 @@ test("assessAgentReadiness reports missing tool readiness when tool steps are in
 
 test("assessAgentReadiness requires at least one executable tool step", async () => {
   const fixture = createAgentFixture();
-  fixture.features[1].steps = [];
   (
     ((fixture.channelConfig as Record<string, unknown>).functionBlocks as Array<Record<string, unknown>>)[0]
       .steps as Array<Record<string, unknown>>
   ) = [];
 
-  const report = await assessAgentReadiness(fixture, createDbStub(fixture));
+  const report = await assessAgentReadiness(fixture, createDbStub());
 
   assert.equal(report.ready, false);
   assert.equal(report.items.find((item) => item.key === "tools")?.done, false);
@@ -166,10 +139,9 @@ test("assessAgentReadiness requires at least one executable tool step", async ()
 
 test("assessAgentReadiness allows deploys without tools for reply-only agents", async () => {
   const fixture = createAgentFixture();
-  fixture.features = fixture.features.filter((feature) => feature.type !== FeatureType.TOOL);
   (fixture.channelConfig as Record<string, unknown>).functionBlocks = [];
 
-  const report = await assessAgentReadiness(fixture, createDbStub(fixture));
+  const report = await assessAgentReadiness(fixture, createDbStub());
 
   assert.equal(report.ready, true);
   assert.equal(report.items.find((item) => item.key === "tools")?.done, true);
@@ -181,7 +153,7 @@ test("getDeployStatus keeps Instagram webhook paths free of embedded secrets", a
   fixture.channel.type = ChannelType.INSTAGRAM;
   fixture.webhookSecret = "preview-secret";
 
-  const report = await getDeployStatus(fixture, createDbStub(fixture));
+  const report = await getDeployStatus(fixture, createDbStub());
   const channelConfig =
     report.channelConfig && typeof report.channelConfig === "object" && !Array.isArray(report.channelConfig)
       ? (report.channelConfig as Record<string, unknown>)
@@ -196,7 +168,7 @@ test("getDeployStatus keeps Gmail webhook paths authenticated for the relay boun
   fixture.channel.type = ChannelType.GMAIL;
   fixture.webhookSecret = "preview-secret";
 
-  const report = await getDeployStatus(fixture, createDbStub(fixture));
+  const report = await getDeployStatus(fixture, createDbStub());
   const channelConfig =
     report.channelConfig && typeof report.channelConfig === "object" && !Array.isArray(report.channelConfig)
       ? (report.channelConfig as Record<string, unknown>)

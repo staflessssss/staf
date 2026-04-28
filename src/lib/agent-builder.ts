@@ -1267,29 +1267,6 @@ export function normalizeFunctionBlocks(
   return values.map((value) => normalizeFunctionBlock(value));
 }
 
-type ToolLikeBlock = {
-  name: string;
-  description: string;
-  steps?: Array<{
-    integrationId: string;
-    action: string;
-    params: Record<string, unknown>;
-  }>;
-};
-
-export function toolBlockToFunctionBlock(toolBlock: ToolLikeBlock): FunctionBlockConfig {
-  return normalizeFunctionBlock({
-    name: toolBlock.name,
-    description: toolBlock.description,
-    steps:
-      toolBlock.steps?.map((step) => ({
-        integrationId: step.integrationId,
-        action: step.action,
-        params: step.params,
-      })) ?? [],
-  });
-}
-
 export function functionBlockToToolBlock(functionBlock: FunctionBlockConfig) {
   return {
     name: functionBlock.name,
@@ -1349,12 +1326,6 @@ export const agentBuilderInclude = {
   channel: true,
   features: {
     orderBy: { sortOrder: "asc" as const },
-    include: {
-      steps: {
-        orderBy: { sortOrder: "asc" as const },
-        include: { integration: true },
-      },
-    },
   },
 } satisfies Prisma.AgentInclude;
 
@@ -1480,47 +1451,6 @@ export function mapAgentToDraft(agent: AgentWithBuilderData) {
         sortOrder: feature.sortOrder,
       })),
   };
-}
-
-export function deriveFunctionBlocksFromAgent(agent: AgentWithBuilderData) {
-  const rawChannelConfig =
-    agent.channelConfig && typeof agent.channelConfig === "object" && !Array.isArray(agent.channelConfig)
-      ? (agent.channelConfig as Record<string, unknown>)
-      : {};
-
-  const toolBlocks = agent.features
-    .filter((feature) => feature.type === FeatureType.TOOL)
-    .map((feature) => ({
-      name: feature.name,
-      description: feature.description,
-      steps: feature.steps.map((step) => ({
-        integrationId: step.integrationId,
-        action: step.action,
-        params: step.params,
-      })),
-    }));
-
-  return normalizeFunctionBlocks(
-    rawChannelConfig.functionBlocks &&
-      Array.isArray(rawChannelConfig.functionBlocks)
-      ? (rawChannelConfig.functionBlocks as Partial<FunctionBlockConfig>[])
-      : toolBlocks.map((tool) =>
-          toolBlockToFunctionBlock({
-            name: tool.name,
-            description: tool.description,
-            steps: tool.steps.map((step) => ({
-              integrationId: step.integrationId,
-              action: step.action,
-              params:
-                step.params &&
-                typeof step.params === "object" &&
-                !Array.isArray(step.params)
-                  ? step.params
-                  : {},
-            })),
-          }),
-        ),
-  );
 }
 
 export async function hydrateFunctionBlocksForRuntime(
