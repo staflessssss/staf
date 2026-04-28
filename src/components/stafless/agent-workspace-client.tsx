@@ -1849,24 +1849,6 @@ export function AgentWorkspaceClient({
               assignedChannels={assignedChannels}
               channelConnections={tenant.channelConnections}
               isReadOnlyMode={isReadOnlyMode}
-              onPriceAttachmentFileIdChange={(value) =>
-                updateDraft("channelConfig", {
-                  ...draft.channelConfig,
-                  priceAttachmentFileId: value,
-                })
-              }
-              onPriceAttachmentFileNameChange={(value) =>
-                updateDraft("channelConfig", {
-                  ...draft.channelConfig,
-                  priceAttachmentFileName: value,
-                })
-              }
-              onPriceAttachmentMimeTypeChange={(value) =>
-                updateDraft("channelConfig", {
-                  ...draft.channelConfig,
-                  priceAttachmentMimeType: value,
-                })
-              }
               onSelectChannel={(connection) => {
                 updateDraft("channelId", connection.id);
                 updateDraft("channelConfig", {
@@ -1874,9 +1856,6 @@ export function AgentWorkspaceClient({
                   channelBehavior: getDefaultChannelBehaviorConfig(connection.type),
                 });
               }}
-              priceAttachmentFileId={draft.channelConfig.priceAttachmentFileId}
-              priceAttachmentFileName={draft.channelConfig.priceAttachmentFileName}
-              priceAttachmentMimeType={draft.channelConfig.priceAttachmentMimeType}
               sectionCanvasClassName={sectionCanvasClassName}
               selectedChannelId={draft.channelId}
               softInfoPanelClassName={softInfoPanelClassName}

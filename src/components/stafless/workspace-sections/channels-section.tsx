@@ -1,190 +1,376 @@
 import Link from "next/link";
-import { ChannelConnection } from "@prisma/client";
+import { ChannelConnection, ChannelType } from "@prisma/client";
+import {
+  BadgeCheck,
+  Camera,
+  CircleAlert,
+  ExternalLink,
+  Mail,
+  MessageCircle,
+  Radio,
+  Send,
+} from "lucide-react";
 
 import {
   EmptyState,
-  FormField,
   StatusBadge,
   SurfaceCard,
-  inputClassName,
   secondaryButtonClassName,
 } from "@/components/stafless/foundation";
+
+type ChannelCatalogItem = {
+  type: ChannelType;
+  title: string;
+  description: string;
+  connectLabel: string;
+  setupSteps: string[];
+  icon: typeof Radio;
+};
+
+const channelCatalog: ChannelCatalogItem[] = [
+  {
+    type: ChannelType.GMAIL,
+    title: "Gmail",
+    description: "Connect the agent to inbound emails and threaded replies.",
+    connectLabel: "Connect Gmail",
+    icon: Mail,
+    setupSteps: [
+      "Client opens Connections in their cabinet.",
+      "Client chooses Gmail and connects the correct Google account.",
+      "Google access also unlocks Calendar, Sheets, and Drive integrations.",
+      "Operator returns here and selects the connected Gmail channel for this agent.",
+    ],
+  },
+  {
+    type: ChannelType.TELEGRAM,
+    title: "Telegram",
+    description: "Connect the agent to a Telegram bot owned by the client business.",
+    connectLabel: "Connect Telegram",
+    icon: Send,
+    setupSteps: [
+      "Client creates or opens the business bot through BotFather.",
+      "Client copies the bot token from BotFather.",
+      "Client pastes the token into Telegram in Connections.",
+      "Operator selects the connected Telegram channel and deploys the agent.",
+    ],
+  },
+  {
+    type: ChannelType.INSTAGRAM,
+    title: "Instagram",
+    description: "Connect the agent to Instagram Direct for a business account.",
+    connectLabel: "Connect Instagram",
+    icon: Camera,
+    setupSteps: [
+      "Client confirms the account is an Instagram business account.",
+      "Client connects Instagram from Connections when Meta access is available.",
+      "Operator verifies the channel shows Connected here.",
+      "Operator selects Instagram and deploys the agent once webhook setup is ready.",
+    ],
+  },
+  {
+    type: ChannelType.WHATSAPP,
+    title: "WhatsApp",
+    description: "WhatsApp is reserved for a later channel expansion pass.",
+    connectLabel: "Unavailable",
+    icon: MessageCircle,
+    setupSteps: [
+      "WhatsApp is intentionally out of the current v1 channel scope.",
+      "Do not assign production agents to WhatsApp until the roadmap adds it.",
+    ],
+  },
+];
+
+function readMetadataLabel(connection?: ChannelConnection | null) {
+  const metadata =
+    connection?.metadata && typeof connection.metadata === "object" && !Array.isArray(connection.metadata)
+      ? (connection.metadata as Record<string, unknown>)
+      : null;
+  const email = typeof metadata?.email === "string" ? metadata.email : "";
+  const name = typeof metadata?.name === "string" ? metadata.name : "";
+  const provider = typeof metadata?.provider === "string" ? metadata.provider : "";
+
+  return email || name || provider || null;
+}
+
+function getChannelConnection(
+  connections: ChannelConnection[],
+  type: ChannelType,
+) {
+  return connections.find((connection) => connection.type === type) ?? null;
+}
+
 export function WorkspaceChannelsSection({
   channelConnections,
   selectedChannelId,
   assignedChannels,
-  priceAttachmentFileId,
-  priceAttachmentFileName,
-  priceAttachmentMimeType,
   isReadOnlyMode,
   tenantId,
   onSelectChannel,
-  onPriceAttachmentFileIdChange,
-  onPriceAttachmentFileNameChange,
-  onPriceAttachmentMimeTypeChange,
   sectionCanvasClassName,
   softInfoPanelClassName,
 }: {
   channelConnections: ChannelConnection[];
   selectedChannelId: string;
   assignedChannels: Map<string, string>;
-  priceAttachmentFileId: string;
-  priceAttachmentFileName: string;
-  priceAttachmentMimeType: string;
   isReadOnlyMode: boolean;
   tenantId: string;
   onSelectChannel: (connection: ChannelConnection) => void;
-  onPriceAttachmentFileIdChange: (value: string) => void;
-  onPriceAttachmentFileNameChange: (value: string) => void;
-  onPriceAttachmentMimeTypeChange: (value: string) => void;
   sectionCanvasClassName: string;
   softInfoPanelClassName: string;
 }) {
+  const selectedChannel =
+    channelConnections.find((connection) => connection.id === selectedChannelId) ?? null;
+  const selectedCatalogItem =
+    channelCatalog.find((item) => item.type === selectedChannel?.type) ?? channelCatalog[0];
+
   return (
     <>
       <SurfaceCard
-        className="border-0 bg-transparent p-0 shadow-none"
-        title="Channel"
-        description="Bind the agent to one connected tenant channel. Unavailable channels stay visible so the rule is obvious."
+        className="rounded-[24px] border-[#e1e7f0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+        title="Channels"
+        description="Choose the single connected channel this agent uses for live conversations."
       >
-        <div className="rounded-[34px] border border-[#ead7c0] bg-[radial-gradient(circle_at_top_left,#fffdf8_0%,#f8eee0_45%,#f4e7d6_100%)] p-6 shadow-[0_24px_54px_rgba(49,31,18,0.08)] sm:p-8">
-          <div className="rounded-[26px] bg-white/72 px-5 py-5 ring-1 ring-[#eadccc]">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d7762]">
-              Channel assignment
-            </p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#201627]">
-              Choose where this agent will live and respond.
-            </h3>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5d5245]">
-              A channel is a real runtime boundary. Connected channels stay visible even when
-              blocked, so the operator can see the assignment rule instead of guessing.
-            </p>
-          </div>
-          <div className="mt-5">
-            {channelConnections.length === 0 ? (
-              <EmptyState
-                title="No channel available"
-                description="Connect at least one tenant channel before turning this draft into a real agent."
-                action={
-                  <Link
-                    href={`/admin/tenants/${tenantId}`}
-                    className={secondaryButtonClassName}
-                  >
-                    Open tenant workspace
-                  </Link>
-                }
-              />
-            ) : (
-              <div className="grid gap-4 lg:grid-cols-2">
-                {channelConnections.map((connection) => {
-                  const assignedAgentName = assignedChannels.get(connection.id);
-                  const isSelected = selectedChannelId === connection.id;
-                  const isUnavailable =
-                    connection.status !== "CONNECTED" || Boolean(assignedAgentName);
+        {channelConnections.length === 0 ? (
+          <EmptyState
+            title="No channel available"
+            description="Connect at least one tenant channel before turning this agent into a live delivery surface."
+            action={
+              <Link href={`/admin/clients/${tenantId}`} className={secondaryButtonClassName}>
+                Open client workspace
+              </Link>
+            }
+          />
+        ) : null}
 
-                  return (
-                    <label
-                      key={connection.id}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {channelCatalog.map((item) => {
+            const connection = getChannelConnection(channelConnections, item.type);
+            const assignedAgentName = connection ? assignedChannels.get(connection.id) : null;
+            const isSelected = Boolean(connection && selectedChannelId === connection.id);
+            const isConnected = connection?.status === "CONNECTED";
+            const isPlannedOnly = item.type === ChannelType.WHATSAPP && !connection;
+            const canSelect =
+              Boolean(connection) &&
+              isConnected &&
+              !isSelected &&
+              !assignedAgentName &&
+              !isReadOnlyMode;
+            const Icon = item.icon;
+            const metadataLabel = readMetadataLabel(connection);
+            const badgeLabel = isSelected
+              ? isConnected
+                ? "Selected"
+                : "Needs reconnection"
+              : assignedAgentName
+                ? "Assigned"
+                : isConnected
+                  ? "Connected"
+                  : isPlannedOnly
+                    ? "Later"
+                    : "Not connected";
+
+            return (
+              <article
+                key={item.type}
+                className={
+                  isSelected && isConnected
+                    ? "rounded-[16px] border border-[#6c63ff] bg-[#fbfaff] p-4 shadow-[0_12px_30px_rgba(108,99,255,0.12)]"
+                    : isSelected
+                      ? "rounded-[16px] border border-[#fecdca] bg-[#fff8f7] p-4 shadow-[0_12px_30px_rgba(180,35,24,0.08)]"
+                    : isPlannedOnly
+                      ? "rounded-[16px] border border-[#edf1f6] bg-[#fbfcfe] p-4 opacity-70"
+                      : "rounded-[16px] border border-[#dbe3ef] bg-[#fcfdff] p-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
+                }
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded-[12px] border border-[#dbe3ef] bg-white text-[#6c63ff]">
+                    <Icon className="size-5" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {canSelect ? (
+                      <button
+                        className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
+                        onClick={() => {
+                          if (connection) {
+                            onSelectChannel(connection);
+                          }
+                        }}
+                        type="button"
+                      >
+                        Choose
+                      </button>
+                    ) : !connection && !isPlannedOnly ? (
+                      <a
+                        className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
+                        href={`#channel-setup-${item.type.toLowerCase()}`}
+                      >
+                        Setup
+                      </a>
+                    ) : connection && !isConnected && !isPlannedOnly ? (
+                      <a
+                        className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#6c63ff] px-5 text-xs font-semibold text-white transition hover:bg-[#5b53ea]"
+                        href={`#channel-setup-${item.type.toLowerCase()}`}
+                      >
+                        Setup
+                      </a>
+                    ) : isSelected ? (
+                      <span className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef2ff] px-5 text-xs font-semibold text-[#5b53ea]">
+                        Selected
+                      </span>
+                    ) : (
+                      <span className="inline-flex h-9 items-center justify-center rounded-[8px] bg-[#eef2f7] px-5 text-xs font-semibold text-[#98a2b3]">
+                        {assignedAgentName ? "Assigned" : item.connectLabel}
+                      </span>
+                    )}
+                    <span
+                      aria-hidden="true"
                       className={
-                        isSelected
-                          ? "flex cursor-pointer items-start gap-4 rounded-[24px] border border-[#d6a06c] bg-[#fff7ef] p-6 shadow-[0_12px_26px_rgba(199,92,42,0.12)]"
-                          : "flex cursor-pointer items-start gap-4 rounded-[24px] border border-[#eadfcf] bg-[#fffcf8] p-6 transition hover:border-[#d8c1aa] hover:bg-white"
+                        isSelected && isConnected
+                          ? "relative inline-flex h-7 w-12 items-center rounded-full border border-[#6c63ff] bg-[#6c63ff]"
+                          : isSelected
+                            ? "relative inline-flex h-7 w-12 items-center rounded-full border border-[#fecdca] bg-[#fee4e2]"
+                          : "relative inline-flex h-7 w-12 items-center rounded-full border border-[#e5ebf3] bg-[#edf1f6]"
                       }
                     >
-                      <input
-                        checked={isSelected}
-                        className="mt-1 size-4"
-                        disabled={isReadOnlyMode || isUnavailable}
-                        name="channelId"
-                        onChange={() => onSelectChannel(connection)}
-                        type="radio"
+                      <span
+                        className={
+                          isSelected && isConnected
+                            ? "inline-block size-5 translate-x-6 rounded-full bg-white shadow-[0_1px_3px_rgba(16,24,40,0.18)]"
+                            : "inline-block size-5 translate-x-1 rounded-full bg-white shadow-[0_1px_3px_rgba(16,24,40,0.18)]"
+                        }
                       />
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-lg font-semibold text-foreground">{connection.type}</p>
-                          <StatusBadge status={connection.status} />
-                        </div>
-                        <p className="text-sm leading-7 text-muted-foreground">
-                          {assignedAgentName
-                            ? `Already assigned to ${assignedAgentName}.`
-                            : connection.status === "CONNECTED"
-                              ? "Ready for agent assignment."
-                              : "This channel must be connected before it can be assigned."}
-                        </p>
-                        <div className="pt-2">
-                          <span className="rounded-full bg-[#f7efe2] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6d5c4d] ring-1 ring-[#eadccc]">
-                            {assignedAgentName
-                              ? "Unavailable"
-                              : connection.status === "CONNECTED"
-                                ? "Available"
-                                : "Needs connection"}
-                          </span>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-semibold text-[#111827]">{item.title}</h3>
+                    <span
+                      className={
+                        isSelected && isConnected
+                          ? "rounded-full bg-[#eef5ff] px-2.5 py-1 text-xs font-semibold text-[#175cd3]"
+                          : isSelected
+                            ? "rounded-full bg-[#fee4e2] px-2.5 py-1 text-xs font-semibold text-[#b42318]"
+                            : isConnected
+                              ? "rounded-full bg-[#eef5ff] px-2.5 py-1 text-xs font-semibold text-[#175cd3]"
+                          : "rounded-full bg-[#eef2f7] px-2.5 py-1 text-xs font-semibold text-[#667085]"
+                      }
+                    >
+                      {badgeLabel}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-6 text-[#667085]">{item.description}</p>
+                  {metadataLabel ? (
+                    <p className="text-xs font-medium text-[#475467]">{metadataLabel}</p>
+                  ) : null}
+                  {assignedAgentName ? (
+                    <p className="text-xs font-semibold text-[#b42318]">
+                      Already assigned to {assignedAgentName}.
+                    </p>
+                  ) : null}
+                  {!connection && !isPlannedOnly ? (
+                    <p className="text-xs font-medium text-[#667085]">
+                      Open the setup instructions below before asking the client to connect this channel.
+                    </p>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </SurfaceCard>
 
-      <SurfaceCard
-        className="border-0 bg-transparent p-0 shadow-none"
-        title="Sales assets"
-        description="Configure optional files the agent can attach when it sends pricing or offer details."
-      >
-        <div className={sectionCanvasClassName}>
-          <div className="grid gap-5 md:grid-cols-2">
-            <FormField
-              label="Pricing attachment"
-              hint="Paste a Google Drive file ID or a share link. The runtime will extract the file ID automatically."
-            >
-              <input
-                className={inputClassName}
-                onChange={(event) => onPriceAttachmentFileIdChange(event.target.value)}
-                placeholder="Drive file ID or URL"
-                readOnly={isReadOnlyMode}
-                value={priceAttachmentFileId}
-              />
-            </FormField>
-            <FormField
-              label="Attachment label"
-              hint="Optional. Helpful if you want the outgoing email attachment to have a nicer file name."
-            >
-              <input
-                className={inputClassName}
-                onChange={(event) => onPriceAttachmentFileNameChange(event.target.value)}
-                placeholder="For example: Myndful Films Pricing Guide"
-                readOnly={isReadOnlyMode}
-                value={priceAttachmentFileName}
-              />
-            </FormField>
-          </div>
-          <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1fr)_240px]">
-            <FormField
-              label="Mime type"
-              hint="Optional. Leave blank unless you want to force the attachment content type."
-            >
-              <input
-                className={inputClassName}
-                onChange={(event) => onPriceAttachmentMimeTypeChange(event.target.value)}
-                placeholder="application/pdf or image/png"
-                readOnly={isReadOnlyMode}
-                value={priceAttachmentMimeType}
-              />
-            </FormField>
-            <div className={softInfoPanelClassName}>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#636563]">
-                Runtime behavior
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section className={sectionCanvasClassName}>
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[#f0efff] text-[#6c63ff]">
+              <BadgeCheck className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#111827]">Selected channel</p>
+              <p className="mt-1 text-sm leading-6 text-[#667085]">
+                {selectedChannel?.status === "CONNECTED"
+                  ? `${selectedCatalogItem.title} is the only live channel assigned to this agent. Save changes after switching channels.`
+                  : selectedChannel
+                    ? `${selectedCatalogItem.title} is selected but not connected. Reconnect it or choose another connected channel before saving this agent.`
+                  : "Choose one connected channel before saving this agent."}
               </p>
-              <p className="mt-2 text-sm leading-6 text-[#433a49]">
-                When a sales reply includes pricing, Gmail can attach this asset automatically
-                without turning the whole flow into a special hardcoded case.
+              {selectedChannel ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={selectedChannel.status} />
+                  <span className="rounded-full border border-[#dbe3ef] bg-white px-3 py-1 text-xs font-semibold text-[#475467]">
+                    One agent per channel
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        <aside className={softInfoPanelClassName}>
+          <div className="flex items-start gap-3">
+            <CircleAlert className="mt-0.5 size-5 shrink-0 text-[#6c63ff]" />
+            <div>
+              <p className="text-sm font-semibold text-[#111827]">Switching channel</p>
+              <p className="mt-1 text-sm leading-6 text-[#667085]">
+                Changing the selected channel changes the live delivery surface. Save the agent and
+                redeploy before relying on inbound production traffic.
               </p>
             </div>
           </div>
+        </aside>
+      </div>
+
+      <SurfaceCard
+        className="rounded-[24px] border-[#e1e7f0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+        title="Connection instructions"
+        description="Use these internal setup notes when a channel is not connected yet. Client credentials still belong in the client Connections surface."
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
+          {channelCatalog.map((item) => {
+            const connection = getChannelConnection(channelConnections, item.type);
+            const Icon = item.icon;
+
+            return (
+              <div
+                key={`${item.type}-instructions`}
+                id={`channel-setup-${item.type.toLowerCase()}`}
+                className="rounded-[16px] border border-[#dbe3ef] bg-[#fcfdff] p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-[12px] border border-[#dbe3ef] bg-white text-[#6c63ff]">
+                    <Icon className="size-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[#111827]">{item.title}</p>
+                    <p className="text-xs text-[#667085]">
+                      {connection?.status === "CONNECTED"
+                        ? "Connection exists for this tenant."
+                        : "Connection required before assignment."}
+                    </p>
+                  </div>
+                </div>
+                <ol className="mt-4 space-y-2 text-sm leading-6 text-[#667085]">
+                  {item.setupSteps.map((step) => (
+                    <li key={step} className="flex gap-2">
+                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-[#6c63ff]" />
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-5">
+          <Link
+            href={`/admin/clients/${tenantId}`}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#344054] transition hover:text-[#6c63ff]"
+          >
+            Open client workspace
+            <ExternalLink className="size-4" />
+          </Link>
         </div>
       </SurfaceCard>
     </>
