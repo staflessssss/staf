@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import {
-  agentBuilderInclude,
+  agentConfigInclude,
   agentDraftSchema,
   buildFeatureCreateInput,
   getChannelConfigObject,
   getToolIntegrationIds,
-  mergeBuilderChannelConfig,
-  serializeBuilderAgent,
-  validateBuilderReferences,
-} from "@/lib/agent-builder";
+  mergeAgentChannelConfig,
+  serializeAgentConfig,
+  validateAgentConfigReferences,
+} from "@/lib/agent-config";
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
 import { buildSystemPrompt } from "@/lib/prompt-builder";
@@ -32,7 +32,7 @@ export async function GET(_: Request, context: AgentRouteContext) {
 
   const agent = await db.agent.findFirst({
     where: { id: agentId, tenantId },
-    include: agentBuilderInclude,
+    include: agentConfigInclude,
   });
 
   if (!agent) {
@@ -41,9 +41,9 @@ export async function GET(_: Request, context: AgentRouteContext) {
 
   return NextResponse.json({
     item: {
-      ...serializeBuilderAgent(agent),
+      ...serializeAgentConfig(agent),
       promptPreview: buildSystemPrompt({
-        ...serializeBuilderAgent(agent).draft,
+        ...serializeAgentConfig(agent).draft,
         channel: agent.channel,
         channelBehavior: getChannelConfigObject(agent.channelConfig).channelBehavior as never,
         conversationPlaybook: getChannelConfigObject(agent.channelConfig).conversationPlaybook as never,
@@ -83,7 +83,7 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
 
   try {
     const item = await db.$transaction(async (tx) => {
-      const validation = await validateBuilderReferences({
+      const validation = await validateAgentConfigReferences({
         tx,
         tenantId,
         channelId: parsed.data.channelId,
@@ -108,7 +108,7 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
           tone: parsed.data.tone,
           languagePreference: parsed.data.languagePreference,
           status: parsed.data.status,
-          channelConfig: mergeBuilderChannelConfig(
+          channelConfig: mergeAgentChannelConfig(
             existingAgent.channelConfig,
             parsed.data.channelConfig,
           ),
@@ -116,7 +116,7 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
             create: buildFeatureCreateInput(parsed.data),
           },
         },
-        include: agentBuilderInclude,
+        include: agentConfigInclude,
       });
 
       return agent;
@@ -127,9 +127,9 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
 
     return NextResponse.json({
       item: {
-        ...serializeBuilderAgent(item),
+        ...serializeAgentConfig(item),
         promptPreview: buildSystemPrompt({
-          ...serializeBuilderAgent(item).draft,
+          ...serializeAgentConfig(item).draft,
           channel: item.channel,
           channelBehavior: getChannelConfigObject(item.channelConfig).channelBehavior as never,
           conversationPlaybook: getChannelConfigObject(item.channelConfig).conversationPlaybook as never,

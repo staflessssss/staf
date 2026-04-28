@@ -16,7 +16,7 @@ export default function AdminSettingsPage() {
 
       <section className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70">
         <div className="rounded-[24px] bg-[#f5f2ff] px-4 py-4 text-sm leading-6 text-[#464554] ring-1 ring-[#d8d6fe]/70">
-          Runtime, deploy, and security controls will land here once the builder and shared runtime
+              Runtime, deploy, and security controls will land here once the workspace and shared runtime
           phases are wired end to end.
         </div>
       </section>

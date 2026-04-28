@@ -1108,7 +1108,7 @@ export const channelConfigSchema = z
     functionBlocks: undefined,
   });
 
-const builderManagedChannelConfigKeys = [
+const agentManagedChannelConfigKeys = [
   "priceAttachmentFileId",
   "priceAttachmentFileName",
   "priceAttachmentMimeType",
@@ -1322,15 +1322,15 @@ export const sandboxInvokeSchema = z.object({
 
 export type SandboxInvokeInput = z.infer<typeof sandboxInvokeSchema>;
 
-export const agentBuilderInclude = {
+export const agentConfigInclude = {
   channel: true,
   features: {
     orderBy: { sortOrder: "asc" as const },
   },
 } satisfies Prisma.AgentInclude;
 
-export type AgentWithBuilderData = Prisma.AgentGetPayload<{
-  include: typeof agentBuilderInclude;
+export type AgentWithConfigData = Prisma.AgentGetPayload<{
+  include: typeof agentConfigInclude;
 }>;
 
 export type RuntimeToolStep = {
@@ -1373,13 +1373,13 @@ function normalizeFunctionStepParams(value: Record<string, unknown> | string): P
   }
 }
 
-export function mergeBuilderChannelConfig(
+export function mergeAgentChannelConfig(
   existing: Prisma.JsonValue | null | undefined,
   patch: AgentDraftInput["channelConfig"] | undefined,
 ): Prisma.InputJsonValue {
   const nextConfig = getChannelConfigObject(existing);
 
-  for (const key of builderManagedChannelConfigKeys) {
+  for (const key of agentManagedChannelConfigKeys) {
     if (!patch || !(key in patch)) {
       continue;
     }
@@ -1422,7 +1422,7 @@ export function mergeChannelConfig(
   };
 }
 
-export function mapAgentToDraft(agent: AgentWithBuilderData) {
+export function mapAgentToDraft(agent: AgentWithConfigData) {
   const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
 
   return {
@@ -1454,7 +1454,7 @@ export function mapAgentToDraft(agent: AgentWithBuilderData) {
 }
 
 export async function hydrateFunctionBlocksForRuntime(
-  agent: Pick<AgentWithBuilderData, "id" | "tenantId" | "channelConfig">,
+  agent: Pick<AgentWithConfigData, "id" | "tenantId" | "channelConfig">,
   database: PrismaClient,
 ): Promise<RuntimeToolFeature[]> {
   const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
@@ -1525,7 +1525,7 @@ export async function hydrateFunctionBlocksForRuntime(
   });
 }
 
-export function serializeBuilderAgent(agent: AgentWithBuilderData) {
+export function serializeAgentConfig(agent: AgentWithConfigData) {
   return {
     id: agent.id,
     tenantId: agent.tenantId,
@@ -1593,7 +1593,7 @@ export function formatEnumLabel(value: string) {
     .join(" ");
 }
 
-export async function validateBuilderReferences(args: {
+export async function validateAgentConfigReferences(args: {
   tx: Prisma.TransactionClient;
   tenantId: string;
   channelId: string;
@@ -1647,7 +1647,7 @@ export async function validateBuilderReferences(args: {
   return { channel, integrations } as const;
 }
 
-export type BuilderPreviewInput = {
+export type AgentPromptInput = {
   name: string;
   persona: string;
   tone: string;

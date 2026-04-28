@@ -5,7 +5,7 @@ import {
   type SerializableEditorAgent,
   serializeEditorAgent,
 } from "@/components/stafless/agent-editor-shared";
-import { type FunctionBlockConfig } from "@/lib/agent-builder";
+import { type FunctionBlockConfig } from "@/lib/agent-config";
 
 function makeAgent(overrides: Partial<SerializableEditorAgent> = {}): SerializableEditorAgent {
   return {

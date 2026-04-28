@@ -65,7 +65,7 @@ import {
   normalizeFunctionBlocks,
   normalizePromptingConfig,
   PromptingConfig,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import {
   getDefaultGoogleCalendarParams,
   getGoogleCalendarValidationErrors,

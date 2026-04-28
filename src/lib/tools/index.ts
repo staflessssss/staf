@@ -2,7 +2,7 @@ import { IntegrationType, Prisma } from "@prisma/client";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
-import { type RuntimeToolFeature } from "@/lib/agent-builder";
+import { type RuntimeToolFeature } from "@/lib/agent-config";
 import { executeGoogleCalendarStep } from "@/lib/tools/google-calendar";
 import { executeGoogleDriveStep } from "@/lib/tools/google-drive";
 import { executeGoogleSheetsStep } from "@/lib/tools/google-sheets";

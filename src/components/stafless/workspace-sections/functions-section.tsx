@@ -28,7 +28,7 @@ import {
   functionParameterTypeOptions,
   functionPostActionOptions,
   functionReactionActionOptions,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import {
   GoogleCalendarParams,
   GoogleSheetsColumnMappingDraft,

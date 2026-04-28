@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { FunctionBlockConfig } from "@/lib/agent-builder";
+import { FunctionBlockConfig } from "@/lib/agent-config";
 
 const workspaceClientPath = resolve(
   process.cwd(),

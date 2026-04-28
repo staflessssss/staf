@@ -1,4 +1,4 @@
-import { FunctionBlockConfig } from "@/lib/agent-builder";
+import { FunctionBlockConfig } from "@/lib/agent-config";
 
 const tierAValues = ["google_sheets", "google_calendar", "api_request"] as const;
 const tierBValues = ["telegram_report", "file_delivery"] as const;

@@ -11,7 +11,7 @@ import {
   ChannelBehaviorConfig,
   followUpOutOfHoursBehaviorOptions,
   followUpSendLimitOptions,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import { humanizeWorkspaceToken } from "@/components/stafless/workspace-sections/utils";
 
 const sectionTitleClassName = "text-[18px] font-semibold tracking-[-0.02em] text-[#111827]";

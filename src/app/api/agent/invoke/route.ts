@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  agentBuilderInclude,
+  agentConfigInclude,
   functionBlocksToToolBlocks,
   normalizeFunctionBlocks,
   resolvePromptingIdentity,
   type SandboxInvokeInput,
   sandboxInvokeSchema,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { invokeAgent } from "@/lib/ai-runtime";
 import { db } from "@/lib/db";
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         id: parsed.data.agentId,
         tenantId: parsed.data.tenantId,
       },
-      include: agentBuilderInclude,
+      include: agentConfigInclude,
     });
 
     if (!agent) {

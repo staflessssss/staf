@@ -13,7 +13,7 @@ import {
   getChannelConfigObject,
   normalizeAgentSettings,
   normalizeFunctionBlocks,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import {
   getFollowUpDelayMs,
   getFollowUpSendLimitCount,

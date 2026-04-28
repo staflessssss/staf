@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { agentBuilderInclude } from "@/lib/agent-builder";
+import { agentConfigInclude } from "@/lib/agent-config";
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
 import { deployAgent, getDeployStatus } from "@/lib/deploy";
@@ -14,7 +14,7 @@ async function loadAgent(context: DeployRouteContext) {
 
   return db.agent.findFirst({
     where: { id: agentId, tenantId },
-    include: agentBuilderInclude,
+    include: agentConfigInclude,
   });
 }
 

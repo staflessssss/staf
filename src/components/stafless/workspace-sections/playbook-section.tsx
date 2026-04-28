@@ -20,7 +20,7 @@ import {
   pricingBehaviorOptions,
   successActionOptions,
   unavailableBehaviorOptions,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import { humanizeWorkspaceToken } from "@/components/stafless/workspace-sections/utils";
 
 export function PlaybookSection({

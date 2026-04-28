@@ -3,10 +3,10 @@ import { randomBytes } from "crypto";
 import { AgentStatus, ChannelType, Prisma } from "@prisma/client";
 
 import {
-  AgentWithBuilderData,
+  AgentWithConfigData,
   hydrateFunctionBlocksForRuntime,
   mergeChannelConfig,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
@@ -35,7 +35,7 @@ export type DeployStatusResult = AgentReadinessReport & {
   channelConfig?: Prisma.JsonValue | null;
 };
 
-function hasValidKnowledge(agent: AgentWithBuilderData) {
+function hasValidKnowledge(agent: AgentWithConfigData) {
   const knowledge = agent.features.filter((feature) => feature.type === "KNOWLEDGE");
 
   return (
@@ -50,7 +50,7 @@ function hasValidKnowledge(agent: AgentWithBuilderData) {
 }
 
 async function hasValidTools(
-  agent: AgentWithBuilderData,
+  agent: AgentWithConfigData,
   database: typeof db,
   toolFeatures?: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>,
 ) {
@@ -75,7 +75,7 @@ async function hasValidTools(
 }
 
 function buildChannelDeployConfig(
-  agent: AgentWithBuilderData,
+  agent: AgentWithConfigData,
   webhookSecret = randomBytes(24).toString("hex"),
 ): {
   webhookSecret: string;
@@ -139,7 +139,7 @@ function buildChannelDeployConfig(
 }
 
 export async function assessAgentReadiness(
-  agent: AgentWithBuilderData,
+  agent: AgentWithConfigData,
   database: typeof db,
 ): Promise<AgentReadinessReport> {
   const settingsAndPromptingReady = Boolean(
@@ -209,7 +209,7 @@ export async function assessAgentReadiness(
 }
 
 export async function getDeployStatus(
-  agent: AgentWithBuilderData,
+  agent: AgentWithConfigData,
   database: typeof db,
 ): Promise<DeployStatusResult> {
   const readiness = await assessAgentReadiness(agent, database);
@@ -227,7 +227,7 @@ export async function getDeployStatus(
 }
 
 export async function deployAgent(
-  agent: AgentWithBuilderData,
+  agent: AgentWithConfigData,
   database: typeof db,
 ): Promise<DeployStatusResult> {
   const readiness = await assessAgentReadiness(agent, database);

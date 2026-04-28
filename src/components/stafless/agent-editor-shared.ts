@@ -8,7 +8,7 @@ import {
 import {
   type FunctionBlockConfig,
   normalizeFunctionBlocks,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 
 export type SerializableEditorTenant = {
   id: string;

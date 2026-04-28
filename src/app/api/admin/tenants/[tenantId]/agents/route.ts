@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
 import {
-  agentBuilderInclude,
+  agentConfigInclude,
   agentDraftSchema,
   buildFeatureCreateInput,
   getChannelConfigObject,
   getToolIntegrationIds,
-  mergeBuilderChannelConfig,
-  serializeBuilderAgent,
-  validateBuilderReferences,
-} from "@/lib/agent-builder";
+  mergeAgentChannelConfig,
+  serializeAgentConfig,
+  validateAgentConfigReferences,
+} from "@/lib/agent-config";
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
 import { buildSystemPrompt } from "@/lib/prompt-builder";
@@ -42,14 +42,14 @@ export async function GET(_: Request, context: TenantAgentsRouteContext) {
   const items = await db.agent.findMany({
     where: { tenantId },
     orderBy: { updatedAt: "desc" },
-    include: agentBuilderInclude,
+    include: agentConfigInclude,
   });
 
   return NextResponse.json({
     items: items.map((agent) => ({
-      ...serializeBuilderAgent(agent),
+      ...serializeAgentConfig(agent),
       promptPreview: buildSystemPrompt({
-        ...serializeBuilderAgent(agent).draft,
+        ...serializeAgentConfig(agent).draft,
         channel: agent.channel,
         channelBehavior: getChannelConfigObject(agent.channelConfig).channelBehavior as never,
         conversationPlaybook: getChannelConfigObject(agent.channelConfig).conversationPlaybook as never,
@@ -89,7 +89,7 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
 
   try {
     const item = await db.$transaction(async (tx) => {
-      const validation = await validateBuilderReferences({
+      const validation = await validateAgentConfigReferences({
         tx,
         tenantId,
         channelId: parsed.data.channelId,
@@ -109,12 +109,12 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
           tone: parsed.data.tone,
           languagePreference: parsed.data.languagePreference,
           status: parsed.data.status,
-          channelConfig: mergeBuilderChannelConfig(null, parsed.data.channelConfig),
+          channelConfig: mergeAgentChannelConfig(null, parsed.data.channelConfig),
           features: {
             create: buildFeatureCreateInput(parsed.data),
           },
         },
-        include: agentBuilderInclude,
+        include: agentConfigInclude,
       });
 
       return agent;
@@ -126,9 +126,9 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
     return NextResponse.json(
       {
         item: {
-          ...serializeBuilderAgent(item),
+          ...serializeAgentConfig(item),
           promptPreview: buildSystemPrompt({
-            ...serializeBuilderAgent(item).draft,
+            ...serializeAgentConfig(item).draft,
             channel: item.channel,
             channelBehavior: getChannelConfigObject(item.channelConfig).channelBehavior as never,
             conversationPlaybook: getChannelConfigObject(item.channelConfig).conversationPlaybook as never,

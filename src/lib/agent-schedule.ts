@@ -1,4 +1,4 @@
-import { AgentSettingsConfig } from "@/lib/agent-builder";
+import { AgentSettingsConfig } from "@/lib/agent-config";
 
 const weekdayMap: Record<string, AgentSettingsConfig["weeklySchedule"][number]["day"]> = {
   monday: "monday",

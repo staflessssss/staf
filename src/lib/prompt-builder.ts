@@ -1,19 +1,19 @@
 import {
-  BuilderPreviewInput,
+  AgentPromptInput,
   buildMultilingualGuidance,
   ConversationPlaybookConfig,
   formatEnumLabel,
   normalizeChannelBehavior,
   normalizeConversationPlaybook,
   resolvePromptingIdentity,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import {
   getOrderedResultTargets,
   getPrimaryStoredTarget,
 } from "@/lib/functions/destination-mapping";
 
 function renderKnowledgeSection(
-  knowledgeBlocks: NonNullable<BuilderPreviewInput["knowledgeBlocks"]>,
+  knowledgeBlocks: NonNullable<AgentPromptInput["knowledgeBlocks"]>,
 ) {
   if (knowledgeBlocks.length === 0) {
     return "No knowledge blocks configured yet.";
@@ -33,7 +33,7 @@ function renderKnowledgeSection(
     .join("\n\n");
 }
 
-function renderFunctionSection(functionBlocks: NonNullable<BuilderPreviewInput["functionBlocks"]>) {
+function renderFunctionSection(functionBlocks: NonNullable<AgentPromptInput["functionBlocks"]>) {
   if (functionBlocks.length === 0) {
     return "No functions configured yet. Define explicit business actions before expecting runtime execution.";
   }
@@ -117,7 +117,7 @@ function humanizeFieldList(fields: ConversationPlaybookConfig["discoveryFields"]
   return fields.map((field) => discoveryFieldLabels[field]).join(", ");
 }
 
-function renderChannelBehaviorSection(agent: BuilderPreviewInput) {
+function renderChannelBehaviorSection(agent: AgentPromptInput) {
   const behavior = normalizeChannelBehavior(agent.channelBehavior, agent.channel?.type ?? null);
 
   return [
@@ -146,7 +146,7 @@ function renderChannelBehaviorSection(agent: BuilderPreviewInput) {
     .join("\n");
 }
 
-function renderConversationPlaybookSection(agent: BuilderPreviewInput) {
+function renderConversationPlaybookSection(agent: AgentPromptInput) {
   const playbook = normalizeConversationPlaybook(agent.conversationPlaybook);
 
   return [
@@ -195,7 +195,7 @@ function buildConversationPlaybookRuntimeGuidance(playbook: ConversationPlaybook
     .join("\n");
 }
 
-function renderPromptingSection(agent: BuilderPreviewInput) {
+function renderPromptingSection(agent: AgentPromptInput) {
   const promptingIdentity = resolvePromptingIdentity({
     prompting: agent.prompting,
     persona: agent.persona,
@@ -237,7 +237,7 @@ export function buildRuntimeExecutionPolicy() {
   ].join("\n");
 }
 
-export function buildSystemPrompt(agent: BuilderPreviewInput) {
+export function buildSystemPrompt(agent: AgentPromptInput) {
   const knowledgeBlocks = agent.knowledgeBlocks ?? [];
   const playbook = normalizeConversationPlaybook(agent.conversationPlaybook);
   const promptingIdentity = resolvePromptingIdentity({

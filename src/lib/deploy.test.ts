@@ -8,10 +8,10 @@ import {
   IntegrationType,
 } from "@prisma/client";
 
-import type { AgentWithBuilderData } from "@/lib/agent-builder";
+import type { AgentWithConfigData } from "@/lib/agent-config";
 import { assessAgentReadiness } from "@/lib/deploy";
 
-function createAgentFixture(): AgentWithBuilderData {
+function createAgentFixture(): AgentWithConfigData {
   return {
     id: "agent-1",
     tenantId: "tenant-1",
@@ -102,7 +102,7 @@ function createDbStub(integration = createIntegration()) {
   } as never;
 }
 
-test("assessAgentReadiness reports ready draft when all builder essentials exist", async () => {
+test("assessAgentReadiness reports ready draft when all workspace essentials exist", async () => {
   const fixture = createAgentFixture();
   const report = await assessAgentReadiness(fixture, createDbStub());
 

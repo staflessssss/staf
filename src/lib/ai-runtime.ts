@@ -10,9 +10,9 @@ import {
 import { generateText, stepCountIs } from "ai";
 
 import {
-  agentBuilderInclude,
+  agentConfigInclude,
   AgentSettingsConfig,
-  AgentWithBuilderData,
+  AgentWithConfigData,
   ControlConfig,
   hydrateFunctionBlocksForRuntime,
   FunctionBlockConfig,
@@ -24,7 +24,7 @@ import {
   normalizeControlConfig,
   normalizePromptingConfig,
   PromptingConfig,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { decrypt } from "@/lib/crypto";
@@ -794,7 +794,7 @@ function extractAttachments(
   return [...attachments.values()];
 }
 
-async function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData): Promise<RuntimeBlocks> {
+async function mapAgentToRuntimeBlocks(agent: AgentWithConfigData): Promise<RuntimeBlocks> {
   const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
   const toolFeatures = await hydrateFunctionBlocksForRuntime(agent, db);
   const knowledgeBlocks = agent.features
@@ -850,7 +850,7 @@ async function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData): Promise<Run
 }
 
 async function runModelInvocation(args: {
-  agent: AgentWithBuilderData;
+  agent: AgentWithConfigData;
   toolFeatures: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>;
   input: InvokeAgentInput;
   promptPreview: string;
@@ -970,7 +970,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       tenantId: input.tenantId,
       ...(input.allowDraftAgent ? {} : { status: AgentStatus.ACTIVE }),
     },
-    include: agentBuilderInclude,
+    include: agentConfigInclude,
   });
 
   if (!agent) {

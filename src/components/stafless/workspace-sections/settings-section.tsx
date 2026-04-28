@@ -7,7 +7,7 @@ import {
   inputClassName,
   selectClassName,
 } from "@/components/stafless/foundation";
-import { AgentSettingsConfig } from "@/lib/agent-builder";
+import { AgentSettingsConfig } from "@/lib/agent-config";
 import { getTimezoneOptions } from "@/lib/timezones";
 
 const dayLabels: Record<AgentSettingsConfig["weeklySchedule"][number]["day"], string> = {

@@ -12,7 +12,7 @@ import {
   normalizeAgentSettings,
   normalizePromptingConfig,
   resolvePromptingIdentity,
-} from "@/lib/agent-builder";
+} from "@/lib/agent-config";
 
 test("agentDraftSchema normalizes empty language preference to null", () => {
   const parsed = agentDraftSchema.parse({
