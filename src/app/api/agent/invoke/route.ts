@@ -10,6 +10,7 @@ import {
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { invokeAgent } from "@/lib/ai-runtime";
 import { db } from "@/lib/db";
+import { getOrderedResultTargets } from "@/lib/functions/destination-mapping";
 import { buildSystemPrompt } from "@/lib/prompt-builder";
 
 export async function POST(req: NextRequest) {
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
         reactionAction: fn.reactionAction,
         postAction: fn.postAction,
         disableDelayedMessages: fn.disableDelayedMessages,
-        resultTargets: fn.resultTargets,
+        resultTargets: getOrderedResultTargets(fn.resultTargets),
         steps: fn.steps.map((step) => ({
           action: step.action,
           integrationType: integrationMap.get(step.integrationId),

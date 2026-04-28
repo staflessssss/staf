@@ -7,6 +7,10 @@ import {
   normalizeConversationPlaybook,
   resolvePromptingIdentity,
 } from "@/lib/agent-builder";
+import {
+  getOrderedResultTargets,
+  getPrimaryStoredTarget,
+} from "@/lib/functions/destination-mapping";
 
 function renderKnowledgeSection(
   knowledgeBlocks: NonNullable<BuilderPreviewInput["knowledgeBlocks"]>,
@@ -57,9 +61,15 @@ function renderFunctionSection(functionBlocks: NonNullable<BuilderPreviewInput["
               })
               .join("\n")
           : "- No structured inputs configured yet.";
+      const primaryResultTarget = fn.resultTargets
+        ? getPrimaryStoredTarget(fn.resultTargets)
+        : null;
+      const orderedResultTargets = fn.resultTargets
+        ? getOrderedResultTargets(fn.resultTargets)
+        : [];
       const resultTargetText =
-        fn.resultTargets && fn.resultTargets.length > 0
-          ? fn.resultTargets
+        orderedResultTargets.length > 0
+          ? orderedResultTargets
               .map((target) => `- ${formatEnumLabel(String(target.type))}: ${target.label}`)
               .join("\n")
           : "- No explicit result targets configured.";
@@ -80,6 +90,7 @@ function renderFunctionSection(functionBlocks: NonNullable<BuilderPreviewInput["
         `Reaction after execution: ${formatEnumLabel(String(fn.reactionAction ?? "ai_agent_decides"))}`,
         `Post-scenario: ${formatEnumLabel(String(fn.postAction ?? "continue_dialog"))}`,
         `Disable delayed messages after run: ${fn.disableDelayedMessages ? "yes" : "no"}`,
+        `Primary destination: ${primaryResultTarget ? `${formatEnumLabel(String(primaryResultTarget.type))}: ${primaryResultTarget.label}` : "none configured"}`,
         "Result delivery",
         resultTargetText,
         "Execution steps",
