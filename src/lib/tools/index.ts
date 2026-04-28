@@ -1,8 +1,8 @@
-import { FeatureType, IntegrationType, Prisma } from "@prisma/client";
+import { IntegrationType, Prisma } from "@prisma/client";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
-import { AgentWithBuilderData } from "@/lib/agent-builder";
+import { type HydratedToolFeature } from "@/lib/agent-builder";
 import { executeGoogleCalendarStep } from "@/lib/tools/google-calendar";
 import { executeGoogleDriveStep } from "@/lib/tools/google-drive";
 import { executeGoogleSheetsStep } from "@/lib/tools/google-sheets";
@@ -15,7 +15,8 @@ type ToolExecutionLog = {
 };
 
 type ResolveToolsArgs = {
-  agent: AgentWithBuilderData;
+  tenantId: string;
+  toolFeatures: HydratedToolFeature[];
   testMode?: boolean;
   defaultEmail?: string;
   onToolResult?: (entry: ToolExecutionLog) => void;
@@ -83,7 +84,7 @@ async function executeIntegrationStep(args: {
   }
 }
 
-function buildToolDescription(feature: AgentWithBuilderData["features"][number]) {
+function buildToolDescription(feature: HydratedToolFeature) {
   const stepDescriptions = feature.steps.map((step) => {
     return `${step.integration.type}: ${step.action}`;
   });
@@ -131,9 +132,14 @@ function extractCanonicalToolFields(steps: Array<{
   };
 }
 
-export function resolveTools({ agent, testMode, defaultEmail, onToolResult }: ResolveToolsArgs) {
-  return agent.features
-    .filter((feature) => feature.type === FeatureType.TOOL)
+export function resolveTools({
+  tenantId,
+  toolFeatures,
+  testMode,
+  defaultEmail,
+  onToolResult,
+}: ResolveToolsArgs) {
+  return toolFeatures
     .reduce<ToolSet>((acc, feature, index) => {
       const toolName = `tool_${index + 1}_${feature.name
         .toLowerCase()
@@ -205,7 +211,7 @@ export function resolveTools({ agent, testMode, defaultEmail, onToolResult }: Re
 
           for (const step of feature.steps) {
             const result = await executeIntegrationStep({
-              tenantId: agent.tenantId,
+              tenantId,
               integrationType: step.integration.type,
               action: step.action,
               params: step.params,

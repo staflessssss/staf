@@ -14,6 +14,7 @@ import {
   AgentSettingsConfig,
   AgentWithBuilderData,
   ControlConfig,
+  hydrateFunctionBlocksForRuntime,
   getDefaultControlConfig,
   getDefaultAgentSettingsConfig,
   getChannelConfigObject,
@@ -49,6 +50,16 @@ type LightweightToolBlock = {
     action: string;
     integrationType?: string;
   }>;
+};
+
+type RuntimeBlocks = {
+  promptPreview: string;
+  knowledgeBlocks: LightweightKnowledgeBlock[];
+  toolBlocks: LightweightToolBlock[];
+  toolFeatures: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>;
+  agentSettings: AgentSettingsConfig;
+  prompting: PromptingConfig;
+  control: ControlConfig;
 };
 
 type InvokeAgentInput = {
@@ -781,8 +792,24 @@ function extractAttachments(
   return [...attachments.values()];
 }
 
-function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData) {
+async function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData): Promise<RuntimeBlocks> {
   const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
+  const toolFeatures = await hydrateFunctionBlocksForRuntime(agent, db);
+  const knowledgeBlocks = agent.features
+    .filter((feature) => feature.type === FeatureType.KNOWLEDGE)
+    .map((feature) => ({
+      name: feature.name,
+      description: feature.description,
+      knowledgeContent: feature.knowledgeContent,
+    }));
+  const toolBlocks = toolFeatures.map((feature) => ({
+    name: feature.name,
+    description: feature.description,
+    steps: feature.steps.map((step) => ({
+      action: step.action,
+      integrationType: step.integration.type,
+    })),
+  }));
 
   return {
     promptPreview: buildSystemPrompt({
@@ -809,41 +836,12 @@ function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData) {
         !Array.isArray(rawChannelConfig.prompting)
           ? (rawChannelConfig.prompting as never)
           : null,
-      knowledgeBlocks: agent.features
-        .filter((feature) => feature.type === FeatureType.KNOWLEDGE)
-        .map((feature) => ({
-          name: feature.name,
-          description: feature.description,
-          knowledgeContent: feature.knowledgeContent,
-        })),
-      toolBlocks: agent.features
-        .filter((feature) => feature.type === FeatureType.TOOL)
-        .map((feature) => ({
-          name: feature.name,
-          description: feature.description,
-          steps: feature.steps.map((step) => ({
-            action: step.action,
-            integrationType: step.integration.type,
-          })),
-        })),
+      knowledgeBlocks,
+      toolBlocks,
     }),
-    knowledgeBlocks: agent.features
-      .filter((feature) => feature.type === FeatureType.KNOWLEDGE)
-      .map((feature) => ({
-        name: feature.name,
-        description: feature.description,
-        knowledgeContent: feature.knowledgeContent,
-      })),
-    toolBlocks: agent.features
-      .filter((feature) => feature.type === FeatureType.TOOL)
-      .map((feature) => ({
-        name: feature.name,
-        description: feature.description,
-        steps: feature.steps.map((step) => ({
-          action: step.action,
-          integrationType: step.integration.type,
-        })),
-        })),
+    knowledgeBlocks,
+    toolBlocks,
+    toolFeatures,
     agentSettings: getRuntimeAgentSettingsConfig(agent.channelConfig),
     prompting: getRuntimePromptingConfig(agent.channelConfig),
     control: getRuntimeControlConfig(agent.channelConfig),
@@ -852,6 +850,7 @@ function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData) {
 
 async function runModelInvocation(args: {
   agent: AgentWithBuilderData;
+  toolFeatures: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>;
   input: InvokeAgentInput;
   promptPreview: string;
   historyText: string;
@@ -866,7 +865,8 @@ async function runModelInvocation(args: {
     durationMs?: number;
   }> = [];
   const tools = resolveTools({
-    agent: args.agent,
+    tenantId: args.agent.tenantId,
+    toolFeatures: args.toolFeatures,
     testMode: Boolean(args.input.testMode),
     defaultEmail:
       args.input.contactEmail ??
@@ -975,7 +975,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     throw new Error(input.allowDraftAgent ? "Saved agent not found." : "Active deployed agent not found.");
   }
 
-  const runtimeBlocks = mapAgentToRuntimeBlocks(agent);
+  const runtimeBlocks = await mapAgentToRuntimeBlocks(agent);
   if (input.testMode) {
     const historyMessages = applyControlToHistory({
       historyMessages: input.historyMessages ?? [],
@@ -1004,6 +1004,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
 
     const modelResult = await runModelInvocation({
       agent,
+      toolFeatures: runtimeBlocks.toolFeatures,
       input,
       promptPreview: runtimeBlocks.promptPreview,
       historyText: renderHistory(historyMessages),
@@ -1078,6 +1079,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
 
   const modelResult = await runModelInvocation({
     agent,
+    toolFeatures: runtimeBlocks.toolFeatures,
     input,
     promptPreview: runtimeBlocks.promptPreview,
     historyText: renderHistory(historyMessages),

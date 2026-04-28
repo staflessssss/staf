@@ -33,7 +33,7 @@ export async function GET(_: Request, context: DeployRouteContext) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
   }
 
-  const result = getDeployStatus(agent);
+  const result = await getDeployStatus(agent, db);
 
   return NextResponse.json(
     {
@@ -58,7 +58,7 @@ export async function POST(_: Request, context: DeployRouteContext) {
     return NextResponse.json({ error: "Agent not found." }, { status: 404 });
   }
 
-  const result = await deployAgent(agent);
+  const result = await deployAgent(agent, db);
 
   return NextResponse.json(
     {

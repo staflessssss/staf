@@ -2,7 +2,11 @@ import { randomBytes } from "crypto";
 
 import { AgentStatus, ChannelType, Prisma } from "@prisma/client";
 
-import { AgentWithBuilderData, mergeChannelConfig } from "@/lib/agent-builder";
+import {
+  AgentWithBuilderData,
+  hydrateFunctionBlocksForRuntime,
+  mergeChannelConfig,
+} from "@/lib/agent-builder";
 import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
@@ -45,8 +49,12 @@ function hasValidKnowledge(agent: AgentWithBuilderData) {
   );
 }
 
-function hasValidTools(agent: AgentWithBuilderData) {
-  const tools = agent.features.filter((feature) => feature.type === "TOOL");
+async function hasValidTools(
+  agent: AgentWithBuilderData,
+  database: typeof db,
+  toolFeatures?: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>,
+) {
+  const tools = toolFeatures ?? (await hydrateFunctionBlocksForRuntime(agent, database));
 
   if (tools.length === 0) {
     return true;
@@ -130,13 +138,17 @@ function buildChannelDeployConfig(
   }
 }
 
-export function assessAgentReadiness(agent: AgentWithBuilderData): AgentReadinessReport {
+export async function assessAgentReadiness(
+  agent: AgentWithBuilderData,
+  database: typeof db,
+): Promise<AgentReadinessReport> {
   const settingsAndPromptingReady = Boolean(
     agent.name.trim() && agent.persona.trim() && agent.tone.trim(),
   );
   const channelReady = agent.channel.status === "CONNECTED";
   const knowledgeReady = hasValidKnowledge(agent);
-  const toolsReady = hasValidTools(agent);
+  const toolFeatures = await hydrateFunctionBlocksForRuntime(agent, database);
+  const toolsReady = await hasValidTools(agent, database, toolFeatures);
   const sandboxExpectationReady = settingsAndPromptingReady && channelReady;
 
   const items: ReadinessItem[] = [
@@ -169,7 +181,7 @@ export function assessAgentReadiness(agent: AgentWithBuilderData): AgentReadines
       label: "Function configuration is valid",
       done: toolsReady,
       detail: toolsReady
-        ? agent.features.some((feature) => feature.type === "TOOL")
+        ? toolFeatures.length > 0
           ? "Functions and integration-backed execution steps are configured."
           : "No functions are configured yet, which is acceptable for a reply-only first deployment."
         : "Any configured function must use valid tenant-owned integration steps.",
@@ -196,8 +208,11 @@ export function assessAgentReadiness(agent: AgentWithBuilderData): AgentReadines
   };
 }
 
-export function getDeployStatus(agent: AgentWithBuilderData): DeployStatusResult {
-  const readiness = assessAgentReadiness(agent);
+export async function getDeployStatus(
+  agent: AgentWithBuilderData,
+  database: typeof db,
+): Promise<DeployStatusResult> {
+  const readiness = await assessAgentReadiness(agent, database);
   const deployment = buildChannelDeployConfig(agent, agent.webhookSecret ?? "preview");
 
   return {
@@ -211,8 +226,11 @@ export function getDeployStatus(agent: AgentWithBuilderData): DeployStatusResult
   };
 }
 
-export async function deployAgent(agent: AgentWithBuilderData): Promise<DeployStatusResult> {
-  const readiness = assessAgentReadiness(agent);
+export async function deployAgent(
+  agent: AgentWithBuilderData,
+  database: typeof db,
+): Promise<DeployStatusResult> {
+  const readiness = await assessAgentReadiness(agent, database);
 
   if (!readiness.ready) {
     return {
