@@ -99,7 +99,7 @@ test("buildFeatureCreateInput ignores channelConfig.functionBlocks for Feature w
   assert.deepEqual(features, []);
 });
 
-test("getToolIntegrationIds returns unique ids only", () => {
+test("getToolIntegrationIds ignores legacy toolBlocks", () => {
   const input = agentDraftSchema.parse({
     name: "Studio Concierge",
     persona: "Helpful assistant",
@@ -125,7 +125,7 @@ test("getToolIntegrationIds returns unique ids only", () => {
     ],
   });
 
-  assert.deepEqual(getToolIntegrationIds(input), ["integration-1"]);
+  assert.deepEqual(getToolIntegrationIds(input), []);
 });
 
 test("getToolIntegrationIds reads from channelConfig.functionBlocks", () => {

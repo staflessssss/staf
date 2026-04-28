@@ -246,14 +246,7 @@ export function buildSystemPrompt(agent: BuilderPreviewInput) {
     tone: agent.tone,
     languagePreference: agent.languagePreference,
   });
-  const functionBlocks =
-    agent.functionBlocks && agent.functionBlocks.length > 0
-      ? agent.functionBlocks
-      : (agent.toolBlocks ?? []).map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          steps: tool.steps,
-        }));
+  const functionBlocks = agent.functionBlocks ?? [];
   const channelLabel = agent.channel?.type ? formatEnumLabel(agent.channel.type) : "Unassigned";
 
   return [

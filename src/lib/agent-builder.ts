@@ -1161,12 +1161,7 @@ export function deriveToolBlocksFromDraft(
   input: Pick<AgentDraftInput, "toolBlocks" | "channelConfig">,
 ) {
   const functionBlocks = normalizeFunctionBlocks(input.channelConfig?.functionBlocks ?? []);
-
-  if (functionBlocks.length > 0) {
-    return functionBlocksToToolBlocks(functionBlocks);
-  }
-
-  return input.toolBlocks;
+  return functionBlocksToToolBlocks(functionBlocks);
 }
 
 export function getDefaultFunctionBlock(): FunctionBlockConfig {

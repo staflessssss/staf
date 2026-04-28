@@ -81,10 +81,16 @@ test("buildSystemPrompt includes multilingual behavior, playbook, channel behavi
         knowledgeContent: "Wedding films and highlight edits.",
       },
     ],
-    toolBlocks: [
+    functionBlocks: [
       {
         name: "Calendar check",
         description: "Verify availability",
+        active: true,
+        parameters: [],
+        reactionAction: "ai_agent_decides",
+        postAction: "continue_dialog",
+        disableDelayedMessages: false,
+        resultTargets: [],
         steps: [{ integrationType: "GOOGLE_CALENDAR", action: "check calendar" }],
       },
     ],
@@ -129,6 +135,24 @@ test("buildSystemPrompt includes multilingual behavior, playbook, channel behavi
   assert.match(prompt, /Google Calendar: check calendar/);
   assert.match(prompt, /Runtime execution policy/);
   assert.match(prompt, /Never invent integration results/);
+});
+
+test("buildSystemPrompt ignores legacy toolBlocks without functionBlocks", () => {
+  const prompt = buildSystemPrompt({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    toolBlocks: [
+      {
+        name: "Legacy calendar check",
+        description: "Verify availability",
+        steps: [{ integrationType: "GOOGLE_CALENDAR", action: "check calendar" }],
+      },
+    ],
+  });
+
+  assert.doesNotMatch(prompt, /Legacy calendar check/);
+  assert.doesNotMatch(prompt, /check calendar/);
 });
 
 test("buildSystemPrompt defaults prompting visibility flags to no when not configured", () => {
