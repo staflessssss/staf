@@ -1,7 +1,6 @@
 import {
   ChannelConnection,
   Feature,
-  FeatureType,
   IntegrationConnection,
   Prisma,
   Step,
@@ -10,7 +9,6 @@ import {
 import {
   type FunctionBlockConfig,
   normalizeFunctionBlocks,
-  toolBlockToFunctionBlock,
 } from "@/lib/agent-builder";
 
 export type SerializableEditorTenant = {
@@ -49,25 +47,6 @@ function getChannelConfigObject(channelConfig: Prisma.JsonValue | null | undefin
     : {};
 }
 
-function normalizeLegacyStepParams(params: Prisma.JsonValue): Record<string, unknown> {
-  if (params && typeof params === "object" && !Array.isArray(params)) {
-    return params as Record<string, unknown>;
-  }
-
-  if (typeof params === "string") {
-    try {
-      const parsed = JSON.parse(params);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : {};
-    } catch {
-      return {};
-    }
-  }
-
-  return {};
-}
-
 function deriveEditorFunctionBlocks(agent: SerializableEditorAgent): FunctionBlockConfig[] {
   const channelConfig = getChannelConfigObject(agent.channelConfig);
 
@@ -75,21 +54,7 @@ function deriveEditorFunctionBlocks(agent: SerializableEditorAgent): FunctionBlo
     return normalizeFunctionBlocks(channelConfig.functionBlocks as Partial<FunctionBlockConfig>[]);
   }
 
-  return normalizeFunctionBlocks(
-    agent.features
-      .filter((feature) => feature.type === FeatureType.TOOL)
-      .map((feature) =>
-        toolBlockToFunctionBlock({
-          name: feature.name,
-          description: feature.description,
-          steps: feature.steps.map((step) => ({
-            integrationId: step.integrationId,
-            action: step.action,
-            params: normalizeLegacyStepParams(step.params),
-          })),
-        }),
-      ),
-  );
+  return [];
 }
 
 function serializeEditorChannelConfig(agent: SerializableEditorAgent) {

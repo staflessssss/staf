@@ -37,7 +37,7 @@ function getSerializedFunctionBlocks(agent: SerializableEditorAgent) {
   return channelConfig.functionBlocks as FunctionBlockConfig[];
 }
 
-test("serializeEditorAgent derives functionBlocks from legacy TOOL features", () => {
+test("serializeEditorAgent returns empty functionBlocks when channelConfig functionBlocks is missing, even if legacy TOOL features exist", () => {
   const functionBlocks = getSerializedFunctionBlocks(
     makeAgent({
       features: asFeatures([
@@ -57,14 +57,10 @@ test("serializeEditorAgent derives functionBlocks from legacy TOOL features", ()
     }),
   );
 
-  assert.equal(functionBlocks.length, 1);
-  assert.equal(functionBlocks[0]?.name, "Calendar check");
-  assert.equal(functionBlocks[0]?.steps[0]?.integrationId, "integration-1");
-  assert.equal(functionBlocks[0]?.steps[0]?.action, "check_calendar");
-  assert.deepEqual(functionBlocks[0]?.steps[0]?.params, { window: "30d" });
+  assert.deepEqual(functionBlocks, []);
 });
 
-test("serializeEditorAgent preserves existing channelConfig functionBlocks over legacy TOOL features", () => {
+test("serializeEditorAgent preserves existing channelConfig functionBlocks and ignores legacy TOOL features", () => {
   const existingFunctionBlocks: FunctionBlockConfig[] = [
     {
       name: "Existing function",
@@ -113,19 +109,11 @@ test("serializeEditorAgent preserves existing channelConfig functionBlocks over 
   assert.equal(functionBlocks[0]?.steps[0]?.integrationId, "integration-existing");
 });
 
-test("serializeEditorAgent returns empty functionBlocks when no legacy TOOL features exist", () => {
+test("serializeEditorAgent returns empty functionBlocks when channelConfig functionBlocks is missing", () => {
   const functionBlocks = getSerializedFunctionBlocks(
     makeAgent({
       channelConfig: null,
-      features: asFeatures([
-        {
-          type: FeatureType.KNOWLEDGE,
-          name: "Services",
-          description: "What the studio offers",
-          knowledgeContent: "Wedding films.",
-          steps: [],
-        },
-      ]),
+      features: [],
     }),
   );
 
