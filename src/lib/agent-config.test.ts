@@ -27,6 +27,100 @@ test("agentDraftSchema normalizes empty language preference to null", () => {
   assert.equal(parsed.status, AgentStatus.ACTIVE);
 });
 
+test("agentDraftSchema accepts explicit active and paused statuses", () => {
+  const createPayload = (status: AgentStatus) => ({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    status,
+  });
+
+  assert.equal(
+    agentDraftSchema.parse(createPayload(AgentStatus.ACTIVE)).status,
+    AgentStatus.ACTIVE,
+  );
+  assert.equal(
+    agentDraftSchema.parse(createPayload(AgentStatus.PAUSED)).status,
+    AgentStatus.PAUSED,
+  );
+});
+
+test("agentDraftSchema allows disabled schedules to keep invalid legacy windows", () => {
+  const parsed = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      agentSettings: {
+        defaultChatEnabled: true,
+        timezone: "UTC",
+        scheduleEnabled: false,
+        weeklySchedule: [
+          { day: "monday", enabled: true, start: "18:00", end: "09:00" },
+        ],
+      },
+    },
+  });
+
+  assert.equal(parsed.channelConfig.agentSettings?.scheduleEnabled, false);
+  assert.equal(parsed.channelConfig.agentSettings?.weeklySchedule[0]?.start, "18:00");
+});
+
+test("agentDraftSchema rejects enabled schedules with invalid windows", () => {
+  const parsed = agentDraftSchema.safeParse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      agentSettings: {
+        defaultChatEnabled: true,
+        timezone: "UTC",
+        scheduleEnabled: true,
+        weeklySchedule: [
+          { day: "monday", enabled: true, start: "18:00", end: "09:00" },
+        ],
+      },
+    },
+  });
+
+  assert.equal(parsed.success, false);
+});
+
+test("agentDraftSchema rejects impossible schedule times", () => {
+  const parsed = agentDraftSchema.safeParse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      agentSettings: {
+        defaultChatEnabled: true,
+        timezone: "UTC",
+        scheduleEnabled: true,
+        weeklySchedule: [
+          { day: "monday", enabled: true, start: "25:00", end: "26:00" },
+        ],
+      },
+    },
+  });
+
+  assert.equal(parsed.success, false);
+});
+
+test("normalizeAgentSettings falls back when legacy schedule times are impossible", () => {
+  const normalized = normalizeAgentSettings({
+    weeklySchedule: [
+      { day: "monday", enabled: true, start: "25:00", end: "26:00" },
+    ],
+  });
+
+  assert.equal(normalized.weeklySchedule[0]?.start, "09:00");
+  assert.equal(normalized.weeklySchedule[0]?.end, "18:00");
+});
+
 test("buildFeatureCreateInput creates only KNOWLEDGE features", () => {
   const input = agentDraftSchema.parse({
     name: "Studio Concierge",

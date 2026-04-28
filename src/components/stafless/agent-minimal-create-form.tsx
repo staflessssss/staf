@@ -73,7 +73,7 @@ export function AgentMinimalCreateForm({
         | null;
 
       if (!response.ok || !result?.item?.id) {
-        setError(result?.error || "Could not create agent draft.");
+        setError(result?.error || "Could not create agent.");
         return;
       }
 
@@ -83,7 +83,7 @@ export function AgentMinimalCreateForm({
       setError(
         createError instanceof Error
           ? createError.message
-          : "Could not create agent draft.",
+          : "Could not create agent.",
       );
     } finally {
       setIsSubmitting(false);
@@ -97,10 +97,10 @@ export function AgentMinimalCreateForm({
     >
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-          New draft
+          New agent
         </p>
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-          Create an agent draft
+          Create an agent
         </h2>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
           Choose the runtime channel and name the agent. The workspace opens next for
@@ -154,7 +154,7 @@ export function AgentMinimalCreateForm({
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
         <button className={primaryButtonClassName} disabled={!canSubmit} type="submit">
-          {isSubmitting ? "Creating..." : "Create draft"}
+          {isSubmitting ? "Creating..." : "Create agent"}
           <ArrowRight className="ml-2 size-4" />
         </button>
         <p className="text-xs leading-5 text-muted-foreground">

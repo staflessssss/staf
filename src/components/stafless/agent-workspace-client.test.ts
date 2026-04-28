@@ -60,7 +60,6 @@ test("agent workspace blocks saving when Functions still contain invalid configu
 
   assert.match(source, /Fix invalid Functions configuration before saving this agent\./);
   assert.match(source, /getGoogleCalendarValidationErrors/);
-  assert.match(source, /steps: steps\.map\(\(\{ uiId, \.\.\.step \}\) => step\),/);
 });
 
 test("agent workspace blocks saving when Settings schedule windows are invalid", () => {

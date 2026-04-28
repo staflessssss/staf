@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -430,12 +429,22 @@ export function withFunctionUiIds(fn: FunctionBlockConfig): FunctionDraft {
 }
 
 export function stripFunctionUiIds(functionBlocks: FunctionDraft[]): FunctionBlockConfig[] {
-  return functionBlocks.map(({ uiId, parameters, resultTargets, steps, ...fn }) => ({
-    ...fn,
-    parameters: parameters.map(({ uiId, ...parameter }) => parameter),
-    resultTargets: resultTargets.map(({ uiId, ...target }) => target),
-    steps: steps.map(({ uiId, ...step }) => step),
-  }));
+  return functionBlocks.map((functionBlock) => {
+    const { parameters, resultTargets, steps, ...fn } = stripUiId(functionBlock);
+
+    return {
+      ...fn,
+      parameters: parameters.map(stripUiId),
+      resultTargets: resultTargets.map(stripUiId),
+      steps: steps.map(stripUiId),
+    };
+  });
+}
+
+function stripUiId<T extends { uiId?: string }>(item: T): Omit<T, "uiId"> {
+  const { uiId, ...rest } = item;
+  void uiId;
+  return rest;
 }
 
 function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgent): WorkspaceDraft {
@@ -549,9 +558,8 @@ function parseFunctionBlocks(
   integrationById: Map<string, IntegrationConnection>,
 ) {
   const errors: string[] = [];
-  const parsedFunctionBlocks = stripFunctionUiIds(functionBlocks).map((fn) => ({
-    ...fn,
-    steps: fn.steps.map((step, stepIndex) => {
+  stripFunctionUiIds(functionBlocks).forEach((fn) => {
+    fn.steps.forEach((step, stepIndex) => {
       const integrationType = integrationById.get(step.integrationId)?.type;
 
       try {
@@ -575,8 +583,8 @@ function parseFunctionBlocks(
           params: {},
         };
       }
-    }),
-  }));
+    });
+  });
 
   return { errors };
 }
@@ -807,7 +815,6 @@ export function AgentWorkspaceClient({
       hint: "The workspace exposes the right-side test chat for a real conversation cycle.",
     },
   ];
-  const completedChecklistCount = checklistItems.filter((item) => item.done).length;
   const selectedWorkspaceSection = workspaceSections.find(
     (section) => section.id === workspaceSection,
   ) ?? workspaceSections[0];

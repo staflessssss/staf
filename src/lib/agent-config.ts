@@ -714,9 +714,10 @@ const defaultAgentScheduleWindows: AgentScheduleWindowConfig[] = agentScheduleDa
   start: "09:00",
   end: "18:00",
 }));
+const scheduleTimePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 function normalizeScheduleTime(value: unknown, fallback: string) {
-  return typeof value === "string" && /^\d{2}:\d{2}$/.test(value) ? value : fallback;
+  return typeof value === "string" && scheduleTimePattern.test(value) ? value : fallback;
 }
 
 function isOrderedScheduleWindow(start: string, end: string) {
@@ -886,8 +887,8 @@ export const functionBlockSchema = z.object({
 const scheduleWindowSchema = z.object({
   day: z.enum(agentScheduleDayOptions),
   enabled: z.boolean().default(false),
-  start: z.string().regex(/^\d{2}:\d{2}$/).default("09:00"),
-  end: z.string().regex(/^\d{2}:\d{2}$/).default("18:00"),
+  start: z.string().regex(scheduleTimePattern).default("09:00"),
+  end: z.string().regex(scheduleTimePattern).default("18:00"),
 });
 
 export const channelConfigSchema = z
