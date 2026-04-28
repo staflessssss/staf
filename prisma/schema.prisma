@@ -84,7 +84,6 @@ model IntegrationConnection {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
-  steps          Step[]
 
   @@unique([tenantId, type])
 }
@@ -154,25 +153,11 @@ model Feature {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   agent            Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  steps            Step[]
 }
 
 enum FeatureType {
   KNOWLEDGE
   TOOL
-}
-
-model Step {
-  id            String                @id @default(cuid())
-  featureId     String
-  integrationId String
-  action        String
-  params        Json
-  sortOrder     Int                   @default(0)
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
-  feature       Feature               @relation(fields: [featureId], references: [id], onDelete: Cascade)
-  integration   IntegrationConnection @relation(fields: [integrationId], references: [id])
 }
 
 model Conversation {
