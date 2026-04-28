@@ -858,39 +858,6 @@ export function AgentCreateWizardClient({
     });
   }
 
-  function addFunctionResultTarget(functionIndex: number) {
-    const current = draft.channelConfig.functionBlocks[functionIndex];
-
-    updateFunction(functionIndex, {
-      resultTargets: [
-        ...current.resultTargets,
-        { uiId: createDraftUiId("target"), type: "integration_step", label: "New target" },
-      ],
-    });
-  }
-
-  function updateFunctionResultTarget(
-    functionIndex: number,
-    targetIndex: number,
-    patch: Partial<FunctionDraft["resultTargets"][number]>,
-  ) {
-    const current = draft.channelConfig.functionBlocks[functionIndex];
-
-    updateFunction(functionIndex, {
-      resultTargets: current.resultTargets.map((target, currentIndex) =>
-        currentIndex === targetIndex ? { ...target, ...patch } : target,
-      ),
-    });
-  }
-
-  function removeFunctionResultTarget(functionIndex: number, targetIndex: number) {
-    const current = draft.channelConfig.functionBlocks[functionIndex];
-
-    updateFunction(functionIndex, {
-      resultTargets: current.resultTargets.filter((_, currentIndex) => currentIndex !== targetIndex),
-    });
-  }
-
   function updateFunctionStep(
     functionIndex: number,
     stepIndex: number,
@@ -2040,8 +2007,7 @@ export function AgentCreateWizardClient({
               isWorkspaceMode={false}
               onAddFunctionBlock={addFunctionBlock}
               onAddFunctionParameter={addFunctionParameter}
-                onAddFunctionResultTarget={addFunctionResultTarget}
-                onAddFunctionStep={addFunctionStep}
+              onAddFunctionStep={addFunctionStep}
                 onAddGoogleSheetsColumnMapping={addGoogleSheetsColumnMapping}
                 onAddGoogleSheetsFilter={addGoogleSheetsFilter}
                 onFunctionStepIntegrationChange={handleFunctionStepIntegrationChange}
@@ -2050,11 +2016,9 @@ export function AgentCreateWizardClient({
               onMoveFunctionBlock={moveFunctionBlock}
               onRemoveFunctionBlock={removeFunctionBlock}
               onRemoveFunctionParameter={removeFunctionParameter}
-              onRemoveFunctionResultTarget={removeFunctionResultTarget}
               onRemoveFunctionStep={removeFunctionStep}
               onUpdateFunction={updateFunction}
               onUpdateFunctionParameter={updateFunctionParameter}
-                onUpdateFunctionResultTarget={updateFunctionResultTarget}
                 onUpdateFunctionStep={updateFunctionStep}
                 onUpdateFunctionStepParams={updateFunctionStepParams}
                 onUpdateGoogleSheetsColumnMapping={updateGoogleSheetsColumnMapping}

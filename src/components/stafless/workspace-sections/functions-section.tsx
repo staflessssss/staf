@@ -1,10 +1,21 @@
 import { IntegrationConnection, IntegrationType } from "@prisma/client";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Braces,
+  ChevronRight,
+  CircleQuestionMark,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import {
   EmptyState,
   FormField,
   SurfaceCard,
+  ToggleSwitch,
   inputClassName,
   secondaryButtonClassName,
   selectClassName,
@@ -17,7 +28,6 @@ import {
   functionParameterTypeOptions,
   functionPostActionOptions,
   functionReactionActionOptions,
-  functionResultTargetTypeOptions,
 } from "@/lib/agent-builder";
 import {
   GoogleCalendarParams,
@@ -27,9 +37,22 @@ import {
   GoogleSheetsParams,
   getGoogleSheetsActionForOperation,
 } from "@/lib/function-execution";
+import {
+  PrimaryDestinationType,
+  changePrimaryDestinationType,
+  createPrimaryDestination,
+  getDestinationSelectorOptions,
+  getLinkedPrimaryStep,
+  loadViewModel,
+  removePrimaryDestination,
+  updatePrimaryDestinationLabel,
+  updatePrimaryDestinationStep,
+} from "@/lib/functions/destination-mapping";
+import { applyFunctionVmChange } from "@/lib/functions/apply-function-vm-change";
 
 type ToolStepDraft = {
   uiId: string;
+  id?: string;
   integrationId: string;
   action: string;
   params: string;
@@ -179,6 +202,79 @@ function getGoogleSheetsBindingPreview(source: GoogleSheetsColumnMappingDraft["v
   }
 }
 
+const compactInputClassName =
+  "h-9 w-full rounded-md border border-[#d8e0ec] bg-white px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/80 focus:border-[#8ea2ff] focus:ring-2 focus:ring-[#8ea2ff]/10";
+const compactSelectClassName = compactInputClassName;
+const compactTextareaClassName =
+  "w-full rounded-md border border-[#d8e0ec] bg-white px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground/80 focus:border-[#8ea2ff] focus:ring-2 focus:ring-[#8ea2ff]/10";
+const iconButtonClassName =
+  "inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#d8e0ec] bg-white text-[#475467] transition hover:bg-[#f8fafc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ea2ff]/20";
+const functionListCardClassName =
+  "rounded-[16px] border border-[#e3e8f1] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[#cfd8e6] hover:bg-[#fbfcff]";
+const detailSectionCardClassName =
+  "rounded-[14px] border border-[#dbe3ef] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.02)]";
+const detailSectionTitleClassName =
+  "text-[18px] font-semibold tracking-[-0.02em] text-[#111827]";
+
+function getFunctionPreview(fn: FunctionDraft) {
+  return (
+    fn.description.trim() ||
+    fn.parameters.map((parameter) => parameter.name.trim()).filter(Boolean).join(", ") ||
+    "Open the function to configure its business action, parameters, and result delivery."
+  );
+}
+
+function getFunctionMeta(fn: FunctionDraft) {
+  return [
+    `${fn.parameters.length} params`,
+    `${fn.steps.length} steps`,
+    fn.resultTargets.length ? `${fn.resultTargets.length} targets` : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
+}
+
+function getReactionDescription(value: FunctionDraft["reactionAction"]) {
+  switch (value) {
+    case "send_message":
+      return "The agent sends a direct reply immediately after the function completes.";
+    case "send_instruction":
+      return "The function result is treated like an instruction layer for the next reply.";
+    case "send_nothing":
+      return "The function completes silently without an automatic customer-facing message.";
+    default:
+      return "The AI agent decides how to respond based on the function result.";
+  }
+}
+
+function getPostActionDescription(value: FunctionDraft["postAction"]) {
+  switch (value) {
+    case "pause_dialog":
+      return "The dialog is paused after the function finishes.";
+    case "switch_agent":
+      return "Use this when another agent or flow should take over next.";
+    case "change_prompt":
+      return "Use this when the function should alter the agent's prompt context.";
+    default:
+      return "The agent continues the current conversation after the function runs.";
+  }
+}
+
+function getFunctionBusinessMeta(fn: FunctionDraft) {
+  const parts = [fn.active ? "Active" : "Inactive"];
+
+  parts.push(
+    fn.parameters.length === 1 ? "1 parameter" : `${fn.parameters.length} parameters`,
+  );
+
+  if (fn.disableDelayedMessages) {
+    parts.push("Delayed messages off");
+  }
+
+  return parts.join(" • ");
+}
+
+
 export function FunctionsSection({
   functionBlocks,
   isReadOnlyMode,
@@ -194,9 +290,6 @@ export function FunctionsSection({
   onAddFunctionParameter,
   onUpdateFunctionParameter,
   onRemoveFunctionParameter,
-  onAddFunctionResultTarget,
-  onUpdateFunctionResultTarget,
-  onRemoveFunctionResultTarget,
   onAddFunctionStep,
   onRemoveFunctionStep,
   onFunctionStepIntegrationChange,
@@ -230,13 +323,6 @@ export function FunctionsSection({
     patch: Partial<FunctionDraft["parameters"][number]>,
   ) => void;
   onRemoveFunctionParameter: (functionIndex: number, parameterIndex: number) => void;
-  onAddFunctionResultTarget: (functionIndex: number) => void;
-  onUpdateFunctionResultTarget: (
-    functionIndex: number,
-    targetIndex: number,
-    patch: Partial<FunctionDraft["resultTargets"][number]>,
-  ) => void;
-  onRemoveFunctionResultTarget: (functionIndex: number, targetIndex: number) => void;
   onAddFunctionStep: (functionIndex: number) => void;
   onRemoveFunctionStep: (functionIndex: number, stepIndex: number) => void;
   onFunctionStepIntegrationChange: (
@@ -274,11 +360,112 @@ export function FunctionsSection({
   getGoogleSheetsParams: (step: ToolStepDraft) => GoogleSheetsParams;
   getGoogleCalendarParams: (step: ToolStepDraft) => GoogleCalendarParams;
 }) {
+  const [selectedFunctionUiId, setSelectedFunctionUiId] = useState<string | null>(null);
+
+  const selectedFunctionEntry = useMemo(() => {
+    if (!selectedFunctionUiId) {
+      return null;
+    }
+
+    const index = functionBlocks.findIndex((fn) => fn.uiId === selectedFunctionUiId);
+
+    if (index === -1) {
+      return null;
+    }
+
+    return {
+      fn: functionBlocks[index],
+      functionIndex: index,
+    };
+  }, [functionBlocks, selectedFunctionUiId]);
+
+  useEffect(() => {
+    if (!functionBlocks.length) {
+      setSelectedFunctionUiId(null);
+      return;
+    }
+
+    if (
+      selectedFunctionUiId &&
+      functionBlocks.some((fn) => fn.uiId === selectedFunctionUiId)
+    ) {
+      return;
+    }
+
+    setSelectedFunctionUiId(null);
+  }, [functionBlocks, selectedFunctionUiId]);
+
+  const applyVmChange = (
+    functionIndex: number,
+    updater: (currentVm: ReturnType<typeof loadViewModel<FunctionResultTargetDraft, ToolStepDraft, FunctionParameterDraft>>) => ReturnType<typeof loadViewModel<FunctionResultTargetDraft, ToolStepDraft, FunctionParameterDraft>>,
+  ) => {
+    const currentFunction = functionBlocks[functionIndex];
+
+    if (!currentFunction) {
+      return;
+    }
+
+    onUpdateFunction(functionIndex, applyFunctionVmChange(currentFunction, updater));
+  };
+
+  const createPrimaryStepStrategy = () => ({
+    createStep: (type: "google_sheets" | "google_calendar" | "api_request"): ToolStepDraft => ({
+      uiId: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: crypto.randomUUID(),
+      integrationId: "",
+      action:
+        type === "google_sheets"
+          ? getGoogleSheetsActionForOperation("get_rows")
+          : type === "google_calendar"
+            ? "check consultation calendar availability"
+            : "send custom api request",
+      params:
+        type === "google_sheets"
+          ? JSON.stringify(getGoogleSheetsParams({ uiId: "", integrationId: "", action: "", params: "{}" }), null, 2)
+          : type === "google_calendar"
+            ? JSON.stringify(getGoogleCalendarParams({ uiId: "", integrationId: "", action: "", params: "{}" }), null, 2)
+            : "{}",
+    }),
+    getStepId: (step: ToolStepDraft) => step.id ?? null,
+    findLegacyStepIndex: (
+      steps: ToolStepDraft[],
+      destinationType: "google_sheets" | "google_calendar" | "api_request",
+    ) => {
+      const matches = steps
+        .map((step, index) => ({ step, index }))
+        .filter(({ step }) =>
+          destinationType === "google_sheets"
+            ? integrationById.get(step.integrationId)?.type === IntegrationType.GOOGLE_SHEETS
+            : destinationType === "google_calendar"
+              ? integrationById.get(step.integrationId)?.type ===
+                IntegrationType.GOOGLE_CALENDAR
+              : (() => {
+                  const integrationType = integrationById.get(step.integrationId)?.type;
+
+                  return (
+                    !integrationType ||
+                    (integrationType !== IntegrationType.GOOGLE_SHEETS &&
+                      integrationType !== IntegrationType.GOOGLE_CALENDAR)
+                  );
+                })(),
+        );
+
+      return matches.length === 1 ? matches[0]!.index : -1;
+    },
+  });
+
+  const visibleFunctionEntries =
+    isWorkspaceMode
+      ? selectedFunctionEntry
+        ? [selectedFunctionEntry]
+        : []
+      : functionBlocks.map((fn, functionIndex) => ({ fn, functionIndex }));
+
   return (
     <SurfaceCard
       className="border-0 bg-transparent p-0 shadow-none"
       title="Functions"
-      description="Define business actions as structured functions, then bind their execution steps to tenant integrations."
+      description="Define business actions in a compact operator workspace, then bind execution to tenant integrations."
       action={
         isReadOnlyMode ? null : (
           <button className={secondaryButtonClassName} onClick={onAddFunctionBlock} type="button">
@@ -309,31 +496,155 @@ export function FunctionsSection({
             />
           ) : null}
 
-          {functionBlocks.map((fn, functionIndex) => (
+          {isWorkspaceMode && functionBlocks.length > 0 && !selectedFunctionEntry ? (
+            <div className="mx-auto w-full max-w-[720px] space-y-6">
+              <div className="flex items-start justify-between gap-4 border-b border-[#e8edf5] pb-5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-[18px] font-semibold tracking-[-0.02em] text-[#101828]">
+                      Functions
+                    </h1>
+                    <CircleQuestionMark className="size-4 text-[#98a2b3]" />
+                  </div>
+                  <p className="mt-2 max-w-[560px] text-sm leading-6 text-[#667085]">
+                    Functions connect the agent to real business actions. Start with a clear
+                    action name, then open the function to configure parameters, behavior,
+                    and result delivery.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {functionBlocks.map((fn, functionIndex) => (
+                  <div
+                    key={fn.uiId}
+                    className={functionListCardClassName}
+                  >
+                    <button
+                      className="flex w-full items-center gap-4 text-left"
+                      onClick={() => setSelectedFunctionUiId(fn.uiId)}
+                      type="button"
+                    >
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#f4f6fb] text-[#6c63ff]">
+                        <Braces className="size-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-semibold text-[#111827]">
+                          {fn.name.trim() || `Untitled function ${functionIndex + 1}`}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#667085]">
+                          {getFunctionPreview(fn)}
+                        </p>
+                        <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-[#98a2b3]">
+                          {getFunctionBusinessMeta(fn)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div
+                          onClick={(event) => event.stopPropagation()}
+                          role="presentation"
+                        >
+                          <ToggleSwitch
+                            checked={fn.active}
+                            disabled={isReadOnlyMode}
+                            onCheckedChange={(checked) =>
+                              onUpdateFunction(functionIndex, { active: checked })
+                            }
+                          />
+                        </div>
+                        <ChevronRight className="size-4 text-[#98a2b3]" />
+                      </div>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {!isReadOnlyMode ? (
+                <div className="flex justify-center pt-1">
+                  <button
+                    className="inline-flex size-9 items-center justify-center rounded-full bg-[#6c63ff] text-white transition hover:bg-[#5a52ea]"
+                    onClick={onAddFunctionBlock}
+                    type="button"
+                  >
+                    <Plus className="size-4" />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {isWorkspaceMode && selectedFunctionEntry ? (
+            <div className="mx-auto w-full max-w-[880px] space-y-6">
+              <div className="flex items-start justify-between gap-4 border-b border-[#e8edf5] pb-5">
+                <div className="min-w-0">
+                  <button
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#667085] transition hover:text-[#111827]"
+                    onClick={() => setSelectedFunctionUiId(null)}
+                    type="button"
+                  >
+                    <ArrowLeft className="size-4" />
+                    Back to functions
+                  </button>
+                  <div className="mt-3 flex items-center gap-2">
+                    <h1 className="truncate text-[18px] font-semibold tracking-[-0.02em] text-[#101828]">
+                      {selectedFunctionEntry.fn.name.trim() || "Untitled function"}
+                    </h1>
+                    <CircleQuestionMark className="size-4 text-[#98a2b3]" />
+                  </div>
+                  <p className="mt-2 max-w-[640px] text-sm leading-6 text-[#667085]">
+                    Configure the function contract, post-scenario behavior, delayed-message
+                    handling, and the destination that receives the result.
+                  </p>
+                </div>
+                <div className="text-sm text-[#98a2b3]">
+                  {selectedFunctionEntry.fn.active ? "Active" : "Inactive"}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {visibleFunctionEntries.map(({ fn, functionIndex }) => (
             <div
               key={fn.uiId}
-              className="rounded-[30px] bg-[linear-gradient(180deg,#fffefb_0%,#fbf4ea_100%)] p-6 ring-1 ring-[#dfcfbb]"
+              className={
+                isWorkspaceMode
+                  ? "mx-auto w-full max-w-[880px] space-y-6"
+                  : "rounded-[16px] border border-[#e6ebf2] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+              }
             >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-foreground">Function {functionIndex + 1}</p>
+              <div
+                className={
+                  isWorkspaceMode
+                    ? "hidden"
+                    : "mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[#edf1f6] pb-4"
+                }
+              >
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#8090ab]">
+                    Function {functionIndex + 1}
+                  </p>
+                  <p className="mt-1 text-base font-semibold text-foreground">
+                    {fn.name.trim() || `Untitled function ${functionIndex + 1}`}
+                  </p>
+                </div>
                 {!isReadOnlyMode ? (
                   <div className="flex gap-2">
                     <button
-                      className={secondaryButtonClassName}
+                      className={iconButtonClassName}
                       onClick={() => onMoveFunctionBlock(functionIndex, -1)}
                       type="button"
                     >
                       <ArrowUp className="size-4" />
                     </button>
                     <button
-                      className={secondaryButtonClassName}
+                      className={iconButtonClassName}
                       onClick={() => onMoveFunctionBlock(functionIndex, 1)}
                       type="button"
                     >
                       <ArrowDown className="size-4" />
                     </button>
                     <button
-                      className={secondaryButtonClassName}
+                      className={iconButtonClassName}
                       onClick={() => onRemoveFunctionBlock(functionIndex)}
                       type="button"
                     >
@@ -344,77 +655,93 @@ export function FunctionsSection({
               </div>
 
               <div className="space-y-4">
-                <div className="grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_320px]">
-                  <div className="space-y-4">
-                    <FormField label="Function name">
-                      <input
-                        className={inputClassName}
-                        onChange={(event) => onUpdateFunction(functionIndex, { name: event.target.value })}
-                        readOnly={isReadOnlyMode}
-                        value={fn.name}
-                      />
-                    </FormField>
-                    <FormField label="Summary">
-                      <textarea
-                        className={textareaClassName}
-                        onChange={(event) =>
-                          onUpdateFunction(functionIndex, { description: event.target.value })
-                        }
-                        readOnly={isReadOnlyMode}
-                        value={fn.description}
-                      />
-                    </FormField>
-                  </div>
+                {!isWorkspaceMode ? (
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                    <div className="space-y-4">
+                      <FormField label="Function name" labelClassName="text-xs font-medium text-[#667085]">
+                        <input
+                          className={compactInputClassName}
+                          onChange={(event) => onUpdateFunction(functionIndex, { name: event.target.value })}
+                          readOnly={isReadOnlyMode}
+                          value={fn.name}
+                        />
+                      </FormField>
+                      <FormField label="Summary" labelClassName="text-xs font-medium text-[#667085]">
+                        <textarea
+                          className={compactTextareaClassName}
+                          onChange={(event) =>
+                            onUpdateFunction(functionIndex, { description: event.target.value })
+                          }
+                          readOnly={isReadOnlyMode}
+                          value={fn.description}
+                        />
+                      </FormField>
+                    </div>
 
-                  <div className="rounded-[22px] bg-[#201627] px-5 py-5 text-[#f7efe4] shadow-[0_16px_34px_rgba(31,23,40,0.12)]">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#d4c4af]">
-                      Function role
-                    </p>
-                    <p className="mt-3 text-sm leading-7 text-[#eadfcf]">
-                      Keep the operator focused on the business action first. Execution details
-                      stay below, but the function itself should read like something the agent does
-                      for the client.
-                    </p>
+                    <div className="rounded-[12px] border border-[#e6ebf2] bg-[#fbfcfe] px-4 py-4">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#8090ab]">
+                        Workspace note
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        Keep the operator focused on the business action first. Execution details
+                        stay below, but the function itself should read like something the agent does
+                        for the client.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 {isWorkspaceMode ? (
                   <>
-                    <div className="grid gap-5 rounded-[22px] bg-white/72 p-5 ring-1 ring-[#eadccc] lg:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
-                      <div className="space-y-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8c745b]">
-                          Function contract
-                        </p>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-3 text-sm text-foreground ring-1 ring-[#eadccc]">
-                            <input
+                    <div className="space-y-3">
+                      <h2 className={detailSectionTitleClassName}>Function details</h2>
+                      <div className={detailSectionCardClassName}>
+                        <div className="space-y-4">
+                          <div className="flex items-start justify-between gap-4 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-4">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium text-[#111827]">Function status</p>
+                              <p className="text-sm leading-6 text-[#667085]">
+                                Control whether this function is available to the agent right now.
+                              </p>
+                            </div>
+                            <ToggleSwitch
                               checked={fn.active}
                               disabled={isReadOnlyMode}
-                              onChange={(event) =>
-                                onUpdateFunction(functionIndex, { active: event.target.checked })
+                              onCheckedChange={(checked) =>
+                                onUpdateFunction(functionIndex, { active: checked })
                               }
-                              type="checkbox"
                             />
-                            Function active
-                          </label>
-                          <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-3 text-sm text-foreground ring-1 ring-[#eadccc]">
+                          </div>
+                          <FormField label="Function name" labelClassName="text-xs font-medium text-[#667085]">
                             <input
-                              checked={fn.disableDelayedMessages}
-                              disabled={isReadOnlyMode}
-                              onChange={(event) =>
-                                onUpdateFunction(functionIndex, {
-                                  disableDelayedMessages: event.target.checked,
-                                })
-                              }
-                              type="checkbox"
+                              className={compactInputClassName}
+                              onChange={(event) => onUpdateFunction(functionIndex, { name: event.target.value })}
+                              readOnly={isReadOnlyMode}
+                              value={fn.name}
                             />
-                            Disable delayed messages after run
-                          </label>
+                          </FormField>
+                          <FormField label="Summary" labelClassName="text-xs font-medium text-[#667085]">
+                            <textarea
+                              className={compactTextareaClassName}
+                              onChange={(event) =>
+                                onUpdateFunction(functionIndex, { description: event.target.value })
+                              }
+                              readOnly={isReadOnlyMode}
+                              value={fn.description}
+                            />
+                          </FormField>
                         </div>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <FormField label="Reaction after execution">
+                      </div>
+
+                      <div className={detailSectionCardClassName}>
+                        <div className="flex items-center gap-2">
+                          <h2 className={detailSectionTitleClassName}>Reaction after function</h2>
+                          <CircleQuestionMark className="size-4 text-[#98a2b3]" />
+                        </div>
+                        <div className="mt-4 space-y-4">
+                          <FormField label="Action" labelClassName="text-xs font-medium text-[#667085]">
                             <select
-                              className={selectClassName}
+                              className={compactSelectClassName}
                               disabled={isReadOnlyMode}
                               onChange={(event) =>
                                 onUpdateFunction(functionIndex, {
@@ -431,9 +758,21 @@ export function FunctionsSection({
                               ))}
                             </select>
                           </FormField>
-                          <FormField label="Post-scenario">
+                          <div className="rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-4 text-sm leading-6 text-[#667085]">
+                            {getReactionDescription(fn.reactionAction)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={detailSectionCardClassName}>
+                        <div className="flex items-center gap-2">
+                          <h2 className={detailSectionTitleClassName}>Post-scenario</h2>
+                          <CircleQuestionMark className="size-4 text-[#98a2b3]" />
+                        </div>
+                        <div className="mt-4 space-y-4">
+                          <FormField label="Action" labelClassName="text-xs font-medium text-[#667085]">
                             <select
-                              className={selectClassName}
+                              className={compactSelectClassName}
                               disabled={isReadOnlyMode}
                               onChange={(event) =>
                                 onUpdateFunction(functionIndex, {
@@ -449,35 +788,47 @@ export function FunctionsSection({
                               ))}
                             </select>
                           </FormField>
+                          <div className="rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-4 text-sm leading-6 text-[#667085]">
+                            {getPostActionDescription(fn.postAction)}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-3 rounded-[18px] bg-[#fcf7ef] px-5 py-5 ring-1 ring-[#eadccc]">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8c745b]">
-                          Operator guidance
-                        </p>
-                        <p className="text-sm leading-7 text-[#655446]">
-                          Use the contract layer for when the function should run, what the model
-                          must extract first, and how the agent should continue after execution.
-                        </p>
+                      <div className={detailSectionCardClassName}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <h2 className={detailSectionTitleClassName}>Disable delayed messages</h2>
+                            <p className="text-sm leading-6 text-[#667085]">
+                              After this function runs, scheduled delayed messages will be turned off for the current dialog.
+                            </p>
+                          </div>
+                          <ToggleSwitch
+                            checked={fn.disableDelayedMessages}
+                            disabled={isReadOnlyMode}
+                            onCheckedChange={(checked) =>
+                              onUpdateFunction(functionIndex, {
+                                disableDelayedMessages: checked,
+                              })
+                            }
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid gap-5 lg:grid-cols-2">
-                      <div className="rounded-[22px] bg-white/72 p-5 ring-1 ring-[#eadccc]">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold text-foreground">Input parameters</p>
-                          {!isReadOnlyMode ? (
-                            <button
-                              className={secondaryButtonClassName}
-                              onClick={() => onAddFunctionParameter(functionIndex)}
-                              type="button"
-                            >
-                              <Plus className="mr-2 size-4" />
-                              Add parameter
-                            </button>
-                          ) : null}
-                        </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <h2 className={detailSectionTitleClassName}>Function parameters</h2>
+                        {!isReadOnlyMode ? (
+                          <button
+                            className="inline-flex size-8 items-center justify-center rounded-full bg-[#6c63ff] text-white transition hover:bg-[#5b53ea]"
+                            onClick={() => onAddFunctionParameter(functionIndex)}
+                            type="button"
+                          >
+                            <Plus className="size-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                      <div className={detailSectionCardClassName}>
                         <div className="space-y-4">
                           {fn.parameters.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
@@ -488,12 +839,12 @@ export function FunctionsSection({
                           {fn.parameters.map((parameter, parameterIndex) => (
                             <div
                               key={parameter.uiId}
-                              className="space-y-3 rounded-[18px] bg-[#fff9f1] p-4 ring-1 ring-[#eadccc]"
+                              className="space-y-4 rounded-[12px] border border-[#e5e7eb] bg-white px-4 py-4"
                             >
-                              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto]">
-                                <FormField label="Name">
+                              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_200px_minmax(0,1.2fr)_40px]">
+                                <FormField label="Name" labelClassName="text-xs font-medium text-[#667085]">
                                   <input
-                                    className={inputClassName}
+                                    className={compactInputClassName}
                                     onChange={(event) =>
                                       onUpdateFunctionParameter(functionIndex, parameterIndex, {
                                         name: event.target.value,
@@ -503,9 +854,9 @@ export function FunctionsSection({
                                     value={parameter.name}
                                   />
                                 </FormField>
-                                <FormField label="Type">
+                                <FormField label="Type" labelClassName="text-xs font-medium text-[#667085]">
                                   <select
-                                    className={selectClassName}
+                                    className={compactSelectClassName}
                                     disabled={isReadOnlyMode}
                                     onChange={(event) =>
                                       onUpdateFunctionParameter(functionIndex, parameterIndex, {
@@ -522,9 +873,21 @@ export function FunctionsSection({
                                     ))}
                                   </select>
                                 </FormField>
+                                <FormField label="Instruction" labelClassName="text-xs font-medium text-[#667085]">
+                                  <textarea
+                                    className={compactTextareaClassName}
+                                    onChange={(event) =>
+                                      onUpdateFunctionParameter(functionIndex, parameterIndex, {
+                                        instruction: event.target.value,
+                                      })
+                                    }
+                                    readOnly={isReadOnlyMode}
+                                    value={parameter.instruction ?? ""}
+                                  />
+                                </FormField>
                                 {!isReadOnlyMode ? (
                                   <button
-                                    className={`${secondaryButtonClassName} self-end`}
+                                    className={`${iconButtonClassName} self-end`}
                                     onClick={() =>
                                       onRemoveFunctionParameter(functionIndex, parameterIndex)
                                     }
@@ -534,21 +897,10 @@ export function FunctionsSection({
                                   </button>
                                 ) : null}
                               </div>
-                              <FormField label="Instruction">
+
+                              <FormField label="Allowed values" labelClassName="text-xs font-medium text-[#667085]">
                                 <input
-                                  className={inputClassName}
-                                  onChange={(event) =>
-                                    onUpdateFunctionParameter(functionIndex, parameterIndex, {
-                                      instruction: event.target.value,
-                                    })
-                                  }
-                                  readOnly={isReadOnlyMode}
-                                  value={parameter.instruction ?? ""}
-                                />
-                              </FormField>
-                              <FormField label="Allowed values (comma-separated)">
-                                <input
-                                  className={inputClassName}
+                                  className={compactInputClassName}
                                   onChange={(event) =>
                                     onUpdateFunctionParameter(functionIndex, parameterIndex, {
                                       allowedValues: event.target.value
@@ -557,11 +909,12 @@ export function FunctionsSection({
                                         .filter(Boolean),
                                     })
                                   }
+                                  placeholder="Add values separated by commas"
                                   readOnly={isReadOnlyMode}
                                   value={parameter.allowedValues.join(", ")}
                                 />
                               </FormField>
-                              <label className="flex items-center gap-3 text-sm text-foreground">
+                              <label className="flex items-center gap-3 text-sm text-[#344054]">
                                 <input
                                   checked={parameter.required}
                                   disabled={isReadOnlyMode}
@@ -578,86 +931,485 @@ export function FunctionsSection({
                           ))}
                         </div>
                       </div>
+                    </div>
 
-                      <div className="rounded-[22px] bg-white/72 p-5 ring-1 ring-[#eadccc]">
-                        <div className="mb-4 flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold text-foreground">Result delivery</p>
-                          {!isReadOnlyMode ? (
-                            <button
-                              className={secondaryButtonClassName}
-                              onClick={() => onAddFunctionResultTarget(functionIndex)}
-                              type="button"
-                            >
-                              <Plus className="mr-2 size-4" />
-                              Add target
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className="space-y-4">
-                          {fn.resultTargets.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                              No explicit result targets yet. Execution can still flow through the
-                              bound steps below.
-                            </p>
-                          ) : null}
-                          {fn.resultTargets.map((target, targetIndex) => (
-                            <div
-                              key={target.uiId}
-                              className="grid gap-3 rounded-[18px] bg-[#fff9f1] p-4 ring-1 ring-[#eadccc] md:grid-cols-[180px_minmax(0,1fr)_auto]"
-                            >
-                              <FormField label="Target type">
-                                <select
-                                  className={selectClassName}
-                                  disabled={isReadOnlyMode}
-                                  onChange={(event) =>
-                                    onUpdateFunctionResultTarget(functionIndex, targetIndex, {
-                                      type:
-                                        event.target.value as FunctionDraft["resultTargets"][number]["type"],
-                                    })
-                                  }
-                                  value={target.type}
-                                >
-                                  {functionResultTargetTypeOptions.map((option) => (
-                                    <option key={option} value={option}>
-                                      {humanizeWorkspaceToken(option)}
-                                    </option>
-                                  ))}
-                                </select>
-                              </FormField>
-                              <FormField label="Label">
-                                <input
-                                  className={inputClassName}
-                                  onChange={(event) =>
-                                    onUpdateFunctionResultTarget(functionIndex, targetIndex, {
-                                      label: event.target.value,
-                                    })
-                                  }
-                                  readOnly={isReadOnlyMode}
-                                  value={target.label}
-                                />
-                              </FormField>
-                              {!isReadOnlyMode ? (
-                                <button
-                                  className={`${secondaryButtonClassName} self-end`}
-                                  onClick={() =>
-                                    onRemoveFunctionResultTarget(functionIndex, targetIndex)
-                                  }
-                                  type="button"
-                                >
-                                  <Trash2 className="size-4" />
-                                </button>
-                              ) : null}
+                    <div className="space-y-3">
+                      <h2 className={detailSectionTitleClassName}>Result delivery</h2>
+                      <div className={detailSectionCardClassName}>
+                        {(() => {
+                          const primaryStepStrategy = createPrimaryStepStrategy();
+                          const functionViewModel = loadViewModel(fn, primaryStepStrategy);
+                          const primaryBinding = functionViewModel.resultDelivery.primary;
+                          const primaryTarget = primaryBinding?.target ?? null;
+                          const visibleDestinationOptions = getDestinationSelectorOptions({
+                            isNewFunction: fn.resultTargets.length === 0,
+                            currentTargets: fn.resultTargets,
+                          });
+                          const secondaryTargets = functionViewModel.advanced.secondaryTargets;
+                          const hasAdvancedOnlyTargets =
+                            functionViewModel.advanced.advancedOnlyTargets.length > 0;
+                          const hasLegacyCompatTargets =
+                            functionViewModel.advanced.legacyCompatTargets.length > 0;
+                          const linkedPrimaryStep = getLinkedPrimaryStep(functionViewModel);
+                          const primaryStep = linkedPrimaryStep?.step ?? null;
+                          const sheetParams = primaryStep ? getGoogleSheetsParams(primaryStep) : null;
+                          const calendarParams = primaryStep
+                            ? getGoogleCalendarParams(primaryStep)
+                            : null;
+
+                          return (
+                            <div className="space-y-4">
+                              <p className="text-sm leading-6 text-[#667085]">
+                                Choose one primary destination for this function. Any legacy
+                                multi-step wiring stays available below in Advanced execution.
+                              </p>
+
+                              {!primaryTarget ? (
+                                <div className="space-y-4 rounded-[12px] border border-dashed border-[#cfd8e6] bg-[#fbfcff] px-4 py-5">
+                                  <p className="text-sm font-medium text-[#344054]">
+                                    {hasAdvancedOnlyTargets || fn.steps.length > 0
+                                      ? "This function still uses advanced delivery."
+                                      : "Create the primary destination for this function."}
+                                  </p>
+                                  {hasAdvancedOnlyTargets || fn.steps.length > 0 ? (
+                                    <p className="text-sm text-[#667085]">
+                                      Result delivery is currently defined through legacy targets
+                                      or execution steps. Choose a supported destination below if
+                                      you want to move this function into the new flow. Existing
+                                      advanced data will stay intact.
+                                    </p>
+                                  ) : null}
+                                  <div className="grid gap-3 md:grid-cols-3">
+                                    {visibleDestinationOptions.map((option) => (
+                                      <button
+                                        key={option.value}
+                                        className="rounded-[12px] border border-[#dbe3ef] bg-white px-4 py-3 text-left text-sm font-medium text-[#111827] transition hover:border-[#b9c7dd] hover:bg-[#f8faff]"
+                                        disabled={isReadOnlyMode}
+                                        onClick={() =>
+                                          applyVmChange(functionIndex, (currentVm) =>
+                                            createPrimaryDestination(
+                                              currentVm,
+                                              option.value,
+                                              primaryStepStrategy,
+                                            ),
+                                          )
+                                        }
+                                        type="button"
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)_40px]">
+                                    <FormField label="Destination" labelClassName="text-xs font-medium text-[#667085]">
+                                      <select
+                                        className={compactSelectClassName}
+                                        disabled={isReadOnlyMode}
+                                        onChange={(event) =>
+                                          applyVmChange(functionIndex, (currentVm) =>
+                                            changePrimaryDestinationType(
+                                              currentVm,
+                                              event.target.value as PrimaryDestinationType,
+                                              primaryStepStrategy,
+                                            ),
+                                          )
+                                        }
+                                        value={primaryTarget.type}
+                                      >
+                                        {visibleDestinationOptions.map((option) => (
+                                          <option key={option.value} value={option.value}>
+                                            {option.label}
+                                            {option.compatibility ? " (legacy)" : ""}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </FormField>
+                                    <FormField label="What to send" labelClassName="text-xs font-medium text-[#667085]">
+                                      <input
+                                        className={compactInputClassName}
+                                        onChange={(event) =>
+                                          applyVmChange(functionIndex, (currentVm) =>
+                                            updatePrimaryDestinationLabel(
+                                              currentVm,
+                                              event.target.value,
+                                            ),
+                                          )
+                                        }
+                                        readOnly={isReadOnlyMode}
+                                        value={primaryTarget.label}
+                                      />
+                                    </FormField>
+                                    {!isReadOnlyMode ? (
+                                      <button
+                                        className={`${iconButtonClassName} self-end`}
+                                        onClick={() =>
+                                          applyVmChange(functionIndex, removePrimaryDestination)
+                                        }
+                                        type="button"
+                                      >
+                                        <Trash2 className="size-4" />
+                                      </button>
+                                    ) : null}
+                                  </div>
+
+                                  {hasLegacyCompatTargets || hasAdvancedOnlyTargets ? (
+                                    <div className="rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3 text-sm text-[#667085]">
+                                      {secondaryTargets.length > 0
+                                        ? `${secondaryTargets.length} legacy result target${secondaryTargets.length === 1 ? "" : "s"} remain preserved in Advanced execution.`
+                                        : "Additional advanced delivery data remains preserved in Advanced execution."}
+                                    </div>
+                                  ) : null}
+
+                                  {primaryBinding?.mode === "compatibility" ? (
+                                    <div className="rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3 text-sm text-[#667085]">
+                                      This destination is shown in compatibility mode. Its legacy
+                                      delivery data stays preserved, and any deeper execution
+                                      wiring remains in Advanced execution.
+                                    </div>
+                                  ) : null}
+
+                                  {primaryBinding?.tier === "A" && !primaryStep ? (
+                                    <div className="rounded-[12px] border border-dashed border-[#cfd8e6] bg-[#fbfcff] px-4 py-5">
+                                      <p className="text-sm text-[#667085]">
+                                        Add one execution step to bind this destination to a real
+                                        integration action.
+                                      </p>
+                                      {!isReadOnlyMode ? (
+                                        <button
+                                          className={`${secondaryButtonClassName} mt-4`}
+                                          onClick={() =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              changePrimaryDestinationType(
+                                                currentVm,
+                                                primaryBinding.kind,
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          type="button"
+                                        >
+                                          <Plus className="mr-2 size-4" />
+                                          Add destination step
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+
+                                  {primaryTarget.type === "google_sheets" && primaryStep ? (
+                                    <div className="grid gap-4 rounded-[12px] border border-[#e5e7eb] bg-white px-4 py-4 md:grid-cols-2">
+                                      <FormField label="Google Sheets account">
+                                        <select
+                                          className={compactSelectClassName}
+                                          disabled={isReadOnlyMode}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  integrationId: event.target.value,
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          value={primaryStep.integrationId}
+                                        >
+                                          <option value="">Select integration</option>
+                                          {connectedIntegrations
+                                            .filter(
+                                              (integration) =>
+                                                integration.type === IntegrationType.GOOGLE_SHEETS,
+                                            )
+                                            .map((integration) => (
+                                              <option key={integration.id} value={integration.id}>
+                                                {getIntegrationDisplayLabel(integration)}
+                                              </option>
+                                            ))}
+                                        </select>
+                                      </FormField>
+                                      <FormField label="Action">
+                                        <select
+                                          className={compactSelectClassName}
+                                          disabled={isReadOnlyMode}
+                                          onChange={(event) => {
+                                            const operation =
+                                              event.target.value as GoogleSheetsOperationDraft;
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  action: getGoogleSheetsActionForOperation(operation),
+                                                  params: JSON.stringify(
+                                                    {
+                                                      ...getGoogleSheetsParams(currentStep),
+                                                      operation,
+                                                    },
+                                                    null,
+                                                    2,
+                                                  ),
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            );
+                                          }}
+                                          value={sheetParams?.operation ?? "get_rows"}
+                                        >
+                                          {googleSheetsOperationOptions.map((option) => (
+                                            <option key={option.value} value={option.value}>
+                                              {option.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </FormField>
+                                      <FormField label="Spreadsheet ID">
+                                        <input
+                                          className={compactInputClassName}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  params: JSON.stringify(
+                                                    {
+                                                      ...getGoogleSheetsParams(currentStep),
+                                                      spreadsheetId: event.target.value,
+                                                    },
+                                                    null,
+                                                    2,
+                                                  ),
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          readOnly={isReadOnlyMode}
+                                          value={sheetParams?.spreadsheetId ?? ""}
+                                        />
+                                      </FormField>
+                                      <FormField label="Sheet tab">
+                                        <input
+                                          className={compactInputClassName}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  params: JSON.stringify(
+                                                    {
+                                                      ...getGoogleSheetsParams(currentStep),
+                                                      sheetName: event.target.value,
+                                                    },
+                                                    null,
+                                                    2,
+                                                  ),
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          readOnly={isReadOnlyMode}
+                                          value={sheetParams?.sheetName ?? ""}
+                                        />
+                                      </FormField>
+                                    </div>
+                                  ) : null}
+
+                                  {primaryTarget.type === "google_calendar" && primaryStep ? (
+                                    <div className="grid gap-4 rounded-[12px] border border-[#e5e7eb] bg-white px-4 py-4 md:grid-cols-2">
+                                      <FormField label="Google Calendar account">
+                                        <select
+                                          className={compactSelectClassName}
+                                          disabled={isReadOnlyMode}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  integrationId: event.target.value,
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          value={primaryStep.integrationId}
+                                        >
+                                          <option value="">Select integration</option>
+                                          {connectedIntegrations
+                                            .filter(
+                                              (integration) =>
+                                                integration.type ===
+                                                IntegrationType.GOOGLE_CALENDAR,
+                                            )
+                                            .map((integration) => (
+                                              <option key={integration.id} value={integration.id}>
+                                                {getIntegrationDisplayLabel(integration)}
+                                              </option>
+                                            ))}
+                                        </select>
+                                      </FormField>
+                                      <FormField label="Action">
+                                        <select
+                                          className={compactSelectClassName}
+                                          disabled={isReadOnlyMode}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  action:
+                                                    event.target.value === "book_call"
+                                                      ? "book call and send invite"
+                                                      : "check consultation calendar availability",
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          value={calendarParams?.operation ?? "check_calendar"}
+                                        >
+                                          <option value="check_calendar">Get free time</option>
+                                          <option value="book_call">Create event</option>
+                                        </select>
+                                      </FormField>
+                                      <FormField label="Calendar ID">
+                                        <input
+                                          className={compactInputClassName}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  params: JSON.stringify(
+                                                    {
+                                                      ...getGoogleCalendarParams(currentStep),
+                                                      calendarId: event.target.value,
+                                                    },
+                                                    null,
+                                                    2,
+                                                  ),
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          readOnly={isReadOnlyMode}
+                                          value={calendarParams?.calendarId ?? ""}
+                                        />
+                                      </FormField>
+                                      <FormField label="Timezone">
+                                        <input
+                                          className={compactInputClassName}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  params: JSON.stringify(
+                                                    {
+                                                      ...getGoogleCalendarParams(currentStep),
+                                                      timeZone: event.target.value,
+                                                    },
+                                                    null,
+                                                    2,
+                                                  ),
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          readOnly={isReadOnlyMode}
+                                          value={calendarParams?.timeZone ?? ""}
+                                        />
+                                      </FormField>
+                                    </div>
+                                  ) : null}
+
+                                  {primaryTarget.type === "api_request" && primaryStep ? (
+                                    <div className="space-y-4 rounded-[12px] border border-[#e5e7eb] bg-white px-4 py-4">
+                                      <FormField label="Request action">
+                                        <input
+                                          className={compactInputClassName}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  action: event.target.value,
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          readOnly={isReadOnlyMode}
+                                          value={primaryStep.action}
+                                        />
+                                      </FormField>
+                                      <FormField label="Request payload (JSON)">
+                                        <textarea
+                                          className={compactTextareaClassName}
+                                          onChange={(event) =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              updatePrimaryDestinationStep(
+                                                currentVm,
+                                                (currentStep) => ({
+                                                  ...currentStep,
+                                                  params: event.target.value,
+                                                }),
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          readOnly={isReadOnlyMode}
+                                          rows={8}
+                                          value={primaryStep.params}
+                                        />
+                                      </FormField>
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </>
                 ) : null}
 
-                <div className="space-y-5 border-t border-[#e8d8c5] pt-6">
+                <details
+                  className={isWorkspaceMode ? "rounded-[14px] border border-[#e6ebf2] bg-white px-4 py-4" : ""}
+                  open={!isWorkspaceMode}
+                >
+                  {isWorkspaceMode ? (
+                    <summary className="cursor-pointer list-none text-sm font-semibold text-[#111827]">
+                      Advanced execution
+                    </summary>
+                  ) : null}
+                  <div className={`space-y-5 ${isWorkspaceMode ? "pt-4" : "border-t border-[#e8d8c5] pt-6"}`}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-foreground">Executable steps</p>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {isWorkspaceMode ? "Legacy execution steps" : "Executable steps"}
+                      </p>
+                      {isWorkspaceMode ? (
+                        <p className="mt-1 text-sm text-[#667085]">
+                          Compatibility layer for old multi-step builder logic:{" "}
+                          {getFunctionMeta(fn)}.
+                        </p>
+                      ) : null}
+                    </div>
                     {!isReadOnlyMode ? (
                       <button
                         className={secondaryButtonClassName}
@@ -1315,7 +2067,7 @@ export function FunctionsSection({
                               </p>
                             </div>
                             <div className="space-y-5 rounded-[22px] bg-white/72 p-5 ring-1 ring-[#eadccc]">
-                                <div className="flex items-start gap-4 rounded-[18px] bg-[#fcf7ef] p-4 ring-1 ring-[#eadccc]">
+                                <div className="flex items-start gap-4 rounded-[12px] border border-[#e6ebf2] bg-[#fbfcfe] p-4">
                                   <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#201627] text-sm font-semibold text-[#f7efe4]">
                                     1
                                   </div>
@@ -1763,7 +2515,7 @@ export function FunctionsSection({
                                 </div>
                                 {calendarParams.operation === "book_call" ? (
                                   <div className="space-y-3">
-                                    <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                    <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                       <input
                                         checked={calendarParams.checkConflictsBeforeBooking}
                                         disabled={isReadOnlyMode}
@@ -1776,7 +2528,7 @@ export function FunctionsSection({
                                       />
                                       Block booking when the slot is already busy
                                     </label>
-                                    <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                    <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                       <input
                                         checked={calendarParams.createMeetLink}
                                         disabled={isReadOnlyMode}
@@ -1789,7 +2541,7 @@ export function FunctionsSection({
                                       />
                                       Create Google Meet link automatically
                                     </label>
-                                    <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                    <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                       <input
                                         checked={calendarParams.inviteCustomerByEmail}
                                         disabled={isReadOnlyMode}
@@ -1821,7 +2573,7 @@ export function FunctionsSection({
 
                             {calendarParams.operation === "book_call" ? (
                               <div className="space-y-4 rounded-[22px] bg-white/72 p-5 ring-1 ring-[#eadccc]">
-                                <div className="flex items-start gap-4 rounded-[18px] bg-[#fcf7ef] p-4 ring-1 ring-[#eadccc]">
+                                <div className="flex items-start gap-4 rounded-[12px] border border-[#e6ebf2] bg-[#fbfcfe] p-4">
                                   <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#201627] text-sm font-semibold text-[#f7efe4]">
                                     4
                                   </div>
@@ -1871,7 +2623,7 @@ export function FunctionsSection({
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-2">
-                                  <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                  <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                     <input
                                       checked={calendarParams.checkConflictsBeforeBooking}
                                       disabled={isReadOnlyMode}
@@ -1884,7 +2636,7 @@ export function FunctionsSection({
                                     />
                                     Block booking when the slot is already busy
                                   </label>
-                                  <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                  <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                     <input
                                       checked={calendarParams.createMeetLink}
                                       disabled={isReadOnlyMode}
@@ -1897,7 +2649,7 @@ export function FunctionsSection({
                                     />
                                     Create Google Meet link automatically
                                   </label>
-                                  <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                  <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                     <input
                                       checked={calendarParams.inviteCustomerByEmail}
                                       disabled={isReadOnlyMode}
@@ -1926,7 +2678,7 @@ export function FunctionsSection({
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-                                  <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                  <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                     <input
                                       checked={calendarParams.reminderEnabled}
                                       disabled={isReadOnlyMode}
@@ -1958,7 +2710,7 @@ export function FunctionsSection({
                                   </FormField>
                                 </div>
 
-                                <label className="flex items-center gap-3 rounded-[16px] bg-[#faf3e9] px-4 py-4 text-sm text-foreground ring-1 ring-[#eadccc]">
+                                <label className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-white px-4 py-4 text-sm text-foreground">
                                   <input
                                     checked={calendarParams.syncLeadToSheets}
                                     disabled={isReadOnlyMode}
@@ -2185,6 +2937,7 @@ export function FunctionsSection({
                     );
                   })}
                 </div>
+                </details>
               </div>
             </div>
           ))}
