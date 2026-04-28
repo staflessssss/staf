@@ -40,19 +40,6 @@ test("buildFeatureCreateInput creates only KNOWLEDGE features", () => {
         knowledgeContent: "Wedding films and highlight edits.",
       },
     ],
-    toolBlocks: [
-      {
-        name: "Calendar check",
-        description: "Verify availability",
-        steps: [
-          {
-            integrationId: "integration-1",
-            action: "check calendar",
-            params: { window: "30d" },
-          },
-        ],
-      },
-    ],
   });
 
   const features = buildFeatureCreateInput(input);
@@ -97,35 +84,6 @@ test("buildFeatureCreateInput ignores channelConfig.functionBlocks for Feature w
   const features = buildFeatureCreateInput(input);
 
   assert.deepEqual(features, []);
-});
-
-test("getToolIntegrationIds ignores legacy toolBlocks", () => {
-  const input = agentDraftSchema.parse({
-    name: "Studio Concierge",
-    persona: "Helpful assistant",
-    tone: "friendly",
-    channelId: "channel-1",
-    toolBlocks: [
-      {
-        name: "Calendar check",
-        description: "Verify availability",
-        steps: [
-          {
-            integrationId: "integration-1",
-            action: "check calendar",
-            params: {},
-          },
-          {
-            integrationId: "integration-1",
-            action: "create hold",
-            params: {},
-          },
-        ],
-      },
-    ],
-  });
-
-  assert.deepEqual(getToolIntegrationIds(input), []);
 });
 
 test("getToolIntegrationIds reads from channelConfig.functionBlocks", () => {
@@ -213,8 +171,6 @@ test("mapAgentToDraft exposes functionBlocks from channelConfig", () => {
   assert.equal(draft.functionBlocks[0]?.name, "fn1");
   assert.equal(draft.functionBlocks[0]?.steps[0]?.id, "s1");
   assert.equal(draft.functionBlocks[0]?.resultTargets[0]?.primaryStepId, "s1");
-  assert.equal((draft as any).toolBlocks, undefined);
-  assert.equal("toolBlocks" in draft, false);
 
   assert.deepEqual(mapAgentToDraft(createAgent(null)).functionBlocks, []);
   assert.deepEqual(mapAgentToDraft(createAgent({})).functionBlocks, []);

@@ -831,22 +831,10 @@ export function normalizeAgentSettings(
   };
 }
 
-export const toolStepSchema = z.object({
-  integrationId: z.string().trim().min(1),
-  action: z.string().trim().min(1).max(120),
-  params: z.record(z.string(), z.unknown()).default({}),
-});
-
 export const knowledgeBlockSchema = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().min(1).max(500),
   knowledgeContent: z.string().trim().min(1).max(10_000),
-});
-
-export const toolBlockSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  description: z.string().trim().min(1).max(500),
-  steps: z.array(toolStepSchema).default([]),
 });
 
 export const functionParameterSchema = z.object({
@@ -1152,13 +1140,12 @@ export const agentDraftSchema = z.object({
     priceAttachmentMimeType: undefined,
   }),
   knowledgeBlocks: z.array(knowledgeBlockSchema).default([]),
-  toolBlocks: z.array(toolBlockSchema).default([]),
 });
 
 export type AgentDraftInput = z.infer<typeof agentDraftSchema>;
 
 export function deriveToolBlocksFromDraft(
-  input: Pick<AgentDraftInput, "toolBlocks" | "channelConfig">,
+  input: Pick<AgentDraftInput, "channelConfig">,
 ) {
   const functionBlocks = normalizeFunctionBlocks(input.channelConfig?.functionBlocks ?? []);
   return functionBlocksToToolBlocks(functionBlocks);
@@ -1766,14 +1753,6 @@ export type BuilderPreviewInput = {
       type: FunctionResultTargetConfig["type"];
       label: string;
     }>;
-    steps?: Array<{
-      integrationType?: IntegrationConnection["type"] | ChannelType | string;
-      action: string;
-    }>;
-  }>;
-  toolBlocks?: Array<{
-    name: string;
-    description: string;
     steps?: Array<{
       integrationType?: IntegrationConnection["type"] | ChannelType | string;
       action: string;

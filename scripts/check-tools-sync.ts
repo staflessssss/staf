@@ -125,7 +125,6 @@ function buildFunctionBlockPicture(
         ? (channelConfig.functionBlocks as AgentDraftInput["channelConfig"]["functionBlocks"])
         : [],
     },
-    toolBlocks: [],
   });
 
   return toolBlocks.map((tool) => normalizeTool(tool));

@@ -62,7 +62,6 @@ import {
   normalizeChannelBehavior,
   normalizeConversationPlaybook,
   ControlConfig,
-  functionBlocksToToolBlocks,
   FunctionBlockConfig,
   getDefaultAgentSettingsConfig,
   getDefaultFunctionBlock,
@@ -594,10 +593,7 @@ function parseFunctionBlocks(
     }),
   }));
 
-  return {
-    toolBlocks: functionBlocksToToolBlocks(parsedFunctionBlocks),
-    errors,
-  };
+  return { errors };
 }
 
 function getSheetInspectorKey(step?: ToolStepDraft | null) {
@@ -795,16 +791,6 @@ export function AgentWorkspaceClient({
       disableDelayedMessages: fn.disableDelayedMessages,
       resultTargets: fn.resultTargets,
       steps: fn.steps.map((step) => ({
-        integrationType:
-          connectedIntegrations.find((integration) => integration.id === step.integrationId)?.type ??
-          undefined,
-        action: step.action,
-      })),
-    })),
-    toolBlocks: parsedFunctionBlocks.toolBlocks.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      steps: tool.steps.map((step) => ({
         integrationType:
           connectedIntegrations.find((integration) => integration.id === step.integrationId)?.type ??
           undefined,

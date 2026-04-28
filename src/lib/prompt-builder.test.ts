@@ -137,24 +137,6 @@ test("buildSystemPrompt includes multilingual behavior, playbook, channel behavi
   assert.match(prompt, /Never invent integration results/);
 });
 
-test("buildSystemPrompt ignores legacy toolBlocks without functionBlocks", () => {
-  const prompt = buildSystemPrompt({
-    name: "Studio Concierge",
-    persona: "Helpful assistant",
-    tone: "friendly",
-    toolBlocks: [
-      {
-        name: "Legacy calendar check",
-        description: "Verify availability",
-        steps: [{ integrationType: "GOOGLE_CALENDAR", action: "check calendar" }],
-      },
-    ],
-  });
-
-  assert.doesNotMatch(prompt, /Legacy calendar check/);
-  assert.doesNotMatch(prompt, /check calendar/);
-});
-
 test("buildSystemPrompt defaults prompting visibility flags to no when not configured", () => {
   const prompt = buildSystemPrompt({
     name: "Studio Concierge",

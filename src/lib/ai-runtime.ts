@@ -81,7 +81,6 @@ type InvokeAgentInput = {
   languagePreference?: string | null;
   knowledgeBlocks?: LightweightKnowledgeBlock[];
   functionBlocks?: FunctionBlockConfig[];
-  toolBlocks?: LightweightToolBlock[];
   historyMessages?: RuntimeHistoryMessage[];
 };
 
@@ -840,7 +839,6 @@ async function mapAgentToRuntimeBlocks(agent: AgentWithBuilderData): Promise<Run
           ? (rawChannelConfig.prompting as never)
           : null,
       knowledgeBlocks,
-      toolBlocks,
     }),
     knowledgeBlocks,
     toolBlocks,
@@ -938,9 +936,7 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
 
 export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentResult> {
   if (!input.agentId) {
-    const sandboxToolBlocks = input.functionBlocks
-      ? functionBlocksToToolBlocks(input.functionBlocks)
-      : input.toolBlocks ?? [];
+    const sandboxToolBlocks = functionBlocksToToolBlocks(input.functionBlocks ?? []);
     const promptPreview =
       input.promptPreview ??
       buildSystemPrompt({

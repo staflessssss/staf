@@ -134,25 +134,9 @@ export async function POST(req: NextRequest) {
           integrationType: integrationMap.get(step.integrationId),
         })),
       })),
-      toolBlocks: derivedToolBlocks.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        steps: tool.steps.map((step) => ({
-          action: step.action,
-          integrationType: integrationMap.get(step.integrationId),
-        })),
-      })),
     }),
     languagePreference: promptingIdentity.languagePreference,
     knowledgeBlocks: parsed.data.draft.knowledgeBlocks,
-    toolBlocks: derivedToolBlocks.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      steps: tool.steps.map((step) => ({
-        action: step.action,
-        integrationType: integrationMap.get(step.integrationId),
-      })),
-    })),
   });
 
   return NextResponse.json({ item: response });
