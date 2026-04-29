@@ -1842,6 +1842,7 @@ export function AgentWorkspaceClient({
             <WorkspaceMessagesSection
               channelBehavior={draft.channelConfig.channelBehavior}
               isReadOnlyMode={isReadOnlyMode}
+              onOpenTest={() => activateWorkspaceSection("test")}
               onUpdateChannelBehavior={updateChannelBehavior}
             />
           ) : null}
