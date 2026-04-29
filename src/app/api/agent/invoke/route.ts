@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       tone: promptingIdentity.tone,
       languagePreference: promptingIdentity.languagePreference,
       channel: selectedChannel,
+      conversationPlaybook: parsed.data.draft.channelConfig.conversationPlaybook,
       prompting: parsed.data.draft.channelConfig.prompting,
       knowledgeBlocks: parsed.data.draft.knowledgeBlocks,
       functionBlocks: parsed.data.draft.channelConfig.functionBlocks?.map((fn) => ({
