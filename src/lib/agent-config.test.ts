@@ -45,6 +45,34 @@ test("formatAgentDraftValidationError explains incomplete Knowledge items", () =
   }
 });
 
+test("agentDraftSchema accepts hidden null notes from workspace defaults", () => {
+  const parsed = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      channelBehavior: {
+        notes: null,
+      },
+      conversationPlaybook: {
+        notes: null,
+      },
+    },
+    knowledgeBlocks: [
+      {
+        name: "Pricing",
+        description: "Use for price questions",
+        knowledgeContent: "Starter package is $100.",
+      },
+    ],
+  });
+
+  assert.equal(parsed.channelConfig.channelBehavior?.notes, undefined);
+  assert.equal(parsed.channelConfig.conversationPlaybook?.notes, undefined);
+  assert.equal(parsed.knowledgeBlocks[0]?.name, "Pricing");
+});
+
 test("agentDraftSchema normalizes empty language preference to null", () => {
   const parsed = agentDraftSchema.parse({
     name: "Studio Concierge",

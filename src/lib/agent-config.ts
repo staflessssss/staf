@@ -942,6 +942,7 @@ export const channelConfigSchema = z
           .string()
           .trim()
           .max(1000)
+          .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
       })
@@ -993,6 +994,7 @@ export const channelConfigSchema = z
           .string()
           .trim()
           .max(2000)
+          .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
       })
