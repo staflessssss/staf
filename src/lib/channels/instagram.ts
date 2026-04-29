@@ -11,10 +11,34 @@ type InstagramMessagingEvent = {
 };
 
 type InstagramPayload = {
+  contactId?: string;
+  text?: string;
+  body?: string;
+  direction?: string;
+  source?: string;
+  senderType?: string;
+  isBusinessManualReply?: boolean;
+  fromBusiness?: boolean;
   entry?: Array<{
     messaging?: InstagramMessagingEvent[];
   }>;
 };
+
+function isBusinessManualPayload(payload: InstagramPayload) {
+  const marker = String(
+    payload.direction ?? payload.source ?? payload.senderType ?? "",
+  ).toLowerCase();
+
+  return (
+    payload.isBusinessManualReply === true ||
+    payload.fromBusiness === true ||
+    marker === "business" ||
+    marker === "business_manual" ||
+    marker === "manual_business" ||
+    marker === "outbound" ||
+    marker === "sent"
+  );
+}
 
 function parseInstagramTimestamp(value?: number) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -28,12 +52,14 @@ function parseInstagramTimestamp(value?: number) {
 export const instagramAdapter = {
   parseIncoming: (payload: InstagramPayload) => {
     const event = payload.entry?.flatMap((entry) => entry.messaging ?? [])[0];
+    const isBusinessManualReply = isBusinessManualPayload(payload);
 
     return {
-      contactId: String(event?.sender?.id ?? ""),
-      message: String(event?.message?.text ?? ""),
+      contactId: String(payload.contactId ?? event?.sender?.id ?? ""),
+      message: String(payload.text ?? payload.body ?? event?.message?.text ?? ""),
       messageId: String(event?.message?.mid ?? ""),
       eventTimestamp: parseInstagramTimestamp(event?.timestamp),
+      isBusinessManualReply,
     };
   },
   formatReply: (text: string, config?: unknown) => {

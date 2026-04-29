@@ -66,10 +66,10 @@ test("control section renders only live controls", () => {
 
   assert.match(source, /Control/);
   assert.match(source, /History optimization/);
-  assert.match(source, /Operator handoff/);
+  assert.match(source, /Business handoff/);
   assert.match(source, /User message limit/);
   assert.match(source, /Limit repeated messages/);
-  assert.match(source, /Pause when operator replies/);
+  assert.match(source, /Pause when business replies/);
   assert.match(source, /Exception phrases/);
   assert.doesNotMatch(source, /Stop phrases/);
   assert.doesNotMatch(source, /Resume phrases/);
@@ -90,14 +90,14 @@ test("control section wires history and user message limit controls", async () =
       antiSpamMessageCount: 3,
       antiSpamWindowSeconds: 3600,
       antiSpamAutoReply: "",
-      pauseOnOperatorIntervention: true,
-      ignoreFirstOperatorMessage: false,
+      pauseOnBusinessIntervention: true,
+      ignoreFirstBusinessMessage: false,
       autoResumeEnabled: false,
       autoResumeAfterValue: 3,
       autoResumeAfterUnit: "hours",
       resumeMessageEnabled: false,
       resumeMessage: "",
-      operatorExceptionPhrases: [],
+      businessExceptionPhrases: [],
     },
     isReadOnlyMode: false,
     onUpdateControl: (patch) => updates.push(patch),
@@ -115,8 +115,8 @@ test("control section wires history and user message limit controls", async () =
   assert.match(text, /History window/);
   assert.match(text, /Message count limit/);
   assert.match(text, /Time limit/);
-  assert.match(text, /Operator handoff/);
-  assert.match(text, /Pause when operator replies/);
+  assert.match(text, /Business handoff/);
+  assert.match(text, /Pause when business replies/);
   assert.match(text, /Auto-resume/);
   assert.match(text, /Exception phrases/);
   assert.equal(inputs[1]?.props?.disabled, true);
@@ -143,14 +143,14 @@ test("control section wires history and user message limit controls", async () =
     { historyWindowType: "message_count" },
     { maxMessages: 20 },
     { maxDays: 7 },
-    { pauseOnOperatorIntervention: true },
-    { ignoreFirstOperatorMessage: true },
+    { pauseOnBusinessIntervention: true },
+    { ignoreFirstBusinessMessage: true },
     { autoResumeEnabled: true },
     { autoResumeAfterValue: 6 },
     { autoResumeAfterUnit: "hours" },
     { resumeMessageEnabled: true },
     { resumeMessage: "The agent is back." },
-    { operatorExceptionPhrases: ["FYI", "internal note"] },
+    { businessExceptionPhrases: ["FYI", "internal note"] },
     { antiSpamEnabled: true },
     { antiSpamMessageCount: 4 },
     { antiSpamWindowSeconds: 3600 },

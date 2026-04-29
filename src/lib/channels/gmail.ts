@@ -29,6 +29,12 @@ type GmailIncomingPayload =
       timestamp?: string | number;
       receivedAt?: string | number;
       internalDate?: string | number;
+      to?: string;
+      direction?: string;
+      source?: string;
+      senderType?: string;
+      isBusinessManualReply?: boolean;
+      fromBusiness?: boolean;
     }
   | Record<string, unknown>;
 
@@ -82,6 +88,22 @@ function asObject(value: unknown) {
   }
 
   return value as Record<string, unknown>;
+}
+
+function isBusinessManualPayload(payload: Record<string, unknown>) {
+  const marker = String(
+    payload.direction ?? payload.source ?? payload.senderType ?? "",
+  ).toLowerCase();
+
+  return (
+    payload.isBusinessManualReply === true ||
+    payload.fromBusiness === true ||
+    marker === "business" ||
+    marker === "business_manual" ||
+    marker === "manual_business" ||
+    marker === "outbound" ||
+    marker === "sent"
+  );
 }
 
 function parseInboundTimestamp(value: unknown) {
@@ -444,7 +466,12 @@ export const gmailAdapterTestHelpers = {
 
 export const gmailAdapter = {
   parseIncoming: (payload: GmailIncomingPayload) => {
-    const contactEmail = String(payload.from ?? payload.contactId ?? "");
+    const isBusinessManualReply = isBusinessManualPayload(payload);
+    const contactEmail = String(
+      isBusinessManualReply
+        ? payload.contactId ?? payload.to ?? payload.from ?? ""
+        : payload.from ?? payload.contactId ?? "",
+    );
     const rawMessage = String(payload.text ?? payload.message ?? payload.body ?? payload.html ?? "");
     const cleanedMessage = stripQuotedReply(rawMessage);
 
@@ -459,6 +486,7 @@ export const gmailAdapter = {
       eventTimestamp: parseInboundTimestamp(
         payload.timestamp ?? payload.receivedAt ?? payload.internalDate,
       ),
+      isBusinessManualReply,
     };
   },
   formatReply: (text: string, config?: unknown) => {

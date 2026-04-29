@@ -3,52 +3,52 @@ import assert from "node:assert/strict";
 
 import { getDefaultControlConfig } from "@/lib/agent-config";
 import {
-  containsOperatorExceptionPhrase,
+  containsBusinessExceptionPhrase,
   getAutoResumeDueAt,
   getLatestCustomerReplyContext,
-  shouldPauseAfterOperatorMessage,
-} from "@/lib/operator-handoff";
+  shouldPauseAfterBusinessManualMessage,
+} from "@/lib/business-handoff";
 
-test("operator handoff pauses only when enabled and not ignored", () => {
+test("business handoff pauses only when enabled and not ignored", () => {
   const control = {
     ...getDefaultControlConfig(),
-    pauseOnOperatorIntervention: true,
-    ignoreFirstOperatorMessage: true,
-    operatorExceptionPhrases: ["FYI"],
+    pauseOnBusinessIntervention: true,
+    ignoreFirstBusinessMessage: true,
+    businessExceptionPhrases: ["FYI"],
   };
 
   assert.equal(
-    shouldPauseAfterOperatorMessage({
+    shouldPauseAfterBusinessManualMessage({
       control,
       message: "Hello, I will help here.",
-      priorOperatorMessageCount: 0,
+      priorBusinessManualMessageCount: 0,
     }),
     false,
   );
   assert.equal(
-    shouldPauseAfterOperatorMessage({
+    shouldPauseAfterBusinessManualMessage({
       control,
       message: "Hello again.",
-      priorOperatorMessageCount: 1,
+      priorBusinessManualMessageCount: 1,
     }),
     true,
   );
   assert.equal(
-    shouldPauseAfterOperatorMessage({
+    shouldPauseAfterBusinessManualMessage({
       control,
       message: "FYI: adding context only.",
-      priorOperatorMessageCount: 1,
+      priorBusinessManualMessageCount: 1,
     }),
     false,
   );
 });
 
-test("operator handoff exception phrases are matched case-insensitively", () => {
-  assert.equal(containsOperatorExceptionPhrase("Internal NOTE only", ["note only"]), true);
-  assert.equal(containsOperatorExceptionPhrase("Taking over now", ["note only"]), false);
+test("business handoff exception phrases are matched case-insensitively", () => {
+  assert.equal(containsBusinessExceptionPhrase("Internal NOTE only", ["note only"]), true);
+  assert.equal(containsBusinessExceptionPhrase("Taking over now", ["note only"]), false);
 });
 
-test("operator auto-resume due date follows configured unit", () => {
+test("business auto-resume due date follows configured unit", () => {
   const base = new Date("2026-04-20T10:00:00.000Z");
 
   assert.equal(
@@ -64,7 +64,7 @@ test("operator auto-resume due date follows configured unit", () => {
   );
 });
 
-test("operator reply context uses the latest customer message metadata", () => {
+test("business reply context uses the latest customer message metadata", () => {
   assert.deepEqual(
     getLatestCustomerReplyContext(
       [
@@ -79,8 +79,8 @@ test("operator reply context uses the latest customer message metadata", () => {
         },
         {
           role: "TOOL",
-          toolName: "operator_message",
-          content: "operator reply",
+          toolName: "business_manual_message",
+          content: "manual business reply",
         },
         {
           role: "USER",

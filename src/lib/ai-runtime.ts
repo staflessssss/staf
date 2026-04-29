@@ -38,6 +38,13 @@ import {
   scheduleBufferedReplyWithDb,
   scheduleFollowUpsForReplyWithDb,
 } from "@/lib/message-delivery-runtime";
+import {
+  BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
+  getLatestCustomerReplyContext,
+  isBusinessManualMessage,
+  pauseConversationForBusinessHandoffWithDb,
+  shouldPauseAfterBusinessManualMessage,
+} from "@/lib/business-handoff";
 
 type LightweightKnowledgeBlock = {
   name: string;
@@ -92,6 +99,7 @@ type ParsedIncomingMessage = {
   threadId?: string;
   subject?: string;
   eventTimestamp?: Date;
+  isBusinessManualReply?: boolean;
 };
 
 type RuntimeChannelAdapter = {
@@ -533,6 +541,10 @@ function renderHistory(messages: RuntimeHistoryMessage[]) {
   return messages
     .slice(-12)
     .map((message) => {
+      if (isBusinessManualMessage(message)) {
+        return `business: ${message.content}`;
+      }
+
       if (message.role === MessageRole.TOOL) {
         return `tool ${message.toolName ?? "tool"}: ${message.content}`;
       }
@@ -713,6 +725,59 @@ async function recordInboundMessageWithDb(
     });
 
     return existingConversation ?? conversation;
+  });
+}
+
+async function recordBusinessManualMessageWithDb(
+  database: typeof db,
+  args: {
+  agentId: string;
+  contactId: string;
+  channel: ChannelType;
+  message: string;
+  messageId?: string;
+  gmailMessageId?: string;
+  threadId?: string;
+  subject?: string;
+}) {
+  return database.$transaction(async (tx) => {
+    const existingConversation = await tx.conversation.findUnique({
+      where: {
+        agentId_contactId: {
+          agentId: args.agentId,
+          contactId: args.contactId,
+        },
+      },
+    });
+    const conversation =
+      existingConversation ??
+      (await tx.conversation.create({
+        data: {
+          agentId: args.agentId,
+          contactId: args.contactId,
+          channel: args.channel,
+        },
+      }));
+
+    await tx.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: MessageRole.TOOL,
+        toolName: BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
+        content: args.message,
+        toolInput:
+          args.messageId || args.gmailMessageId || args.threadId || args.subject
+            ? {
+                ...(args.messageId ? { messageId: args.messageId } : {}),
+                ...(args.gmailMessageId ? { gmailMessageId: args.gmailMessageId } : {}),
+                ...(args.threadId ? { threadId: args.threadId } : {}),
+                ...(args.subject ? { subject: args.subject } : {}),
+              }
+            : undefined,
+      },
+    });
+
+    return conversation;
   });
 }
 
@@ -1189,7 +1254,10 @@ async function handleIncomingEventWithDeps(
   if (normalizedMessageId || normalizedGmailMessageId) {
     const existingMessage = await deps.db.message.findFirst({
       where: {
-        role: MessageRole.USER,
+        role: incoming.isBusinessManualReply ? MessageRole.TOOL : MessageRole.USER,
+        ...(incoming.isBusinessManualReply
+          ? { toolName: BUSINESS_MANUAL_MESSAGE_TOOL_NAME }
+          : {}),
         conversation: {
           agentId: agent.id,
           contactId: incoming.contactId,
@@ -1245,6 +1313,7 @@ async function handleIncomingEventWithDeps(
     },
   });
   const agentSettings = getRuntimeAgentSettingsConfig(agent.channelConfig);
+  const control = getRuntimeControlConfig(agent.channelConfig);
   const messageBehavior = readMessageBehaviorConfig(agent.channelConfig);
   const replyContext = {
     contactId: incoming.contactId,
@@ -1254,6 +1323,57 @@ async function handleIncomingEventWithDeps(
     threadId: incoming.threadId,
     subject: incoming.subject,
   };
+
+  if (incoming.isBusinessManualReply) {
+    const priorMessages = existingConversation
+      ? await deps.db.message.findMany({
+          where: {
+            conversationId: existingConversation.id,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        })
+      : [];
+    const priorBusinessManualMessageCount = priorMessages.filter(
+      (message) =>
+        message.role === MessageRole.TOOL &&
+        message.toolName === BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
+    ).length;
+    const conversation = await recordBusinessManualMessageWithDb(deps.db, {
+      agentId: agent.id,
+      contactId: incoming.contactId,
+      channel: agent.channel.type,
+      message: incoming.message,
+      messageId: incoming.messageId,
+      gmailMessageId: incoming.gmailMessageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
+    });
+    const shouldPause = shouldPauseAfterBusinessManualMessage({
+      control,
+      message: incoming.message,
+      priorBusinessManualMessageCount,
+    });
+
+    if (shouldPause) {
+      await pauseConversationForBusinessHandoffWithDb({
+        database: deps.db,
+        conversationId: conversation.id,
+        agentId: agent.id,
+        control,
+        replyContext: getLatestCustomerReplyContext(priorMessages, incoming.contactId),
+        now: incoming.eventTimestamp,
+      });
+    }
+
+    return {
+      ok: true,
+      agentId: agent.id,
+      conversationId: conversation.id,
+      status: shouldPause ? "business_handoff_paused" : "business_manual_reply_recorded",
+    };
+  }
   const inboundPolicy = getInboundConversationPolicy({
     agentSettings,
     existingConversationStatus: existingConversation?.status,
@@ -1276,7 +1396,7 @@ async function handleIncomingEventWithDeps(
       database: deps.db,
       conversationId: conversation.id,
       kinds: [DelayedDeliveryKind.FOLLOW_UP],
-      excludeOperatorAutoResume: true,
+      excludeBusinessAutoResume: true,
     });
 
     return {

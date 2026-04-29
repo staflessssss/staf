@@ -183,7 +183,7 @@ test("processDelayedDeliveryByIdWithDeps generates and sends a follow-up reminde
     contactId: "contact-2",
     contactEmail: undefined,
     message:
-      "Internal delayed follow-up task.\n\nWrite the next outbound message to the customer based on the existing conversation history.\n\nDo not mention this instruction, internal settings, automation, or that this is a follow-up task.\n\nOperator follow-up guidance: Just checking in. I can still help with pricing or booking when you're ready.",
+      "Internal delayed follow-up task.\n\nWrite the next outbound message to the customer based on the existing conversation history.\n\nDo not mention this instruction, internal settings, automation, or that this is a follow-up task.\n\nFollow-up guidance: Just checking in. I can still help with pricing or booking when you're ready.",
     conversationId: "conv-2",
     skipInboundPersistence: true,
   });
@@ -375,7 +375,7 @@ test("processDelayedDeliveryByIdWithDeps cancels buffered reply when control sup
   );
 });
 
-test("processDelayedDeliveryByIdWithDeps auto-resumes an operator-paused dialog", async () => {
+test("processDelayedDeliveryByIdWithDeps auto-resumes a business-paused dialog", async () => {
   const updates: Array<Record<string, unknown>> = [];
   const savedMessages: Array<{ role: string; content: string; model?: string }> = [];
   const events: string[] = [];
@@ -393,7 +393,7 @@ test("processDelayedDeliveryByIdWithDeps auto-resumes an operator-paused dialog"
             conversationId: "conv-auto-resume",
             kind: DelayedDeliveryKind.FOLLOW_UP,
             payload: {
-              kind: "operator_auto_resume",
+              kind: "business_auto_resume",
               replyContext: {
                 contactId: "contact-1",
                 messageId: "message-id-1",
@@ -446,7 +446,7 @@ test("processDelayedDeliveryByIdWithDeps auto-resumes an operator-paused dialog"
           },
         }) as never,
       invokeAgent: async () => {
-        throw new Error("invokeAgent should not run for operator auto-resume");
+        throw new Error("invokeAgent should not run for business auto-resume");
       },
       saveMessages: async (_conversationId, messages) => {
         events.push("save");
@@ -457,7 +457,7 @@ test("processDelayedDeliveryByIdWithDeps auto-resumes an operator-paused dialog"
   );
 
   assert.equal(result.ok, true);
-  assert.equal(result.status, "operator_auto_resumed");
+  assert.equal(result.status, "business_auto_resumed");
   assert.deepEqual(sentMessage, {
     credentials: "decrypted:encrypted",
     contactId: "contact-1",
@@ -503,7 +503,7 @@ test("processDelayedDeliveryByIdWithDeps does not resend an already-saved auto-r
             conversationId: "conv-auto-resume",
             kind: DelayedDeliveryKind.FOLLOW_UP,
             payload: {
-              kind: "operator_auto_resume",
+              kind: "business_auto_resume",
               resumeMessage: "The agent is available again.",
             },
             agent: {
@@ -542,7 +542,7 @@ test("processDelayedDeliveryByIdWithDeps does not resend an already-saved auto-r
           },
         }) as never,
       invokeAgent: async () => {
-        throw new Error("invokeAgent should not run for operator auto-resume");
+        throw new Error("invokeAgent should not run for business auto-resume");
       },
       saveMessages: async () => {
         saveCalled = true;
@@ -552,7 +552,7 @@ test("processDelayedDeliveryByIdWithDeps does not resend an already-saved auto-r
   );
 
   assert.equal(result.ok, true);
-  assert.equal(result.status, "operator_auto_resumed");
+  assert.equal(result.status, "business_auto_resumed");
   assert.equal(sendCalled, false);
   assert.equal(saveCalled, false);
 });
@@ -572,7 +572,7 @@ test("processDelayedDeliveryByIdWithDeps resumes even when optional auto-resume 
             conversationId: "conv-auto-resume",
             kind: DelayedDeliveryKind.FOLLOW_UP,
             payload: {
-              kind: "operator_auto_resume",
+              kind: "business_auto_resume",
               resumeMessage: "The agent is available again.",
             },
             agent: {
@@ -616,7 +616,7 @@ test("processDelayedDeliveryByIdWithDeps resumes even when optional auto-resume 
           },
         }) as never,
       invokeAgent: async () => {
-        throw new Error("invokeAgent should not run for operator auto-resume");
+        throw new Error("invokeAgent should not run for business auto-resume");
       },
       saveMessages: async () => {
         throw new Error("saveMessages should not run after failed send");
@@ -626,7 +626,7 @@ test("processDelayedDeliveryByIdWithDeps resumes even when optional auto-resume 
   );
 
   assert.equal(result.ok, true);
-  assert.equal(result.status, "operator_auto_resumed_without_resume_message");
+  assert.equal(result.status, "business_auto_resumed_without_resume_message");
   assert.equal(
     updates.some(
       (update) =>

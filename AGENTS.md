@@ -25,6 +25,14 @@ Read these before substantial work:
 - Preserve conversation isolation by `(agentId, contactId)`.
 - Do not expand scope into billing, voice, or self-serve bot building unless roadmap updates explicitly add it.
 
+## Context and Token Discipline
+
+- Do not reread broad planning files on every task. Use `.planning/PROJECT.md`, `.planning/REQUIREMENTS.md`, `.planning/ROADMAP.md`, and `.planning/STATE.md` only when scope, roadmap, or product boundaries are unclear.
+- For workspace feature cadence, prefer the specific cadence/feature artifact plus the relevant code paths over loading global planning context.
+- During development, run targeted tests and type checks first. Run the full `npm test` suite only before commit/deploy or when a change touches shared runtime behavior.
+- Do not paste full successful `npm test`, `npm run build`, or deploy logs into the conversation. Summarize pass/fail counts and include only actionable errors.
+- Use review agents once near final verification, then rerun only when they find important issues.
+
 ## Next Step
 
 Start with Phase 1 from `.planning/ROADMAP.md`.

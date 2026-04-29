@@ -1,33 +1,19 @@
-import { ChannelType, ConversationStatus, DelayedDeliveryKind, DelayedDeliveryStatus, MessageRole } from "@prisma/client";
+import { ConversationStatus, DelayedDeliveryKind, DelayedDeliveryStatus, MessageRole } from "@prisma/client";
 
 import { ControlConfig } from "@/lib/agent-config";
-import { getChannelAdapter } from "@/lib/channels";
-import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 
-export const OPERATOR_MESSAGE_TOOL_NAME = "operator_message";
+export const BUSINESS_MANUAL_MESSAGE_TOOL_NAME = "business_manual_message";
+const LEGACY_OPERATOR_MESSAGE_TOOL_NAME = "operator_message";
 
-type OperatorChannelAdapter = {
-  formatReply: (text: string, config?: unknown) => unknown;
-  sendReply: (params: {
-    credentials: string;
-    contactId: string;
-    message: string | string[] | { text: string; html?: string };
-    messageId?: string;
-    threadId?: string;
-    subject?: string;
-    channelConfig?: unknown;
-  }) => Promise<unknown>;
-};
-
-type OperatorMessage = {
+type ConversationMessage = {
   role: MessageRole | `${MessageRole}`;
   toolName?: string | null;
   content: string;
   toolInput?: unknown;
 };
 
-type OperatorReplyContext = {
+type BusinessReplyContext = {
   contactId: string;
   messageId?: string;
   gmailMessageId?: string;
@@ -35,11 +21,15 @@ type OperatorReplyContext = {
   subject?: string;
 };
 
-export function isOperatorMessage(message: OperatorMessage) {
-  return message.role === MessageRole.TOOL && message.toolName === OPERATOR_MESSAGE_TOOL_NAME;
+export function isBusinessManualMessage(message: ConversationMessage) {
+  return (
+    message.role === MessageRole.TOOL &&
+    (message.toolName === BUSINESS_MANUAL_MESSAGE_TOOL_NAME ||
+      message.toolName === LEGACY_OPERATOR_MESSAGE_TOOL_NAME)
+  );
 }
 
-export function containsOperatorExceptionPhrase(message: string, phrases: string[]) {
+export function containsBusinessExceptionPhrase(message: string, phrases: string[]) {
   const normalizedMessage = message.toLowerCase();
 
   return phrases.some((phrase) => {
@@ -58,9 +48,9 @@ function readStringField(value: unknown, field: string) {
 }
 
 export function getLatestCustomerReplyContext(
-  messages: OperatorMessage[],
+  messages: ConversationMessage[],
   fallbackContactId: string,
-): OperatorReplyContext {
+): BusinessReplyContext {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (!message) {
@@ -83,20 +73,20 @@ export function getLatestCustomerReplyContext(
   return { contactId: fallbackContactId };
 }
 
-export function shouldPauseAfterOperatorMessage(args: {
+export function shouldPauseAfterBusinessManualMessage(args: {
   control: ControlConfig;
   message: string;
-  priorOperatorMessageCount: number;
+  priorBusinessManualMessageCount: number;
 }) {
-  if (!args.control.pauseOnOperatorIntervention) {
+  if (!args.control.pauseOnBusinessIntervention) {
     return false;
   }
 
-  if (containsOperatorExceptionPhrase(args.message, args.control.operatorExceptionPhrases)) {
+  if (containsBusinessExceptionPhrase(args.message, args.control.businessExceptionPhrases)) {
     return false;
   }
 
-  if (args.control.ignoreFirstOperatorMessage && args.priorOperatorMessageCount === 0) {
+  if (args.control.ignoreFirstBusinessMessage && args.priorBusinessManualMessageCount === 0) {
     return false;
   }
 
@@ -115,12 +105,12 @@ export function getAutoResumeDueAt(control: ControlConfig, now = new Date()) {
   return new Date(now.getTime() + amount * unitMs);
 }
 
-export async function scheduleOperatorAutoResumeWithDb(args: {
+export async function scheduleBusinessAutoResumeWithDb(args: {
   database: typeof db;
   agentId: string;
   conversationId: string;
   control: ControlConfig;
-  replyContext?: OperatorReplyContext;
+  replyContext?: BusinessReplyContext;
   now?: Date;
 }) {
   if (!args.control.autoResumeEnabled) {
@@ -134,15 +124,25 @@ export async function scheduleOperatorAutoResumeWithDb(args: {
       status: {
         in: [DelayedDeliveryStatus.PENDING, DelayedDeliveryStatus.PROCESSING],
       },
-      payload: {
-        path: ["kind"],
-        equals: "operator_auto_resume",
-      },
+      OR: [
+        {
+          payload: {
+            path: ["kind"],
+            equals: "business_auto_resume",
+          },
+        },
+        {
+          payload: {
+            path: ["kind"],
+            equals: "operator_auto_resume",
+          },
+        },
+      ],
     },
     data: {
       status: DelayedDeliveryStatus.CANCELED,
       canceledAt: args.now ?? new Date(),
-      error: "operator_auto_resume_replaced",
+      error: "business_auto_resume_replaced",
     },
   });
 
@@ -153,7 +153,7 @@ export async function scheduleOperatorAutoResumeWithDb(args: {
       kind: DelayedDeliveryKind.FOLLOW_UP,
       dueAt: getAutoResumeDueAt(args.control, args.now),
       payload: {
-        kind: "operator_auto_resume",
+        kind: "business_auto_resume",
         replyContext: args.replyContext,
         resumeMessage:
           args.control.resumeMessageEnabled && args.control.resumeMessage?.trim()
@@ -164,38 +164,12 @@ export async function scheduleOperatorAutoResumeWithDb(args: {
   });
 }
 
-export async function sendOperatorReplyThroughChannel(args: {
-  channel: { type: ChannelType; credentialsEnc: string };
-  contactId: string;
-  message: string;
-  channelConfig: unknown;
-  messageId?: string;
-  threadId?: string;
-  subject?: string;
-}) {
-  const adapter = getChannelAdapter(args.channel.type) as OperatorChannelAdapter;
-  const formattedReply = adapter.formatReply(args.message, args.channelConfig);
-
-  return adapter.sendReply({
-    credentials:
-      args.channel.type === ChannelType.GMAIL
-        ? args.channel.credentialsEnc
-        : decrypt(args.channel.credentialsEnc),
-    contactId: args.contactId,
-    message: formattedReply as string | string[] | { text: string; html?: string },
-    messageId: args.messageId,
-    threadId: args.threadId,
-    subject: args.subject,
-    channelConfig: args.channelConfig,
-  });
-}
-
-export async function pauseConversationForOperatorWithDb(args: {
+export async function pauseConversationForBusinessHandoffWithDb(args: {
   database: typeof db;
   conversationId: string;
   agentId: string;
   control: ControlConfig;
-  replyContext?: OperatorReplyContext;
+  replyContext?: BusinessReplyContext;
   now?: Date;
 }) {
   await args.database.conversation.update({
@@ -218,11 +192,11 @@ export async function pauseConversationForOperatorWithDb(args: {
     data: {
       status: DelayedDeliveryStatus.CANCELED,
       canceledAt: args.now ?? new Date(),
-      error: "operator_handoff_pause",
+      error: "business_handoff_pause",
     },
   });
 
-  await scheduleOperatorAutoResumeWithDb({
+  await scheduleBusinessAutoResumeWithDb({
     database: args.database,
     agentId: args.agentId,
     conversationId: args.conversationId,

@@ -454,10 +454,20 @@ test("handleIncomingEventWithDeps records inbound and does not auto-reply when m
         status: "PENDING",
         kind: { in: ["FOLLOW_UP"] },
         NOT: {
-          payload: {
-            path: ["kind"],
-            equals: "operator_auto_resume",
-          },
+          OR: [
+            {
+              payload: {
+                path: ["kind"],
+                equals: "business_auto_resume",
+              },
+            },
+            {
+              payload: {
+                path: ["kind"],
+                equals: "operator_auto_resume",
+              },
+            },
+          ],
         },
       },
       data: {
@@ -469,6 +479,155 @@ test("handleIncomingEventWithDeps records inbound and does not auto-reply when m
       },
     },
   ]);
+});
+
+test("handleIncomingEventWithDeps pauses a dialog after a manual business reply", async () => {
+  const createdMessages: Array<Record<string, unknown>> = [];
+  const conversationUpdates: Array<Record<string, unknown>> = [];
+  const deliveryCreates: Array<Record<string, unknown>> = [];
+  const deliveryUpdates: Array<Record<string, unknown>> = [];
+  const existingConversation = {
+    id: "conv-1",
+    status: ConversationStatus.ACTIVE,
+  };
+  const priorMessages = [
+    {
+      id: "customer-message-1",
+      role: MessageRole.USER,
+      content: "How much does it cost?",
+      toolName: null,
+      toolInput: {
+        messageId: "customer-message-id",
+        threadId: "thread-1",
+        subject: "Pricing",
+      },
+      createdAt: new Date("2026-04-20T10:00:00.000Z"),
+    },
+  ];
+  const fakeDb = {
+    agent: {
+      findFirst: async () => ({
+        id: "agent-1",
+        tenantId: "tenant-1",
+        channelConfig: {
+          control: {
+            pauseOnBusinessIntervention: true,
+            autoResumeEnabled: true,
+            autoResumeAfterValue: 3,
+            autoResumeAfterUnit: "hours",
+            resumeMessageEnabled: false,
+            businessExceptionPhrases: [],
+          },
+        },
+        channel: {
+          type: "GMAIL",
+          credentialsEnc: "encrypted",
+        },
+      }),
+    },
+    message: {
+      findFirst: async () => null,
+      findMany: async () => priorMessages,
+      create: async (args: Record<string, unknown>) => {
+        createdMessages.push(args);
+        return { id: "business-message-1" };
+      },
+    },
+    conversation: {
+      findUnique: async () => existingConversation,
+      create: async () => existingConversation,
+      update: async (args: Record<string, unknown>) => {
+        conversationUpdates.push(args);
+        return { ...existingConversation, status: ConversationStatus.ESCALATED };
+      },
+    },
+    delayedDelivery: {
+      updateMany: async (args: Record<string, unknown>) => {
+        deliveryUpdates.push(args);
+        return { count: 0 };
+      },
+      create: async (args: Record<string, unknown>) => {
+        deliveryCreates.push(args);
+        return { id: "delivery-1" };
+      },
+    },
+    $transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        conversation: {
+          findUnique: async () => existingConversation,
+          create: async () => existingConversation,
+        },
+        message: {
+          create: async (args: Record<string, unknown>) => {
+            createdMessages.push(args);
+            return { id: "business-message-1" };
+          },
+        },
+      }),
+  } as never;
+  let invokeCalled = false;
+  let sendReplyCalled = false;
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "GMAIL" as never,
+      payload: {
+        contactId: "customer@example.com",
+        text: "The price is 25000.",
+        isBusinessManualReply: true,
+      },
+    },
+    {
+      db: fakeDb,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => {
+        invokeCalled = true;
+        throw new Error("invokeAgent should not run for manual business replies");
+      },
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "customer@example.com",
+            message: "The price is 25000.",
+            messageId: "business-message-id",
+            threadId: "thread-1",
+            subject: "Pricing",
+            isBusinessManualReply: true,
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sendReplyCalled = true;
+            return {};
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal("status" in result ? result.status : null, "business_handoff_paused");
+  assert.equal(invokeCalled, false);
+  assert.equal(sendReplyCalled, false);
+  assert.equal(
+    createdMessages[0]?.data && typeof createdMessages[0].data === "object"
+      ? (createdMessages[0].data as Record<string, unknown>).toolName
+      : null,
+    "business_manual_message",
+  );
+  assert.deepEqual(conversationUpdates[0], {
+    where: { id: "conv-1" },
+    data: {
+      status: ConversationStatus.ESCALATED,
+    },
+  });
+  assert.equal(
+    deliveryCreates[0]?.data && typeof deliveryCreates[0].data === "object"
+      ? ((deliveryCreates[0].data as Record<string, unknown>).payload as Record<string, unknown>).kind
+      : null,
+    "business_auto_resume",
+  );
+  assert.equal(deliveryUpdates.length, 2);
 });
 
 test("handleIncomingEventWithDeps keeps closed dialogs closed and avoids auto-reply", async () => {

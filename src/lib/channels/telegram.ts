@@ -4,6 +4,14 @@ import {
 } from "@/lib/channels/message-behavior";
 
 type TelegramMessagePayload = {
+  contactId?: string | number;
+  text?: string;
+  body?: string;
+  direction?: string;
+  source?: string;
+  senderType?: string;
+  isBusinessManualReply?: boolean;
+  fromBusiness?: boolean;
   message?: {
     message_id?: number;
     date?: number;
@@ -25,6 +33,22 @@ type TelegramMessagePayload = {
     };
   };
 };
+
+function isBusinessManualPayload(payload: TelegramMessagePayload) {
+  const marker = String(
+    payload.direction ?? payload.source ?? payload.senderType ?? "",
+  ).toLowerCase();
+
+  return (
+    payload.isBusinessManualReply === true ||
+    payload.fromBusiness === true ||
+    marker === "business" ||
+    marker === "business_manual" ||
+    marker === "manual_business" ||
+    marker === "outbound" ||
+    marker === "sent"
+  );
+}
 
 function wait(ms: number) {
   return new Promise((resolve) => {
@@ -116,13 +140,15 @@ export async function registerTelegramWebhook(args: {
 export const telegramAdapter = {
   parseIncoming: (payload: TelegramMessagePayload) => {
     const message = payload.message ?? payload.edited_message;
+    const isBusinessManualReply = isBusinessManualPayload(payload);
 
     return {
-      contactId: String(message?.chat?.id ?? ""),
-      message: String(message?.text ?? message?.caption ?? ""),
+      contactId: String(payload.contactId ?? message?.chat?.id ?? ""),
+      message: String(payload.text ?? payload.body ?? message?.text ?? message?.caption ?? ""),
       messageId: String(message?.message_id ?? ""),
       eventTimestamp:
         parseTelegramTimestamp(message?.edit_date) ?? parseTelegramTimestamp(message?.date),
+      isBusinessManualReply,
     };
   },
   formatReply: (text: string, config?: unknown) => {

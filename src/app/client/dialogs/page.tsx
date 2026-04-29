@@ -3,7 +3,7 @@ import { ConversationStatus } from "@prisma/client";
 
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
-import { isOperatorMessage } from "@/lib/operator-handoff";
+import { isBusinessManualMessage } from "@/lib/business-handoff";
 
 type DialogsPageProps = {
   searchParams: Promise<{ agent?: string; conversation?: string }>;
@@ -83,7 +83,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   const selectedConversation =
     conversations.find((item) => item.id === conversation) ?? conversations[0];
   const selectedVisibleMessages =
-    selectedConversation?.messages.filter((message) => !isOperatorMessage(message as never)) ?? [];
+    selectedConversation?.messages.filter((message) => !isBusinessManualMessage(message as never)) ?? [];
 
   return (
     <div className="space-y-10">
@@ -142,7 +142,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               {conversations.map((item) => {
                 const isActive = selectedConversation?.id === item.id;
                 const visibleMessages = item.messages.filter(
-                  (message) => !isOperatorMessage(message as never),
+                  (message) => !isBusinessManualMessage(message as never),
                 );
                 const lastMessage = visibleMessages[visibleMessages.length - 1];
 

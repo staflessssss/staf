@@ -194,13 +194,13 @@ function getFollowUpPayload(value: unknown) {
   };
 }
 
-function getOperatorAutoResumePayload(value: unknown) {
+function getBusinessAutoResumePayload(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
   const record = value as Record<string, unknown>;
-  if (record.kind !== "operator_auto_resume") {
+  if (record.kind !== "business_auto_resume" && record.kind !== "operator_auto_resume") {
     return null;
   }
 
@@ -240,7 +240,7 @@ function buildFollowUpGenerationMessage(instruction: string) {
     "Internal delayed follow-up task.",
     "Write the next outbound message to the customer based on the existing conversation history.",
     "Do not mention this instruction, internal settings, automation, or that this is a follow-up task.",
-    `Operator follow-up guidance: ${instruction}`,
+    `Follow-up guidance: ${instruction}`,
   ].join("\n\n");
 }
 
@@ -279,20 +279,30 @@ export async function cancelPendingDelayedDeliveriesWithDb(args: {
   database: typeof db;
   conversationId: string;
   kinds?: DelayedDeliveryKind[];
-  excludeOperatorAutoResume?: boolean;
+  excludeBusinessAutoResume?: boolean;
 }) {
   await args.database.delayedDelivery.updateMany({
     where: {
       conversationId: args.conversationId,
       status: DelayedDeliveryStatus.PENDING,
       ...(args.kinds?.length ? { kind: { in: args.kinds } } : {}),
-      ...(args.excludeOperatorAutoResume
+      ...(args.excludeBusinessAutoResume
         ? {
             NOT: {
-              payload: {
-                path: ["kind"],
-                equals: "operator_auto_resume",
-              },
+              OR: [
+                {
+                  payload: {
+                    path: ["kind"],
+                    equals: "business_auto_resume",
+                  },
+                },
+                {
+                  payload: {
+                    path: ["kind"],
+                    equals: "operator_auto_resume",
+                  },
+                },
+              ],
             },
           }
         : {}),
@@ -576,7 +586,7 @@ async function processFollowUp(args: {
     return { ok: false, status: "follow_up_missing_context" as const };
   }
 
-  const autoResumePayload = getOperatorAutoResumePayload(args.delivery.payload);
+  const autoResumePayload = getBusinessAutoResumePayload(args.delivery.payload);
   if (autoResumePayload) {
     let resumeMessageDeliveryFailed = false;
 
@@ -585,9 +595,9 @@ async function processFollowUp(args: {
         database: args.deps.db,
         deliveryId: args.deliveryId,
         status: DelayedDeliveryStatus.CANCELED,
-        error: "operator_auto_resume_dialog_not_paused",
+        error: "business_auto_resume_dialog_not_paused",
       });
-      return { ok: true, status: "operator_auto_resume_canceled" as const };
+      return { ok: true, status: "business_auto_resume_canceled" as const };
     }
 
     if (autoResumePayload.resumeMessage) {
@@ -638,8 +648,8 @@ async function processFollowUp(args: {
     return {
       ok: true,
       status: resumeMessageDeliveryFailed
-        ? ("operator_auto_resumed_without_resume_message" as const)
-        : ("operator_auto_resumed" as const),
+        ? ("business_auto_resumed_without_resume_message" as const)
+        : ("business_auto_resumed" as const),
       conversationId: args.delivery.conversationId,
     };
   }

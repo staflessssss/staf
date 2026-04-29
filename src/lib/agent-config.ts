@@ -200,8 +200,8 @@ export type ControlConfig = {
   historyWindowType: (typeof historyWindowTypeOptions)[number];
   maxMessages: number;
   maxDays: number;
-  pauseOnOperatorIntervention: boolean;
-  ignoreFirstOperatorMessage: boolean;
+  pauseOnBusinessIntervention: boolean;
+  ignoreFirstBusinessMessage: boolean;
   antiSpamEnabled: boolean;
   antiSpamMessageCount: number;
   antiSpamWindowSeconds: number;
@@ -211,7 +211,7 @@ export type ControlConfig = {
   autoResumeAfterUnit: (typeof autoResumeUnitOptions)[number];
   resumeMessageEnabled: boolean;
   resumeMessage?: string | null;
-  operatorExceptionPhrases: string[];
+  businessExceptionPhrases: string[];
 };
 
 export const agentScheduleDayOptions = [
@@ -647,8 +647,8 @@ export function getDefaultControlConfig(): ControlConfig {
     historyWindowType: "hybrid",
     maxMessages: 30,
     maxDays: 14,
-    pauseOnOperatorIntervention: true,
-    ignoreFirstOperatorMessage: false,
+    pauseOnBusinessIntervention: true,
+    ignoreFirstBusinessMessage: false,
     antiSpamEnabled: false,
     antiSpamMessageCount: 5,
     antiSpamWindowSeconds: 60,
@@ -658,7 +658,7 @@ export function getDefaultControlConfig(): ControlConfig {
     autoResumeAfterUnit: "hours",
     resumeMessageEnabled: false,
     resumeMessage: null,
-    operatorExceptionPhrases: [],
+    businessExceptionPhrases: [],
   };
 }
 
@@ -708,7 +708,25 @@ export function normalizeControlConfig(
       typeof value?.antiSpamAutoReply === "string" ? value.antiSpamAutoReply : base.antiSpamAutoReply,
     resumeMessage:
       typeof value?.resumeMessage === "string" ? value.resumeMessage : base.resumeMessage,
-    operatorExceptionPhrases: normalizePhraseList(value?.operatorExceptionPhrases),
+    pauseOnBusinessIntervention:
+      typeof value?.pauseOnBusinessIntervention === "boolean"
+        ? value.pauseOnBusinessIntervention
+        : typeof (value as { pauseOnOperatorIntervention?: unknown } | null | undefined)
+              ?.pauseOnOperatorIntervention === "boolean"
+          ? Boolean((value as { pauseOnOperatorIntervention?: unknown }).pauseOnOperatorIntervention)
+          : base.pauseOnBusinessIntervention,
+    ignoreFirstBusinessMessage:
+      typeof value?.ignoreFirstBusinessMessage === "boolean"
+        ? value.ignoreFirstBusinessMessage
+        : typeof (value as { ignoreFirstOperatorMessage?: unknown } | null | undefined)
+              ?.ignoreFirstOperatorMessage === "boolean"
+          ? Boolean((value as { ignoreFirstOperatorMessage?: unknown }).ignoreFirstOperatorMessage)
+          : base.ignoreFirstBusinessMessage,
+    businessExceptionPhrases: normalizePhraseList(
+      value?.businessExceptionPhrases ??
+        (value as { operatorExceptionPhrases?: string[] | null } | null | undefined)
+          ?.operatorExceptionPhrases,
+    ),
   };
 }
 
@@ -1050,8 +1068,8 @@ export const channelConfigSchema = z
         historyWindowType: z.enum(historyWindowTypeOptions).default("hybrid"),
         maxMessages: z.number().int().min(1).max(500).default(30),
         maxDays: z.number().int().min(1).max(365).default(14),
-        pauseOnOperatorIntervention: z.boolean().default(true),
-        ignoreFirstOperatorMessage: z.boolean().default(false),
+        pauseOnBusinessIntervention: z.boolean().default(true),
+        ignoreFirstBusinessMessage: z.boolean().default(false),
         antiSpamEnabled: z.boolean().default(false),
         antiSpamMessageCount: z.number().int().min(1).max(100).default(5),
         antiSpamWindowSeconds: z.number().int().min(5).max(3600).default(60),
@@ -1073,7 +1091,7 @@ export const channelConfigSchema = z
           .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
-        operatorExceptionPhrases: z.array(z.string().trim().min(1).max(120)).default([]),
+        businessExceptionPhrases: z.array(z.string().trim().min(1).max(120)).default([]),
       })
       .optional(),
     agentSettings: z

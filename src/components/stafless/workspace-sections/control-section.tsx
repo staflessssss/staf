@@ -171,25 +171,25 @@ export function WorkspaceControlSection({
       </section>
 
       <section className="space-y-3">
-        <h2 className={sectionTitleClassName}>Operator handoff</h2>
+        <h2 className={sectionTitleClassName}>Business handoff</h2>
 
         <div className={fieldCardClassName}>
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <p className={cardHeadingClassName}>Pause when operator replies</p>
-                <HelpHint label="When the operator sends a message in a dialog, that specific dialog moves to manual mode and the agent stops auto-replying there." />
+                <p className={cardHeadingClassName}>Pause when business replies</p>
+                <HelpHint label="When the business owner or manager replies manually from the connected business account, that specific dialog moves to manual mode and the agent stops auto-replying there." />
               </div>
               <p className={mutedTextClassName}>
-                Operator replies pause only the current dialog, not the whole agent.
+                Manual business replies pause only the current dialog, not the whole agent.
               </p>
             </div>
             <ToggleSwitch
-              checked={control.pauseOnOperatorIntervention}
+              checked={control.pauseOnBusinessIntervention}
               disabled={isReadOnlyMode}
               onCheckedChange={(checked) =>
                 onUpdateControl({
-                  pauseOnOperatorIntervention: checked,
+                  pauseOnBusinessIntervention: checked,
                 })
               }
             />
@@ -200,19 +200,19 @@ export function WorkspaceControlSection({
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <p className={cardHeadingClassName}>Ignore first operator message</p>
-                <HelpHint label="The first operator message in a dialog will not pause the agent. The second operator message can pause it." />
+                <p className={cardHeadingClassName}>Ignore first business reply</p>
+                <HelpHint label="The first manual business reply in a dialog will not pause the agent. The second manual business reply can pause it." />
               </div>
               <p className={mutedTextClassName}>
-                Useful when the operator only wants to greet the customer or add context.
+                Useful when the business only wants to add a quick note without taking over.
               </p>
             </div>
             <ToggleSwitch
-              checked={control.ignoreFirstOperatorMessage}
-              disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention}
+              checked={control.ignoreFirstBusinessMessage}
+              disabled={isReadOnlyMode || !control.pauseOnBusinessIntervention}
               onCheckedChange={(checked) =>
                 onUpdateControl({
-                  ignoreFirstOperatorMessage: checked,
+                  ignoreFirstBusinessMessage: checked,
                 })
               }
             />
@@ -224,7 +224,7 @@ export function WorkspaceControlSection({
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <p className={cardHeadingClassName}>Auto-resume</p>
-                <HelpHint label="After an operator-paused dialog waits for the configured time, the agent resumes that dialog automatically." />
+                <HelpHint label="After a manually handled dialog waits for the configured time, the agent resumes that dialog automatically." />
               </div>
               <p className={mutedTextClassName}>
                 Return a paused dialog to the agent after a fixed interval.
@@ -232,7 +232,7 @@ export function WorkspaceControlSection({
             </div>
             <ToggleSwitch
               checked={control.autoResumeEnabled}
-              disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention}
+              disabled={isReadOnlyMode || !control.pauseOnBusinessIntervention}
               onCheckedChange={(checked) =>
                 onUpdateControl({
                   autoResumeEnabled: checked,
@@ -245,7 +245,7 @@ export function WorkspaceControlSection({
             <FormField label="Resume after">
               <select
                 className={selectClassName}
-                disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention || !control.autoResumeEnabled}
+                disabled={isReadOnlyMode || !control.pauseOnBusinessIntervention || !control.autoResumeEnabled}
                 onChange={(event) =>
                   onUpdateControl({
                     autoResumeAfterValue: Number(event.target.value || 1),
@@ -264,7 +264,7 @@ export function WorkspaceControlSection({
             <FormField label="Unit">
               <select
                 className={selectClassName}
-                disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention || !control.autoResumeEnabled}
+                disabled={isReadOnlyMode || !control.pauseOnBusinessIntervention || !control.autoResumeEnabled}
                 onChange={(event) =>
                   onUpdateControl({
                     autoResumeAfterUnit: event.target.value as ControlConfig["autoResumeAfterUnit"],
@@ -295,7 +295,7 @@ export function WorkspaceControlSection({
             </div>
             <ToggleSwitch
               checked={control.resumeMessageEnabled}
-              disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention || !control.autoResumeEnabled}
+              disabled={isReadOnlyMode || !control.pauseOnBusinessIntervention || !control.autoResumeEnabled}
               onCheckedChange={(checked) =>
                 onUpdateControl({
                   resumeMessageEnabled: checked,
@@ -310,7 +310,7 @@ export function WorkspaceControlSection({
                 className={textareaClassName}
                 disabled={
                   isReadOnlyMode ||
-                  !control.pauseOnOperatorIntervention ||
+                  !control.pauseOnBusinessIntervention ||
                   !control.autoResumeEnabled ||
                   !control.resumeMessageEnabled
                 }
@@ -330,10 +330,10 @@ export function WorkspaceControlSection({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <p className={cardHeadingClassName}>Exception phrases</p>
-              <HelpHint label="If the operator message contains one of these phrases, the agent will not pause the dialog." />
+              <HelpHint label="If the manual business reply contains one of these phrases, the agent will not pause the dialog." />
             </div>
             <p className={mutedTextClassName}>
-              Phrases the operator can send without stopping the agent.
+              Phrases the business can send without stopping the agent.
             </p>
           </div>
 
@@ -341,17 +341,17 @@ export function WorkspaceControlSection({
             <FormField label="Phrases">
               <textarea
                 className={textareaClassName}
-                disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention}
+                disabled={isReadOnlyMode || !control.pauseOnBusinessIntervention}
                 onChange={(event) =>
                   onUpdateControl({
-                    operatorExceptionPhrases: event.target.value
+                    businessExceptionPhrases: event.target.value
                       .split(/\r?\n/)
                       .map((line) => line.trim())
                       .filter(Boolean),
                   })
                 }
                 placeholder="One phrase per line"
-                value={control.operatorExceptionPhrases.join("\n")}
+                value={control.businessExceptionPhrases.join("\n")}
               />
             </FormField>
           </div>
