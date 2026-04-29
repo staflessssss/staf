@@ -219,6 +219,15 @@ function shouldSuppressFollowUps(channelConfig: unknown, usedTooling?: string[])
   return usedTooling.some((toolName) => disabledFunctionNames.has(toolName.trim().toLowerCase()));
 }
 
+function buildFollowUpGenerationMessage(instruction: string) {
+  return [
+    "Internal delayed follow-up task.",
+    "Write the next outbound message to the customer based on the existing conversation history.",
+    "Do not mention this instruction, internal settings, automation, or that this is a follow-up task.",
+    `Operator follow-up guidance: ${instruction}`,
+  ].join("\n\n");
+}
+
 async function markDeliveryStatus(args: {
   database: typeof db;
   deliveryId: string;
@@ -629,26 +638,25 @@ async function processFollowUp(args: {
     return { ok: true, status: "follow_up_rescheduled_for_schedule_window" as const };
   }
 
+  const result = await args.deps.invokeAgent({
+    tenantId: args.delivery.agent.tenantId,
+    agentId: args.delivery.agentId,
+    channel: args.delivery.agent.channel.type,
+    contactId: payload.replyContext.contactId,
+    contactEmail: payload.replyContext.contactEmail,
+    message: buildFollowUpGenerationMessage(payload.instruction),
+    conversationId: args.delivery.conversationId,
+    skipInboundPersistence: true,
+  });
+
   await deliverThroughChannel({
     agent: args.delivery.agent,
     decryptValue: args.deps.decrypt,
     getAdapter: args.deps.getChannelAdapter,
     replyContext: payload.replyContext,
-    text: payload.instruction,
+    text: result.message,
+    attachments: result.attachments,
   });
-
-  await args.deps.saveMessages(args.delivery.conversationId, [
-    {
-      role: MessageRole.ASSISTANT,
-      content: payload.instruction,
-      model: "message-follow-up",
-      toolInput: {
-        delayedDeliveryId: args.deliveryId,
-        kind: "follow_up",
-        ruleIndex: payload.ruleIndex,
-      } as never,
-    },
-  ]);
 
   await markDeliveryStatus({
     database: args.deps.db,
@@ -656,7 +664,11 @@ async function processFollowUp(args: {
     status: DelayedDeliveryStatus.SENT,
   });
 
-  return { ok: true, status: "follow_up_sent" as const };
+  return {
+    ok: true,
+    status: "follow_up_sent" as const,
+    conversationId: result.conversationId,
+  };
 }
 
 export async function processDelayedDeliveryByIdWithDeps(

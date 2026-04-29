@@ -356,7 +356,7 @@ export function WorkspaceMessagesSection({
                   </div>
 
                   <div className="mt-4">
-                    <FormField label="Instruction">
+                    <FormField label="Follow-up instruction">
                       <textarea
                         className={textareaClassName}
                         disabled={isReadOnlyMode}
@@ -367,7 +367,7 @@ export function WorkspaceMessagesSection({
                             }),
                           })
                         }
-                        placeholder="Write the follow-up message instruction"
+                        placeholder="Tell the agent how to follow up"
                         value={rule.instruction}
                       />
                     </FormField>

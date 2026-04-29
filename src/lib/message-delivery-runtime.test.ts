@@ -6,7 +6,6 @@ import {
   ConversationStatus,
   DelayedDeliveryKind,
   DelayedDeliveryStatus,
-  MessageRole,
 } from "@prisma/client";
 
 import { messageDeliveryRuntimeTestHelpers } from "@/lib/message-delivery-runtime";
@@ -85,7 +84,7 @@ test("processDelayedDeliveryByIdWithDeps reschedules follow-up into the next sch
           },
         }) as never,
       invokeAgent: async () => {
-        throw new Error("invokeAgent is not used for literal follow-up delivery");
+        throw new Error("invokeAgent should not run while follow-up is rescheduled");
       },
       saveMessages: async () => {
         throw new Error("saveMessages should not run while follow-up is rescheduled");
@@ -100,8 +99,8 @@ test("processDelayedDeliveryByIdWithDeps reschedules follow-up into the next sch
   assert.equal(updates[0]?.data && typeof updates[0].data === "object" ? (updates[0].data as Record<string, unknown>).status : null, DelayedDeliveryStatus.PENDING);
 });
 
-test("processDelayedDeliveryByIdWithDeps sends a follow-up reminder and persists the assistant message", async () => {
-  const savedMessages: Array<{ conversationId: string; messages: unknown[] }> = [];
+test("processDelayedDeliveryByIdWithDeps generates and sends a follow-up reminder", async () => {
+  let modelInput: Record<string, unknown> | null = null;
   let sentMessage: unknown = null;
 
   const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
@@ -157,11 +156,18 @@ test("processDelayedDeliveryByIdWithDeps sends a follow-up reminder and persists
             return { ok: true };
           },
         }) as never,
-      invokeAgent: async () => {
-        throw new Error("invokeAgent is not used for literal follow-up delivery");
+      invokeAgent: async (input: Record<string, unknown>) => {
+        modelInput = input;
+        return {
+          message: "Are you still looking at pricing, or should I help you book the next step?",
+          promptPreview: "prompt",
+          usedTooling: [],
+          conversationId: "conv-2",
+          model: "test-model",
+        };
       },
-      saveMessages: async (conversationId: string, messages: unknown[]) => {
-        savedMessages.push({ conversationId, messages });
+      saveMessages: async () => {
+        throw new Error("invokeAgent persists the generated follow-up message");
       },
     },
     new Date("2026-04-20T16:00:00Z"),
@@ -169,31 +175,27 @@ test("processDelayedDeliveryByIdWithDeps sends a follow-up reminder and persists
 
   assert.equal(result.ok, true);
   assert.equal(result.status, "follow_up_sent");
+  assert.equal(result.conversationId, "conv-2");
+  assert.deepEqual(modelInput, {
+    tenantId: "tenant-1",
+    agentId: "agent-1",
+    channel: ChannelType.TELEGRAM,
+    contactId: "contact-2",
+    contactEmail: undefined,
+    message:
+      "Internal delayed follow-up task.\n\nWrite the next outbound message to the customer based on the existing conversation history.\n\nDo not mention this instruction, internal settings, automation, or that this is a follow-up task.\n\nOperator follow-up guidance: Just checking in. I can still help with pricing or booking when you're ready.",
+    conversationId: "conv-2",
+    skipInboundPersistence: true,
+  });
   assert.deepEqual(sentMessage, {
     credentials: "decrypted:encrypted",
     contactId: "contact-2",
-    message: "Just checking in. I can still help with pricing or booking when you're ready.",
+    message: "Are you still looking at pricing, or should I help you book the next step?",
     messageId: undefined,
     threadId: "thread-2",
     subject: undefined,
     attachments: undefined,
     channelConfig: {},
-  });
-  assert.equal(savedMessages.length, 1);
-  assert.deepEqual(savedMessages[0], {
-    conversationId: "conv-2",
-    messages: [
-      {
-        role: MessageRole.ASSISTANT,
-        content: "Just checking in. I can still help with pricing or booking when you're ready.",
-        model: "message-follow-up",
-        toolInput: {
-          delayedDeliveryId: "delivery-2",
-          kind: "follow_up",
-          ruleIndex: 0,
-        },
-      },
-    ],
   });
 });
 
@@ -313,7 +315,13 @@ test("processDelayedDeliveryByIdWithDeps requeues transient failures with backof
           },
         }) as never,
       invokeAgent: async () => {
-        throw new Error("invokeAgent is not used for literal follow-up delivery");
+        return {
+          message: "Generated follow-up",
+          promptPreview: "prompt",
+          usedTooling: [],
+          conversationId: "conv-4",
+          model: "test-model",
+        };
       },
       saveMessages: async () => {
         throw new Error("saveMessages should not run on failed send");
