@@ -66,6 +66,8 @@ type InvokeAgentInput = {
   message: string;
   messageId?: string;
   gmailMessageId?: string;
+  threadId?: string;
+  subject?: string;
   contactEmail?: string;
   promptPreview?: string;
   languagePreference?: string | null;
@@ -347,12 +349,12 @@ function getInboundConversationPolicy(args: {
     return "closed_conversation" as const;
   }
 
+  if (args.existingConversationStatus === ConversationStatus.ESCALATED) {
+    return "waiting_for_manual_dialog_activation" as const;
+  }
+
   if (!args.agentSettings.defaultChatEnabled) {
     if (!args.existingConversationStatus) {
-      return "waiting_for_manual_dialog_activation" as const;
-    }
-
-    if (args.existingConversationStatus === ConversationStatus.ESCALATED) {
       return "waiting_for_manual_dialog_activation" as const;
     }
   }
@@ -657,6 +659,8 @@ async function recordInboundMessageWithDb(
   message: string;
   messageId?: string;
   gmailMessageId?: string;
+  threadId?: string;
+  subject?: string;
   conversationStatus?: ConversationStatus;
 }) {
   return database.$transaction(async (tx) => {
@@ -697,10 +701,12 @@ async function recordInboundMessageWithDb(
         role: MessageRole.USER,
         content: args.message,
         toolInput:
-          args.messageId || args.gmailMessageId
+          args.messageId || args.gmailMessageId || args.threadId || args.subject
             ? {
                 ...(args.messageId ? { messageId: args.messageId } : {}),
                 ...(args.gmailMessageId ? { gmailMessageId: args.gmailMessageId } : {}),
+                ...(args.threadId ? { threadId: args.threadId } : {}),
+                ...(args.subject ? { subject: args.subject } : {}),
               }
             : undefined,
       },
@@ -717,6 +723,8 @@ async function recordInboundMessage(args: {
   message: string;
   messageId?: string;
   gmailMessageId?: string;
+  threadId?: string;
+  subject?: string;
   conversationStatus?: ConversationStatus;
 }) {
   return recordInboundMessageWithDb(db, args);
@@ -1033,6 +1041,8 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
           message: input.message,
           messageId: input.messageId,
           gmailMessageId: input.gmailMessageId,
+          threadId: input.threadId,
+          subject: input.subject,
         });
 
   const antiSpamIntercept = getAntiSpamIntercept({
@@ -1258,12 +1268,15 @@ async function handleIncomingEventWithDeps(
       message: incoming.message,
       messageId: incoming.messageId,
       gmailMessageId: incoming.gmailMessageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
       conversationStatus: ConversationStatus.ESCALATED,
     });
     await cancelPendingDelayedDeliveriesWithDb({
       database: deps.db,
       conversationId: conversation.id,
       kinds: [DelayedDeliveryKind.FOLLOW_UP],
+      excludeOperatorAutoResume: true,
     });
 
     return {
@@ -1282,6 +1295,8 @@ async function handleIncomingEventWithDeps(
       message: incoming.message,
       messageId: incoming.messageId,
       gmailMessageId: incoming.gmailMessageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
       conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
     });
     await cancelPendingDelayedDeliveriesWithDb({
@@ -1333,6 +1348,8 @@ async function handleIncomingEventWithDeps(
       message: incoming.message,
       messageId: incoming.messageId,
       gmailMessageId: incoming.gmailMessageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
       conversationStatus: ConversationStatus.CLOSED,
     });
     await cancelPendingDelayedDeliveriesWithDb({
@@ -1360,6 +1377,8 @@ async function handleIncomingEventWithDeps(
       message: incoming.message,
       messageId: incoming.messageId,
       gmailMessageId: incoming.gmailMessageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
       conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
     });
     await cancelPendingDelayedDeliveriesWithDb({
@@ -1409,6 +1428,8 @@ async function handleIncomingEventWithDeps(
     message: incoming.message,
     messageId: incoming.messageId,
     gmailMessageId: incoming.gmailMessageId,
+    threadId: incoming.threadId,
+    subject: incoming.subject,
   });
 
   if (result.suppressReply) {

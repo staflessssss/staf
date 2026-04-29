@@ -194,6 +194,22 @@ function getFollowUpPayload(value: unknown) {
   };
 }
 
+function getOperatorAutoResumePayload(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.kind !== "operator_auto_resume") {
+    return null;
+  }
+
+  return {
+    replyContext: parseReplyContext(record.replyContext),
+    resumeMessage: typeof record.resumeMessage === "string" ? record.resumeMessage.trim() : "",
+  };
+}
+
 function supportsBufferedReplies(channel: ChannelType) {
   return channel !== ChannelType.GMAIL;
 }
@@ -263,12 +279,23 @@ export async function cancelPendingDelayedDeliveriesWithDb(args: {
   database: typeof db;
   conversationId: string;
   kinds?: DelayedDeliveryKind[];
+  excludeOperatorAutoResume?: boolean;
 }) {
   await args.database.delayedDelivery.updateMany({
     where: {
       conversationId: args.conversationId,
       status: DelayedDeliveryStatus.PENDING,
       ...(args.kinds?.length ? { kind: { in: args.kinds } } : {}),
+      ...(args.excludeOperatorAutoResume
+        ? {
+            NOT: {
+              payload: {
+                path: ["kind"],
+                equals: "operator_auto_resume",
+              },
+            },
+          }
+        : {}),
     },
     data: {
       status: DelayedDeliveryStatus.CANCELED,
@@ -547,6 +574,74 @@ async function processFollowUp(args: {
       error: "follow_up_missing_agent_or_conversation",
     });
     return { ok: false, status: "follow_up_missing_context" as const };
+  }
+
+  const autoResumePayload = getOperatorAutoResumePayload(args.delivery.payload);
+  if (autoResumePayload) {
+    let resumeMessageDeliveryFailed = false;
+
+    if (args.delivery.conversation.status !== ConversationStatus.ESCALATED) {
+      await markDeliveryStatus({
+        database: args.deps.db,
+        deliveryId: args.deliveryId,
+        status: DelayedDeliveryStatus.CANCELED,
+        error: "operator_auto_resume_dialog_not_paused",
+      });
+      return { ok: true, status: "operator_auto_resume_canceled" as const };
+    }
+
+    if (autoResumePayload.resumeMessage) {
+      const existingResumeMessage = await args.deps.db.message.findFirst({
+        where: {
+          conversationId: args.delivery.conversationId,
+          role: MessageRole.ASSISTANT,
+          model: "control-auto-resume",
+          content: autoResumePayload.resumeMessage,
+        },
+      });
+
+      if (!existingResumeMessage) {
+        try {
+          await deliverThroughChannel({
+            agent: args.delivery.agent,
+            decryptValue: args.deps.decrypt,
+            getAdapter: args.deps.getChannelAdapter,
+            replyContext: autoResumePayload.replyContext ?? {
+              contactId: args.delivery.conversation.contactId,
+            },
+            text: autoResumePayload.resumeMessage,
+          });
+          await args.deps.saveMessages(args.delivery.conversationId, [
+            {
+              role: MessageRole.ASSISTANT,
+              content: autoResumePayload.resumeMessage,
+              model: "control-auto-resume",
+            },
+          ]);
+        } catch {
+          resumeMessageDeliveryFailed = true;
+        }
+      }
+    }
+
+    await args.deps.db.conversation.update({
+      where: { id: args.delivery.conversationId },
+      data: { status: ConversationStatus.ACTIVE },
+    });
+
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.SENT,
+    });
+
+    return {
+      ok: true,
+      status: resumeMessageDeliveryFailed
+        ? ("operator_auto_resumed_without_resume_message" as const)
+        : ("operator_auto_resumed" as const),
+      conversationId: args.delivery.conversationId,
+    };
   }
 
   const payload = getFollowUpPayload(args.delivery.payload);

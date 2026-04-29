@@ -375,6 +375,278 @@ test("processDelayedDeliveryByIdWithDeps cancels buffered reply when control sup
   );
 });
 
+test("processDelayedDeliveryByIdWithDeps auto-resumes an operator-paused dialog", async () => {
+  const updates: Array<Record<string, unknown>> = [];
+  const savedMessages: Array<{ role: string; content: string; model?: string }> = [];
+  const events: string[] = [];
+  let sentMessage: unknown = null;
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-auto-resume",
+    {
+      db: {
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-auto-resume",
+            agentId: "agent-1",
+            conversationId: "conv-auto-resume",
+            kind: DelayedDeliveryKind.FOLLOW_UP,
+            payload: {
+              kind: "operator_auto_resume",
+              replyContext: {
+                contactId: "contact-1",
+                messageId: "message-id-1",
+                threadId: "thread-1",
+                subject: "Subject 1",
+              },
+              resumeMessage: "The agent is available again.",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.TELEGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-auto-resume",
+              contactId: "contact-1",
+              status: ConversationStatus.ESCALATED,
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return args;
+          },
+        },
+        conversation: {
+          update: async (args: Record<string, unknown>) => {
+            events.push("conversation:update");
+            updates.push(args);
+            return args;
+          },
+        },
+        message: {
+          findFirst: async () => null,
+        },
+      } as never,
+      decrypt: (value: string) => `decrypted:${value}`,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async (args: Record<string, unknown>) => {
+            events.push("send");
+            sentMessage = args;
+            return { ok: true };
+          },
+        }) as never,
+      invokeAgent: async () => {
+        throw new Error("invokeAgent should not run for operator auto-resume");
+      },
+      saveMessages: async (_conversationId, messages) => {
+        events.push("save");
+        savedMessages.push(...(messages as Array<{ role: string; content: string; model?: string }>));
+      },
+    },
+    new Date("2026-04-20T16:00:00Z"),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "operator_auto_resumed");
+  assert.deepEqual(sentMessage, {
+    credentials: "decrypted:encrypted",
+    contactId: "contact-1",
+    message: "The agent is available again.",
+    messageId: "message-id-1",
+    threadId: "thread-1",
+    subject: "Subject 1",
+    attachments: undefined,
+    channelConfig: {},
+  });
+  assert.deepEqual(savedMessages, [
+    {
+      role: "ASSISTANT",
+      content: "The agent is available again.",
+      model: "control-auto-resume",
+    },
+  ]);
+  assert.equal(
+    updates.some(
+      (update) =>
+        update.data &&
+        typeof update.data === "object" &&
+        (update.data as Record<string, unknown>).status === ConversationStatus.ACTIVE,
+    ),
+    true,
+  );
+  assert.deepEqual(events, ["send", "save", "conversation:update"]);
+});
+
+test("processDelayedDeliveryByIdWithDeps does not resend an already-saved auto-resume message", async () => {
+  let sendCalled = false;
+  let saveCalled = false;
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-auto-resume-retry",
+    {
+      db: {
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-auto-resume-retry",
+            agentId: "agent-1",
+            conversationId: "conv-auto-resume",
+            kind: DelayedDeliveryKind.FOLLOW_UP,
+            payload: {
+              kind: "operator_auto_resume",
+              resumeMessage: "The agent is available again.",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.TELEGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-auto-resume",
+              contactId: "contact-1",
+              status: ConversationStatus.ESCALATED,
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => args,
+        },
+        conversation: {
+          update: async (args: Record<string, unknown>) => args,
+        },
+        message: {
+          findFirst: async () => ({ id: "saved-resume-message" }),
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sendCalled = true;
+            return { ok: true };
+          },
+        }) as never,
+      invokeAgent: async () => {
+        throw new Error("invokeAgent should not run for operator auto-resume");
+      },
+      saveMessages: async () => {
+        saveCalled = true;
+      },
+    },
+    new Date("2026-04-20T16:00:00Z"),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "operator_auto_resumed");
+  assert.equal(sendCalled, false);
+  assert.equal(saveCalled, false);
+});
+
+test("processDelayedDeliveryByIdWithDeps resumes even when optional auto-resume message delivery fails", async () => {
+  const updates: Array<Record<string, unknown>> = [];
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-auto-resume-send-fails",
+    {
+      db: {
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-auto-resume-send-fails",
+            agentId: "agent-1",
+            conversationId: "conv-auto-resume",
+            kind: DelayedDeliveryKind.FOLLOW_UP,
+            payload: {
+              kind: "operator_auto_resume",
+              resumeMessage: "The agent is available again.",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.TELEGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-auto-resume",
+              contactId: "contact-1",
+              status: ConversationStatus.ESCALATED,
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return args;
+          },
+        },
+        conversation: {
+          update: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return args;
+          },
+        },
+        message: {
+          findFirst: async () => null,
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            throw new Error("channel unavailable");
+          },
+        }) as never,
+      invokeAgent: async () => {
+        throw new Error("invokeAgent should not run for operator auto-resume");
+      },
+      saveMessages: async () => {
+        throw new Error("saveMessages should not run after failed send");
+      },
+    },
+    new Date("2026-04-20T16:00:00Z"),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "operator_auto_resumed_without_resume_message");
+  assert.equal(
+    updates.some(
+      (update) =>
+        update.data &&
+        typeof update.data === "object" &&
+        (update.data as Record<string, unknown>).status === ConversationStatus.ACTIVE,
+    ),
+    true,
+  );
+  assert.equal(
+    updates.some(
+      (update) =>
+        update.data &&
+        typeof update.data === "object" &&
+        (update.data as Record<string, unknown>).status === DelayedDeliveryStatus.SENT,
+    ),
+    true,
+  );
+});
+
 test("runBufferedDeliveryWhenDueWithDeps waits until due time before processing the delivery", async () => {
   const slept: number[] = [];
   const attemptedAt: Date[] = [];

@@ -330,6 +330,7 @@ test("buildRuntimeContextLines does not expose hidden prompting visibility flags
 
 test("handleIncomingEventWithDeps records inbound and does not auto-reply when manual activation is required", async () => {
   const createdMessages: Array<{ conversationId: string; role: string; content: string }> = [];
+  const delayedDeliveryUpdates: Array<Record<string, unknown>> = [];
   const txConversation = {
     id: "conv-new",
     status: ConversationStatus.ESCALATED,
@@ -393,7 +394,10 @@ test("handleIncomingEventWithDeps records inbound and does not auto-reply when m
         },
       }),
     delayedDelivery: {
-      updateMany: async () => ({ count: 0 }),
+      updateMany: async (args: Record<string, unknown>) => {
+        delayedDeliveryUpdates.push(args);
+        return { count: 0 };
+      },
     },
   } as never;
   let invokeCalled = false;
@@ -440,6 +444,28 @@ test("handleIncomingEventWithDeps records inbound and does not auto-reply when m
       content: "hello",
       toolInput: {
         messageId: "msg-1",
+      },
+    },
+  ]);
+  assert.deepEqual(delayedDeliveryUpdates, [
+    {
+      where: {
+        conversationId: "conv-new",
+        status: "PENDING",
+        kind: { in: ["FOLLOW_UP"] },
+        NOT: {
+          payload: {
+            path: ["kind"],
+            equals: "operator_auto_resume",
+          },
+        },
+      },
+      data: {
+        status: "CANCELED",
+        canceledAt: delayedDeliveryUpdates[0]?.data
+          ? (delayedDeliveryUpdates[0].data as { canceledAt?: Date }).canceledAt
+          : undefined,
+        error: "superseded_by_newer_runtime_state",
       },
     },
   ]);
@@ -570,6 +596,7 @@ test("handleIncomingEventWithDeps keeps closed dialogs closed and avoids auto-re
 
 test("handleIncomingEventWithDeps auto-replies through the channel adapter when policy allows it", async () => {
   let sendReplyArgs: Record<string, unknown> | null = null;
+  let invokeAgentArgs: { messageId?: unknown; threadId?: unknown; subject?: unknown } | null = null;
 
   const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
     {
@@ -605,18 +632,23 @@ test("handleIncomingEventWithDeps auto-replies through the channel adapter when 
         },
       } as never,
       decrypt: (value: string) => `decrypted:${value}`,
-      invokeAgent: async () => ({
-        message: "Agent reply",
-        promptPreview: "preview",
-        usedTooling: ["Calendar check"],
-        conversationId: "conv-active",
-      }),
+      invokeAgent: async (args) => {
+        invokeAgentArgs = args as Record<string, unknown>;
+        return {
+          message: "Agent reply",
+          promptPreview: "preview",
+          usedTooling: ["Calendar check"],
+          conversationId: "conv-active",
+        };
+      },
       getChannelAdapter: () =>
         ({
           parseIncoming: () => ({
             contactId: "contact-1",
             message: "hello",
+            messageId: "message-1",
             threadId: "thread-1",
+            subject: "Question",
           }),
           formatReply: (text: string) => text,
           sendReply: async (args: Record<string, unknown>) => {
@@ -634,12 +666,21 @@ test("handleIncomingEventWithDeps auto-replies through the channel adapter when 
     credentials: "decrypted:encrypted-credentials",
     contactId: "contact-1",
     message: "Agent reply",
-    messageId: undefined,
+    messageId: "message-1",
     threadId: "thread-1",
-    subject: undefined,
+    subject: "Question",
     attachments: undefined,
     channelConfig: {},
   });
+  assert.ok(invokeAgentArgs);
+  const capturedInvokeAgentArgs = invokeAgentArgs as {
+    messageId?: unknown;
+    threadId?: unknown;
+    subject?: unknown;
+  };
+  assert.equal(capturedInvokeAgentArgs.messageId, "message-1");
+  assert.equal(capturedInvokeAgentArgs.threadId, "thread-1");
+  assert.equal(capturedInvokeAgentArgs.subject, "Question");
 });
 
 test("control user message limit can suppress replies without a fallback message", () => {

@@ -211,8 +211,7 @@ export type ControlConfig = {
   autoResumeAfterUnit: (typeof autoResumeUnitOptions)[number];
   resumeMessageEnabled: boolean;
   resumeMessage?: string | null;
-  stopPhrases: string[];
-  resumePhrases: string[];
+  operatorExceptionPhrases: string[];
 };
 
 export const agentScheduleDayOptions = [
@@ -659,8 +658,7 @@ export function getDefaultControlConfig(): ControlConfig {
     autoResumeAfterUnit: "hours",
     resumeMessageEnabled: false,
     resumeMessage: null,
-    stopPhrases: [],
-    resumePhrases: [],
+    operatorExceptionPhrases: [],
   };
 }
 
@@ -710,8 +708,7 @@ export function normalizeControlConfig(
       typeof value?.antiSpamAutoReply === "string" ? value.antiSpamAutoReply : base.antiSpamAutoReply,
     resumeMessage:
       typeof value?.resumeMessage === "string" ? value.resumeMessage : base.resumeMessage,
-    stopPhrases: normalizePhraseList(value?.stopPhrases),
-    resumePhrases: normalizePhraseList(value?.resumePhrases),
+    operatorExceptionPhrases: normalizePhraseList(value?.operatorExceptionPhrases),
   };
 }
 
@@ -1076,8 +1073,7 @@ export const channelConfigSchema = z
           .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
-        stopPhrases: z.array(z.string().trim().min(1).max(120)).default([]),
-        resumePhrases: z.array(z.string().trim().min(1).max(120)).default([]),
+        operatorExceptionPhrases: z.array(z.string().trim().min(1).max(120)).default([]),
       })
       .optional(),
     agentSettings: z

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ConversationStatus } from "@prisma/client";
 
-import { ClientDialogActivationButton } from "@/components/stafless/client-dialog-activation-button";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
+import { isOperatorMessage } from "@/lib/operator-handoff";
 
 type DialogsPageProps = {
   searchParams: Promise<{ agent?: string; conversation?: string }>;
@@ -16,13 +16,25 @@ function channelLabel(channel: string) {
 function conversationStatusLabel(status: ConversationStatus) {
   switch (status) {
     case ConversationStatus.ESCALATED:
-      return "Waiting for activation";
+      return "Being reviewed";
     case ConversationStatus.CLOSED:
       return "Closed";
     case ConversationStatus.ACTIVE:
     default:
       return "Active";
   }
+}
+
+function messageBubbleKind(message: { role: string }) {
+  if (message.role === "USER") {
+    return "user";
+  }
+
+  if (message.role === "ASSISTANT") {
+    return "assistant";
+  }
+
+  return "system";
 }
 
 function conversationStatusClassName(status: ConversationStatus) {
@@ -70,6 +82,8 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
 
   const selectedConversation =
     conversations.find((item) => item.id === conversation) ?? conversations[0];
+  const selectedVisibleMessages =
+    selectedConversation?.messages.filter((message) => !isOperatorMessage(message as never)) ?? [];
 
   return (
     <div className="space-y-10">
@@ -127,7 +141,10 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             <div className="max-h-[760px] overflow-y-auto">
               {conversations.map((item) => {
                 const isActive = selectedConversation?.id === item.id;
-                const lastMessage = item.messages[item.messages.length - 1];
+                const visibleMessages = item.messages.filter(
+                  (message) => !isOperatorMessage(message as never),
+                );
+                const lastMessage = visibleMessages[visibleMessages.length - 1];
 
                 return (
                   <Link
@@ -203,53 +220,51 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                     >
                       {conversationStatusLabel(selectedConversation.status)}
                     </span>
-                    {selectedConversation.status === ConversationStatus.ESCALATED ? (
-                      <ClientDialogActivationButton conversationId={selectedConversation.id} />
-                    ) : (
-                      <Link
-                        href="/client/leads"
-                        className="rounded-xl bg-[#efecff] px-5 py-2.5 text-sm font-semibold text-[#4648d4] transition hover:bg-[#e8e5ff]"
-                      >
-                        Open Leads
-                      </Link>
-                    )}
+                    <Link
+                      href="/client/leads"
+                      className="rounded-xl bg-[#efecff] px-5 py-2.5 text-sm font-semibold text-[#4648d4] transition hover:bg-[#e8e5ff]"
+                    >
+                      Open Leads
+                    </Link>
                   </div>
                 </div>
 
                 <div className="flex-1 space-y-8 overflow-y-auto p-10">
-                  {selectedConversation.messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.role === "USER" ? "" : "justify-end"}`}
-                    >
+                  {selectedVisibleMessages.map((message) => {
+                    const kind = messageBubbleKind(message);
+
+                    return (
                       <div
-                        className={`max-w-[80%] rounded-[24px] p-5 ${
-                          message.role === "USER"
-                            ? "bg-[#f5f2ff] text-[#181836]"
-                            : message.role === "ASSISTANT"
-                              ? "bg-white text-[#181836] ring-1 ring-[#d8d6fe]/70"
-                              : "bg-[#eef2ff] text-[#4648d4] ring-1 ring-[#d8d6fe]/70"
-                        }`}
+                        key={message.id}
+                        className={`flex ${kind === "user" ? "" : "justify-end"}`}
                       >
+                        <div
+                          className={`max-w-[80%] rounded-[24px] p-5 ${
+                            kind === "user"
+                              ? "bg-[#f5f2ff] text-[#181836]"
+                              : kind === "assistant"
+                                  ? "bg-white text-[#181836] ring-1 ring-[#d8d6fe]/70"
+                                  : "bg-[#eef2ff] text-[#4648d4] ring-1 ring-[#d8d6fe]/70"
+                          }`}
+                        >
                         <p className="leading-7">{message.content}</p>
                         <span className="mt-3 block text-[10px] font-medium opacity-65">
                           {message.createdAt.toLocaleString()}
                         </span>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="border-t border-[#eef0ff] px-6 py-5">
                   {selectedConversation.status === ConversationStatus.ESCALATED ? (
                     <div className="rounded-2xl bg-[#fff8ea] px-4 py-4 text-sm text-[#7a5a00] ring-1 ring-[#f5d18c]">
-                      This dialog is paused and waiting for manual activation. New incoming
-                      messages stay visible here, but the agent will not auto-reply until you
-                      activate the dialog.
+                      Our team is reviewing this dialog. New customer messages stay visible here.
                     </div>
                   ) : (
-                    <div className="rounded-2xl bg-[#f5f2ff] px-4 py-4 text-sm text-[#5c5c7e] ring-1 ring-[#d8d6fe]/70">
-                      Dialogs are read-only for clients in v1.
+                    <div className="rounded-2xl bg-[#f8f8ff] px-4 py-4 text-sm text-[#5c5c7e] ring-1 ring-[#d8d6fe]/70">
+                      Dialogs are read-only for the client cabinet.
                     </div>
                   )}
                 </div>

@@ -5,7 +5,11 @@ import {
   selectClassName,
   textareaClassName,
 } from "@/components/stafless/foundation";
-import { ControlConfig, historyWindowTypeOptions } from "@/lib/agent-config";
+import {
+  ControlConfig,
+  autoResumeUnitOptions,
+  historyWindowTypeOptions,
+} from "@/lib/agent-config";
 import { humanizeWorkspaceToken } from "@/components/stafless/workspace-sections/utils";
 
 const sectionTitleClassName = "text-[18px] font-semibold tracking-[-0.02em] text-[#111827]";
@@ -24,6 +28,8 @@ const maxDayOptions = [
   { value: 30, label: "1 month" },
   { value: 90, label: "3 months" },
 ];
+
+const autoResumeValueOptions = [1, 2, 3, 6, 12, 24, 48, 72];
 
 function HelpHint({ label }: { label: string }) {
   return (
@@ -160,6 +166,194 @@ export function WorkspaceControlSection({
                 </select>
               </FormField>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className={sectionTitleClassName}>Operator handoff</h2>
+
+        <div className={fieldCardClassName}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>Pause when operator replies</p>
+                <HelpHint label="When the operator sends a message in a dialog, that specific dialog moves to manual mode and the agent stops auto-replying there." />
+              </div>
+              <p className={mutedTextClassName}>
+                Operator replies pause only the current dialog, not the whole agent.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={control.pauseOnOperatorIntervention}
+              disabled={isReadOnlyMode}
+              onCheckedChange={(checked) =>
+                onUpdateControl({
+                  pauseOnOperatorIntervention: checked,
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className={fieldCardClassName}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>Ignore first operator message</p>
+                <HelpHint label="The first operator message in a dialog will not pause the agent. The second operator message can pause it." />
+              </div>
+              <p className={mutedTextClassName}>
+                Useful when the operator only wants to greet the customer or add context.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={control.ignoreFirstOperatorMessage}
+              disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention}
+              onCheckedChange={(checked) =>
+                onUpdateControl({
+                  ignoreFirstOperatorMessage: checked,
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div className={fieldCardClassName}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>Auto-resume</p>
+                <HelpHint label="After an operator-paused dialog waits for the configured time, the agent resumes that dialog automatically." />
+              </div>
+              <p className={mutedTextClassName}>
+                Return a paused dialog to the agent after a fixed interval.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={control.autoResumeEnabled}
+              disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention}
+              onCheckedChange={(checked) =>
+                onUpdateControl({
+                  autoResumeEnabled: checked,
+                })
+              }
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormField label="Resume after">
+              <select
+                className={selectClassName}
+                disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention || !control.autoResumeEnabled}
+                onChange={(event) =>
+                  onUpdateControl({
+                    autoResumeAfterValue: Number(event.target.value || 1),
+                  })
+                }
+                value={String(control.autoResumeAfterValue)}
+              >
+                {autoResumeValueOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Unit">
+              <select
+                className={selectClassName}
+                disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention || !control.autoResumeEnabled}
+                onChange={(event) =>
+                  onUpdateControl({
+                    autoResumeAfterUnit: event.target.value as ControlConfig["autoResumeAfterUnit"],
+                  })
+                }
+                value={control.autoResumeAfterUnit}
+              >
+                {autoResumeUnitOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {humanizeWorkspaceToken(option)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+        </div>
+
+        <div className={fieldCardClassName}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>Resume message</p>
+                <HelpHint label="When auto-resume runs, the agent can notify the customer that it is available again." />
+              </div>
+              <p className={mutedTextClassName}>
+                Optional message sent when the paused dialog returns to the agent.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={control.resumeMessageEnabled}
+              disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention || !control.autoResumeEnabled}
+              onCheckedChange={(checked) =>
+                onUpdateControl({
+                  resumeMessageEnabled: checked,
+                })
+              }
+            />
+          </div>
+
+          <div className="mt-4">
+            <FormField label="Message">
+              <textarea
+                className={textareaClassName}
+                disabled={
+                  isReadOnlyMode ||
+                  !control.pauseOnOperatorIntervention ||
+                  !control.autoResumeEnabled ||
+                  !control.resumeMessageEnabled
+                }
+                onChange={(event) =>
+                  onUpdateControl({
+                    resumeMessage: event.target.value,
+                  })
+                }
+                placeholder="The agent is available again and ready to continue."
+                value={control.resumeMessage ?? ""}
+              />
+            </FormField>
+          </div>
+        </div>
+
+        <div className={fieldCardClassName}>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <p className={cardHeadingClassName}>Exception phrases</p>
+              <HelpHint label="If the operator message contains one of these phrases, the agent will not pause the dialog." />
+            </div>
+            <p className={mutedTextClassName}>
+              Phrases the operator can send without stopping the agent.
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <FormField label="Phrases">
+              <textarea
+                className={textareaClassName}
+                disabled={isReadOnlyMode || !control.pauseOnOperatorIntervention}
+                onChange={(event) =>
+                  onUpdateControl({
+                    operatorExceptionPhrases: event.target.value
+                      .split(/\r?\n/)
+                      .map((line) => line.trim())
+                      .filter(Boolean),
+                  })
+                }
+                placeholder="One phrase per line"
+                value={control.operatorExceptionPhrases.join("\n")}
+              />
+            </FormField>
           </div>
         </div>
       </section>
