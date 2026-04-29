@@ -5,6 +5,7 @@ import {
   agentConfigInclude,
   agentDraftSchema,
   buildFeatureCreateInput,
+  formatAgentDraftValidationError,
   getChannelConfigObject,
   getFunctionIntegrationIds,
   mergeAgentChannelConfig,
@@ -67,7 +68,10 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
   const parsed = agentDraftSchema.safeParse(json);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid agent payload." }, { status: 400 });
+    return NextResponse.json(
+      { error: formatAgentDraftValidationError(parsed.error) },
+      { status: 400 },
+    );
   }
 
   const existingAgent = await db.agent.findFirst({

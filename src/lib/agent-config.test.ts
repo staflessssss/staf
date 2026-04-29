@@ -6,6 +6,7 @@ import {
   agentDraftSchema,
   buildFeatureCreateInput,
   buildMultilingualGuidance,
+  formatAgentDraftValidationError,
   formatEnumLabel,
   getFunctionIntegrationIds,
   mapAgentToDraft,
@@ -13,6 +14,36 @@ import {
   normalizePromptingConfig,
   resolvePromptingIdentity,
 } from "@/lib/agent-config";
+
+test("formatAgentDraftValidationError explains incomplete Knowledge items", () => {
+  const parsed = agentDraftSchema.safeParse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    knowledgeBlocks: [
+      {
+        name: "Pricing",
+        description: "Use for price questions",
+        knowledgeContent: "Starter package is $100.",
+      },
+      {
+        name: "item",
+        description: "Use for item questions",
+        knowledgeContent: "",
+      },
+    ],
+  });
+
+  assert.equal(parsed.success, false);
+
+  if (!parsed.success) {
+    assert.equal(
+      formatAgentDraftValidationError(parsed.error),
+      "Knowledge item 2: facts are required.",
+    );
+  }
+});
 
 test("agentDraftSchema normalizes empty language preference to null", () => {
   const parsed = agentDraftSchema.parse({

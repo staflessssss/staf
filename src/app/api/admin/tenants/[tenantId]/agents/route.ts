@@ -5,6 +5,7 @@ import {
   agentConfigInclude,
   agentDraftSchema,
   buildFeatureCreateInput,
+  formatAgentDraftValidationError,
   getChannelConfigObject,
   getFunctionIntegrationIds,
   mergeAgentChannelConfig,
@@ -73,7 +74,10 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
   const parsed = agentDraftSchema.safeParse(json);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid agent payload." }, { status: 400 });
+    return NextResponse.json(
+      { error: formatAgentDraftValidationError(parsed.error) },
+      { status: 400 },
+    );
   }
 
   const tenant = await db.tenant.findUnique({

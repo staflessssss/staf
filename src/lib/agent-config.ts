@@ -1147,6 +1147,57 @@ export const agentDraftSchema = z.object({
 
 export type AgentDraftInput = z.infer<typeof agentDraftSchema>;
 
+export function formatAgentDraftValidationError(error: z.ZodError): string {
+  const issue = error.issues[0];
+
+  if (!issue) {
+    return "Invalid agent payload.";
+  }
+
+  const [section, rawIndex, field] = issue.path;
+
+  if (section === "knowledgeBlocks" && typeof rawIndex === "number") {
+    const fieldLabel =
+      field === "name"
+        ? "name"
+        : field === "description"
+          ? "use when"
+          : field === "knowledgeContent"
+            ? "facts"
+            : "field";
+    const reason =
+      issue.code === "too_small"
+        ? fieldLabel === "facts"
+          ? "are required"
+          : "is required"
+        : issue.code === "too_big"
+          ? "is too long"
+          : issue.message.toLowerCase();
+
+    return `Knowledge item ${rawIndex + 1}: ${fieldLabel} ${reason}.`;
+  }
+
+  if (section === "channelId") {
+    return "Select a channel before saving this agent.";
+  }
+
+  if (section === "name") {
+    return "Agent name is required before saving.";
+  }
+
+  if (section === "persona") {
+    return "Agent instruction is required before saving.";
+  }
+
+  if (section === "tone") {
+    return "Agent tone is required before saving.";
+  }
+
+  const path = issue.path.length > 0 ? issue.path.join(".") : "draft";
+
+  return `Invalid agent payload: ${path} ${issue.message}.`;
+}
+
 export function getDefaultFunctionBlock(): FunctionBlockConfig {
   return {
     name: "New function",

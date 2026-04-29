@@ -53,6 +53,8 @@ import {
   DiscoveryField,
   getConversationPlaybookPreset,
   getDefaultChannelBehaviorConfig,
+  agentDraftSchema,
+  formatAgentDraftValidationError,
   normalizeChannelBehavior,
   normalizeConversationPlaybook,
   ControlConfig,
@@ -1572,6 +1574,12 @@ export function AgentWorkspaceClient({
         },
         knowledgeBlocks: stripKnowledgeUiIds(draft.knowledgeBlocks),
       };
+      const parsedPayload = agentDraftSchema.safeParse(payload);
+
+      if (!parsedPayload.success) {
+        setError(formatAgentDraftValidationError(parsedPayload.error));
+        return;
+      }
 
       const response = await fetch(
         agent
@@ -1582,7 +1590,7 @@ export function AgentWorkspaceClient({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(parsedPayload.data),
         },
       );
 
