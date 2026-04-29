@@ -26,9 +26,7 @@ import {
 } from "lucide-react";
 
 import {
-  Checklist,
   EmptyState,
-  StatusBadge,
   SurfaceCard,
   primaryButtonClassName,
   secondaryButtonClassName,
@@ -335,17 +333,6 @@ const discoveryFieldLabels: Record<DiscoveryField, string> = {
   notes_or_special_request: "Notes or special request",
 };
 
-const sampleKnowledge: KnowledgeDraft[] = [
-  {
-    uiId: "knowledge_sample_service_scope",
-    name: "Service scope",
-    description:
-      "Use this when the customer asks what the business offers, who it serves, or what is outside scope.",
-    knowledgeContent:
-      "The studio handles wedding videography, highlight edits, and post-event delivery. It does not offer photography-only packages.",
-  },
-];
-
 function uniqueDiscoveryFields(fields: DiscoveryField[]) {
   return fields.filter(
     (field, index, items): field is DiscoveryField =>
@@ -403,6 +390,15 @@ function stripKnowledgeUiIds(knowledgeBlocks: KnowledgeDraft[]) {
     description: block.description,
     knowledgeContent: block.knowledgeContent,
   }));
+}
+
+function hasIncompleteKnowledgeBlocks(knowledgeBlocks: KnowledgeDraft[]) {
+  return knowledgeBlocks.some(
+    (block) =>
+      !block.name.trim() ||
+      !block.description.trim() ||
+      !block.knowledgeContent.trim(),
+  );
 }
 
 export function withFunctionUiIds(fn: FunctionBlockConfig): FunctionDraft {
@@ -546,10 +542,7 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
       ),
       functionBlocks,
     },
-    knowledgeBlocks:
-      knowledgeBlocks.length > 0
-        ? knowledgeBlocks
-        : sampleKnowledge.map((block) => ({ ...block })),
+    knowledgeBlocks,
   };
 }
 
@@ -763,69 +756,9 @@ export function AgentWorkspaceClient({
   );
 
   const isDirty = JSON.stringify(draft) !== savedDraftSnapshot;
-  const checklistItems = [
-    {
-      label:
-        draft.name.trim() && draft.persona.trim()
-          ? "Settings and prompting are defined"
-          : "Complete settings and prompting",
-      done: Boolean(draft.name.trim() && draft.persona.trim()),
-      hint: "Name, tone, persona, and optional language preference shape the operator-facing brief.",
-    },
-    {
-      label: selectedChannel ? `Channel selected: ${selectedChannel.type}` : "Choose a connected channel",
-      done: Boolean(selectedChannel && !assignedChannels.has(selectedChannel.id)),
-      hint: selectedChannel
-        ? assignedChannels.has(selectedChannel.id)
-          ? `This channel is already assigned to ${assignedChannels.get(selectedChannel.id)}.`
-          : "This agent will use the selected tenant-scoped channel."
-        : "Connect and choose one tenant channel before saving the draft.",
-    },
-    {
-      label: "Playbook behavior defined",
-      done: Boolean(
-        draft.channelConfig.conversationPlaybook.discoveryFields.length > 0 &&
-          draft.channelConfig.conversationPlaybook.discoveryOrder.length > 0,
-      ),
-      hint: "The playbook controls what the agent asks first, what it needs before checks, and how it moves toward the goal.",
-    },
-    {
-      label: `${draft.knowledgeBlocks.length} knowledge item${draft.knowledgeBlocks.length === 1 ? "" : "s"} ready`,
-      done: draft.knowledgeBlocks.every(
-        (block) =>
-          block.name.trim() && block.description.trim() && block.knowledgeContent.trim(),
-      ),
-      hint: "Each item should say what it covers, when the agent should use it, and the actual reference content.",
-    },
-    {
-      label: `${draft.channelConfig.functionBlocks.length} function${draft.channelConfig.functionBlocks.length === 1 ? "" : "s"} ready`,
-      done:
-        draft.channelConfig.functionBlocks.length > 0 &&
-        draft.channelConfig.functionBlocks.every(
-          (fn) =>
-            fn.name.trim() &&
-            fn.description.trim() &&
-            fn.steps.every((step) => step.integrationId && step.action.trim()),
-        ),
-      hint: "Functions define what the agent can do; integrations remain the execution layer underneath.",
-    },
-    {
-      label: "Use the test chat from the workspace before deploy",
-      done: Boolean(agent),
-      hint: "The workspace exposes the right-side test chat for a real conversation cycle.",
-    },
-  ];
   const selectedWorkspaceSection = workspaceSections.find(
     (section) => section.id === workspaceSection,
   ) ?? workspaceSections[0];
-  const shouldShowWorkspaceReviewRail =
-    workspaceSection !== "settings" &&
-    workspaceSection !== "prompting" &&
-    workspaceSection !== "messages";
-  const isWideWorkbenchStep =
-    workspaceSection === "messages" ||
-    workspaceSection === "settings" ||
-    workspaceSection === "prompting";
   const sectionCanvasClassName =
     "rounded-[16px] border border-[#e6ebf2] bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
   const softInfoPanelClassName =
@@ -1547,6 +1480,11 @@ export function AgentWorkspaceClient({
       return;
     }
 
+    if (hasIncompleteKnowledgeBlocks(draft.knowledgeBlocks)) {
+      setError("Complete or remove empty Knowledge items before saving this agent.");
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
     setSuccess(null);
@@ -1720,13 +1658,7 @@ export function AgentWorkspaceClient({
       ) : null}
 
       <div
-        className={
-          isWideWorkbenchStep
-            ? "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
-            : shouldShowWorkspaceReviewRail
-              ? "grid gap-6 xl:grid-cols-[minmax(0,1040px)_320px] xl:items-start"
-              : "grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
-        }
+        className="grid gap-6 xl:grid-cols-[minmax(0,1120px)] xl:items-start"
       >
         <div className="space-y-6">
           {shouldShowWorkspaceOverview ? (
@@ -1887,7 +1819,6 @@ export function AgentWorkspaceClient({
                 )
               }
               onUpdateBlock={updateKnowledge}
-              sectionCanvasClassName={sectionCanvasClassName}
             />
           ) : null}
 
@@ -1941,89 +1872,48 @@ export function AgentWorkspaceClient({
             />
           ) : null}
 
+          <div className="flex flex-wrap justify-end gap-3 border-t border-[#e8edf5] pt-5">
+            {isReadOnlyMode ? (
+              <>
+                <button
+                  className={primaryButtonClassName}
+                  onClick={checkDeployReadiness}
+                  type="button"
+                >
+                  {isCheckingDeploy ? "Checking readiness..." : "Check readiness"}
+                </button>
+                <button
+                  className={primaryButtonClassName}
+                  disabled={isCheckingDeploy || isDeploying}
+                  onClick={deployCurrentAgent}
+                  type="button"
+                >
+                  {isDeploying ? "Deploying..." : "Deploy agent"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className={secondaryButtonClassName}
+                  onClick={() => activateWorkspaceSection("test")}
+                  type="button"
+                >
+                  Open test section
+                </button>
+                <button
+                  className={primaryButtonClassName}
+                  disabled={isSaving}
+                  onClick={saveDraft}
+                  type="button"
+                >
+                  {isSaving ? "Saving..." : "Save changes"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
-
-        {shouldShowWorkspaceReviewRail ? (
-        <div className={isWideWorkbenchStep ? "space-y-6 xl:col-span-2" : "space-y-6 xl:sticky xl:top-24"}>
-          <SurfaceCard
-            className="border-[#e6ebf2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-            title="Workspace review"
-            description="This rail stays constant while the center of the workspace changes, so the operator always has readiness, launch posture, and tenant context in view."
-          >
-            <Checklist items={checklistItems} />
-            <div className="mt-6 flex flex-wrap gap-3">
-              {isReadOnlyMode ? (
-                <>
-                  <button
-                    className={primaryButtonClassName}
-                    onClick={checkDeployReadiness}
-                    type="button"
-                  >
-                    {isCheckingDeploy ? "Checking readiness..." : "Check readiness"}
-                  </button>
-                  <button
-                    className={primaryButtonClassName}
-                    disabled={isCheckingDeploy || isDeploying}
-                    onClick={deployCurrentAgent}
-                    type="button"
-                  >
-                    {isDeploying ? "Deploying..." : "Deploy agent"}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    className={secondaryButtonClassName}
-                    onClick={() => activateWorkspaceSection("test")}
-                    type="button"
-                  >
-                    Open test section
-                  </button>
-                  <button
-                    className={primaryButtonClassName}
-                    disabled={isSaving}
-                    onClick={saveDraft}
-                    type="button"
-                  >
-                    {isSaving ? "Saving..." : "Save changes"}
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="mt-6 space-y-3">
-              <div className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3">
-                <Layers3 className="size-4 text-primary" />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{tenant.name}</p>
-                  <p className="text-xs text-muted-foreground">Tenant slug: {tenant.slug}</p>
-                </div>
-              </div>
-              {agent ? (
-                <div className="flex items-center gap-3 rounded-[12px] border border-[#e6ebf2] bg-[#fafcff] px-4 py-3">
-                  <Settings2 className="size-4 text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{agent.name}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <StatusBadge status={agent.status} />
-                      {agent.deployedAt ? (
-                        <span className="text-xs text-muted-foreground">
-                          Deployed {new Date(agent.deployedAt).toLocaleString()}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-              <p className="text-xs leading-5 text-muted-foreground">
-                Runtime isolation stays one conversation per `(agentId, contactId)`, and this workspace keeps that operating model visible.
-              </p>
-            </div>
-          </SurfaceCard>
-
-        </div>
-        ) : null}
       </div>
-      </div>
+    </div>
   );
 }
 

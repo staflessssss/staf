@@ -1,9 +1,8 @@
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, BookOpen, Plus, Trash2 } from "lucide-react";
 
 import {
   EmptyState,
   FormField,
-  SurfaceCard,
   inputClassName,
   secondaryButtonClassName,
   textareaClassName,
@@ -23,7 +22,6 @@ export function KnowledgeSection({
   onUpdateBlock,
   onMoveBlock,
   onRemoveBlock,
-  sectionCanvasClassName,
 }: {
   blocks: KnowledgeDraft[];
   isReadOnlyMode: boolean;
@@ -31,62 +29,84 @@ export function KnowledgeSection({
   onUpdateBlock: (index: number, patch: Partial<KnowledgeDraft>) => void;
   onMoveBlock: (index: number, direction: -1 | 1) => void;
   onRemoveBlock: (index: number) => void;
-  sectionCanvasClassName: string;
 }) {
   return (
-    <SurfaceCard
-      className="border-0 bg-transparent p-0 shadow-none"
-      title="Knowledge"
-      description="Store reusable knowledge as clear items: what this knowledge is, when the agent should use it, and the source content it can rely on."
-      action={
-        isReadOnlyMode ? null : (
-          <button className={secondaryButtonClassName} onClick={onAddBlock} type="button">
-            <Plus className="mr-2 size-4" />
-            Add knowledge item
-          </button>
-        )
-      }
-    >
-      <div className={sectionCanvasClassName}>
-        {blocks.length === 0 ? (
-          <EmptyState
-            title="No knowledge items yet"
-            description="Keep business facts separate from prompting and playbook. Each item should say what it contains, when the agent should reach for it, and the actual reference content."
-            action={
-              isReadOnlyMode ? undefined : (
-                <button className={secondaryButtonClassName} onClick={onAddBlock} type="button">
-                  <Plus className="mr-2 size-4" />
-                  Add first item
-                </button>
-              )
-            }
-          />
-        ) : null}
+    <div className="mx-auto w-full max-w-[920px] space-y-6">
+      <section className="space-y-6">
+        <div className="flex items-start justify-between gap-4 border-b border-[#e8edf5] pb-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h1 className="text-[18px] font-semibold tracking-[-0.02em] text-[#101828]">
+                Knowledge
+              </h1>
+              <BookOpen className="size-4 text-[#98a2b3]" />
+            </div>
+            <p className="mt-2 max-w-[620px] text-sm leading-6 text-[#667085]">
+              Add the business facts the agent can rely on in conversation.
+            </p>
+          </div>
+          {isReadOnlyMode ? null : (
+            <button className={secondaryButtonClassName} onClick={onAddBlock} type="button">
+              <Plus className="mr-2 size-4" />
+              Add item
+            </button>
+          )}
+        </div>
+
         <div className="space-y-4">
+          {blocks.length === 0 ? (
+            <EmptyState
+              title="No knowledge yet"
+              description="Add services, prices, policies, FAQs, or other facts the agent should use when answering customers."
+              action={
+                isReadOnlyMode ? undefined : (
+                  <button className={secondaryButtonClassName} onClick={onAddBlock} type="button">
+                    <Plus className="mr-2 size-4" />
+                    Add first item
+                  </button>
+                )
+              }
+            />
+          ) : null}
+
           {blocks.map((block, index) => (
             <div
               key={block.uiId}
-              className="rounded-[26px] bg-white/78 p-6 ring-1 ring-[#ece0d2]"
+              className="rounded-[16px] border border-[#dbe3ef] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.03)]"
             >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-foreground">Knowledge item {index + 1}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-[#111827]">
+                    {block.name.trim() || `Untitled knowledge ${index + 1}`}
+                  </p>
+                  <p className="mt-1 text-sm text-[#667085]">
+                    {block.name.trim() && block.description.trim() && block.knowledgeContent.trim()
+                      ? "Ready"
+                      : "Incomplete"}
+                  </p>
+                </div>
                 {!isReadOnlyMode ? (
                   <div className="flex gap-2">
                     <button
+                      aria-label={`Move ${block.name.trim() || `knowledge item ${index + 1}`} up`}
                       className={secondaryButtonClassName}
+                      disabled={index === 0}
                       onClick={() => onMoveBlock(index, -1)}
                       type="button"
                     >
                       <ArrowUp className="size-4" />
                     </button>
                     <button
+                      aria-label={`Move ${block.name.trim() || `knowledge item ${index + 1}`} down`}
                       className={secondaryButtonClassName}
+                      disabled={index === blocks.length - 1}
                       onClick={() => onMoveBlock(index, 1)}
                       type="button"
                     >
                       <ArrowDown className="size-4" />
                     </button>
                     <button
+                      aria-label={`Delete ${block.name.trim() || `knowledge item ${index + 1}`}`}
                       className={secondaryButtonClassName}
                       onClick={() => onRemoveBlock(index)}
                       type="button"
@@ -98,22 +118,24 @@ export function KnowledgeSection({
               </div>
               <div className="space-y-4">
                 <FormField
-                  label="Knowledge name"
-                  hint="Name the item the same way the operator thinks about it: pricing, service scope, FAQ, objection handling, and so on."
+                  label="Name"
+                  hint="For example: pricing, services, FAQ, refund policy."
                 >
                   <input
                     className={inputClassName}
+                    maxLength={120}
                     onChange={(event) => onUpdateBlock(index, { name: event.target.value })}
                     readOnly={isReadOnlyMode}
                     value={block.name}
                   />
                 </FormField>
                 <FormField
-                  label="When to use it"
-                  hint="Describe the condition or situation when the agent should consult this knowledge item."
+                  label="Use when"
+                  hint="Describe when the agent should use this item."
                 >
                   <textarea
                     className={textareaClassName}
+                    maxLength={500}
                     onChange={(event) =>
                       onUpdateBlock(index, { description: event.target.value })
                     }
@@ -122,11 +144,12 @@ export function KnowledgeSection({
                   />
                 </FormField>
                 <FormField
-                  label="Knowledge content"
-                  hint="Put the actual facts, policy, wording, or reference material the agent can use once the condition is met."
+                  label="Facts"
+                  hint="Write the exact information the agent can use in replies."
                 >
                   <textarea
                     className={textareaClassName}
+                    maxLength={10_000}
                     onChange={(event) =>
                       onUpdateBlock(index, { knowledgeContent: event.target.value })
                     }
@@ -138,7 +161,7 @@ export function KnowledgeSection({
             </div>
           ))}
         </div>
-      </div>
-    </SurfaceCard>
+      </section>
+    </div>
   );
 }

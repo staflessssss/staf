@@ -69,6 +69,31 @@ test("agent workspace blocks saving when Settings schedule windows are invalid",
   assert.match(source, /Fix invalid Settings schedule windows before saving this agent\./);
 });
 
+test("agent workspace removes the review rail and keeps save actions in the main flow", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.doesNotMatch(source, /Workspace review/);
+  assert.doesNotMatch(source, /<Checklist/);
+  assert.match(source, /Open test section/);
+  assert.match(source, /Save changes/);
+});
+
+test("agent workspace blocks saving incomplete Knowledge items", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.match(source, /hasIncompleteKnowledgeBlocks\(draft\.knowledgeBlocks\)/);
+  assert.match(source, /Complete or remove empty Knowledge items before saving this agent\./);
+});
+
+test("agent workspace does not inject sample Knowledge into empty drafts", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.doesNotMatch(source, /sampleKnowledge/);
+  assert.doesNotMatch(source, /knowledge_sample_service_scope/);
+  assert.doesNotMatch(source, /wedding videography/);
+  assert.match(source, /knowledgeBlocks,/);
+});
+
 test("agent workspace clears hidden legacy prompting language and visibility fields on save", () => {
   const source = readFileSync(workspaceClientPath, "utf8");
 
