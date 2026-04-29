@@ -8,6 +8,9 @@ import {
   buildMultilingualGuidance,
   formatAgentDraftValidationError,
   formatEnumLabel,
+  getDefaultChannelBehaviorConfig,
+  getDefaultControlConfig,
+  getConversationPlaybookPreset,
   getFunctionIntegrationIds,
   mapAgentToDraft,
   normalizeAgentSettings,
@@ -45,19 +48,16 @@ test("formatAgentDraftValidationError explains incomplete Knowledge items", () =
   }
 });
 
-test("agentDraftSchema accepts hidden null notes from workspace defaults", () => {
+test("agentDraftSchema accepts hidden null fields from workspace defaults", () => {
   const parsed = agentDraftSchema.parse({
     name: "Studio Concierge",
     persona: "Helpful assistant",
     tone: "friendly",
     channelId: "channel-1",
     channelConfig: {
-      channelBehavior: {
-        notes: null,
-      },
-      conversationPlaybook: {
-        notes: null,
-      },
+      channelBehavior: getDefaultChannelBehaviorConfig(null),
+      conversationPlaybook: getConversationPlaybookPreset("general_lead_capture"),
+      control: getDefaultControlConfig(),
     },
     knowledgeBlocks: [
       {
@@ -70,6 +70,8 @@ test("agentDraftSchema accepts hidden null notes from workspace defaults", () =>
 
   assert.equal(parsed.channelConfig.channelBehavior?.notes, undefined);
   assert.equal(parsed.channelConfig.conversationPlaybook?.notes, undefined);
+  assert.equal(parsed.channelConfig.control?.antiSpamAutoReply, undefined);
+  assert.equal(parsed.channelConfig.control?.resumeMessage, undefined);
   assert.equal(parsed.knowledgeBlocks[0]?.name, "Pricing");
 });
 

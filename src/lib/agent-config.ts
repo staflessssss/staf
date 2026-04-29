@@ -1054,6 +1054,7 @@ export const channelConfigSchema = z
           .string()
           .trim()
           .max(1000)
+          .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
         autoResumeEnabled: z.boolean().default(false),
@@ -1064,6 +1065,7 @@ export const channelConfigSchema = z
           .string()
           .trim()
           .max(1000)
+          .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
         stopPhrases: z.array(z.string().trim().min(1).max(120)).default([]),
