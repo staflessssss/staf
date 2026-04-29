@@ -27,6 +27,7 @@ test("buildSystemPrompt includes multilingual behavior, playbook, channel behavi
       tonePace: "fast",
       ctaStyle: "offer_options",
       emojiUsage: "limited",
+      splitMessageDelaySeconds: 2,
       bufferDelaySeconds: 1,
       useSignature: false,
       useRichFormatting: false,

@@ -4,9 +4,11 @@ import assert from "node:assert/strict";
 import { telegramAdapter } from "@/lib/channels/telegram";
 
 const originalFetch = global.fetch;
+const originalSetTimeout = global.setTimeout;
 
 afterEach(() => {
   global.fetch = originalFetch;
+  global.setTimeout = originalSetTimeout;
 });
 
 test("telegram adapter returns partial-delivery metadata if a later split chunk fails", async () => {
@@ -61,4 +63,36 @@ test("telegram adapter still throws if the first delivery attempt fails", async 
     }),
     /Telegram send failed with 500\./,
   );
+});
+
+test("telegram adapter waits between split message parts when configured", async () => {
+  const delays: number[] = [];
+
+  global.fetch = (async () =>
+    ({
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: 1 } }),
+    }) as Response) as typeof fetch;
+  global.setTimeout = ((handler: TimerHandler, timeout?: number) => {
+    delays.push(Number(timeout ?? 0));
+
+    if (typeof handler === "function") {
+      handler();
+    }
+
+    return 0 as never;
+  }) as unknown as typeof setTimeout;
+
+  await telegramAdapter.sendReply({
+    credentials: "bot-token",
+    contactId: "12345",
+    message: ["First part", "Second part", "Third part"],
+    channelConfig: {
+      channelBehavior: {
+        splitMessageDelaySeconds: 2,
+      },
+    },
+  });
+
+  assert.deepEqual(delays, [2000, 2000]);
 });

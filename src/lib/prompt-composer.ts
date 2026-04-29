@@ -127,6 +127,7 @@ function renderChannelBehaviorSection(agent: AgentPromptInput) {
     `Tone pace: ${behavior.tonePace}`,
     `CTA style: ${behavior.ctaStyle}`,
     `Emoji usage: ${behavior.emojiUsage}`,
+    `Split message delay (seconds): ${behavior.splitMessageDelaySeconds}`,
     `Message buffer delay (seconds): ${behavior.bufferDelaySeconds}`,
     `Use signature: ${behavior.useSignature ? "yes" : "no"}`,
     `Use rich formatting: ${behavior.useRichFormatting ? "yes" : "no"}`,

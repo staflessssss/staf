@@ -71,6 +71,8 @@ test("messages section is English and avoids fake schedule or notes controls", (
   assert.match(source, /Messages/);
   assert.match(source, /Message delivery/);
   assert.match(source, /Follow-up messages/);
+  assert.match(source, /Delay between messages in seconds/);
+  assert.match(source, /Reply with a delay and combine several rapid user messages into one answer/);
   assert.doesNotMatch(source, /Schedule/);
   assert.doesNotMatch(source, /Internal notes/);
   assert.doesNotMatch(source, /notes:/);
@@ -104,13 +106,16 @@ test("messages section wires delivery controls without duplicating test chat", a
   assert.match(text, /Delayed follow-up/);
   assert.doesNotMatch(text, /Test chat/);
   assert.equal(selects[0]?.props?.disabled, true);
+  assert.equal(selects[1]?.props?.disabled, true);
 
   toggles[0]?.props?.onCheckedChange?.(true);
+  selects[0]?.props?.onChange?.({ target: { value: "3" } });
   toggles[1]?.props?.onCheckedChange?.(true);
   toggles[2]?.props?.onCheckedChange?.(true);
 
   assert.deepEqual(updates, [
     { messageFormat: "split_into_2_3_messages" },
+    { splitMessageDelaySeconds: 3 },
     { bufferDelaySeconds: 1 },
     {
       followUpEnabled: true,

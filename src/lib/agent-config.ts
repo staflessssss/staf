@@ -167,6 +167,7 @@ export type ChannelBehaviorConfig = {
   tonePace: (typeof tonePaceOptions)[number];
   ctaStyle: (typeof ctaStyleOptions)[number];
   emojiUsage: (typeof emojiUsageOptions)[number];
+  splitMessageDelaySeconds: number;
   bufferDelaySeconds: number;
   useSignature: boolean;
   useRichFormatting: boolean;
@@ -292,13 +293,14 @@ export function getDefaultChannelBehaviorConfig(
   channelType?: ChannelType | null,
 ): ChannelBehaviorConfig {
   const base = {
+    splitMessageDelaySeconds: 2,
     bufferDelaySeconds: 0,
     followUpEnabled: false,
     followUpRules: [],
     notes: null,
   } satisfies Pick<
     ChannelBehaviorConfig,
-    "bufferDelaySeconds" | "followUpEnabled" | "followUpRules" | "notes"
+    "splitMessageDelaySeconds" | "bufferDelaySeconds" | "followUpEnabled" | "followUpRules" | "notes"
   >;
 
   switch (channelType) {
@@ -619,6 +621,11 @@ export function normalizeChannelBehavior(
   return {
     ...base,
     ...value,
+    splitMessageDelaySeconds:
+      typeof value?.splitMessageDelaySeconds === "number" &&
+      Number.isFinite(value.splitMessageDelaySeconds)
+        ? Math.max(0, Math.min(30, Math.floor(value.splitMessageDelaySeconds)))
+        : base.splitMessageDelaySeconds,
     bufferDelaySeconds:
       typeof value?.bufferDelaySeconds === "number" && Number.isFinite(value.bufferDelaySeconds)
         ? Math.max(0, Math.min(300, Math.floor(value.bufferDelaySeconds)))
@@ -919,6 +926,7 @@ export const channelConfigSchema = z
         tonePace: z.enum(tonePaceOptions).default("warm"),
         ctaStyle: z.enum(ctaStyleOptions).default("ask_a_question"),
         emojiUsage: z.enum(emojiUsageOptions).default("limited"),
+        splitMessageDelaySeconds: z.number().int().min(0).max(30).default(2),
         bufferDelaySeconds: z.number().int().min(0).max(300).default(0),
         useSignature: z.boolean().default(false),
         useRichFormatting: z.boolean().default(false),

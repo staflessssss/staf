@@ -46,6 +46,7 @@ test("readMessageBehaviorConfig reads attachment permission from channel behavio
     channelBehavior: {
       allowAttachments: true,
       messageFormat: "single_message",
+      splitMessageDelaySeconds: 2,
       bufferDelaySeconds: 3,
       followUpEnabled: true,
       followUpRules: [
@@ -63,7 +64,18 @@ test("readMessageBehaviorConfig reads attachment permission from channel behavio
 
   assert.equal(result.allowAttachments, true);
   assert.equal(result.messageFormat, "single_message");
+  assert.equal(result.splitMessageDelaySeconds, 2);
   assert.equal(result.bufferDelaySeconds, 3);
   assert.equal(result.followUpEnabled, true);
   assert.equal(result.followUpRules.length, 1);
+});
+
+test("readMessageBehaviorConfig clamps split-message delay", () => {
+  const result = messageBehaviorTestHelpers.readMessageBehaviorConfig({
+    channelBehavior: {
+      splitMessageDelaySeconds: 99,
+    },
+  });
+
+  assert.equal(result.splitMessageDelaySeconds, 30);
 });

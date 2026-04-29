@@ -1,4 +1,7 @@
-import { splitOutgoingMessage } from "@/lib/channels/message-behavior";
+import {
+  readMessageBehaviorConfig,
+  splitOutgoingMessage,
+} from "@/lib/channels/message-behavior";
 
 type TelegramMessagePayload = {
   message?: {
@@ -22,6 +25,12 @@ type TelegramMessagePayload = {
     };
   };
 };
+
+function wait(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export function parseTelegramBotToken(credentials: string) {
   const trimmed = credentials.trim();
@@ -132,12 +141,17 @@ export const telegramAdapter = {
     }
 
     const messageParts = Array.isArray(params.message) ? params.message : [params.message];
+    const splitDelayMs = readMessageBehaviorConfig(params.channelConfig).splitMessageDelaySeconds * 1000;
     const deliveries = [];
 
     for (let index = 0; index < messageParts.length; index += 1) {
       const part = messageParts[index];
 
       try {
+        if (index > 0 && splitDelayMs > 0) {
+          await wait(splitDelayMs);
+        }
+
         const payload = await sendTelegramMessage({
           botToken,
           contactId: params.contactId,

@@ -23,6 +23,7 @@ const compactInputClassName =
   "w-full rounded-[10px] border border-[#dde3ee] bg-white px-3 py-2 text-sm text-[#344054] outline-none transition focus:border-[#6c63ff] focus:ring-4 focus:ring-[#6c63ff]/10 disabled:bg-[#f8fafc] disabled:text-[#98a2b3]";
 
 const bufferDelayOptions = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60];
+const splitMessageDelayOptions = [0, 1, 2, 3, 4, 5];
 const hourOptions = Array.from({ length: 24 }, (_, option) => String(option).padStart(2, "0"));
 const minuteOptions = ["00", "05", "10", "15", "20", "30", "45", "55"];
 
@@ -45,6 +46,12 @@ function getBufferedRepliesEnabled(channelBehavior: ChannelBehaviorConfig) {
 
 function getBufferedDelayValue(channelBehavior: ChannelBehaviorConfig) {
   return channelBehavior.bufferDelaySeconds > 0 ? channelBehavior.bufferDelaySeconds : 1;
+}
+
+function getSplitMessageDelayValue(channelBehavior: ChannelBehaviorConfig) {
+  return channelBehavior.splitMessageDelaySeconds >= 0
+    ? channelBehavior.splitMessageDelaySeconds
+    : 2;
 }
 
 function updateFollowUpRule(
@@ -80,6 +87,7 @@ export function WorkspaceMessagesSection({
   const splitMessagesEnabled = getSplitMessagesEnabled(channelBehavior);
   const bufferedRepliesEnabled = getBufferedRepliesEnabled(channelBehavior);
   const bufferDelayValue = getBufferedDelayValue(channelBehavior);
+  const splitMessageDelayValue = getSplitMessageDelayValue(channelBehavior);
 
   return (
     <div className="mx-auto w-full max-w-[720px] space-y-9">
@@ -98,10 +106,10 @@ export function WorkspaceMessagesSection({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className={cardHeadingClassName}>Split messages</p>
-                  <HelpHint label="The agent sends each paragraph as a separate message instead of one long reply." />
+                  <HelpHint label="The agent sends each response paragraph as a separate message instead of one long text, with the configured delay between messages." />
                 </div>
                 <p className={mutedTextClassName}>
-                  Send paragraph-based replies as separate messages.
+                  Send each paragraph as a separate message with a short delay.
                 </p>
               </div>
               <ToggleSwitch
@@ -114,6 +122,27 @@ export function WorkspaceMessagesSection({
                 }
               />
             </div>
+
+            <div className="mt-4">
+              <FormField label="Delay between messages in seconds">
+                <select
+                  className={selectClassName}
+                  disabled={isReadOnlyMode || !splitMessagesEnabled}
+                  onChange={(event) =>
+                    onUpdateChannelBehavior({
+                      splitMessageDelaySeconds: Number(event.target.value || 0),
+                    })
+                  }
+                  value={String(splitMessageDelayValue)}
+                >
+                  {splitMessageDelayOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
           </div>
 
           <div className={fieldCardClassName}>
@@ -121,7 +150,7 @@ export function WorkspaceMessagesSection({
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <p className={cardHeadingClassName}>Message buffer</p>
-                  <HelpHint label="The agent waits briefly, combines rapid user messages, then sends one answer." />
+                  <HelpHint label="The agent answers with the configured delay. If the user sends several messages in a row, the agent combines them into one reply and sends it with the same delay." />
                 </div>
                 <ToggleSwitch
                   checked={bufferedRepliesEnabled}
@@ -134,7 +163,7 @@ export function WorkspaceMessagesSection({
                 />
               </div>
               <p className={mutedTextClassName}>
-                Delay replies to combine rapid user messages into one answer.
+                Reply with a delay and combine several rapid user messages into one answer.
               </p>
             </div>
 

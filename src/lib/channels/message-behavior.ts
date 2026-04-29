@@ -84,6 +84,11 @@ export function readMessageBehaviorConfig(config: unknown) {
       typeof channelBehavior?.allowAttachments === "boolean"
         ? channelBehavior.allowAttachments
         : false,
+    splitMessageDelaySeconds:
+      typeof channelBehavior?.splitMessageDelaySeconds === "number" &&
+      Number.isFinite(channelBehavior.splitMessageDelaySeconds)
+        ? Math.max(0, Math.min(30, Math.floor(channelBehavior.splitMessageDelaySeconds)))
+        : 0,
     bufferDelaySeconds:
       typeof channelBehavior?.bufferDelaySeconds === "number" &&
       Number.isFinite(channelBehavior.bufferDelaySeconds)
