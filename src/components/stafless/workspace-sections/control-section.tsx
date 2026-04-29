@@ -1,324 +1,246 @@
 import {
   FormField,
-  SurfaceCard,
+  ToggleSwitch,
   inputClassName,
   selectClassName,
   textareaClassName,
 } from "@/components/stafless/foundation";
-import {
-  autoResumeUnitOptions,
-  ControlConfig,
-  historyWindowTypeOptions,
-} from "@/lib/agent-config";
+import { ControlConfig, historyWindowTypeOptions } from "@/lib/agent-config";
 import { humanizeWorkspaceToken } from "@/components/stafless/workspace-sections/utils";
+
+const sectionTitleClassName = "text-[18px] font-semibold tracking-[-0.02em] text-[#111827]";
+const fieldCardClassName =
+  "rounded-[14px] border border-[#dbe3ef] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.02)]";
+const mutedTextClassName = "text-sm leading-6 text-[#667085]";
+const cardHeadingClassName = "text-base font-semibold text-[#111827]";
+
+const maxDayOptions = [
+  { value: 1, label: "1 day" },
+  { value: 2, label: "2 days" },
+  { value: 3, label: "3 days" },
+  { value: 5, label: "5 days" },
+  { value: 7, label: "1 week" },
+  { value: 14, label: "2 weeks" },
+  { value: 30, label: "1 month" },
+  { value: 90, label: "3 months" },
+];
+
+function HelpHint({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex size-4 items-center justify-center rounded-full border border-[#b8c4d6] text-[10px] font-semibold text-[#667085]"
+      title={label}
+    >
+      ?
+    </span>
+  );
+}
+
+function getAntiSpamWindowMinutes(control: ControlConfig) {
+  return Math.max(1, Math.round(control.antiSpamWindowSeconds / 60));
+}
 
 export function WorkspaceControlSection({
   control,
   isReadOnlyMode,
   onUpdateControl,
-  softInfoPanelClassName,
 }: {
   control: ControlConfig;
   isReadOnlyMode: boolean;
   onUpdateControl: (patch: Partial<ControlConfig>) => void;
-  softInfoPanelClassName: string;
 }) {
+  const messageLimitEnabled =
+    control.historyWindowType === "message_count" || control.historyWindowType === "hybrid";
+  const timeLimitEnabled =
+    control.historyWindowType === "time_window" || control.historyWindowType === "hybrid";
+  const antiSpamWindowMinutes = getAntiSpamWindowMinutes(control);
+
   return (
-    <SurfaceCard
-      className="rounded-[30px] bg-[linear-gradient(180deg,#fffefb_0%,#f8efe3_100%)] shadow-[0_16px_34px_rgba(31,23,40,0.05)]"
-      title="Control"
-      description="Give the runtime explicit operating limits: how much history to use, how operator intervention pauses the agent, and which phrases stop or resume automation."
-    >
-      <div className="rounded-[30px] bg-[linear-gradient(180deg,#fffefb_0%,#f8efe3_100%)] p-6 ring-1 ring-[#e6d7c5] shadow-[0_18px_36px_rgba(31,23,40,0.06)] sm:p-7">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className={softInfoPanelClassName}>
-            <p className="text-sm font-semibold text-foreground">Runtime boundary</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Control is where we stop mixing conversation logic, message presentation, and runtime safety. This section sets operator rules that future channels and functions can rely on consistently.
-            </p>
-          </div>
-          <div className={softInfoPanelClassName}>
-            <p className="text-sm font-semibold text-foreground">What lands here now</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              History policy, operator pause behavior, anti-spam posture, auto-resume, and stop/resume phrases are stored as structured config instead of implied rules.
-            </p>
-          </div>
+    <div className="mx-auto w-full max-w-[720px] space-y-9">
+      <section className="space-y-6">
+        <div className="border-b border-[#e8edf5] pb-5">
+          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#101828]">
+            Control
+          </h1>
         </div>
 
-        <div className="mt-6 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-[20px] bg-[#f5fff7] px-4 py-4 ring-1 ring-[#cfe7d5]">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#4f7a58]">
-              Enforced today
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              History windowing and anti-spam already change live runtime behavior.
-            </p>
-          </div>
-          <div className="rounded-[20px] bg-[#fff8f1] px-4 py-4 ring-1 ring-[#ead9c7]">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8c745b]">
-              Policy layer next
-            </p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Operator intervention, auto-resume, and stop/resume phrases are saved now and already shape control policy instructions, with hard runtime enforcement landing in the handoff layer.
-            </p>
-          </div>
-        </div>
+        <div className="space-y-3">
+          <h2 className={sectionTitleClassName}>History optimization</h2>
 
-        <div className="mt-6 rounded-[24px] bg-white/82 p-5 ring-1 ring-[#e8d8c6] shadow-[0_18px_34px_rgba(31,23,40,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8c745b]">History policy</p>
-          <p className="mt-2 text-sm text-muted-foreground">Enforced in runtime now.</p>
-          <div className="mt-4 grid gap-5 md:grid-cols-3">
-            <FormField label="History window">
-              <select
-                className={selectClassName}
-                disabled={isReadOnlyMode}
-                onChange={(event) =>
-                  onUpdateControl({
-                    historyWindowType: event.target.value as ControlConfig["historyWindowType"],
-                  })
-                }
-                value={control.historyWindowType}
-              >
-                {historyWindowTypeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {humanizeWorkspaceToken(option)}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label="Max messages">
-              <input
-                className={inputClassName}
-                inputMode="numeric"
-                onChange={(event) =>
-                  onUpdateControl({
-                    maxMessages: Number(event.target.value || 0),
-                  })
-                }
-                readOnly={isReadOnlyMode}
-                value={control.maxMessages}
-              />
-            </FormField>
-            <FormField label="Max days">
-              <input
-                className={inputClassName}
-                inputMode="numeric"
-                onChange={(event) =>
-                  onUpdateControl({
-                    maxDays: Number(event.target.value || 0),
-                  })
-                }
-                readOnly={isReadOnlyMode}
-                value={control.maxDays}
-              />
-            </FormField>
-          </div>
-        </div>
+          <div className={fieldCardClassName}>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>History window</p>
+                <HelpHint label="Controls which previous messages are passed into the model before it replies." />
+              </div>
+              <p className={mutedTextClassName}>
+                Limit the conversation history the agent uses for each answer.
+              </p>
+            </div>
 
-        <div className="mt-6 rounded-[24px] bg-white/82 p-5 ring-1 ring-[#e8d8c6] shadow-[0_18px_34px_rgba(31,23,40,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8c745b]">Operator intervention</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Saved today, with full runtime enforcement landing alongside operator handoff state.
-          </p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {[
-              {
-                key: "pauseOnOperatorIntervention",
-                label: "Pause when operator replies",
-                value: control.pauseOnOperatorIntervention,
-              },
-              {
-                key: "ignoreFirstOperatorMessage",
-                label: "Ignore first operator message",
-                value: control.ignoreFirstOperatorMessage,
-              },
-              {
-                key: "autoResumeEnabled",
-                label: "Auto resume after handoff",
-                value: control.autoResumeEnabled,
-              },
-              {
-                key: "resumeMessageEnabled",
-                label: "Send message on resume",
-                value: control.resumeMessageEnabled,
-              },
-            ].map((toggle) => (
-              <label
-                key={toggle.key}
-                className="flex items-center gap-3 rounded-[18px] bg-[#fff9f1] px-4 py-4 ring-1 ring-[#eadccc]"
-              >
-                <input
-                  checked={toggle.value}
-                  className="size-4"
+            <div className="mt-4">
+              <FormField label="Mode">
+                <select
+                  className={selectClassName}
                   disabled={isReadOnlyMode}
                   onChange={(event) =>
                     onUpdateControl({
-                      [toggle.key]: event.target.checked,
-                    } as Partial<ControlConfig>)
+                      historyWindowType: event.target.value as ControlConfig["historyWindowType"],
+                    })
                   }
-                  type="checkbox"
+                  value={control.historyWindowType}
+                >
+                  {historyWindowTypeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {humanizeWorkspaceToken(option)}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
+          </div>
+
+          <div className={fieldCardClassName}>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>Message count limit</p>
+                <HelpHint label="The agent focuses on the latest messages so long conversations do not confuse the answer." />
+              </div>
+              <p className={mutedTextClassName}>
+                The agent uses only the latest messages in the dialog.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <FormField label="Number of messages">
+                <input
+                  className={inputClassName}
+                  disabled={isReadOnlyMode || !messageLimitEnabled}
+                  min={1}
+                  onChange={(event) =>
+                    onUpdateControl({
+                      maxMessages: Number(event.target.value || 0),
+                    })
+                  }
+                  type="number"
+                  value={control.maxMessages}
                 />
-                <span className="text-sm font-medium text-[#2f2330]">{toggle.label}</span>
-              </label>
-            ))}
+              </FormField>
+            </div>
           </div>
-          <div className="mt-5 grid gap-5 md:grid-cols-[1fr_180px]">
-            <FormField label="Auto resume after">
-              <input
-                className={inputClassName}
-                inputMode="numeric"
-                onChange={(event) =>
-                  onUpdateControl({
-                    autoResumeAfterValue: Number(event.target.value || 0),
-                  })
-                }
-                readOnly={isReadOnlyMode}
-                value={control.autoResumeAfterValue}
-              />
-            </FormField>
-            <FormField label="Unit">
-              <select
-                className={selectClassName}
-                disabled={isReadOnlyMode}
-                onChange={(event) =>
-                  onUpdateControl({
-                    autoResumeAfterUnit: event.target.value as ControlConfig["autoResumeAfterUnit"],
-                  })
-                }
-                value={control.autoResumeAfterUnit}
-              >
-                {autoResumeUnitOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {humanizeWorkspaceToken(option)}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-          </div>
-          <div className="mt-5">
-            <FormField
-              label="Resume message"
-              hint="Optional. If enabled, the agent can send this when it automatically resumes after operator intervention."
-            >
-              <textarea
-                className={textareaClassName}
-                onChange={(event) =>
-                  onUpdateControl({
-                    resumeMessage: event.target.value,
-                  })
-                }
-                readOnly={isReadOnlyMode}
-                value={control.resumeMessage ?? ""}
-              />
-            </FormField>
+
+          <div className={fieldCardClassName}>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>Time limit</p>
+                <HelpHint label="Old messages are ignored when they fall outside the selected window." />
+              </div>
+              <p className={mutedTextClassName}>
+                The agent uses only recent dialog history.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <FormField label="Time window">
+                <select
+                  className={selectClassName}
+                  disabled={isReadOnlyMode || !timeLimitEnabled}
+                  onChange={(event) =>
+                    onUpdateControl({
+                      maxDays: Number(event.target.value || 1),
+                    })
+                  }
+                  value={String(control.maxDays)}
+                >
+                  {maxDayOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
           </div>
         </div>
+      </section>
 
-        <div className="mt-6 rounded-[24px] bg-white/82 p-5 ring-1 ring-[#e8d8c6] shadow-[0_18px_34px_rgba(31,23,40,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8c745b]">Anti-spam</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Enforced in runtime now, including a cooldown so the same calming auto-reply does not fire repeatedly in one burst.
-          </p>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <label className="flex items-center gap-3 rounded-[18px] bg-[#fff9f1] px-4 py-4 ring-1 ring-[#eadccc]">
-              <input
-                checked={control.antiSpamEnabled}
-                className="size-4"
-                disabled={isReadOnlyMode}
-                onChange={(event) =>
-                  onUpdateControl({
-                    antiSpamEnabled: event.target.checked,
-                  })
-                }
-                type="checkbox"
-              />
-              <span className="text-sm font-medium text-[#2f2330]">Enable anti-spam</span>
-            </label>
-            <FormField label="Message burst threshold">
+      <section className="space-y-3">
+        <h2 className={sectionTitleClassName}>User message limit</h2>
+
+        <div className={fieldCardClassName}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <p className={cardHeadingClassName}>Limit repeated messages</p>
+                <HelpHint label="If the user reaches the configured number of messages during the selected period, the agent stops answering that user until the period expires." />
+              </div>
+              <p className={mutedTextClassName}>
+                Protect the agent from repeated or mass user messages.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={control.antiSpamEnabled}
+              disabled={isReadOnlyMode}
+              onCheckedChange={(checked) =>
+                onUpdateControl({
+                  antiSpamEnabled: checked,
+                })
+              }
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <FormField label="Message count">
               <input
                 className={inputClassName}
-                inputMode="numeric"
+                disabled={isReadOnlyMode || !control.antiSpamEnabled}
+                min={1}
                 onChange={(event) =>
                   onUpdateControl({
                     antiSpamMessageCount: Number(event.target.value || 0),
                   })
                 }
-                readOnly={isReadOnlyMode}
+                type="number"
                 value={control.antiSpamMessageCount}
               />
             </FormField>
-            <FormField label="Window (seconds)">
+
+            <FormField label="Duration in minutes">
               <input
                 className={inputClassName}
-                inputMode="numeric"
+                disabled={isReadOnlyMode || !control.antiSpamEnabled}
+                min={1}
                 onChange={(event) =>
                   onUpdateControl({
-                    antiSpamWindowSeconds: Number(event.target.value || 0),
+                    antiSpamWindowSeconds: Number(event.target.value || 0) * 60,
                   })
                 }
-                readOnly={isReadOnlyMode}
-                value={control.antiSpamWindowSeconds}
+                type="number"
+                value={antiSpamWindowMinutes}
               />
             </FormField>
           </div>
-          <div className="mt-5">
+
+          <div className="mt-4">
             <FormField
-              label="Anti-spam auto-reply"
-              hint="Optional. If anti-spam is enabled, this can be used as the operator-facing response during a pause."
+              label="Limit response message"
+              hint="Optional. If this is empty, the agent silently ignores messages after the limit until the duration expires."
             >
               <textarea
                 className={textareaClassName}
+                disabled={isReadOnlyMode || !control.antiSpamEnabled}
                 onChange={(event) =>
                   onUpdateControl({
                     antiSpamAutoReply: event.target.value,
                   })
                 }
-                readOnly={isReadOnlyMode}
+                placeholder="Write the message the user receives after the limit"
                 value={control.antiSpamAutoReply ?? ""}
               />
             </FormField>
           </div>
         </div>
-
-        <div className="mt-6 grid gap-5 md:grid-cols-2">
-          <FormField
-            label="Stop phrases"
-            hint="One phrase per line. Stored now and already reflected in control policy instructions; hard stop-state handling lands with the conversation-control slice."
-          >
-            <textarea
-              className={textareaClassName}
-              onChange={(event) =>
-                onUpdateControl({
-                  stopPhrases: event.target.value
-                    .split(/\r?\n/)
-                    .map((line) => line.trim())
-                    .filter(Boolean),
-                })
-              }
-              readOnly={isReadOnlyMode}
-              value={control.stopPhrases.join("\n")}
-            />
-          </FormField>
-          <FormField
-            label="Resume phrases"
-            hint="One phrase per line. Stored now and reflected in control policy instructions; hard resume-state handling lands with the conversation-control slice."
-          >
-            <textarea
-              className={textareaClassName}
-              onChange={(event) =>
-                onUpdateControl({
-                  resumePhrases: event.target.value
-                    .split(/\r?\n/)
-                    .map((line) => line.trim())
-                    .filter(Boolean),
-                })
-              }
-              readOnly={isReadOnlyMode}
-              value={control.resumePhrases.join("\n")}
-            />
-          </FormField>
-        </div>
-      </div>
-    </SurfaceCard>
+      </section>
+    </div>
   );
 }

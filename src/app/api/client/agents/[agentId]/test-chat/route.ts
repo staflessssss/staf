@@ -16,6 +16,7 @@ const clientTestChatSchema = z.object({
         toolName: z.string().optional(),
         toolResult: z.unknown().optional(),
         durationMs: z.number().optional(),
+        createdAt: z.string().datetime().optional(),
       }),
     )
     .optional(),
@@ -75,6 +76,7 @@ export async function POST(
       toolName: message.toolName,
       toolResult: message.toolResult,
       durationMs: message.durationMs,
+      createdAt: message.createdAt ? new Date(message.createdAt) : undefined,
     })),
   });
 

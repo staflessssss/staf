@@ -1826,7 +1826,6 @@ export function AgentWorkspaceClient({
               control={draft.channelConfig.control}
               isReadOnlyMode={isReadOnlyMode}
               onUpdateControl={updateControlConfig}
-              softInfoPanelClassName={softInfoPanelClassName}
             />
           ) : null}
 

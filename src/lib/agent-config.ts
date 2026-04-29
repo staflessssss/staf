@@ -1343,6 +1343,7 @@ export const sandboxInvokeSchema = z.object({
         toolName: z.string().optional(),
         toolResult: z.unknown().optional(),
         durationMs: z.number().optional(),
+        createdAt: z.string().datetime().optional(),
       }),
     )
     .optional(),

@@ -153,6 +153,7 @@ function coerceHistoryMessages(input: SandboxInvokeInput) {
       toolName?: string;
       toolResult?: unknown;
       durationMs?: number;
+      createdAt?: string;
     }>;
   }).history!.map((message) => ({
     role: message.role,
@@ -160,5 +161,6 @@ function coerceHistoryMessages(input: SandboxInvokeInput) {
     toolName: message.toolName,
     toolResult: message.toolResult,
     durationMs: message.durationMs,
+    createdAt: message.createdAt ? new Date(message.createdAt) : undefined,
   }));
 }

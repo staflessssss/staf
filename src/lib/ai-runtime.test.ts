@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ConversationStatus } from "@prisma/client";
+import { ConversationStatus, MessageRole } from "@prisma/client";
 
 import { aiRuntimeTestHelpers, invokeAgent } from "@/lib/ai-runtime";
+import { getDefaultControlConfig } from "@/lib/agent-config";
 import { splitOutgoingMessage } from "@/lib/channels/message-behavior";
 
 test("invokeAgent sandbox mentions runtime tooling from functionBlocks", async () => {
@@ -639,6 +640,130 @@ test("handleIncomingEventWithDeps auto-replies through the channel adapter when 
     attachments: undefined,
     channelConfig: {},
   });
+});
+
+test("control user message limit can suppress replies without a fallback message", () => {
+  const intercept = aiRuntimeTestHelpers.getAntiSpamIntercept({
+    control: {
+      ...getDefaultControlConfig(),
+      antiSpamEnabled: true,
+      antiSpamMessageCount: 3,
+      antiSpamWindowSeconds: 3600,
+      antiSpamAutoReply: "",
+    },
+    historyMessages: [
+      {
+        role: MessageRole.USER,
+        content: "one",
+        createdAt: new Date(),
+      },
+      {
+        role: MessageRole.USER,
+        content: "two",
+        createdAt: new Date(),
+      },
+    ],
+  });
+
+  assert.deepEqual(intercept, { kind: "silent" });
+});
+
+test("control user message limit suppresses later messages after one auto-reply", () => {
+  const now = new Date();
+  const intercept = aiRuntimeTestHelpers.getAntiSpamIntercept({
+    control: {
+      ...getDefaultControlConfig(),
+      antiSpamEnabled: true,
+      antiSpamMessageCount: 3,
+      antiSpamWindowSeconds: 3600,
+      antiSpamAutoReply: "Please wait a moment.",
+    },
+    historyMessages: [
+      {
+        role: MessageRole.USER,
+        content: "one",
+        createdAt: now,
+      },
+      {
+        role: MessageRole.USER,
+        content: "two",
+        createdAt: now,
+      },
+      {
+        role: MessageRole.ASSISTANT,
+        content: "Please wait a moment.",
+        createdAt: now,
+        model: "control-anti-spam",
+      },
+    ],
+  });
+
+  assert.deepEqual(intercept, { kind: "silent" });
+});
+
+test("handleIncomingEventWithDeps skips channel delivery when control suppresses the reply", async () => {
+  let sendReplyCalled = false;
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "TELEGRAM" as never,
+      payload: { text: "hello" },
+    },
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({
+            id: "agent-1",
+            tenantId: "tenant-1",
+            channelConfig: {},
+            channel: {
+              type: "TELEGRAM",
+              credentialsEnc: "encrypted-credentials",
+            },
+          }),
+        },
+        message: {
+          findFirst: async () => null,
+        },
+        conversation: {
+          findUnique: async () => ({
+            id: "conv-active",
+            status: ConversationStatus.ACTIVE,
+          }),
+        },
+        delayedDelivery: {
+          updateMany: async () => ({ count: 0 }),
+          create: async () => ({ id: "delivery-1" }),
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => ({
+        message: "",
+        promptPreview: "preview",
+        usedTooling: [],
+        conversationId: "conv-active",
+        suppressReply: true,
+      }),
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "contact-1",
+            message: "hello",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sendReplyCalled = true;
+            return { delivered: true };
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal("status" in result ? result.status : null, "reply_suppressed_by_control");
+  assert.equal(sendReplyCalled, false);
 });
 
 test("handleIncomingEventWithDeps strips outbound attachments when Messages disallow them", async () => {

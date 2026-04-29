@@ -29,6 +29,7 @@ type HiddenHistoryMessage = {
   toolName?: string;
   toolResult?: unknown;
   durationMs?: number;
+  createdAt?: string;
 };
 
 type InvokeResponse = {
@@ -36,6 +37,7 @@ type InvokeResponse = {
     message: string;
     usedTooling: string[];
     historyAppend?: HiddenHistoryMessage[];
+    suppressReply?: boolean;
   };
   error?: string;
 };
@@ -125,20 +127,23 @@ export function AgentTestChatDrawer({
         return;
       }
 
-      setVisibleMessages((current) => [
-        ...current,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          text: result.item?.message ?? "",
-          usedTooling: result.item?.usedTooling ?? [],
-        },
-      ]);
+      if (!result.item.suppressReply) {
+        setVisibleMessages((current) => [
+          ...current,
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            text: result.item?.message ?? "",
+            usedTooling: result.item?.usedTooling ?? [],
+          },
+        ]);
+      }
       setHistoryMessages((current) => [
         ...current,
         {
           role: "USER",
           content: trimmed,
+          createdAt: new Date().toISOString(),
         },
         ...((result.item?.historyAppend ?? []).map((historyEntry) => ({
           role: historyEntry.role,
@@ -146,6 +151,7 @@ export function AgentTestChatDrawer({
           toolName: historyEntry.toolName,
           toolResult: historyEntry.toolResult,
           durationMs: historyEntry.durationMs,
+          createdAt: new Date().toISOString(),
         })) as HiddenHistoryMessage[]),
       ]);
     } catch (invokeError) {

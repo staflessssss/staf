@@ -123,6 +123,7 @@ export type InvokeAgentResult = {
   model?: string;
   attachments?: RuntimeAttachment[];
   historyAppend?: RuntimeHistoryMessage[];
+  suppressReply?: boolean;
 };
 
 export type RuntimeHistoryMessage = {
@@ -406,24 +407,6 @@ function buildControlRuntimeRules(control: ControlConfig) {
     );
   }
 
-  if (control.stopPhrases.length > 0) {
-    lines.push(
-      `Treat these customer phrases as stop / human-handoff triggers: ${control.stopPhrases.join(", ")}.`,
-    );
-  }
-
-  if (control.resumePhrases.length > 0) {
-    lines.push(
-      `If the customer later uses one of these resume phrases, continue the conversation naturally: ${control.resumePhrases.join(", ")}.`,
-    );
-  }
-
-  if (control.pauseOnOperatorIntervention) {
-    lines.push(
-      "When operator intervention is active in the future control layer, prefer a safe handoff posture instead of jumping back in aggressively.",
-    );
-  }
-
   if (lines.length === 0) {
     return "";
   }
@@ -441,10 +424,19 @@ function buildRuntimeContextLines(args: {
   return "";
 }
 
+type AntiSpamIntercept =
+  | {
+      kind: "reply";
+      message: string;
+    }
+  | {
+      kind: "silent";
+    };
+
 function getAntiSpamIntercept(args: {
   historyMessages: RuntimeHistoryMessage[];
   control: ControlConfig;
-}) {
+}): AntiSpamIntercept | null {
   if (!args.control.antiSpamEnabled) {
     return null;
   }
@@ -457,6 +449,11 @@ function getAntiSpamIntercept(args: {
       message.createdAt instanceof Date &&
       message.createdAt.getTime() >= cutoff,
   );
+  const currentBurstCount = recentUserMessages.length + 1;
+  if (currentBurstCount < args.control.antiSpamMessageCount) {
+    return null;
+  }
+
   const recentAntiSpamAcknowledgement = args.historyMessages.some(
     (message) =>
       message.role === MessageRole.ASSISTANT &&
@@ -466,18 +463,18 @@ function getAntiSpamIntercept(args: {
   );
 
   if (recentAntiSpamAcknowledgement) {
-    return null;
+    return { kind: "silent" };
   }
 
-  const currentBurstCount = recentUserMessages.length + 1;
-  if (currentBurstCount < args.control.antiSpamMessageCount) {
-    return null;
+  const autoReply = args.control.antiSpamAutoReply?.trim();
+  if (!autoReply) {
+    return { kind: "silent" };
   }
 
-  return (
-    args.control.antiSpamAutoReply?.trim() ||
-    "I’ve got your latest messages and I’m still working on it. I’ll reply as soon as I can."
-  );
+  return {
+    kind: "reply",
+    message: autoReply,
+  };
 }
 
 function finalizeAssistantText(args: {
@@ -968,15 +965,25 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     });
 
     if (antiSpamIntercept) {
+      if (antiSpamIntercept.kind === "silent") {
+        return {
+          message: "",
+          promptPreview: runtimeBlocks.promptPreview,
+          usedTooling: [],
+          model: "control-anti-spam-silent",
+          suppressReply: true,
+        };
+      }
+
       return {
-        message: antiSpamIntercept,
+        message: antiSpamIntercept.message,
         promptPreview: runtimeBlocks.promptPreview,
         usedTooling: [],
         model: "control-anti-spam",
         historyAppend: [
           {
             role: MessageRole.ASSISTANT,
-            content: antiSpamIntercept,
+            content: antiSpamIntercept.message,
             model: "control-anti-spam",
           },
         ],
@@ -1034,16 +1041,27 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
   });
 
   if (antiSpamIntercept) {
+    if (antiSpamIntercept.kind === "silent") {
+      return {
+        message: "",
+        promptPreview: runtimeBlocks.promptPreview,
+        usedTooling: [],
+        conversationId: conversation.id,
+        model: "control-anti-spam-silent",
+        suppressReply: true,
+      };
+    }
+
     await saveMessages(conversation.id, [
       {
         role: MessageRole.ASSISTANT,
-        content: antiSpamIntercept,
+        content: antiSpamIntercept.message,
         model: "control-anti-spam",
       },
     ]);
 
     return {
-      message: antiSpamIntercept,
+      message: antiSpamIntercept.message,
       promptPreview: runtimeBlocks.promptPreview,
       usedTooling: [],
       conversationId: conversation.id,
@@ -1051,7 +1069,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       historyAppend: [
         {
           role: MessageRole.ASSISTANT,
-          content: antiSpamIntercept,
+          content: antiSpamIntercept.message,
           model: "control-anti-spam",
         },
       ],
@@ -1117,6 +1135,7 @@ export const aiRuntimeTestHelpers = {
   handleIncomingEventWithDeps,
   isWithinAgentSchedule,
   buildRuntimeContextLines,
+  getAntiSpamIntercept,
 };
 
 async function handleIncomingEventWithDeps(
@@ -1391,6 +1410,25 @@ async function handleIncomingEventWithDeps(
     messageId: incoming.messageId,
     gmailMessageId: incoming.gmailMessageId,
   });
+
+  if (result.suppressReply) {
+    if (result.conversationId) {
+      await cancelPendingDelayedDeliveriesWithDb({
+        database: deps.db,
+        conversationId: result.conversationId,
+        kinds: [DelayedDeliveryKind.FOLLOW_UP],
+      });
+    }
+
+    return {
+      ok: true,
+      agentId: agent.id,
+      conversationId: result.conversationId,
+      status: "reply_suppressed_by_control",
+      usedTooling: result.usedTooling,
+    };
+  }
+
   const formattedReply = adapter.formatReply(result.message, agent.channelConfig);
   const outboundMessage = formattedReply as string | string[] | { text: string; html?: string };
 

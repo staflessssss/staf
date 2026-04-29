@@ -199,6 +199,182 @@ test("processDelayedDeliveryByIdWithDeps generates and sends a follow-up reminde
   });
 });
 
+test("processDelayedDeliveryByIdWithDeps cancels follow-up when control suppresses the reply", async () => {
+  let sentMessage = false;
+  const updates: Array<Record<string, unknown>> = [];
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-suppressed",
+    {
+      db: {
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-suppressed",
+            agentId: "agent-1",
+            conversationId: "conv-suppressed",
+            kind: DelayedDeliveryKind.FOLLOW_UP,
+            payload: {
+              replyContext: {
+                contactId: "contact-1",
+              },
+              instruction: "Check in.",
+              outOfHoursBehavior: "send_immediately_ignore_schedule",
+              sendLimit: "once_per_dialog",
+              ruleIndex: 0,
+              anchorCreatedAt: "2026-04-20T15:00:00.000Z",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.TELEGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-suppressed",
+              status: ConversationStatus.ACTIVE,
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return args;
+          },
+        },
+        message: {
+          findFirst: async () => null,
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sentMessage = true;
+            return { ok: true };
+          },
+        }) as never,
+      invokeAgent: async () => ({
+        message: "",
+        promptPreview: "prompt",
+        usedTooling: [],
+        conversationId: "conv-suppressed",
+        model: "control-anti-spam-silent",
+        suppressReply: true,
+      }),
+      saveMessages: async () => {},
+    },
+    new Date("2026-04-20T16:00:00Z"),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "follow_up_suppressed_by_control");
+  assert.equal(sentMessage, false);
+  assert.equal(
+    updates[0]?.data && typeof updates[0].data === "object"
+      ? (updates[0].data as Record<string, unknown>).status
+      : null,
+    DelayedDeliveryStatus.CANCELED,
+  );
+});
+
+test("processDelayedDeliveryByIdWithDeps cancels buffered reply when control suppresses the reply", async () => {
+  let sentMessage = false;
+  const updates: Array<Record<string, unknown>> = [];
+  const now = new Date("2026-04-20T16:00:00Z");
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-buffered-suppressed",
+    {
+      db: {
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-buffered-suppressed",
+            agentId: "agent-1",
+            conversationId: "conv-buffered",
+            kind: DelayedDeliveryKind.BUFFERED_REPLY,
+            payload: {
+              replyContext: {
+                contactId: "contact-1",
+              },
+              triggerMessageId: "message-2",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.TELEGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-buffered",
+              status: ConversationStatus.ACTIVE,
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return args;
+          },
+        },
+        message: {
+          findMany: async () => [
+            {
+              id: "message-1",
+              role: "USER",
+              content: "hello",
+              createdAt: new Date(now.getTime() - 1000),
+            },
+            {
+              id: "message-2",
+              role: "USER",
+              content: "are you there?",
+              createdAt: now,
+            },
+          ],
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sentMessage = true;
+            return { ok: true };
+          },
+        }) as never,
+      invokeAgent: async () => ({
+        message: "",
+        promptPreview: "prompt",
+        usedTooling: [],
+        conversationId: "conv-buffered",
+        model: "control-anti-spam-silent",
+        suppressReply: true,
+      }),
+      saveMessages: async () => {},
+    },
+    now,
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "buffered_reply_suppressed_by_control");
+  assert.equal(sentMessage, false);
+  assert.equal(
+    updates[0]?.data && typeof updates[0].data === "object"
+      ? (updates[0].data as Record<string, unknown>).status
+      : null,
+    DelayedDeliveryStatus.CANCELED,
+  );
+});
+
 test("runBufferedDeliveryWhenDueWithDeps waits until due time before processing the delivery", async () => {
   const slept: number[] = [];
   const attemptedAt: Date[] = [];

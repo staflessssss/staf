@@ -486,6 +486,21 @@ async function processBufferedReply(args: {
     skipInboundPersistence: true,
   });
 
+  if (result.suppressReply) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "buffered_reply_suppressed_by_control",
+    });
+
+    return {
+      ok: true,
+      status: "buffered_reply_suppressed_by_control" as const,
+      conversationId: result.conversationId,
+    };
+  }
+
   await deliverThroughChannel({
     agent: args.delivery.agent,
     decryptValue: args.deps.decrypt,
@@ -648,6 +663,21 @@ async function processFollowUp(args: {
     conversationId: args.delivery.conversationId,
     skipInboundPersistence: true,
   });
+
+  if (result.suppressReply) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "follow_up_suppressed_by_control",
+    });
+
+    return {
+      ok: true,
+      status: "follow_up_suppressed_by_control" as const,
+      conversationId: result.conversationId,
+    };
+  }
 
   await deliverThroughChannel({
     agent: args.delivery.agent,
