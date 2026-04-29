@@ -53,6 +53,7 @@ test("agentDraftSchema accepts hidden null fields from workspace defaults", () =
     name: "Studio Concierge",
     persona: "Helpful assistant",
     tone: "friendly",
+    languagePreference: null,
     channelId: "channel-1",
     channelConfig: {
       channelBehavior: getDefaultChannelBehaviorConfig(null),
@@ -68,11 +69,44 @@ test("agentDraftSchema accepts hidden null fields from workspace defaults", () =
     ],
   });
 
+  assert.equal(parsed.languagePreference, null);
   assert.equal(parsed.channelConfig.channelBehavior?.notes, undefined);
   assert.equal(parsed.channelConfig.conversationPlaybook?.notes, undefined);
   assert.equal(parsed.channelConfig.control?.antiSpamAutoReply, undefined);
   assert.equal(parsed.channelConfig.control?.resumeMessage, undefined);
   assert.equal(parsed.knowledgeBlocks[0]?.name, "Pricing");
+});
+
+test("buildFeatureCreateInput creates a new simple Knowledge item after workspace validation", () => {
+  const parsed = agentDraftSchema.parse({
+    name: "Knowledge Agent",
+    persona: "Answer from saved facts.",
+    tone: "friendly",
+    languagePreference: null,
+    channelId: "channel-1",
+    channelConfig: {
+      channelBehavior: getDefaultChannelBehaviorConfig(null),
+      conversationPlaybook: getConversationPlaybookPreset("general_lead_capture"),
+      control: getDefaultControlConfig(),
+    },
+    knowledgeBlocks: [
+      {
+        name: "awd",
+        description: "da",
+        knowledgeContent: "da",
+      },
+    ],
+  });
+
+  assert.deepEqual(buildFeatureCreateInput(parsed), [
+    {
+      name: "awd",
+      description: "da",
+      type: FeatureType.KNOWLEDGE,
+      sortOrder: 0,
+      knowledgeContent: "da",
+    },
+  ]);
 });
 
 test("agentDraftSchema normalizes empty language preference to null", () => {

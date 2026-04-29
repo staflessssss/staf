@@ -1137,6 +1137,7 @@ export const agentDraftSchema = z.object({
     .string()
     .trim()
     .max(120)
+    .nullable()
     .optional()
     .transform((value) => (value ? value : null)),
   channelId: z.string().trim().min(1),
