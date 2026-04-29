@@ -4,7 +4,6 @@ import {
   FormField,
   ToggleSwitch,
   selectClassName,
-  secondaryButtonClassName,
   textareaClassName,
 } from "@/components/stafless/foundation";
 import {
@@ -72,12 +71,10 @@ function HelpHint({ label }: { label: string }) {
 export function WorkspaceMessagesSection({
   channelBehavior,
   isReadOnlyMode,
-  onOpenTest,
   onUpdateChannelBehavior,
 }: {
   channelBehavior: ChannelBehaviorConfig;
   isReadOnlyMode: boolean;
-  onOpenTest: () => void;
   onUpdateChannelBehavior: (patch: Partial<ChannelBehaviorConfig>) => void;
 }) {
   const splitMessagesEnabled = getSplitMessagesEnabled(channelBehavior);
@@ -87,13 +84,10 @@ export function WorkspaceMessagesSection({
   return (
     <div className="mx-auto w-full max-w-[720px] space-y-9">
       <section className="space-y-6">
-        <div className="flex items-center justify-between gap-4 border-b border-[#e8edf5] pb-5">
+        <div className="border-b border-[#e8edf5] pb-5">
           <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#101828]">
             Messages
           </h1>
-          <button className={secondaryButtonClassName} onClick={onOpenTest} type="button">
-            Test chat
-          </button>
         </div>
 
         <div className="space-y-3">

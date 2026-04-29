@@ -74,7 +74,9 @@ test("agent workspace removes the review rail and keeps save actions in the main
 
   assert.doesNotMatch(source, /Workspace review/);
   assert.doesNotMatch(source, /<Checklist/);
-  assert.match(source, /Open test section/);
+  assert.doesNotMatch(source, /Open test section/);
+  assert.doesNotMatch(source, /id: "test"/);
+  assert.doesNotMatch(source, /activateWorkspaceSection\("test"\)/);
   assert.match(source, /Save changes/);
 });
 

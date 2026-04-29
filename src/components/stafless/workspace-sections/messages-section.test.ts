@@ -77,10 +77,9 @@ test("messages section is English and avoids fake schedule or notes controls", (
   assert.doesNotMatch(source, /Р/);
 });
 
-test("messages section wires delivery controls and test chat", async () => {
+test("messages section wires delivery controls without duplicating test chat", async () => {
   const { WorkspaceMessagesSection } = await loadMessagesSection();
   const updates: Array<Record<string, unknown>> = [];
-  let testOpened = 0;
 
   const tree = WorkspaceMessagesSection({
     channelBehavior: {
@@ -90,9 +89,6 @@ test("messages section wires delivery controls and test chat", async () => {
       followUpRules: [],
     },
     isReadOnlyMode: false,
-    onOpenTest: () => {
-      testOpened += 1;
-    },
     onUpdateChannelBehavior: (patch) => updates.push(patch),
   });
 
@@ -101,20 +97,18 @@ test("messages section wires delivery controls and test chat", async () => {
     tree,
     (element) => typeof element.props?.onCheckedChange === "function",
   );
-  const buttons = collectElements(tree, (element) => element.type === "button");
   const selects = collectElements(tree, (element) => element.type === "select");
 
   assert.match(text, /Split messages/);
   assert.match(text, /Message buffer/);
   assert.match(text, /Delayed follow-up/);
+  assert.doesNotMatch(text, /Test chat/);
   assert.equal(selects[0]?.props?.disabled, true);
 
-  buttons.find((button) => textOf(button).includes("Test chat"))?.props?.onClick?.();
   toggles[0]?.props?.onCheckedChange?.(true);
   toggles[1]?.props?.onCheckedChange?.(true);
   toggles[2]?.props?.onCheckedChange?.(true);
 
-  assert.equal(testOpened, 1);
   assert.deepEqual(updates, [
     { messageFormat: "split_into_2_3_messages" },
     { bufferDelaySeconds: 1 },
@@ -154,7 +148,6 @@ test("messages section edits follow-up rules", async () => {
       ],
     },
     isReadOnlyMode: false,
-    onOpenTest: () => undefined,
     onUpdateChannelBehavior: (patch) => updates.push(patch),
   });
 

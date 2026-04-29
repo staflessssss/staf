@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AgentStatus,
@@ -13,7 +13,6 @@ import {
 import {
   BookOpen,
   Boxes,
-  FlaskConical,
   LayoutDashboard,
   Layers3,
   MessageSquare,
@@ -29,7 +28,6 @@ import {
   EmptyState,
   SurfaceCard,
   primaryButtonClassName,
-  secondaryButtonClassName,
 } from "@/components/stafless/foundation";
 import { WorkspaceControlSection } from "@/components/stafless/workspace-sections/control-section";
 import { WorkspaceChannelsSection } from "@/components/stafless/workspace-sections/channels-section";
@@ -44,7 +42,6 @@ import {
   hasInvalidScheduleWindow,
   WorkspaceSettingsSection,
 } from "@/components/stafless/workspace-sections/settings-section";
-import { WorkspaceTestSection } from "@/components/stafless/workspace-sections/test-section";
 import {
   AgentSettingsConfig,
   ChannelBehaviorConfig,
@@ -209,7 +206,6 @@ type WorkspaceSectionId =
   | "functions"
   | "knowledge"
   | "integrations"
-  | "test"
   | "activity";
 
 function isWorkspaceSectionId(value: string): value is WorkspaceSectionId {
@@ -224,7 +220,6 @@ function isWorkspaceSectionId(value: string): value is WorkspaceSectionId {
     "functions",
     "knowledge",
     "integrations",
-    "test",
     "activity",
   ].includes(value);
 }
@@ -305,13 +300,6 @@ const workspaceSections: Array<{
     description: "Connected systems that functions and channels depend on.",
     kind: "live",
     icon: Layers3,
-  },
-  {
-    id: "test",
-    title: "Test",
-    description: "Operator-safe simulation before this agent touches live traffic.",
-    kind: "live",
-    icon: FlaskConical,
   },
   {
     id: "activity",
@@ -657,7 +645,6 @@ export function AgentWorkspaceClient({
   initialWorkspaceSection?: string;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   const isReadOnlyMode = false;
   const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSectionId>(
     initialWorkspaceSection && isWorkspaceSectionId(initialWorkspaceSection)
@@ -673,7 +660,6 @@ export function AgentWorkspaceClient({
   const [isSaving, setIsSaving] = useState(false);
   const [isCheckingDeploy, setIsCheckingDeploy] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
-  const [deployReadiness, setDeployReadiness] = useState<DeployReadinessResult | null>(null);
   const [sheetInspectors, setSheetInspectors] = useState<Record<string, SheetInspectionState>>({});
   const [selectedKnowledgeIndex, setSelectedKnowledgeIndex] = useState<number | null>(null);
 
@@ -803,7 +789,6 @@ export function AgentWorkspaceClient({
     "functions",
     "knowledge",
     "integrations",
-    "test",
   ]);
   const shouldShowWorkspaceOverview = workspaceSection === "overview";
   const shouldShowWorkspaceSettings = workspaceSection === "settings";
@@ -815,7 +800,6 @@ export function AgentWorkspaceClient({
   const showWorkspacePlaybook = workspaceSection === "playbook";
   const showWorkspaceKnowledge = workspaceSection === "knowledge";
   const showWorkspaceFunctions = workspaceSection === "functions";
-  const showWorkspaceTest = workspaceSection === "test";
   const shouldShowWorkspacePlaceholder =
     !shouldShowWorkspaceOverview &&
     !shouldShowWorkspaceSettings &&
@@ -827,11 +811,6 @@ export function AgentWorkspaceClient({
 
   function updateDraft<K extends keyof WorkspaceDraft>(key: K, value: WorkspaceDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  function activateWorkspaceSection(sectionId: WorkspaceSectionId) {
-    setWorkspaceSection(sectionId);
-    router.replace(`${pathname}?section=${sectionId}`, { scroll: false });
   }
 
   function applyConversationPlaybookPreset(
@@ -1653,9 +1632,7 @@ export function AgentWorkspaceClient({
         return;
       }
 
-      setDeployReadiness(result.item);
       setSuccess(result.item.message);
-      activateWorkspaceSection("test");
     } catch (deployError) {
       setError(
         deployError instanceof Error
@@ -1694,9 +1671,7 @@ export function AgentWorkspaceClient({
           return;
         }
 
-        setDeployReadiness(result.item);
         setSuccess(result.item.message);
-        activateWorkspaceSection("test");
       } catch (deployError) {
         setError(
           deployError instanceof Error
@@ -1842,7 +1817,6 @@ export function AgentWorkspaceClient({
             <WorkspaceMessagesSection
               channelBehavior={draft.channelConfig.channelBehavior}
               isReadOnlyMode={isReadOnlyMode}
-              onOpenTest={() => activateWorkspaceSection("test")}
               onUpdateChannelBehavior={updateChannelBehavior}
             />
           ) : null}
@@ -1916,14 +1890,6 @@ export function AgentWorkspaceClient({
               />
           ) : null}
 
-          {showWorkspaceTest ? (
-            <WorkspaceTestSection
-              deployReadiness={deployReadiness}
-              hasAgent={Boolean(agent)}
-              isDirty={isDirty}
-            />
-          ) : null}
-
           {shouldShowWorkspaceIntegrations ? (
             <IntegrationsSection
               dependencies={functionDependenciesByIntegration}
@@ -1954,13 +1920,6 @@ export function AgentWorkspaceClient({
               </>
             ) : (
               <>
-                <button
-                  className={secondaryButtonClassName}
-                  onClick={() => activateWorkspaceSection("test")}
-                  type="button"
-                >
-                  Open test section
-                </button>
                 <button
                   className={primaryButtonClassName}
                   disabled={isSaving}

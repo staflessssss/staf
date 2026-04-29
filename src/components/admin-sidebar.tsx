@@ -6,7 +6,6 @@ import {
   Boxes,
   BookOpen,
   Bot,
-  FlaskConical,
   Layers3,
   LayoutDashboard,
   MessageSquare,
@@ -48,7 +47,6 @@ const agentWorkspaceItems: Array<{
   { id: "integrations", label: "Integrations", icon: Layers3 },
   { id: "channels", label: "Channels", icon: Radio },
   { id: "playbook", label: "Playbook", icon: Workflow },
-  { id: "test", label: "Test", icon: FlaskConical },
 ];
 
 function parseAgentRoute(pathname: string) {
