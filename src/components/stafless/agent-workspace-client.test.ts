@@ -85,6 +85,16 @@ test("agent workspace blocks saving incomplete Knowledge items", () => {
   assert.match(source, /Complete or remove empty Knowledge items before saving this agent\./);
 });
 
+test("agent workspace keeps Knowledge drawer selection in draft state", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.match(source, /selectedKnowledgeIndex/);
+  assert.match(source, /setSelectedKnowledgeIndex\(nextIndex\)/);
+  assert.match(source, /event\.key === "Escape"/);
+  assert.match(source, /onOpenBlock=\{setSelectedKnowledgeIndex\}/);
+  assert.match(source, /selectedBlockIndex=\{selectedKnowledgeIndex\}/);
+});
+
 test("agent workspace does not inject sample Knowledge into empty drafts", () => {
   const source = readFileSync(workspaceClientPath, "utf8");
 

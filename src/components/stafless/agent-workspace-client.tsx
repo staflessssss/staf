@@ -673,6 +673,7 @@ export function AgentWorkspaceClient({
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployReadiness, setDeployReadiness] = useState<DeployReadinessResult | null>(null);
   const [sheetInspectors, setSheetInspectors] = useState<Record<string, SheetInspectionState>>({});
+  const [selectedKnowledgeIndex, setSelectedKnowledgeIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (initialWorkspaceSection && isWorkspaceSectionId(initialWorkspaceSection)) {
@@ -684,6 +685,33 @@ export function AgentWorkspaceClient({
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+
+  useEffect(() => {
+    if (selectedKnowledgeIndex === null) {
+      return;
+    }
+
+    if (selectedKnowledgeIndex >= draft.knowledgeBlocks.length) {
+      setSelectedKnowledgeIndex(
+        draft.knowledgeBlocks.length > 0 ? draft.knowledgeBlocks.length - 1 : null,
+      );
+    }
+  }, [draft.knowledgeBlocks.length, selectedKnowledgeIndex]);
+
+  useEffect(() => {
+    if (selectedKnowledgeIndex === null) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedKnowledgeIndex(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedKnowledgeIndex]);
 
   const connectedIntegrations = useMemo(
     () =>
@@ -1355,10 +1383,38 @@ export function AgentWorkspaceClient({
   }
 
   function addKnowledgeBlock() {
+    const nextIndex = draft.knowledgeBlocks.length;
+
     updateDraft("knowledgeBlocks", [
       ...draft.knowledgeBlocks,
       createKnowledgeDraft(),
     ]);
+    setSelectedKnowledgeIndex(nextIndex);
+  }
+
+  function moveKnowledgeBlock(index: number, direction: -1 | 1) {
+    const nextIndex = index + direction;
+
+    updateDraft("knowledgeBlocks", moveItem(draft.knowledgeBlocks, index, direction));
+
+    if (selectedKnowledgeIndex === index) {
+      setSelectedKnowledgeIndex(nextIndex);
+    } else if (selectedKnowledgeIndex === nextIndex) {
+      setSelectedKnowledgeIndex(index);
+    }
+  }
+
+  function removeKnowledgeBlock(index: number) {
+    updateDraft(
+      "knowledgeBlocks",
+      draft.knowledgeBlocks.filter((_, itemIndex) => itemIndex !== index),
+    );
+
+    if (selectedKnowledgeIndex === index) {
+      setSelectedKnowledgeIndex(null);
+    } else if (selectedKnowledgeIndex !== null && selectedKnowledgeIndex > index) {
+      setSelectedKnowledgeIndex(selectedKnowledgeIndex - 1);
+    }
   }
 
   function addFunctionBlock() {
@@ -1809,16 +1865,12 @@ export function AgentWorkspaceClient({
               blocks={draft.knowledgeBlocks}
               isReadOnlyMode={isReadOnlyMode}
               onAddBlock={addKnowledgeBlock}
-              onMoveBlock={(index, direction) =>
-                updateDraft("knowledgeBlocks", moveItem(draft.knowledgeBlocks, index, direction))
-              }
-              onRemoveBlock={(index) =>
-                updateDraft(
-                  "knowledgeBlocks",
-                  draft.knowledgeBlocks.filter((_, itemIndex) => itemIndex !== index),
-                )
-              }
+              onCloseEditor={() => setSelectedKnowledgeIndex(null)}
+              onMoveBlock={moveKnowledgeBlock}
+              onOpenBlock={setSelectedKnowledgeIndex}
+              onRemoveBlock={removeKnowledgeBlock}
               onUpdateBlock={updateKnowledge}
+              selectedBlockIndex={selectedKnowledgeIndex}
             />
           ) : null}
 
