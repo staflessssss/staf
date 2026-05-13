@@ -117,6 +117,18 @@ test("agent workspace clears hidden legacy prompting language and visibility fie
   assert.match(source, /prompting: promptingForPayload/);
 });
 
+test("agent workspace saves and applies per-agent integration allowlist", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.match(source, /normalizeIntegrationsConfig/);
+  assert.match(source, /integrations: draft\.channelConfig\.integrations/);
+  assert.match(source, /toggleAgentIntegration/);
+  assert.match(source, /Remove this integration from Functions before turning it off/);
+  assert.match(source, /enabledIds: usedIntegrationIds/);
+  assert.doesNotMatch(source, /enabledIds: \[\.\.\.connectedIntegrationIds, \.\.\.usedIntegrationIds\]/);
+  assert.match(source, /tenantConnectedIntegrations\.filter\(\(connection\) => enabledIds\.has\(connection\.id\)\)/);
+});
+
 test("agent workspace function draft UI ids round-trip without dropping persisted ids", async () => {
   const { stripFunctionUiIds, withFunctionUiIds } = await loadWorkspaceSerializers();
   const draft = withFunctionUiIds(functionBlockFixture);

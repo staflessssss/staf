@@ -62,8 +62,10 @@ import {
   normalizeAgentSettings,
   normalizeControlConfig,
   normalizeFunctionBlocks,
+  normalizeIntegrationsConfig,
   normalizePromptingConfig,
   PromptingConfig,
+  IntegrationsConfig,
 } from "@/lib/agent-config";
 import {
   getDefaultGoogleCalendarParams,
@@ -136,6 +138,7 @@ type ChannelConfigDraft = {
   conversationPlaybook: ConversationPlaybookConfig;
   prompting: PromptingConfig;
   control: ControlConfig;
+  integrations: IntegrationsConfig;
   functionBlocks: FunctionDraft[];
 };
 
@@ -459,6 +462,17 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
       ? (rawChannelConfig.functionBlocks as Partial<FunctionDraft>[])
       : [],
   ).map(withFunctionUiIds);
+  const usedIntegrationIds = functionBlocks.flatMap((fn) =>
+    fn.steps.map((step) => step.integrationId).filter(Boolean),
+  );
+  const integrationsConfig =
+    rawChannelConfig.integrations &&
+    typeof rawChannelConfig.integrations === "object" &&
+    !Array.isArray(rawChannelConfig.integrations)
+      ? normalizeIntegrationsConfig(rawChannelConfig.integrations as Partial<IntegrationsConfig>)
+      : normalizeIntegrationsConfig({
+          enabledIds: usedIntegrationIds,
+        });
   const promptingConfig = normalizePromptingConfig(
     rawChannelConfig.prompting &&
       typeof rawChannelConfig.prompting === "object" &&
@@ -530,6 +544,7 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
           ? (rawChannelConfig.control as Partial<ControlConfig>)
           : getDefaultControlConfig(),
       ),
+      integrations: integrationsConfig,
       functionBlocks,
     },
     knowledgeBlocks,
@@ -546,6 +561,11 @@ function parseFunctionBlocks(
       const integrationType = integrationById.get(step.integrationId)?.type;
 
       try {
+        if (!integrationType) {
+          errors.push(`${fn.name || `#${stepIndex + 1}`}: select an enabled integration.`);
+          return;
+        }
+
         if (integrationType === IntegrationType.GOOGLE_CALENDAR) {
           errors.push(...getGoogleCalendarValidationErrors(step).map((error) => `${fn.name || `#${stepIndex + 1}`}: ${error}`));
         }
@@ -701,13 +721,19 @@ export function AgentWorkspaceClient({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedKnowledgeIndex]);
 
-  const connectedIntegrations = useMemo(
+  const tenantConnectedIntegrations = useMemo(
     () =>
       tenant.integrationConnections.filter(
         (connection) => connection.status === "CONNECTED",
       ),
     [tenant.integrationConnections],
   );
+
+  const connectedIntegrations = useMemo(() => {
+    const enabledIds = new Set(draft.channelConfig.integrations.enabledIds);
+
+    return tenantConnectedIntegrations.filter((connection) => enabledIds.has(connection.id));
+  }, [draft.channelConfig.integrations.enabledIds, tenantConnectedIntegrations]);
 
   const integrationById = useMemo(
     () =>
@@ -852,6 +878,32 @@ export function AgentWorkspaceClient({
     updateDraft("channelConfig", {
       ...draft.channelConfig,
       ...patch,
+    });
+  }
+
+  function toggleAgentIntegration(integrationId: string, enabled: boolean) {
+    const isReferencedByFunction = draft.channelConfig.functionBlocks.some(
+      (fn) => fn.steps.some((step) => step.integrationId === integrationId),
+    );
+
+    if (!enabled && isReferencedByFunction) {
+      setError("Remove this integration from Functions before turning it off for this agent.");
+      return;
+    }
+
+    const enabledIds = new Set(draft.channelConfig.integrations.enabledIds);
+
+    if (enabled) {
+      enabledIds.add(integrationId);
+    } else {
+      enabledIds.delete(integrationId);
+    }
+
+    setError(null);
+    updateChannelConfig({
+      integrations: normalizeIntegrationsConfig({
+        enabledIds: Array.from(enabledIds),
+      }),
     });
   }
 
@@ -1549,6 +1601,7 @@ export function AgentWorkspaceClient({
           conversationPlaybook: draft.channelConfig.conversationPlaybook,
           prompting: promptingForPayload,
           control: draft.channelConfig.control,
+          integrations: draft.channelConfig.integrations,
           functionBlocks: stripFunctionUiIds(draft.channelConfig.functionBlocks),
         },
         knowledgeBlocks: stripKnowledgeUiIds(draft.knowledgeBlocks),
@@ -1892,7 +1945,9 @@ export function AgentWorkspaceClient({
           {shouldShowWorkspaceIntegrations ? (
             <IntegrationsSection
               dependencies={functionDependenciesByIntegration}
+              enabledIntegrationIds={draft.channelConfig.integrations.enabledIds}
               integrations={tenant.integrationConnections}
+              onIntegrationEnabledChange={toggleAgentIntegration}
               sectionCanvasClassName={sectionCanvasClassName}
               softInfoPanelClassName={softInfoPanelClassName}
             />

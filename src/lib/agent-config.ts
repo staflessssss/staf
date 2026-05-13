@@ -250,6 +250,10 @@ export type PromptingConfig = {
   notes?: string | null;
 };
 
+export type IntegrationsConfig = {
+  enabledIds: string[];
+};
+
 export type FunctionParameterConfig = {
   name: string;
   type: (typeof functionParameterTypeOptions)[number];
@@ -1125,6 +1129,14 @@ export const channelConfigSchema = z
         });
       })
       .optional(),
+    integrations: z
+      .object({
+        enabledIds: z
+          .array(z.string().trim().min(1))
+          .default([])
+          .transform((ids) => Array.from(new Set(ids))),
+      })
+      .optional(),
     functionBlocks: z.array(functionBlockSchema).optional(),
   })
   .default({
@@ -1136,6 +1148,7 @@ export const channelConfigSchema = z
     prompting: undefined,
     control: undefined,
     agentSettings: undefined,
+    integrations: undefined,
     functionBlocks: undefined,
   });
 
@@ -1148,6 +1161,7 @@ const agentManagedChannelConfigKeys = [
   "prompting",
   "control",
   "agentSettings",
+  "integrations",
   "functionBlocks",
 ] as const;
 
@@ -1343,6 +1357,22 @@ export function normalizeFunctionBlocks(
   return values.map((value) => normalizeFunctionBlock(value));
 }
 
+export function normalizeIntegrationsConfig(
+  value?: Partial<IntegrationsConfig> | null,
+): IntegrationsConfig {
+  return {
+    enabledIds: Array.isArray(value?.enabledIds)
+      ? Array.from(
+          new Set(
+            value.enabledIds.filter(
+              (id): id is string => typeof id === "string" && id.trim().length > 0,
+            ).map((id) => id.trim()),
+          ),
+        )
+      : [],
+  };
+}
+
 export const sandboxInvokeSchema = z.object({
   tenantId: z.string().trim().min(1),
   agentId: z.string().trim().min(1).optional(),
@@ -1510,6 +1540,15 @@ export async function hydrateFunctionBlocksForRuntime(
   database: PrismaClient,
 ): Promise<RuntimeToolFeature[]> {
   const rawChannelConfig = getChannelConfigObject(agent.channelConfig);
+  const hasIntegrationsConfig =
+    rawChannelConfig.integrations &&
+    typeof rawChannelConfig.integrations === "object" &&
+    !Array.isArray(rawChannelConfig.integrations);
+  const enabledIntegrationIds = new Set(
+    hasIntegrationsConfig
+      ? normalizeIntegrationsConfig(rawChannelConfig.integrations as Partial<IntegrationsConfig>).enabledIds
+      : [],
+  );
   const functionBlocks = normalizeFunctionBlocks(
     Array.isArray(rawChannelConfig.functionBlocks)
       ? (rawChannelConfig.functionBlocks as Partial<FunctionBlockConfig>[])
@@ -1536,6 +1575,7 @@ export async function hydrateFunctionBlocksForRuntime(
           where: {
             tenantId: agent.tenantId,
             id: { in: integrationIds },
+            status: ConnectionStatus.CONNECTED,
           },
         })
       : [];
@@ -1552,6 +1592,13 @@ export async function hydrateFunctionBlocksForRuntime(
       description: block.description,
       sortOrder: blockIndex,
       steps: block.steps.flatMap((step, stepIndex) => {
+        if (hasIntegrationsConfig && !enabledIntegrationIds.has(step.integrationId)) {
+          console.warn(
+            `[hydrateFunctionBlocksForRuntime] Agent ${agent.id} skipped step ${blockIndex}:${stepIndex} because integration ${step.integrationId} is not enabled for this agent.`,
+          );
+          return [];
+        }
+
         const integration = integrationsById.get(step.integrationId);
 
         if (!integration) {
@@ -1607,9 +1654,31 @@ export function getFunctionIntegrationIds(input: AgentDraftInput) {
 
   return Array.from(
     new Set(
-      functionBlocks.flatMap((block) => block.steps.map((step) => step.integrationId)),
+      functionBlocks.flatMap((block) =>
+        block.steps
+          .map((step) => step.integrationId.trim())
+          .filter((integrationId) => integrationId.length > 0),
+      ),
     ),
   );
+}
+
+export function getEnabledIntegrationIds(input: AgentDraftInput) {
+  return normalizeIntegrationsConfig(input.channelConfig?.integrations).enabledIds;
+}
+
+export function getFunctionIntegrationAllowlistViolation(input: AgentDraftInput) {
+  const enabledIds = new Set(getEnabledIntegrationIds(input));
+  const disabledReferencedIds = getFunctionIntegrationIds(input).filter(
+    (integrationId) => !enabledIds.has(integrationId),
+  );
+
+  return disabledReferencedIds.length > 0
+    ? {
+        integrationIds: disabledReferencedIds,
+        error: "Function steps must reference integrations enabled for this agent.",
+      }
+    : null;
 }
 
 export function buildMultilingualGuidance(input: {

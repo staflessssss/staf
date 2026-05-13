@@ -7,6 +7,8 @@ import {
   buildFeatureCreateInput,
   formatAgentDraftValidationError,
   getChannelConfigObject,
+  getEnabledIntegrationIds,
+  getFunctionIntegrationAllowlistViolation,
   getFunctionIntegrationIds,
   mergeAgentChannelConfig,
   serializeAgentConfig,
@@ -89,7 +91,20 @@ export async function POST(request: Request, context: TenantAgentsRouteContext) 
     return NextResponse.json({ error: "Tenant not found." }, { status: 404 });
   }
 
-  const integrationIds = getFunctionIntegrationIds(parsed.data);
+  const integrationIds = Array.from(
+    new Set([
+      ...getFunctionIntegrationIds(parsed.data),
+      ...getEnabledIntegrationIds(parsed.data),
+    ]),
+  );
+  const allowlistViolation = getFunctionIntegrationAllowlistViolation(parsed.data);
+
+  if (allowlistViolation) {
+    return NextResponse.json(
+      { error: allowlistViolation.error },
+      { status: 400 },
+    );
+  }
 
   try {
     const item = await db.$transaction(async (tx) => {

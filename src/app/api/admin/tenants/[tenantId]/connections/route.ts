@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 
@@ -18,6 +19,14 @@ const createConnectionSchema = z.object({
 });
 
 export async function GET(_: Request, context: ConnectionsRouteContext) {
+  const session = await requireAdminApiSession();
+
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
+  void session;
+
   const { tenantId } = await context.params;
   const [channelConnections, integrationConnections] = await Promise.all([
     db.channelConnection.findMany({
@@ -38,6 +47,14 @@ export async function GET(_: Request, context: ConnectionsRouteContext) {
 }
 
 export async function POST(request: Request, context: ConnectionsRouteContext) {
+  const session = await requireAdminApiSession();
+
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
+  void session;
+
   const { tenantId } = await context.params;
   const json = await request.json().catch(() => null);
   const parsed = createConnectionSchema.safeParse(json);

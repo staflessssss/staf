@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AgentStatus, FeatureType } from "@prisma/client";
+import { AgentStatus, ConnectionStatus, FeatureType, IntegrationType } from "@prisma/client";
 
 import {
   agentDraftSchema,
@@ -10,10 +10,14 @@ import {
   formatEnumLabel,
   getDefaultChannelBehaviorConfig,
   getDefaultControlConfig,
+  getEnabledIntegrationIds,
+  getFunctionIntegrationAllowlistViolation,
   getConversationPlaybookPreset,
   getFunctionIntegrationIds,
+  hydrateFunctionBlocksForRuntime,
   mapAgentToDraft,
   normalizeAgentSettings,
+  normalizeIntegrationsConfig,
   normalizePromptingConfig,
   resolvePromptingIdentity,
 } from "@/lib/agent-config";
@@ -304,6 +308,147 @@ test("getFunctionIntegrationIds reads from channelConfig.functionBlocks", () => 
   });
 
   assert.deepEqual(getFunctionIntegrationIds(input), ["int1"]);
+});
+
+test("agentDraftSchema preserves per-agent enabled integration ids", () => {
+  const input = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      integrations: {
+        enabledIds: ["integration_sheets", "integration_sheets", " integration_calendar "],
+      },
+    },
+  });
+
+  assert.deepEqual(input.channelConfig.integrations?.enabledIds, [
+    "integration_sheets",
+    "integration_calendar",
+  ]);
+  assert.deepEqual(getEnabledIntegrationIds(input), [
+    "integration_sheets",
+    "integration_calendar",
+  ]);
+});
+
+test("normalizeIntegrationsConfig drops empty ids and keeps tenant integrations reusable", () => {
+  assert.deepEqual(
+    normalizeIntegrationsConfig({
+      enabledIds: [" integration_shared ", "", "integration_shared", "integration_crm"],
+    }),
+    {
+      enabledIds: ["integration_shared", "integration_crm"],
+    },
+  );
+});
+
+test("getFunctionIntegrationAllowlistViolation blocks function steps outside per-agent allowlist", () => {
+  const input = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      integrations: {
+        enabledIds: ["integration_sheets"],
+      },
+      functionBlocks: [
+        {
+          name: "Calendar check",
+          description: "Verify availability",
+          active: false,
+          parameters: [],
+          reactionAction: "ai_agent_decides",
+          postAction: "continue_dialog",
+          disableDelayedMessages: false,
+          resultTargets: [],
+          steps: [
+            {
+              integrationId: "integration_calendar",
+              action: "check calendar",
+              params: {},
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(getFunctionIntegrationAllowlistViolation(input), {
+    integrationIds: ["integration_calendar"],
+    error: "Function steps must reference integrations enabled for this agent.",
+  });
+});
+
+test("hydrateFunctionBlocksForRuntime skips connected integrations disabled for the agent", async () => {
+  const fakeDatabase = {
+    integrationConnection: {
+      findMany: async () => [
+        {
+          id: "integration_sheets",
+          tenantId: "tenant-1",
+          type: IntegrationType.GOOGLE_SHEETS,
+          status: ConnectionStatus.CONNECTED,
+          credentialsEnc: "enc",
+          metadata: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "integration_calendar",
+          tenantId: "tenant-1",
+          type: IntegrationType.GOOGLE_CALENDAR,
+          status: ConnectionStatus.CONNECTED,
+          credentialsEnc: "enc",
+          metadata: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    },
+  };
+
+  const [feature] = await hydrateFunctionBlocksForRuntime(
+    {
+      id: "agent-1",
+      tenantId: "tenant-1",
+      channelConfig: {
+        integrations: { enabledIds: ["integration_sheets"] },
+        functionBlocks: [
+          {
+            name: "Lead routing",
+            description: "Route leads",
+            active: true,
+            parameters: [],
+            reactionAction: "ai_agent_decides",
+            postAction: "continue_dialog",
+            disableDelayedMessages: false,
+            resultTargets: [],
+            steps: [
+              {
+                integrationId: "integration_sheets",
+                action: "append row",
+                params: {},
+              },
+              {
+                integrationId: "integration_calendar",
+                action: "check calendar",
+                params: {},
+              },
+            ],
+          },
+        ],
+      },
+    },
+    fakeDatabase as never,
+  );
+
+  assert.deepEqual(
+    feature?.steps.map((step) => step.integrationId),
+    ["integration_sheets"],
+  );
 });
 
 test("mapAgentToDraft exposes functionBlocks from channelConfig", () => {
