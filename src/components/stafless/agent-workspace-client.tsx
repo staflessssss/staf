@@ -74,6 +74,7 @@ import {
   GoogleSheetsFilterDraft,
   getGoogleCalendarActionForOperation,
   getGoogleCalendarParams,
+  getGoogleSheetsValidationErrors,
   getGoogleSheetsActionForOperation,
   getGoogleSheetsParams,
 } from "@/lib/function-execution";
@@ -557,6 +558,10 @@ function parseFunctionBlocks(
 ) {
   const errors: string[] = [];
   stripFunctionUiIds(functionBlocks).forEach((fn) => {
+    if (fn.active && fn.steps.length === 0) {
+      errors.push(`${fn.name || "Function"}: choose a result delivery backend before keeping it active.`);
+    }
+
     fn.steps.forEach((step, stepIndex) => {
       const integrationType = integrationById.get(step.integrationId)?.type;
 
@@ -568,6 +573,10 @@ function parseFunctionBlocks(
 
         if (integrationType === IntegrationType.GOOGLE_CALENDAR) {
           errors.push(...getGoogleCalendarValidationErrors(step).map((error) => `${fn.name || `#${stepIndex + 1}`}: ${error}`));
+        }
+
+        if (integrationType === IntegrationType.GOOGLE_SHEETS) {
+          errors.push(...getGoogleSheetsValidationErrors(step).map((error) => `${fn.name || `#${stepIndex + 1}`}: ${error}`));
         }
 
         return {

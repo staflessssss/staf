@@ -4,7 +4,9 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  AlertTriangle,
   Braces,
+  CheckCircle2,
   ChevronRight,
   CircleQuestionMark,
   Plus,
@@ -274,6 +276,118 @@ function getFunctionBusinessMeta(fn: FunctionDraft) {
   return parts.join(" • ");
 }
 
+function getFunctionBackendLabel(
+  fn: FunctionDraft,
+  integrationById: Map<string, IntegrationConnection>,
+) {
+  const primaryTarget =
+    fn.resultTargets.find((target) => target.type === "google_calendar") ??
+    fn.resultTargets.find((target) => target.type === "google_sheets") ??
+    fn.resultTargets.find((target) => target.type === "api_request") ??
+    fn.resultTargets[0];
+
+  if (primaryTarget?.type === "google_calendar") {
+    return "Google Calendar";
+  }
+
+  if (primaryTarget?.type === "google_sheets") {
+    return "Google Sheets";
+  }
+
+  if (primaryTarget?.type === "api_request") {
+    return "Custom API";
+  }
+
+  const firstConnectedStep = fn.steps.find((step) => integrationById.has(step.integrationId));
+  const firstStepIntegration = firstConnectedStep
+    ? integrationById.get(firstConnectedStep.integrationId)
+    : null;
+
+  return firstStepIntegration ? formatEnumLabel(firstStepIntegration.type) : "No backend";
+}
+
+function getFunctionReadiness(
+  fn: FunctionDraft,
+  integrationById: Map<string, IntegrationConnection>,
+) {
+  if (!fn.active) {
+    return {
+      status: "inactive" as const,
+      label: "Inactive",
+      detail: "The agent will not call this function.",
+    };
+  }
+
+  if (!fn.name.trim() || !fn.description.trim()) {
+    return {
+      status: "blocked" as const,
+      label: "Needs basics",
+      detail: "Name and summary are required before this function can run.",
+    };
+  }
+
+  if (fn.steps.length === 0) {
+    return {
+      status: "blocked" as const,
+      label: "Needs backend",
+      detail: "Choose Google Calendar or Google Sheets and bind a connected account.",
+    };
+  }
+
+  const hasConnectedStep = fn.steps.some((step) => integrationById.has(step.integrationId));
+
+  if (!hasConnectedStep) {
+    return {
+      status: "blocked" as const,
+      label: "Needs integration",
+      detail: "Select an integration enabled for this agent.",
+    };
+  }
+
+  return {
+    status: "ready" as const,
+    label: "Ready",
+    detail: "This function has an executable backend.",
+  };
+}
+
+function getDestinationIntegrationType(destination: PrimaryDestinationType) {
+  if (destination === "google_sheets") {
+    return IntegrationType.GOOGLE_SHEETS;
+  }
+
+  if (destination === "google_calendar") {
+    return IntegrationType.GOOGLE_CALENDAR;
+  }
+
+  return null;
+}
+
+function isOperatorDestinationAvailable(
+  destination: PrimaryDestinationType,
+  connectedIntegrations: IntegrationConnection[],
+) {
+  const integrationType = getDestinationIntegrationType(destination);
+
+  if (!integrationType) {
+    return false;
+  }
+
+  return connectedIntegrations.some((integration) => integration.type === integrationType);
+}
+
+function getDestinationUnavailableCopy(destination: PrimaryDestinationType) {
+  switch (destination) {
+    case "google_sheets":
+      return "Turn on Google Sheets in Integrations first.";
+    case "google_calendar":
+      return "Turn on Google Calendar in Integrations first.";
+    case "api_request":
+      return "Custom API is not available in this workspace slice.";
+    default:
+      return "This legacy destination is preserved but not configurable here.";
+  }
+}
 
 export function FunctionsSection({
   functionBlocks,
@@ -515,48 +629,79 @@ export function FunctionsSection({
               </div>
 
               <div className="space-y-3">
-                {functionBlocks.map((fn, functionIndex) => (
-                  <div
-                    key={fn.uiId}
-                    className={functionListCardClassName}
-                  >
-                    <button
-                      className="flex w-full items-center gap-4 text-left"
-                      onClick={() => setSelectedFunctionUiId(fn.uiId)}
-                      type="button"
+                {functionBlocks.map((fn, functionIndex) => {
+                  const readiness = getFunctionReadiness(fn, integrationById);
+                  const backendLabel = getFunctionBackendLabel(fn, integrationById);
+
+                  return (
+                    <div
+                      key={fn.uiId}
+                      className={functionListCardClassName}
                     >
-                      <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#f4f6fb] text-[#6c63ff]">
-                        <Braces className="size-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-base font-semibold text-[#111827]">
-                          {fn.name.trim() || `Untitled function ${functionIndex + 1}`}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#667085]">
-                          {getFunctionPreview(fn)}
-                        </p>
-                        <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-[#98a2b3]">
-                          {getFunctionBusinessMeta(fn)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div
-                          onClick={(event) => event.stopPropagation()}
-                          role="presentation"
-                        >
-                          <ToggleSwitch
-                            checked={fn.active}
-                            disabled={isReadOnlyMode}
-                            onCheckedChange={(checked) =>
-                              onUpdateFunction(functionIndex, { active: checked })
-                            }
-                          />
+                      <button
+                        className="flex w-full items-start gap-4 text-left"
+                        onClick={() => setSelectedFunctionUiId(fn.uiId)}
+                        type="button"
+                      >
+                        <div className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-[#f4f6fb] text-[#6c63ff]">
+                          <Braces className="size-5" />
                         </div>
-                        <ChevronRight className="size-4 text-[#98a2b3]" />
-                      </div>
-                    </button>
-                  </div>
-                ))}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-base font-semibold text-[#111827]">
+                              {fn.name.trim() || `Untitled function ${functionIndex + 1}`}
+                            </p>
+                            <span className="rounded-[8px] bg-[#eef2f7] px-2 py-1 text-xs font-semibold text-[#526173]">
+                              {backendLabel}
+                            </span>
+                            <span
+                              className={
+                                readiness.status === "ready"
+                                  ? "inline-flex items-center gap-1 rounded-[8px] bg-[#eaf7ee] px-2 py-1 text-xs font-semibold text-[#247144]"
+                                  : readiness.status === "blocked"
+                                    ? "inline-flex items-center gap-1 rounded-[8px] bg-[#fff3e8] px-2 py-1 text-xs font-semibold text-[#b45309]"
+                                    : "inline-flex items-center gap-1 rounded-[8px] bg-[#eef2f7] px-2 py-1 text-xs font-semibold text-[#667085]"
+                              }
+                            >
+                              {readiness.status === "ready" ? (
+                                <CheckCircle2 className="size-3.5" />
+                              ) : readiness.status === "blocked" ? (
+                                <AlertTriangle className="size-3.5" />
+                              ) : null}
+                              {readiness.label}
+                            </span>
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-sm leading-6 text-[#667085]">
+                            {getFunctionPreview(fn)}
+                          </p>
+                          <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-[#98a2b3]">
+                            {getFunctionBusinessMeta(fn)}
+                          </p>
+                          {readiness.status === "blocked" ? (
+                            <p className="mt-2 text-sm leading-5 text-[#b45309]">
+                              {readiness.detail}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-3 pt-1">
+                          <div
+                            onClick={(event) => event.stopPropagation()}
+                            role="presentation"
+                          >
+                            <ToggleSwitch
+                              checked={fn.active}
+                              disabled={isReadOnlyMode}
+                              onCheckedChange={(checked) =>
+                                onUpdateFunction(functionIndex, { active: checked })
+                              }
+                            />
+                          </div>
+                          <ChevronRight className="size-4 text-[#98a2b3]" />
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {!isReadOnlyMode ? (
@@ -945,6 +1090,11 @@ export function FunctionsSection({
                             isNewFunction: fn.resultTargets.length === 0,
                             currentTargets: fn.resultTargets,
                           });
+                          const operatorDestinationOptions = visibleDestinationOptions.filter(
+                            (option) =>
+                              option.value !== "api_request" ||
+                              primaryTarget?.type === "api_request",
+                          );
                           const secondaryTargets = functionViewModel.advanced.secondaryTargets;
                           const hasAdvancedOnlyTargets =
                             functionViewModel.advanced.advancedOnlyTargets.length > 0;
@@ -979,26 +1129,42 @@ export function FunctionsSection({
                                       advanced data will stay intact.
                                     </p>
                                   ) : null}
-                                  <div className="grid gap-3 md:grid-cols-3">
-                                    {visibleDestinationOptions.map((option) => (
-                                      <button
-                                        key={option.value}
-                                        className="rounded-[12px] border border-[#dbe3ef] bg-white px-4 py-3 text-left text-sm font-medium text-[#111827] transition hover:border-[#b9c7dd] hover:bg-[#f8faff]"
-                                        disabled={isReadOnlyMode}
-                                        onClick={() =>
-                                          applyVmChange(functionIndex, (currentVm) =>
-                                            createPrimaryDestination(
-                                              currentVm,
-                                              option.value,
-                                              primaryStepStrategy,
-                                            ),
-                                          )
-                                        }
-                                        type="button"
-                                      >
-                                        {option.label}
-                                      </button>
-                                    ))}
+                                  <div className="grid gap-3 md:grid-cols-2">
+                                    {operatorDestinationOptions.map((option) => {
+                                      const isAvailable = isOperatorDestinationAvailable(
+                                        option.value,
+                                        connectedIntegrations,
+                                      );
+
+                                      return (
+                                        <button
+                                          key={option.value}
+                                          className={
+                                            isAvailable
+                                              ? "rounded-[12px] border border-[#dbe3ef] bg-white px-4 py-3 text-left text-sm font-medium text-[#111827] transition hover:border-[#b9c7dd] hover:bg-[#f8faff]"
+                                              : "cursor-not-allowed rounded-[12px] border border-[#dbe3ef] bg-[#f3f5f8] px-4 py-3 text-left text-sm font-medium text-[#8b98aa]"
+                                          }
+                                          disabled={isReadOnlyMode || !isAvailable}
+                                          onClick={() =>
+                                            applyVmChange(functionIndex, (currentVm) =>
+                                              createPrimaryDestination(
+                                                currentVm,
+                                                option.value,
+                                                primaryStepStrategy,
+                                              ),
+                                            )
+                                          }
+                                          type="button"
+                                        >
+                                          <span className="block">{option.label}</span>
+                                          {!isAvailable ? (
+                                            <span className="mt-1 block text-xs font-normal leading-5">
+                                              {getDestinationUnavailableCopy(option.value)}
+                                            </span>
+                                          ) : null}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               ) : (
@@ -1019,8 +1185,18 @@ export function FunctionsSection({
                                         }
                                         value={primaryTarget.type}
                                       >
-                                        {visibleDestinationOptions.map((option) => (
-                                          <option key={option.value} value={option.value}>
+                                        {operatorDestinationOptions.map((option) => (
+                                          <option
+                                            disabled={
+                                              primaryTarget.type !== option.value &&
+                                              !isOperatorDestinationAvailable(
+                                                option.value,
+                                                connectedIntegrations,
+                                              )
+                                            }
+                                            key={option.value}
+                                            value={option.value}
+                                          >
                                             {option.label}
                                             {option.compatibility ? " (legacy)" : ""}
                                           </option>
@@ -1071,7 +1247,9 @@ export function FunctionsSection({
                                     </div>
                                   ) : null}
 
-                                  {primaryBinding?.tier === "A" && !primaryStep ? (
+                                  {primaryBinding?.tier === "A" &&
+                                  primaryBinding.kind !== "api_request" &&
+                                  !primaryStep ? (
                                     <div className="rounded-[12px] border border-dashed border-[#cfd8e6] bg-[#fbfcff] px-4 py-5">
                                       <p className="text-sm text-[#667085]">
                                         Add one execution step to bind this destination to a real
@@ -1336,46 +1514,21 @@ export function FunctionsSection({
                                   ) : null}
 
                                   {primaryTarget.type === "api_request" && primaryStep ? (
-                                    <div className="space-y-4 rounded-[12px] border border-[#e5e7eb] bg-white px-4 py-4">
-                                      <FormField label="Request action">
-                                        <input
-                                          className={compactInputClassName}
-                                          onChange={(event) =>
-                                            applyVmChange(functionIndex, (currentVm) =>
-                                              updatePrimaryDestinationStep(
-                                                currentVm,
-                                                (currentStep) => ({
-                                                  ...currentStep,
-                                                  action: event.target.value,
-                                                }),
-                                                primaryStepStrategy,
-                                              ),
-                                            )
-                                          }
-                                          readOnly={isReadOnlyMode}
-                                          value={primaryStep.action}
-                                        />
-                                      </FormField>
-                                      <FormField label="Request payload (JSON)">
-                                        <textarea
-                                          className={compactTextareaClassName}
-                                          onChange={(event) =>
-                                            applyVmChange(functionIndex, (currentVm) =>
-                                              updatePrimaryDestinationStep(
-                                                currentVm,
-                                                (currentStep) => ({
-                                                  ...currentStep,
-                                                  params: event.target.value,
-                                                }),
-                                                primaryStepStrategy,
-                                              ),
-                                            )
-                                          }
-                                          readOnly={isReadOnlyMode}
-                                          rows={8}
-                                          value={primaryStep.params}
-                                        />
-                                      </FormField>
+                                    <div className="rounded-[12px] border border-[#f3c7a6] bg-[#fff7ed] px-4 py-4">
+                                      <div className="flex gap-3">
+                                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[#b45309]" />
+                                        <div>
+                                          <p className="text-sm font-semibold text-[#92400e]">
+                                            Custom API is preserved as legacy data.
+                                          </p>
+                                          <p className="mt-1 text-sm leading-6 text-[#9a5b22]">
+                                            This workspace slice does not expose Custom API setup because
+                                            there is no first-class runtime executor for it yet. Switch this
+                                            function to Google Calendar or Google Sheets, or keep the legacy
+                                            data in Advanced execution until Custom API is implemented.
+                                          </p>
+                                        </div>
+                                      </div>
                                     </div>
                                   ) : null}
                                 </>
@@ -1394,10 +1547,13 @@ export function FunctionsSection({
                 >
                   {isWorkspaceMode ? (
                     <summary className="cursor-pointer list-none text-sm font-semibold text-[#111827]">
-                      Advanced execution
+                      Advanced compatibility
                     </summary>
                   ) : null}
-                  <div className={`space-y-5 ${isWorkspaceMode ? "pt-4" : "border-t border-[#e8d8c5] pt-6"}`}>
+                  <fieldset
+                    className={`space-y-5 disabled:opacity-75 ${isWorkspaceMode ? "pt-4" : "border-t border-[#e8d8c5] pt-6"}`}
+                    disabled={isWorkspaceMode || isReadOnlyMode}
+                  >
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-foreground">
@@ -1405,12 +1561,12 @@ export function FunctionsSection({
                       </p>
                       {isWorkspaceMode ? (
                         <p className="mt-1 text-sm text-[#667085]">
-                          Advanced multi-step wiring stays available for functions that need it:{" "}
-                          {getFunctionMeta(fn)}.
+                          Preserved legacy execution data for migrated functions:{" "}
+                          {getFunctionMeta(fn)}. New workspace actions should use Result delivery above.
                         </p>
                       ) : null}
                     </div>
-                    {!isReadOnlyMode ? (
+                    {!isReadOnlyMode && !isWorkspaceMode ? (
                       <button
                         className={secondaryButtonClassName}
                         onClick={() => onAddFunctionStep(functionIndex)}
@@ -2921,7 +3077,7 @@ export function FunctionsSection({
                           </div>
                         )}
 
-                        {!isReadOnlyMode ? (
+                        {!isReadOnlyMode && !isWorkspaceMode ? (
                           <div className="mt-4 flex justify-end">
                             <button
                               className={secondaryButtonClassName}
@@ -2936,7 +3092,7 @@ export function FunctionsSection({
                       </div>
                     );
                   })}
-                </div>
+                </fieldset>
                 </details>
               </div>
             </div>

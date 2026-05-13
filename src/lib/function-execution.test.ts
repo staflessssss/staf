@@ -5,6 +5,7 @@ import {
   getGoogleCalendarValidationErrors,
   getGoogleSheetsActionForOperation,
   getGoogleSheetsParams,
+  getGoogleSheetsValidationErrors,
 } from "@/lib/function-execution";
 
 test("getGoogleCalendarValidationErrors reports invalid literal bindings for booking", () => {
@@ -69,6 +70,51 @@ test("getGoogleSheetsParams preserves typed write and update modes", () => {
   assert.equal(update.operation, "update_rows");
   assert.equal(update.filters[0]?.valueSource, "email");
   assert.equal(update.columnMappings[0]?.column, "Status");
+});
+
+test("getGoogleSheetsValidationErrors rejects incomplete executable sheet config", () => {
+  const errors = getGoogleSheetsValidationErrors({
+    params: {
+      operation: "update_rows",
+      spreadsheetId: "",
+      sheetName: "",
+      filters: [{ column: "", operator: "equals", valueSource: "literal", value: "" }],
+      columnMappings: [{ column: "", valueSource: "literal", value: "" }],
+    },
+  });
+
+  assert.match(errors.join("\n"), /selected spreadsheet/i);
+  assert.match(errors.join("\n"), /selected sheet tab/i);
+  assert.match(errors.join("\n"), /condition 1 needs a column/i);
+  assert.match(errors.join("\n"), /condition 1 needs a fixed value/i);
+  assert.match(errors.join("\n"), /mapping 1 needs a column/i);
+  assert.match(errors.join("\n"), /mapping 1 needs a fixed value/i);
+});
+
+test("getGoogleSheetsValidationErrors accepts complete lookup and append configs", () => {
+  assert.deepEqual(
+    getGoogleSheetsValidationErrors({
+      params: {
+        operation: "get_rows",
+        spreadsheetId: "sheet-id",
+        sheetName: "Leads",
+        filters: [{ column: "Email", operator: "equals", valueSource: "email", value: "" }],
+      },
+    }),
+    [],
+  );
+
+  assert.deepEqual(
+    getGoogleSheetsValidationErrors({
+      params: {
+        operation: "append_row",
+        spreadsheetId: "sheet-id",
+        sheetName: "Leads",
+        columnMappings: [{ column: "Name", valueSource: "couple_name", value: "" }],
+      },
+    }),
+    [],
+  );
 });
 
 test("getGoogleSheetsActionForOperation returns human action copy for each mode", () => {

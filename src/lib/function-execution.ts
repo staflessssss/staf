@@ -235,6 +235,53 @@ export function getGoogleSheetsParams(step: Pick<StepLike, "params">): GoogleShe
   };
 }
 
+export function getGoogleSheetsValidationErrors(step: Pick<StepLike, "params">) {
+  const params = getGoogleSheetsParams(step);
+  const errors: string[] = [];
+
+  if (!params.spreadsheetId.trim()) {
+    errors.push("Google Sheets needs a selected spreadsheet.");
+  }
+
+  if (!params.sheetName.trim()) {
+    errors.push("Google Sheets needs a selected sheet tab.");
+  }
+
+  if (params.operation === "get_rows" || params.operation === "update_rows") {
+    if (params.filters.length === 0) {
+      errors.push("Google Sheets lookup needs at least one row condition.");
+    }
+
+    params.filters.forEach((filter, index) => {
+      if (!filter.column.trim()) {
+        errors.push(`Google Sheets condition ${index + 1} needs a column.`);
+      }
+
+      if (filter.valueSource === "literal" && !filter.value.trim()) {
+        errors.push(`Google Sheets condition ${index + 1} needs a fixed value.`);
+      }
+    });
+  }
+
+  if (params.operation === "append_row" || params.operation === "update_rows") {
+    if (params.columnMappings.length === 0) {
+      errors.push("Google Sheets write action needs at least one column mapping.");
+    }
+
+    params.columnMappings.forEach((mapping, index) => {
+      if (!mapping.column.trim()) {
+        errors.push(`Google Sheets mapping ${index + 1} needs a column.`);
+      }
+
+      if (mapping.valueSource === "literal" && !mapping.value.trim()) {
+        errors.push(`Google Sheets mapping ${index + 1} needs a fixed value.`);
+      }
+    });
+  }
+
+  return errors;
+}
+
 export function getGoogleSheetsActionForOperation(operation: GoogleSheetsOperationDraft) {
   switch (operation) {
     case "append_row":

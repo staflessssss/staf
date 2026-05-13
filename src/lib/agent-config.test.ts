@@ -11,9 +11,12 @@ import {
   getDefaultChannelBehaviorConfig,
   getDefaultControlConfig,
   getEnabledIntegrationIds,
+  getFunctionExecutionViolation,
   getFunctionIntegrationAllowlistViolation,
   getConversationPlaybookPreset,
   getFunctionIntegrationIds,
+  getFunctionStepValidationViolation,
+  getUnsupportedFunctionIntegrationViolation,
   hydrateFunctionBlocksForRuntime,
   mapAgentToDraft,
   normalizeAgentSettings,
@@ -451,6 +454,57 @@ test("hydrateFunctionBlocksForRuntime skips connected integrations disabled for 
   );
 });
 
+test("hydrateFunctionBlocksForRuntime does not expose inactive functions as runtime tools", async () => {
+  const fakeDatabase = {
+    integrationConnection: {
+      findMany: async () => [
+        {
+          id: "integration_sheets",
+          tenantId: "tenant-1",
+          type: IntegrationType.GOOGLE_SHEETS,
+          status: ConnectionStatus.CONNECTED,
+          credentialsEnc: "enc",
+          metadata: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    },
+  };
+
+  const features = await hydrateFunctionBlocksForRuntime(
+    {
+      id: "agent-1",
+      tenantId: "tenant-1",
+      channelConfig: {
+        integrations: { enabledIds: ["integration_sheets"] },
+        functionBlocks: [
+          {
+            name: "Inactive sheet action",
+            description: "Should not be callable",
+            active: false,
+            parameters: [],
+            reactionAction: "ai_agent_decides",
+            postAction: "continue_dialog",
+            disableDelayedMessages: false,
+            resultTargets: [],
+            steps: [
+              {
+                integrationId: "integration_sheets",
+                action: "append row",
+                params: {},
+              },
+            ],
+          },
+        ],
+      },
+    },
+    fakeDatabase as never,
+  );
+
+  assert.deepEqual(features, []);
+});
+
 test("mapAgentToDraft exposes functionBlocks from channelConfig", () => {
   const createAgent = (
     channelConfig: Parameters<typeof mapAgentToDraft>[0]["channelConfig"],
@@ -682,4 +736,133 @@ test("resolvePromptingIdentity prefers prompting identity fields over legacy top
   assert.equal(resolved.persona, "Prompting persona");
   assert.equal(resolved.tone, "premium");
   assert.equal(resolved.languagePreference, "Russian");
+});
+
+test("getFunctionExecutionViolation blocks active functions without an execution backend", () => {
+  const draft = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      functionBlocks: [
+        {
+          name: "Book consultation",
+          description: "Book a consultation when the customer chooses a time.",
+          active: true,
+          parameters: [],
+          reactionAction: "ai_agent_decides",
+          postAction: "continue_dialog",
+          disableDelayedMessages: false,
+          resultTargets: [],
+          steps: [],
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(getFunctionExecutionViolation(draft), {
+    functionName: "Book consultation",
+    error:
+      'Function "Book consultation" needs a result delivery backend before it can be active.',
+  });
+
+  draft.channelConfig.functionBlocks![0]!.active = false;
+  assert.equal(getFunctionExecutionViolation(draft), null);
+});
+
+test("getUnsupportedFunctionIntegrationViolation blocks integrations without live executors", () => {
+  const draft = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      integrations: {
+        enabledIds: ["hubspot-1"],
+      },
+      functionBlocks: [
+        {
+          name: "Create CRM lead",
+          description: "Create a lead record in the CRM.",
+          active: true,
+          parameters: [],
+          reactionAction: "ai_agent_decides",
+          postAction: "continue_dialog",
+          disableDelayedMessages: false,
+          resultTargets: [],
+          steps: [
+            {
+              integrationId: "hubspot-1",
+              action: "create lead",
+              params: {},
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  const violation = getUnsupportedFunctionIntegrationViolation(draft, [
+    { id: "hubspot-1", type: IntegrationType.HUBSPOT },
+  ]);
+
+  assert.deepEqual(violation, {
+    integrationId: "hubspot-1",
+    integrationType: IntegrationType.HUBSPOT,
+    error: "Hubspot does not have a live Function executor yet.",
+  });
+
+  assert.equal(
+    getUnsupportedFunctionIntegrationViolation(draft, [
+      { id: "hubspot-1", type: IntegrationType.GOOGLE_SHEETS },
+    ]),
+    null,
+  );
+});
+
+test("getFunctionStepValidationViolation blocks invalid typed execution params", () => {
+  const draft = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      integrations: {
+        enabledIds: ["calendar-1", "sheets-1"],
+      },
+      functionBlocks: [
+        {
+          name: "Check sheet",
+          description: "Look up a row in Google Sheets.",
+          active: true,
+          parameters: [],
+          reactionAction: "ai_agent_decides",
+          postAction: "continue_dialog",
+          disableDelayedMessages: false,
+          resultTargets: [],
+          steps: [
+            {
+              integrationId: "sheets-1",
+              action: "lookup rows in sheet",
+              params: {
+                operation: "get_rows",
+                spreadsheetId: "",
+                sheetName: "Leads",
+                filters: [{ column: "Email", operator: "equals", valueSource: "email", value: "" }],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(getFunctionStepValidationViolation(draft, [
+    { id: "sheets-1", type: IntegrationType.GOOGLE_SHEETS },
+  ]), {
+    functionName: "Check sheet",
+    integrationId: "sheets-1",
+    error: "Check sheet: Google Sheets needs a selected spreadsheet.",
+  });
 });

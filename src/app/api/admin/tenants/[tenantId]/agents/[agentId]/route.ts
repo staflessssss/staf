@@ -8,8 +8,11 @@ import {
   formatAgentDraftValidationError,
   getChannelConfigObject,
   getEnabledIntegrationIds,
+  getFunctionExecutionViolation,
   getFunctionIntegrationAllowlistViolation,
   getFunctionIntegrationIds,
+  getFunctionStepValidationViolation,
+  getUnsupportedFunctionIntegrationViolation,
   mergeAgentChannelConfig,
   serializeAgentConfig,
   validateAgentConfigReferences,
@@ -91,6 +94,15 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
       ...getEnabledIntegrationIds(parsed.data),
     ]),
   );
+  const executionViolation = getFunctionExecutionViolation(parsed.data);
+
+  if (executionViolation) {
+    return NextResponse.json(
+      { error: executionViolation.error },
+      { status: 400 },
+    );
+  }
+
   const allowlistViolation = getFunctionIntegrationAllowlistViolation(parsed.data);
 
   if (allowlistViolation) {
@@ -112,6 +124,28 @@ export async function PATCH(request: Request, context: AgentRouteContext) {
 
       if ("error" in validation) {
         throw new Error(validation.error);
+      }
+
+      const unsupportedFunctionIntegration = getUnsupportedFunctionIntegrationViolation(
+        parsed.data,
+        "integrations" in validation && validation.integrations
+          ? validation.integrations
+          : [],
+      );
+
+      if (unsupportedFunctionIntegration) {
+        throw new Error(unsupportedFunctionIntegration.error);
+      }
+
+      const functionStepViolation = getFunctionStepValidationViolation(
+        parsed.data,
+        "integrations" in validation && validation.integrations
+          ? validation.integrations
+          : [],
+      );
+
+      if (functionStepViolation) {
+        throw new Error(functionStepViolation.error);
       }
 
       await tx.feature.deleteMany({

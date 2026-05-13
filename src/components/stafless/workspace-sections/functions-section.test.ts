@@ -62,3 +62,21 @@ test("functions section exposes a staged Google Sheets lookup flow", () => {
   assert.match(source, /Map the row values|Define the row changes/);
   assert.match(source, /Column mapping/);
 });
+
+test("functions workspace keeps operators out of legacy and unavailable execution paths", () => {
+  const source = fs.readFileSync(
+    path.join(process.cwd(), "src/components/stafless/workspace-sections/functions-section.tsx"),
+    "utf8",
+  );
+
+  assert.match(source, /Needs backend/);
+  assert.match(source, /Choose Google Calendar or Google Sheets and bind a connected account/);
+  assert.match(source, /Advanced compatibility/);
+  assert.match(source, /New workspace actions should use Result delivery above/);
+  assert.match(source, /Custom API is not available in this workspace slice/);
+  assert.match(source, /Turn on Google Calendar in Integrations first/);
+  assert.match(source, /Turn on Google Sheets in Integrations first/);
+  assert.match(source, /!isWorkspaceMode/);
+  assert.match(source, /disabled=\{isWorkspaceMode \|\| isReadOnlyMode\}/);
+  assert.match(source, /primaryBinding\.kind !== "api_request"/);
+});

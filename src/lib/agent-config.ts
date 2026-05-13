@@ -5,6 +5,7 @@ import {
   ConnectionStatus,
   FeatureType,
   IntegrationConnection,
+  IntegrationType,
   MessageRole,
   Prisma,
   PrismaClient,
@@ -12,6 +13,10 @@ import {
 import { z } from "zod";
 
 import { isValidTimezone } from "@/lib/timezones";
+import {
+  getGoogleCalendarValidationErrors,
+  getGoogleSheetsValidationErrors,
+} from "@/lib/function-execution";
 
 export const discoveryFieldOptions = [
   "customer_name",
@@ -1553,7 +1558,7 @@ export async function hydrateFunctionBlocksForRuntime(
     Array.isArray(rawChannelConfig.functionBlocks)
       ? (rawChannelConfig.functionBlocks as Partial<FunctionBlockConfig>[])
       : [],
-  );
+  ).filter((block) => block.active);
 
   if (functionBlocks.length === 0) {
     return [];
@@ -1679,6 +1684,79 @@ export function getFunctionIntegrationAllowlistViolation(input: AgentDraftInput)
         error: "Function steps must reference integrations enabled for this agent.",
       }
     : null;
+}
+
+export function getFunctionExecutionViolation(input: AgentDraftInput) {
+  const blockedFunction = normalizeFunctionBlocks(
+    input.channelConfig?.functionBlocks ?? [],
+  ).find((block) => block.active && block.steps.length === 0);
+
+  return blockedFunction
+    ? {
+        functionName: blockedFunction.name,
+        error: `Function "${blockedFunction.name}" needs a result delivery backend before it can be active.`,
+      }
+    : null;
+}
+
+const executableFunctionIntegrationTypes = new Set<IntegrationType>([
+  IntegrationType.GOOGLE_CALENDAR,
+  IntegrationType.GOOGLE_DRIVE,
+  IntegrationType.GOOGLE_SHEETS,
+]);
+
+export function getUnsupportedFunctionIntegrationViolation(
+  input: AgentDraftInput,
+  integrations: Array<Pick<IntegrationConnection, "id" | "type">>,
+) {
+  const functionIntegrationIds = new Set(getFunctionIntegrationIds(input));
+  const unsupportedIntegration = integrations.find(
+    (integration) =>
+      functionIntegrationIds.has(integration.id) &&
+      !executableFunctionIntegrationTypes.has(integration.type),
+  );
+
+  return unsupportedIntegration
+    ? {
+        integrationId: unsupportedIntegration.id,
+        integrationType: unsupportedIntegration.type,
+        error: `${formatEnumLabel(unsupportedIntegration.type)} does not have a live Function executor yet.`,
+      }
+    : null;
+}
+
+export function getFunctionStepValidationViolation(
+  input: AgentDraftInput,
+  integrations: Array<Pick<IntegrationConnection, "id" | "type">>,
+) {
+  const integrationById = new Map(integrations.map((integration) => [integration.id, integration]));
+  const functionBlocks = normalizeFunctionBlocks(input.channelConfig?.functionBlocks ?? []);
+
+  for (const block of functionBlocks) {
+    if (!block.active) {
+      continue;
+    }
+
+    for (const step of block.steps) {
+      const integrationType = integrationById.get(step.integrationId)?.type;
+      const errors =
+        integrationType === IntegrationType.GOOGLE_CALENDAR
+          ? getGoogleCalendarValidationErrors(step)
+          : integrationType === IntegrationType.GOOGLE_SHEETS
+            ? getGoogleSheetsValidationErrors(step)
+            : [];
+
+      if (errors.length > 0) {
+        return {
+          functionName: block.name,
+          integrationId: step.integrationId,
+          error: `${block.name}: ${errors[0]}`,
+        };
+      }
+    }
+  }
+
+  return null;
 }
 
 export function buildMultilingualGuidance(input: {
