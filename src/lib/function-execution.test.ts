@@ -72,6 +72,43 @@ test("getGoogleSheetsParams preserves typed write and update modes", () => {
   assert.equal(update.columnMappings[0]?.column, "Status");
 });
 
+test("getGoogleSheetsParams preserves capacity availability settings", () => {
+  const params = getGoogleSheetsParams({
+    params: {
+      operation: "capacity_availability",
+      spreadsheetId: "sheet-id",
+      sheetName: "Bookings",
+      dateColumn: "date",
+      statusColumn: "status",
+      regionColumn: "region",
+      bookedStatusValue: "Booked",
+      capacityRules: [
+        { region: "FL", aliases: ["FL", "Florida"], capacity: 1 },
+        { region: "NC/SC/GA", aliases: ["NC", "SC", "GA"], capacity: 2 },
+      ],
+      suggestionSearchDays: 30,
+    },
+  });
+
+  assert.equal(params.operation, "capacity_availability");
+  assert.equal(params.dateColumn, "date");
+  assert.equal(params.statusColumn, "status");
+  assert.equal(params.regionColumn, "region");
+  assert.equal(params.bookedStatusValue, "Booked");
+  assert.equal(params.capacityRules[0]?.region, "FL");
+  assert.equal(params.capacityRules[1]?.capacity, 2);
+  assert.equal(params.suggestionSearchDays, 30);
+
+  const explicitEmptyRules = getGoogleSheetsParams({
+    params: {
+      operation: "capacity_availability",
+      capacityRules: [],
+    },
+  });
+
+  assert.deepEqual(explicitEmptyRules.capacityRules, []);
+});
+
 test("getGoogleSheetsValidationErrors rejects incomplete executable sheet config", () => {
   const errors = getGoogleSheetsValidationErrors({
     params: {
@@ -117,11 +154,49 @@ test("getGoogleSheetsValidationErrors accepts complete lookup and append configs
   );
 });
 
+test("getGoogleSheetsValidationErrors validates capacity availability config", () => {
+  assert.match(
+    getGoogleSheetsValidationErrors({
+      params: {
+        operation: "capacity_availability",
+        spreadsheetId: "sheet-id",
+        sheetName: "Bookings",
+        dateColumn: "",
+        statusColumn: "",
+        regionColumn: "",
+        bookedStatusValue: "",
+        capacityRules: [],
+      },
+    }).join("\n"),
+    /date column[\s\S]*status column[\s\S]*region column[\s\S]*booked status value[\s\S]*capacity rule/i,
+  );
+
+  assert.deepEqual(
+    getGoogleSheetsValidationErrors({
+      params: {
+        operation: "capacity_availability",
+        spreadsheetId: "sheet-id",
+        sheetName: "Bookings",
+        dateColumn: "date",
+        statusColumn: "status",
+        regionColumn: "region",
+        bookedStatusValue: "Booked",
+        capacityRules: [{ region: "FL", aliases: ["FL", "Florida"], capacity: 1 }],
+      },
+    }),
+    [],
+  );
+});
+
 test("getGoogleSheetsActionForOperation returns human action copy for each mode", () => {
   assert.equal(getGoogleSheetsActionForOperation("get_rows"), "lookup rows in sheet");
   assert.equal(getGoogleSheetsActionForOperation("append_row"), "append row to sheet");
   assert.equal(
     getGoogleSheetsActionForOperation("update_rows"),
     "update matching rows in sheet",
+  );
+  assert.equal(
+    getGoogleSheetsActionForOperation("capacity_availability"),
+    "check capacity availability in sheet",
   );
 });

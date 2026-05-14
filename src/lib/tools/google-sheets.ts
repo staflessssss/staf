@@ -46,7 +46,7 @@ type SheetsColumnMappingConfig = {
 };
 
 type SheetsBaseConfig = {
-  operation: "get_rows" | "append_row" | "update_rows";
+  operation: "get_rows" | "append_row" | "update_rows" | "capacity_availability";
   spreadsheetId?: string;
   spreadsheetTitle?: string;
   sheetName?: string;
@@ -69,6 +69,22 @@ type SheetsUpdateConfig = SheetsBaseConfig & {
   combineFilters: "AND" | "OR";
   filters: SheetsFilterConfig[];
   columnMappings: SheetsColumnMappingConfig[];
+};
+
+type SheetsCapacityRuleConfig = {
+  region: string;
+  aliases: string[];
+  capacity: number;
+};
+
+type SheetsCapacityAvailabilityConfig = SheetsBaseConfig & {
+  operation: "capacity_availability";
+  dateColumn: string;
+  statusColumn: string;
+  regionColumn: string;
+  bookedStatusValue: string;
+  capacityRules: SheetsCapacityRuleConfig[];
+  suggestionSearchDays: number;
 };
 
 const monthMap: Record<string, number> = {
@@ -337,7 +353,9 @@ function parseSheetsBaseConfig(
 
   return {
     operation:
-      config?.operation === "append_row" || config?.operation === "update_rows"
+      config?.operation === "append_row" ||
+      config?.operation === "update_rows" ||
+      config?.operation === "capacity_availability"
         ? config.operation
         : "get_rows",
     spreadsheetId: parseSpreadsheetId(
@@ -352,6 +370,32 @@ function parseSheetsBaseConfig(
     sheetName: typeof config?.sheetName === "string" ? config.sheetName : undefined,
     headerRow:
       typeof config?.headerRow === "number" && config.headerRow > 0 ? config.headerRow : 1,
+  };
+}
+
+function parseCapacityRuleConfig(value: Prisma.JsonValue): SheetsCapacityRuleConfig | null {
+  const rule = asObject(value);
+
+  if (!rule || typeof rule.region !== "string" || !rule.region.trim()) {
+    return null;
+  }
+
+  const aliases = asArray(rule.aliases).filter(
+    (alias): alias is string => typeof alias === "string" && alias.trim().length > 0,
+  );
+  const capacity =
+    typeof rule.capacity === "number" && Number.isFinite(rule.capacity)
+      ? Math.floor(rule.capacity)
+      : 0;
+
+  if (capacity < 1) {
+    return null;
+  }
+
+  return {
+    region: rule.region.trim(),
+    aliases: aliases.length > 0 ? aliases : [rule.region.trim()],
+    capacity,
   };
 }
 
@@ -410,6 +454,62 @@ function parseSheetsUpdateConfig(
   };
 }
 
+function parseSheetsCapacityAvailabilityConfig(
+  params: Prisma.JsonValue,
+  metadata?: Prisma.JsonValue | null,
+): SheetsCapacityAvailabilityConfig {
+  const base = parseSheetsBaseConfig(params, metadata);
+  const config = asObject(params);
+  const hasCapacityRules = Array.isArray(config?.capacityRules);
+  const capacityRules = asArray(config?.capacityRules)
+    .map((rule) => parseCapacityRuleConfig(rule))
+    .filter((rule): rule is SheetsCapacityRuleConfig => Boolean(rule));
+
+  return {
+    ...base,
+    operation: "capacity_availability",
+    dateColumn:
+      typeof config?.dateColumn === "string" && config.dateColumn.trim()
+        ? config.dateColumn
+        : "date",
+    statusColumn:
+      typeof config?.statusColumn === "string" && config.statusColumn.trim()
+        ? config.statusColumn
+        : "status",
+    regionColumn:
+      typeof config?.regionColumn === "string" && config.regionColumn.trim()
+        ? config.regionColumn
+        : "region",
+    bookedStatusValue:
+      typeof config?.bookedStatusValue === "string" && config.bookedStatusValue.trim()
+        ? config.bookedStatusValue
+        : "Booked",
+    capacityRules: hasCapacityRules
+      ? capacityRules
+      : capacityRules.length > 0
+        ? capacityRules
+        : [
+            { region: "FL", aliases: ["FL", "Florida"], capacity: 1 },
+            {
+              region: "NC/SC/GA",
+              aliases: [
+                "NC/SC/GA",
+                "NC, SC",
+                "North Carolina",
+                "South Carolina",
+                "Georgia",
+                "Charlotte",
+              ],
+              capacity: 2,
+            },
+          ],
+    suggestionSearchDays:
+      typeof config?.suggestionSearchDays === "number" && config.suggestionSearchDays > 0
+        ? Math.floor(config.suggestionSearchDays)
+        : 45,
+  };
+}
+
 async function createSheetsClient(credentialsEnc: string) {
   const auth = createGoogleOAuthClientFromEncryptedCredentials(credentialsEnc);
   return google.sheets({ version: "v4", auth });
@@ -421,34 +521,40 @@ function getColumnIndex(headers: unknown[], lookupColumn: string) {
   );
 }
 
-function normalizeRegion(value: string) {
+function matchesAlias(value: string, aliases: string[]) {
   const normalized = normalizeText(value);
 
-  if (
-    normalized.includes("florida") ||
-    normalized === "fl" ||
-    normalized.includes("wedding in florida")
-  ) {
-    return "FL" as const;
-  }
+  return aliases.some((alias) => {
+    const normalizedAlias = normalizeText(alias);
 
-  if (
-    normalized.includes("north carolina") ||
-    normalized.includes("south carolina") ||
-    normalized.includes("georgia") ||
-    normalized.includes("charlotte") ||
-    normalized.includes("nc/sc/ga") ||
-    normalized.includes("nc, sc") ||
-    normalized.includes("wedding in nc, sc or ga")
-  ) {
-    return "NC_SC_GA" as const;
-  }
+    if (!normalizedAlias) {
+      return false;
+    }
 
-  return null;
+    if (normalized === normalizedAlias) {
+      return true;
+    }
+
+    if (/^[a-z0-9]{1,3}$/i.test(normalizedAlias)) {
+      return new RegExp(`(^|[^a-z0-9])${normalizedAlias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i").test(
+        normalized,
+      );
+    }
+
+    return normalized.includes(normalizedAlias);
+  });
 }
 
-function inferRequestedRegion(request: string, location?: string) {
-  return normalizeRegion(location ?? "") ?? normalizeRegion(request);
+function inferRequestedCapacityRule(args: {
+  request: string;
+  location?: string;
+  capacityRules: SheetsCapacityRuleConfig[];
+}) {
+  const sources = [args.location ?? "", args.request];
+
+  return args.capacityRules.find((rule) =>
+    sources.some((source) => source.trim() && matchesAlias(source, [rule.region, ...rule.aliases])),
+  ) ?? null;
 }
 
 function mapRowToObject(headers: unknown[], row: unknown[]) {
@@ -716,101 +822,6 @@ async function runSheetsLookup(args: SheetsExecutionArgs) {
       row: row.rowObject,
     }));
 
-  const dateColumn = resolvedFilters.find((filter) => filter.valueSource === "requested_date")?.column;
-  const statusColumn = headers.find(
-    (header) => typeof header === "string" && normalizeHeader(header) === "status",
-  );
-  const regionColumn = headers.find(
-    (header) => typeof header === "string" && normalizeHeader(header) === "region",
-  );
-  const requestedDate =
-    resolvedFilters.find((filter) => filter.valueSource === "requested_date")?.resolvedValue ?? null;
-  const requestedRegion =
-    typeof regionColumn === "string" ? inferRequestedRegion(args.request, args.location) : null;
-
-  if (
-    typeof requestedDate === "string" &&
-    typeof dateColumn === "string" &&
-    typeof statusColumn === "string" &&
-    typeof regionColumn === "string" &&
-    requestedRegion
-  ) {
-    const bookedCounts = new Map<string, number>();
-
-    for (const row of rows.slice(headerRowIndex + 1)) {
-      const rowObject = mapRowToObject(headers, row);
-      const normalizedDate = normalizeSheetDateValue(rowObject[dateColumn]);
-      const normalizedStatus = normalizeText(String(rowObject[statusColumn] ?? ""));
-      const normalizedRegion = normalizeRegion(String(rowObject[regionColumn] ?? ""));
-
-      if (!normalizedDate || !normalizedStatus.includes("booked") || !normalizedRegion) {
-        continue;
-      }
-
-      const key = `${normalizedDate}:${normalizedRegion}`;
-      bookedCounts.set(key, (bookedCounts.get(key) ?? 0) + 1);
-    }
-
-    const requestedCount = bookedCounts.get(`${requestedDate}:${requestedRegion}`) ?? 0;
-    const available = requestedRegion === "FL" ? requestedCount === 0 : requestedCount < 2;
-    const findNearestAvailableDate = (direction: -1 | 1) => {
-      let cursor = buildUtcDate(
-        Number(requestedDate.slice(0, 4)),
-        Number(requestedDate.slice(5, 7)) - 1,
-        Number(requestedDate.slice(8, 10)),
-      );
-
-      for (let dayOffset = 1; dayOffset <= 45; dayOffset += 1) {
-        cursor = addUtcDays(cursor, direction);
-        const candidateIso = toIsoDate(cursor);
-        const candidateCount = bookedCounts.get(`${candidateIso}:${requestedRegion}`) ?? 0;
-        const candidateAvailable = requestedRegion === "FL" ? candidateCount === 0 : candidateCount < 2;
-
-        if (candidateAvailable) {
-          return candidateIso;
-        }
-      }
-
-      return null;
-    };
-
-    const nearestAvailableDates = available
-      ? null
-      : {
-          before: findNearestAvailableDate(-1),
-          after: findNearestAvailableDate(1),
-        };
-    const suggestedDates = nearestAvailableDates
-      ? [nearestAvailableDates.before, nearestAvailableDates.after].filter(
-          (value): value is string => Boolean(value),
-        )
-      : [];
-
-    return {
-      integration: "GOOGLE_SHEETS",
-      mode: "live",
-      status: available ? "available" : "unavailable",
-      action: args.action,
-      operation: config.operation,
-      spreadsheetId: config.spreadsheetId,
-      spreadsheetTitle: metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
-      sheetName: config.sheetName,
-      requestedDate,
-      requestedRegion,
-      bookedCount: requestedCount,
-      matchedRows,
-      nearestAvailableDates,
-      suggestedDates,
-      summary: available
-        ? `Wedding date check: ${requestedDate} is available for ${requestedRegion}.`
-        : suggestedDates.length > 0
-          ? `Wedding date check: ${requestedDate} is unavailable for ${requestedRegion}. Offer these nearby dates right away: ${suggestedDates.join(", ")}.`
-          : `Wedding date check: ${requestedDate} is unavailable for ${requestedRegion} and no nearby replacement dates were found automatically.`,
-      params: args.params,
-      request: args.request,
-    };
-  }
-
   return {
     integration: "GOOGLE_SHEETS",
     mode: "live",
@@ -832,6 +843,211 @@ async function runSheetsLookup(args: SheetsExecutionArgs) {
       matchedRows.length > 0
         ? `Google Sheets lookup found ${matchedRows.length} matching row(s).`
         : "Google Sheets lookup found no matching rows.",
+    params: args.params,
+    request: args.request,
+  };
+}
+
+async function runSheetsCapacityAvailability(args: SheetsExecutionArgs) {
+  const config = parseSheetsCapacityAvailabilityConfig(args.params, args.metadata);
+
+  if (config.capacityRules.length === 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_capacity_rules",
+      action: args.action,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      summary: "This capacity availability function needs at least one region capacity rule before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (!args.credentialsEnc) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_credentials",
+      action: args.action,
+      summary: "This Google Sheets integration does not have usable OAuth credentials.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (!config.spreadsheetId || !config.sheetName) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "misconfigured",
+      action: args.action,
+      summary: "This capacity availability function needs a spreadsheet and a sheet tab before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const requestedDate = inferRequestedDate(args.request, args.date);
+
+  if (!requestedDate) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "needs_date",
+      action: args.action,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      summary: "This capacity availability function needs a wedding date in YYYY-MM-DD or clear date text.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const requestedRule = inferRequestedCapacityRule({
+    request: args.request,
+    location: args.location,
+    capacityRules: config.capacityRules,
+  });
+
+  if (!requestedRule) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "needs_region",
+      action: args.action,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      date: toIsoDate(requestedDate),
+      supportedRegions: config.capacityRules.map((rule) => rule.region),
+      summary: "This capacity availability function needs a region that matches one configured capacity rule.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const sheets = await createSheetsClient(args.credentialsEnc);
+  const snapshot = await loadSheetSnapshot({ sheets, config });
+  const missingColumns = getMissingColumns(snapshot.headers, [
+    config.dateColumn,
+    config.statusColumn,
+    config.regionColumn,
+  ]);
+
+  if (missingColumns.length > 0) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live",
+      status: "column_not_found",
+      action: args.action,
+      spreadsheetId: config.spreadsheetId,
+      spreadsheetTitle: snapshot.metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
+      sheetName: config.sheetName,
+      missingColumns,
+      summary: `Columns not found: ${missingColumns.join(", ")}.`,
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  const dateIndex = getColumnIndex(snapshot.headers, config.dateColumn);
+  const statusIndex = getColumnIndex(snapshot.headers, config.statusColumn);
+  const regionIndex = getColumnIndex(snapshot.headers, config.regionColumn);
+  const bookedCounts = new Map<string, number>();
+  const bookedRows = snapshot.rows.slice(snapshot.headerRowIndex + 1).flatMap((row, index) => {
+    const normalizedDate = normalizeSheetDateValue(row[dateIndex]);
+    const normalizedStatus = normalizeText(String(row[statusIndex] ?? ""));
+    const rowRegion = String(row[regionIndex] ?? "");
+    const matchedRule = config.capacityRules.find((rule) =>
+      matchesAlias(rowRegion, [rule.region, ...rule.aliases]),
+    );
+
+    if (
+      !normalizedDate ||
+      normalizedStatus !== normalizeText(config.bookedStatusValue) ||
+      !matchedRule
+    ) {
+      return [];
+    }
+
+    const key = `${normalizedDate}:${matchedRule.region}`;
+    bookedCounts.set(key, (bookedCounts.get(key) ?? 0) + 1);
+
+    return [
+      {
+        rowNumber: snapshot.headerRowIndex + 2 + index,
+        date: normalizedDate,
+        region: matchedRule.region,
+        row: mapRowToObject(snapshot.headers, row),
+      },
+    ];
+  });
+
+  const requestedDateIso = toIsoDate(requestedDate);
+  const bookedCount = bookedCounts.get(`${requestedDateIso}:${requestedRule.region}`) ?? 0;
+  const capacity = requestedRule.capacity;
+  const available = bookedCount < capacity;
+  const findNearestAvailableDate = (direction: -1 | 1) => {
+    let cursor = requestedDate;
+
+    for (let dayOffset = 1; dayOffset <= config.suggestionSearchDays; dayOffset += 1) {
+      cursor = addUtcDays(cursor, direction);
+      const candidateIso = toIsoDate(cursor);
+      const candidateCount = bookedCounts.get(`${candidateIso}:${requestedRule.region}`) ?? 0;
+
+      if (candidateCount < capacity) {
+        return candidateIso;
+      }
+    }
+
+    return null;
+  };
+  const nearestAvailableDates = available
+    ? null
+    : {
+        before: findNearestAvailableDate(-1),
+        after: findNearestAvailableDate(1),
+      };
+  const suggestedDates = nearestAvailableDates
+    ? [nearestAvailableDates.before, nearestAvailableDates.after].filter(
+        (value): value is string => Boolean(value),
+      )
+    : [];
+
+  return {
+    integration: "GOOGLE_SHEETS",
+    mode: "live",
+    status: available ? "available" : "unavailable",
+    action: args.action,
+    operation: config.operation,
+    spreadsheetId: config.spreadsheetId,
+    spreadsheetTitle: snapshot.metadata.data.properties?.title ?? config.spreadsheetTitle ?? null,
+    sheetName: config.sheetName,
+    date: requestedDateIso,
+    requestedDate: requestedDateIso,
+    region: requestedRule.region,
+    requestedRegion: requestedRule.region,
+    bookedCount,
+    booked_count: bookedCount,
+    capacity,
+    available,
+    reason: available
+      ? `${requestedRule.region} has ${bookedCount}/${capacity} booked slot(s) used.`
+      : `${requestedRule.region} is fully booked with ${bookedCount}/${capacity} booked slot(s).`,
+    bookedRows: bookedRows.filter(
+      (row) => row.date === requestedDateIso && row.region === requestedRule.region,
+    ),
+    nearestAvailableDates,
+    suggestedDates,
+    result: available
+      ? `${requestedDateIso} is AVAILABLE in ${requestedRule.region}`
+      : `${requestedDateIso} is UNAVAILABLE in ${requestedRule.region}`,
+    summary: available
+      ? `Wedding date check: ${requestedDateIso} is available for ${requestedRule.region} (${bookedCount}/${capacity} booked).`
+      : suggestedDates.length > 0
+        ? `Wedding date check: ${requestedDateIso} is unavailable for ${requestedRule.region} (${bookedCount}/${capacity} booked). Offer these nearby dates right away: ${suggestedDates.join(", ")}.`
+        : `Wedding date check: ${requestedDateIso} is unavailable for ${requestedRule.region} (${bookedCount}/${capacity} booked), and no nearby replacement dates were found automatically.`,
     params: args.params,
     request: args.request,
   };
@@ -1093,9 +1309,15 @@ async function runSheetsUpdate(args: SheetsExecutionArgs) {
 
 export async function executeGoogleSheetsStep(args: SheetsExecutionArgs) {
   const operation =
-    asObject(args.params)?.operation === "append_row" || asObject(args.params)?.operation === "update_rows"
-      ? (asObject(args.params)?.operation as "append_row" | "update_rows")
+    asObject(args.params)?.operation === "append_row" ||
+    asObject(args.params)?.operation === "update_rows" ||
+    asObject(args.params)?.operation === "capacity_availability"
+      ? (asObject(args.params)?.operation as "append_row" | "update_rows" | "capacity_availability")
       : "get_rows";
+
+  if (operation === "capacity_availability") {
+    return runSheetsCapacityAvailability(args);
+  }
 
   if (operation === "append_row") {
     return runSheetsAppend(args);
@@ -1107,3 +1329,8 @@ export async function executeGoogleSheetsStep(args: SheetsExecutionArgs) {
 
   return runSheetsLookup(args);
 }
+
+export const googleSheetsTestHelpers = {
+  inferRequestedCapacityRule,
+  matchesAlias,
+};

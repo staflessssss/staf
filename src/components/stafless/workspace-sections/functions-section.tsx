@@ -145,6 +145,7 @@ const calendarEmailSourceOptions = [
 
 const googleSheetsOperationOptions = [
   { value: "get_rows", label: "Lookup rows" },
+  { value: "capacity_availability", label: "Check capacity availability" },
   { value: "append_row", label: "Add row" },
   { value: "update_rows", label: "Update rows" },
 ] as const;
@@ -1396,6 +1397,174 @@ export function FunctionsSection({
                                           value={sheetParams?.sheetName ?? ""}
                                         />
                                       </FormField>
+                                      {sheetParams?.operation === "capacity_availability" ? (
+                                        <>
+                                          <FormField label="Date column">
+                                            <input
+                                              className={compactInputClassName}
+                                              onChange={(event) =>
+                                                applyVmChange(functionIndex, (currentVm) =>
+                                                  updatePrimaryDestinationStep(
+                                                    currentVm,
+                                                    (currentStep) => ({
+                                                      ...currentStep,
+                                                      params: JSON.stringify(
+                                                        {
+                                                          ...getGoogleSheetsParams(currentStep),
+                                                          dateColumn: event.target.value,
+                                                        },
+                                                        null,
+                                                        2,
+                                                      ),
+                                                    }),
+                                                    primaryStepStrategy,
+                                                  ),
+                                                )
+                                              }
+                                              readOnly={isReadOnlyMode}
+                                              value={sheetParams.dateColumn}
+                                            />
+                                          </FormField>
+                                          <FormField label="Status column">
+                                            <input
+                                              className={compactInputClassName}
+                                              onChange={(event) =>
+                                                applyVmChange(functionIndex, (currentVm) =>
+                                                  updatePrimaryDestinationStep(
+                                                    currentVm,
+                                                    (currentStep) => ({
+                                                      ...currentStep,
+                                                      params: JSON.stringify(
+                                                        {
+                                                          ...getGoogleSheetsParams(currentStep),
+                                                          statusColumn: event.target.value,
+                                                        },
+                                                        null,
+                                                        2,
+                                                      ),
+                                                    }),
+                                                    primaryStepStrategy,
+                                                  ),
+                                                )
+                                              }
+                                              readOnly={isReadOnlyMode}
+                                              value={sheetParams.statusColumn}
+                                            />
+                                          </FormField>
+                                          <FormField label="Region column">
+                                            <input
+                                              className={compactInputClassName}
+                                              onChange={(event) =>
+                                                applyVmChange(functionIndex, (currentVm) =>
+                                                  updatePrimaryDestinationStep(
+                                                    currentVm,
+                                                    (currentStep) => ({
+                                                      ...currentStep,
+                                                      params: JSON.stringify(
+                                                        {
+                                                          ...getGoogleSheetsParams(currentStep),
+                                                          regionColumn: event.target.value,
+                                                        },
+                                                        null,
+                                                        2,
+                                                      ),
+                                                    }),
+                                                    primaryStepStrategy,
+                                                  ),
+                                                )
+                                              }
+                                              readOnly={isReadOnlyMode}
+                                              value={sheetParams.regionColumn}
+                                            />
+                                          </FormField>
+                                          <FormField label="Booked status">
+                                            <input
+                                              className={compactInputClassName}
+                                              onChange={(event) =>
+                                                applyVmChange(functionIndex, (currentVm) =>
+                                                  updatePrimaryDestinationStep(
+                                                    currentVm,
+                                                    (currentStep) => ({
+                                                      ...currentStep,
+                                                      params: JSON.stringify(
+                                                        {
+                                                          ...getGoogleSheetsParams(currentStep),
+                                                          bookedStatusValue: event.target.value,
+                                                        },
+                                                        null,
+                                                        2,
+                                                      ),
+                                                    }),
+                                                    primaryStepStrategy,
+                                                  ),
+                                                )
+                                              }
+                                              readOnly={isReadOnlyMode}
+                                              value={sheetParams.bookedStatusValue}
+                                            />
+                                          </FormField>
+                                          <div className="grid gap-3 md:col-span-2 md:grid-cols-2">
+                                            {sheetParams.capacityRules.map((rule, ruleIndex) => (
+                                              <div
+                                                className="rounded-[10px] border border-[#e5e7eb] bg-[#fbfcff] px-3 py-3"
+                                                key={`${rule.region}:${ruleIndex}`}
+                                              >
+                                                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#667085]">
+                                                  {rule.region}
+                                                </p>
+                                                <FormField label="Capacity">
+                                                  <input
+                                                    className={compactInputClassName}
+                                                    min={1}
+                                                    onChange={(event) =>
+                                                      applyVmChange(functionIndex, (currentVm) =>
+                                                        updatePrimaryDestinationStep(
+                                                          currentVm,
+                                                          (currentStep) => {
+                                                            const currentParams =
+                                                              getGoogleSheetsParams(currentStep);
+                                                            const nextRules =
+                                                              currentParams.capacityRules.map(
+                                                                (currentRule, currentIndex) =>
+                                                                  currentIndex === ruleIndex
+                                                                    ? {
+                                                                        ...currentRule,
+                                                                        capacity: Math.max(
+                                                                          Number(
+                                                                            event.target.value || 1,
+                                                                          ),
+                                                                          1,
+                                                                        ),
+                                                                      }
+                                                                    : currentRule,
+                                                              );
+
+                                                            return {
+                                                              ...currentStep,
+                                                              params: JSON.stringify(
+                                                                {
+                                                                  ...currentParams,
+                                                                  capacityRules: nextRules,
+                                                                },
+                                                                null,
+                                                                2,
+                                                              ),
+                                                            };
+                                                          },
+                                                          primaryStepStrategy,
+                                                        ),
+                                                      )
+                                                    }
+                                                    readOnly={isReadOnlyMode}
+                                                    type="number"
+                                                    value={rule.capacity}
+                                                  />
+                                                </FormField>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </>
+                                      ) : null}
                                     </div>
                                   ) : null}
 
@@ -1711,14 +1880,18 @@ export function FunctionsSection({
                                   ? "Sheet write flow"
                                   : sheetParams.operation === "update_rows"
                                     ? "Sheet update flow"
-                                    : "Sheet lookup flow"}
+                                    : sheetParams.operation === "capacity_availability"
+                                      ? "Capacity availability flow"
+                                      : "Sheet lookup flow"}
                               </h4>
                               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
                                 {sheetParams.operation === "append_row"
                                   ? "Pick the spreadsheet file, bind the sheet tab, then map function fields into the row this action should append."
                                   : sheetParams.operation === "update_rows"
                                     ? "Pick the spreadsheet file, define which rows should be found, then map the field values this action should overwrite."
-                                    : "Pick the spreadsheet file, bind the sheet tab, then define the row conditions this function should use when searching for a match."}
+                                    : sheetParams.operation === "capacity_availability"
+                                      ? "Pick the bookings sheet, bind the date/status/region columns, then define how many booked rows each region can accept."
+                                      : "Pick the spreadsheet file, bind the sheet tab, then define the row conditions this function should use when searching for a match."}
                               </p>
                             </div>
 
@@ -1859,7 +2032,8 @@ export function FunctionsSection({
                                 </FormField>
                               </div>
 
-                              {sheetParams.operation !== "append_row" ? (
+                              {sheetParams.operation === "get_rows" ||
+                              sheetParams.operation === "update_rows" ? (
                                 <div className="space-y-4 rounded-[18px] border border-[#eadccc] bg-[#fffaf2] p-4">
                                 <div className="flex items-start gap-4">
                                   <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#201627] text-sm font-semibold text-[#f7efe4]">
@@ -2036,7 +2210,156 @@ export function FunctionsSection({
                                 </div>
                               ) : null}
 
-                              {sheetParams.operation !== "get_rows" ? (
+                              {sheetParams.operation === "capacity_availability" ? (
+                                <div className="space-y-4 rounded-[18px] border border-[#eadccc] bg-[#fffaf2] p-4">
+                                  <div className="flex items-start gap-4">
+                                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#201627] text-sm font-semibold text-[#f7efe4]">
+                                      2
+                                    </div>
+                                    <div className="space-y-1">
+                                      <p className="text-sm font-semibold text-foreground">
+                                        Bind availability columns
+                                      </p>
+                                      <p className="text-sm leading-6 text-muted-foreground">
+                                        The function counts booked rows for the requested wedding date
+                                        and region, then compares the count with the configured capacity.
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                    <FormField label="Date column">
+                                      <input
+                                        className={inputClassName}
+                                        onChange={(event) =>
+                                          onUpdateFunctionStepParams(functionIndex, stepIndex, {
+                                            dateColumn: event.target.value,
+                                          })
+                                        }
+                                        readOnly={isReadOnlyMode}
+                                        value={sheetParams.dateColumn}
+                                      />
+                                    </FormField>
+                                    <FormField label="Status column">
+                                      <input
+                                        className={inputClassName}
+                                        onChange={(event) =>
+                                          onUpdateFunctionStepParams(functionIndex, stepIndex, {
+                                            statusColumn: event.target.value,
+                                          })
+                                        }
+                                        readOnly={isReadOnlyMode}
+                                        value={sheetParams.statusColumn}
+                                      />
+                                    </FormField>
+                                    <FormField label="Region column">
+                                      <input
+                                        className={inputClassName}
+                                        onChange={(event) =>
+                                          onUpdateFunctionStepParams(functionIndex, stepIndex, {
+                                            regionColumn: event.target.value,
+                                          })
+                                        }
+                                        readOnly={isReadOnlyMode}
+                                        value={sheetParams.regionColumn}
+                                      />
+                                    </FormField>
+                                    <FormField label="Booked status">
+                                      <input
+                                        className={inputClassName}
+                                        onChange={(event) =>
+                                          onUpdateFunctionStepParams(functionIndex, stepIndex, {
+                                            bookedStatusValue: event.target.value,
+                                          })
+                                        }
+                                        readOnly={isReadOnlyMode}
+                                        value={sheetParams.bookedStatusValue}
+                                      />
+                                    </FormField>
+                                  </div>
+
+                                  <div className="grid gap-4 md:grid-cols-2">
+                                    {sheetParams.capacityRules.map((rule, ruleIndex) => (
+                                      <div
+                                        className="space-y-3 rounded-[18px] bg-white p-4 ring-1 ring-[#eadccc]"
+                                        key={`${step.uiId}:capacity:${ruleIndex}`}
+                                      >
+                                        <FormField label="Region label">
+                                          <input
+                                            className={inputClassName}
+                                            onChange={(event) => {
+                                              const nextRules = sheetParams.capacityRules.map(
+                                                (currentRule, currentIndex) =>
+                                                  currentIndex === ruleIndex
+                                                    ? { ...currentRule, region: event.target.value }
+                                                    : currentRule,
+                                              );
+                                              onUpdateFunctionStepParams(functionIndex, stepIndex, {
+                                                capacityRules: nextRules,
+                                              });
+                                            }}
+                                            readOnly={isReadOnlyMode}
+                                            value={rule.region}
+                                          />
+                                        </FormField>
+                                        <FormField label="Aliases">
+                                          <input
+                                            className={inputClassName}
+                                            onChange={(event) => {
+                                              const nextRules = sheetParams.capacityRules.map(
+                                                (currentRule, currentIndex) =>
+                                                  currentIndex === ruleIndex
+                                                    ? {
+                                                        ...currentRule,
+                                                        aliases: event.target.value
+                                                          .split(",")
+                                                          .map((alias) => alias.trim())
+                                                          .filter(Boolean),
+                                                      }
+                                                    : currentRule,
+                                              );
+                                              onUpdateFunctionStepParams(functionIndex, stepIndex, {
+                                                capacityRules: nextRules,
+                                              });
+                                            }}
+                                            readOnly={isReadOnlyMode}
+                                            value={rule.aliases.join(", ")}
+                                          />
+                                        </FormField>
+                                        <FormField label="Capacity">
+                                          <input
+                                            className={inputClassName}
+                                            min={1}
+                                            onChange={(event) => {
+                                              const nextRules = sheetParams.capacityRules.map(
+                                                (currentRule, currentIndex) =>
+                                                  currentIndex === ruleIndex
+                                                    ? {
+                                                        ...currentRule,
+                                                        capacity: Math.max(
+                                                          Number(event.target.value || 1),
+                                                          1,
+                                                        ),
+                                                      }
+                                                    : currentRule,
+                                              );
+                                              onUpdateFunctionStepParams(functionIndex, stepIndex, {
+                                                capacityRules: nextRules,
+                                              });
+                                            }}
+                                            readOnly={isReadOnlyMode}
+                                            type="number"
+                                            value={rule.capacity}
+                                          />
+                                        </FormField>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {sheetParams.operation === "append_row" ||
+                              sheetParams.operation === "update_rows" ? (
                                 <div className="space-y-4 rounded-[18px] border border-[#eadccc] bg-[#fffaf2] p-4">
                                   <div className="flex items-start gap-4">
                                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#201627] text-sm font-semibold text-[#f7efe4]">

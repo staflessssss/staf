@@ -1,6 +1,10 @@
 import { isValidTimezone } from "@/lib/timezones";
 
-export type GoogleSheetsOperationDraft = "get_rows" | "append_row" | "update_rows";
+export type GoogleSheetsOperationDraft =
+  | "get_rows"
+  | "append_row"
+  | "update_rows"
+  | "capacity_availability";
 
 export type GoogleSheetsValueSourceDraft =
   | "literal"
@@ -26,6 +30,12 @@ export type GoogleSheetsColumnMappingDraft = {
   value: string;
 };
 
+export type GoogleSheetsCapacityRuleDraft = {
+  region: string;
+  aliases: string[];
+  capacity: number;
+};
+
 export type GoogleCalendarOperationDraft = "check_calendar" | "book_call";
 
 export type GoogleSheetsParams = {
@@ -37,6 +47,12 @@ export type GoogleSheetsParams = {
   headerRow: number;
   filters: GoogleSheetsFilterDraft[];
   columnMappings: GoogleSheetsColumnMappingDraft[];
+  dateColumn: string;
+  statusColumn: string;
+  regionColumn: string;
+  bookedStatusValue: string;
+  capacityRules: GoogleSheetsCapacityRuleDraft[];
+  suggestionSearchDays: number;
 };
 
 export type GoogleCalendarParams = {
@@ -144,6 +160,23 @@ export function getDefaultGoogleSheetsParams(): GoogleSheetsParams {
         value: "",
       },
     ],
+    dateColumn: "date",
+    statusColumn: "status",
+    regionColumn: "region",
+    bookedStatusValue: "Booked",
+    capacityRules: [
+      {
+        region: "FL",
+        aliases: ["FL", "Florida"],
+        capacity: 1,
+      },
+      {
+        region: "NC/SC/GA",
+        aliases: ["NC/SC/GA", "NC, SC", "North Carolina", "South Carolina", "Georgia", "Charlotte"],
+        capacity: 2,
+      },
+    ],
+    suggestionSearchDays: 45,
   };
 }
 
@@ -209,10 +242,42 @@ export function getGoogleSheetsParams(step: Pick<StepLike, "params">): GoogleShe
         })
         .filter((mapping): mapping is GoogleSheetsColumnMappingDraft => Boolean(mapping))
     : [];
+  const capacityRules = Array.isArray(params.capacityRules)
+    ? params.capacityRules
+        .map((rule) => {
+          const record = asRecord(rule);
+
+          if (!record) {
+            return null;
+          }
+
+          const region = typeof record.region === "string" ? record.region.trim() : "";
+          const aliases = Array.isArray(record.aliases)
+            ? record.aliases.filter(
+                (alias): alias is string => typeof alias === "string" && alias.trim().length > 0,
+              )
+            : [];
+          const capacity =
+            typeof record.capacity === "number" && record.capacity > 0
+              ? Math.floor(record.capacity)
+              : 0;
+
+          return region && capacity > 0
+            ? {
+                region,
+                aliases: aliases.length > 0 ? aliases : [region],
+                capacity,
+              }
+            : null;
+        })
+        .filter((rule): rule is GoogleSheetsCapacityRuleDraft => Boolean(rule))
+    : [];
 
   return {
     operation:
-      params.operation === "append_row" || params.operation === "update_rows"
+      params.operation === "append_row" ||
+      params.operation === "update_rows" ||
+      params.operation === "capacity_availability"
         ? params.operation
         : defaults.operation,
     spreadsheetId:
@@ -232,6 +297,20 @@ export function getGoogleSheetsParams(step: Pick<StepLike, "params">): GoogleShe
         : defaults.headerRow,
     filters: filters.length > 0 ? filters : defaults.filters,
     columnMappings: columnMappings.length > 0 ? columnMappings : defaults.columnMappings,
+    dateColumn: typeof params.dateColumn === "string" ? params.dateColumn : defaults.dateColumn,
+    statusColumn:
+      typeof params.statusColumn === "string" ? params.statusColumn : defaults.statusColumn,
+    regionColumn:
+      typeof params.regionColumn === "string" ? params.regionColumn : defaults.regionColumn,
+    bookedStatusValue:
+      typeof params.bookedStatusValue === "string"
+        ? params.bookedStatusValue
+        : defaults.bookedStatusValue,
+    capacityRules: Array.isArray(params.capacityRules) ? capacityRules : defaults.capacityRules,
+    suggestionSearchDays:
+      typeof params.suggestionSearchDays === "number" && params.suggestionSearchDays > 0
+        ? Math.floor(params.suggestionSearchDays)
+        : defaults.suggestionSearchDays,
   };
 }
 
@@ -245,6 +324,44 @@ export function getGoogleSheetsValidationErrors(step: Pick<StepLike, "params">) 
 
   if (!params.sheetName.trim()) {
     errors.push("Google Sheets needs a selected sheet tab.");
+  }
+
+  if (params.operation === "capacity_availability") {
+    if (!params.dateColumn.trim()) {
+      errors.push("Google Sheets capacity availability needs a date column.");
+    }
+
+    if (!params.statusColumn.trim()) {
+      errors.push("Google Sheets capacity availability needs a status column.");
+    }
+
+    if (!params.regionColumn.trim()) {
+      errors.push("Google Sheets capacity availability needs a region column.");
+    }
+
+    if (!params.bookedStatusValue.trim()) {
+      errors.push("Google Sheets capacity availability needs a booked status value.");
+    }
+
+    if (params.capacityRules.length === 0) {
+      errors.push("Google Sheets capacity availability needs at least one capacity rule.");
+    }
+
+    params.capacityRules.forEach((rule, index) => {
+      if (!rule.region.trim()) {
+        errors.push(`Google Sheets capacity rule ${index + 1} needs a region label.`);
+      }
+
+      if (rule.aliases.length === 0) {
+        errors.push(`Google Sheets capacity rule ${index + 1} needs at least one alias.`);
+      }
+
+      if (rule.capacity < 1) {
+        errors.push(`Google Sheets capacity rule ${index + 1} needs a capacity of at least 1.`);
+      }
+    });
+
+    return errors;
   }
 
   if (params.operation === "get_rows" || params.operation === "update_rows") {
@@ -288,6 +405,8 @@ export function getGoogleSheetsActionForOperation(operation: GoogleSheetsOperati
       return "append row to sheet";
     case "update_rows":
       return "update matching rows in sheet";
+    case "capacity_availability":
+      return "check capacity availability in sheet";
     default:
       return "lookup rows in sheet";
   }
