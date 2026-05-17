@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test src/**/*.test.ts",
+    "eval:wedding-sales": "node --env-file=.env --import tsx scripts/eval-wedding-sales.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "db:seed": "node --env-file=.env --import tsx prisma/seed.ts"
