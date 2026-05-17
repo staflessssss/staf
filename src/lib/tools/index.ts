@@ -3,6 +3,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 
 import { type RuntimeToolFeature } from "@/lib/agent-config";
+import { traceLangRuntime, type LangRuntimeTraceMetadata } from "@/lib/lang/langsmith";
 import { executeGoogleCalendarStep } from "@/lib/tools/google-calendar";
 import { executeGoogleDriveStep } from "@/lib/tools/google-drive";
 import { executeGoogleSheetsStep } from "@/lib/tools/google-sheets";
@@ -20,6 +21,7 @@ type ResolveToolsArgs = {
   testMode?: boolean;
   defaultEmail?: string;
   currentMessage?: string;
+  traceMetadata?: LangRuntimeTraceMetadata;
   onToolResult?: (entry: ToolExecutionLog) => void;
 };
 
@@ -198,6 +200,7 @@ export function resolveTools({
   testMode,
   defaultEmail,
   currentMessage,
+  traceMetadata,
   onToolResult,
 }: ResolveToolsArgs) {
   return toolFeatures
@@ -303,24 +306,35 @@ export function resolveTools({
           }
 
           for (const step of feature.steps) {
-            const result = await executeIntegrationStep({
-              tenantId,
-              integrationType: step.integration.type,
-              action: step.action,
-              params: step.params,
-              request,
-              metadata: step.integration.metadata,
-              credentialsEnc: step.integration.credentialsEnc,
-              date,
-              timeText,
-              coupleName,
-              weddingDate,
-              location,
-              email,
-              channel,
-              defaultEmail,
-              testMode,
-            });
+            const result = await traceLangRuntime(
+              "legacy.tool.execute",
+              {
+                ...traceMetadata,
+                toolName: feature.name,
+                integrationId: step.integrationId,
+                integrationType: step.integration.type,
+                action: step.action,
+              },
+              () =>
+                executeIntegrationStep({
+                  tenantId,
+                  integrationType: step.integration.type,
+                  action: step.action,
+                  params: step.params,
+                  request,
+                  metadata: step.integration.metadata,
+                  credentialsEnc: step.integration.credentialsEnc,
+                  date,
+                  timeText,
+                  coupleName,
+                  weddingDate,
+                  location,
+                  email,
+                  channel,
+                  defaultEmail,
+                  testMode,
+                }),
+            );
 
             steps.push({
               integrationId: step.integrationId,

@@ -29,6 +29,7 @@ import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { traceLangRuntime } from "@/lib/lang/langsmith";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
 import { resolveTools } from "@/lib/tools";
 import { readMessageBehaviorConfig } from "@/lib/channels/message-behavior";
@@ -1082,11 +1083,20 @@ async function runModelInvocation(args: {
     toolResult: unknown;
     durationMs?: number;
   }> = [];
+  const traceMetadata = {
+    tenantId: args.agent.tenantId,
+    agentId: args.agent.id,
+    contactId: args.input.contactId,
+    channel: String(args.input.channel),
+    testMode: Boolean(args.input.testMode),
+    runtimeType: "legacy" as const,
+  };
   const tools = resolveTools({
     tenantId: args.agent.tenantId,
     toolFeatures: args.toolFeatures,
     testMode: Boolean(args.input.testMode),
     currentMessage: args.input.message,
+    traceMetadata,
     defaultEmail:
       args.input.contactEmail ??
       (String(args.input.channel).toUpperCase() === "GMAIL" && args.input.contactId.includes("@")
@@ -1124,9 +1134,10 @@ async function runModelInvocation(args: {
     input: args.input,
   });
 
-  const result = await generateText({
-    model: openai(modelId),
-    system: `${args.promptPreview}
+  const result = await traceLangRuntime("legacy.model.invoke", traceMetadata, () =>
+    generateText({
+      model: openai(modelId),
+      system: `${args.promptPreview}
 
 Runtime application note:
 - Respect the runtime execution policy already defined in the composed system prompt.
@@ -1144,7 +1155,8 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
           stopWhen: stepCountIs(5),
         }
       : {}),
-  });
+    }),
+  );
 
   return {
     text: result.text,
