@@ -117,6 +117,16 @@ type RuntimeChannelAdapter = {
   }) => Promise<unknown>;
 };
 
+type GmailClientClassification =
+  | {
+      kind: "client";
+      reason: string;
+    }
+  | {
+      kind: "other";
+      reason: string;
+    };
+
 type HandleIncomingEventDeps = {
   db: typeof db;
   getChannelAdapter: typeof getChannelAdapter;
@@ -552,6 +562,83 @@ function renderHistory(messages: RuntimeHistoryMessage[]) {
       return `${message.role.toLowerCase()}: ${message.content}`;
     })
       .join("\n");
+}
+
+function isGmailClientClassifierEnabled(channelConfig: unknown) {
+  const rawChannelConfig = getChannelConfigObject(channelConfig as never);
+  const classifier =
+    rawChannelConfig.gmailClientClassifier &&
+    typeof rawChannelConfig.gmailClientClassifier === "object" &&
+    !Array.isArray(rawChannelConfig.gmailClientClassifier)
+      ? (rawChannelConfig.gmailClientClassifier as Record<string, unknown>)
+      : null;
+
+  return classifier?.enabled === true;
+}
+
+function classifyGmailClientMessage(args: {
+  from?: string;
+  subject?: string;
+  message: string;
+}): GmailClientClassification {
+  const subject = (args.subject ?? "").trim();
+  const message = args.message.trim();
+  const from = (args.from ?? "").trim().toLowerCase();
+  const normalizedSubject = subject.toLowerCase();
+  const normalizedMessage = message.toLowerCase().replace(/\s+/g, " ");
+  const combined = `${normalizedSubject}\n${normalizedMessage}`;
+
+  if (/^\s*re\s*:/i.test(subject)) {
+    return {
+      kind: "client",
+      reason: "reply_thread",
+    };
+  }
+
+  const wordCount = normalizedMessage.split(/\s+/).filter(Boolean).length;
+  const shortClientReply =
+    wordCount > 0 &&
+    wordCount <= 6 &&
+    /^(yes|no|ok|okay|sure|great|perfect|thanks|thank you|tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|[a-z .'-]+|\d{1,2}([:.\-]\d{2})?\s*(am|pm)?)$/i.test(
+      message,
+    );
+
+  if (shortClientReply) {
+    return {
+      kind: "client",
+      reason: "short_reply",
+    };
+  }
+
+  const hardOtherPatterns = [
+    /\bcoordinator\b/,
+    /\bplanner\b/,
+    /\btimeline\b/,
+    /\bcoi\b/,
+    /\bcertificate of insurance\b/,
+    /\bvendor arrivals?\b/,
+    /\bvendor list\b/,
+    /\bnewsletter\b/,
+    /\bunsubscribe\b/,
+    /\bno[-\s]?reply\b/,
+    /\bautomated\b/,
+    /\bnotification\b/,
+    /\bdelivery status notification\b/,
+    /\bmail delivery subsystem\b/,
+    /\bdaemon\b/,
+  ];
+
+  if (hardOtherPatterns.some((pattern) => pattern.test(combined)) || from.includes("no-reply")) {
+    return {
+      kind: "other",
+      reason: "non_client_signal",
+    };
+  }
+
+  return {
+    kind: "client",
+    reason: "default_when_uncertain",
+  };
 }
 
 function buildSchedulingNudge(args: {
@@ -1211,6 +1298,7 @@ export const aiRuntimeTestHelpers = {
   isWithinAgentSchedule,
   buildRuntimeContextLines,
   getAntiSpamIntercept,
+  classifyGmailClientMessage,
 };
 
 async function handleIncomingEventWithDeps(
@@ -1296,6 +1384,27 @@ async function handleIncomingEventWithDeps(
         agentId: agent.id,
         status: "ignored_duplicate_inbound_message",
         duplicateMessageId: normalizedMessageId ?? normalizedGmailMessageId,
+      };
+    }
+  }
+
+  if (
+    args.channel === ChannelType.GMAIL &&
+    !incoming.isBusinessManualReply &&
+    isGmailClientClassifierEnabled(agent.channelConfig)
+  ) {
+    const classification = classifyGmailClientMessage({
+      from: incoming.contactEmail ?? incoming.contactId,
+      subject: incoming.subject,
+      message: incoming.message,
+    });
+
+    if (classification.kind === "other") {
+      return {
+        ok: true,
+        agentId: agent.id,
+        status: "ignored_gmail_non_client_message",
+        classificationReason: classification.reason,
       };
     }
   }

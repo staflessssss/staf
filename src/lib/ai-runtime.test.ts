@@ -6,6 +6,91 @@ import { aiRuntimeTestHelpers, invokeAgent } from "@/lib/ai-runtime";
 import { getDefaultControlConfig } from "@/lib/agent-config";
 import { splitOutgoingMessage } from "@/lib/channels/message-behavior";
 
+test("gmail classifier mirrors n8n client/other routing rules", () => {
+  assert.deepEqual(
+    aiRuntimeTestHelpers.classifyGmailClientMessage({
+      subject: "Re: Wedding video",
+      message: "Can we do tomorrow at 10?",
+    }),
+    {
+      kind: "client",
+      reason: "reply_thread",
+    },
+  );
+  assert.deepEqual(
+    aiRuntimeTestHelpers.classifyGmailClientMessage({
+      subject: "Timeline",
+      message: "Please send the vendor list and COI.",
+    }),
+    {
+      kind: "other",
+      reason: "non_client_signal",
+    },
+  );
+  assert.equal(
+    aiRuntimeTestHelpers.classifyGmailClientMessage({
+      subject: "Availability",
+      message: "June 14 2027",
+    }).kind,
+    "client",
+  );
+});
+
+test("handleIncomingEventWithDeps ignores Gmail non-client messages when classifier is enabled", async () => {
+  const fakeDb = {
+    agent: {
+      findFirst: async () => ({
+        id: "agent-1",
+        tenantId: "tenant-1",
+        channelConfig: {
+          gmailClientClassifier: {
+            enabled: true,
+          },
+        },
+        channel: {
+          type: "GMAIL",
+          credentialsEnc: "encrypted",
+        },
+      }),
+    },
+  } as never;
+  let invokeCalled = false;
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "GMAIL" as never,
+      payload: {},
+    },
+    {
+      db: fakeDb,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => {
+        invokeCalled = true;
+        throw new Error("invokeAgent should not run");
+      },
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "planner@example.com",
+            contactEmail: "planner@example.com",
+            message: "Can you send the wedding timeline and vendor list?",
+            subject: "Timeline",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            throw new Error("sendReply should not run");
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal("status" in result ? result.status : null, "ignored_gmail_non_client_message");
+  assert.equal(invokeCalled, false);
+});
+
 test("invokeAgent sandbox mentions runtime tooling from functionBlocks", async () => {
   const result = await invokeAgent({
     tenantId: "tenant-1",
