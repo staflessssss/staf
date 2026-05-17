@@ -1,5 +1,7 @@
 import { END, START, StateGraph } from "@langchain/langgraph";
 
+import { buildLangGraphThreadId, getLangGraphPostgresSaver } from "@/lib/lang/checkpointing";
+
 import { defaultWeddingSalesConfig, type WeddingSalesConfig } from "./config";
 import { analyzeWeddingSalesMessage } from "./nodes/analyze";
 import { createWeddingSalesReplyNodes } from "./nodes/reply";
@@ -21,8 +23,12 @@ type WeddingSalesRoute =
 export type InvokeWeddingSalesGraphInput = {
   channel: WeddingSalesChannel;
   message: string;
+  tenantId?: string;
+  agentId?: string;
+  contactId?: string;
   previousState?: Partial<WeddingSalesState>;
   config?: Partial<WeddingSalesConfig>;
+  checkpoint?: boolean;
 };
 
 export function routeWeddingSalesState(state: WeddingSalesState): WeddingSalesRoute {
@@ -74,11 +80,15 @@ function mergeWeddingSalesConfig(config?: Partial<WeddingSalesConfig>): WeddingS
   };
 }
 
-export function buildWeddingSalesGraph(config?: Partial<WeddingSalesConfig>) {
+export function buildWeddingSalesGraph(args: {
+  config?: Partial<WeddingSalesConfig>;
+  checkpointer?: Awaited<ReturnType<typeof getLangGraphPostgresSaver>>;
+} = {}) {
+  const { config, checkpointer } = args;
   const resolvedConfig = mergeWeddingSalesConfig(config);
   const replyNodes = createWeddingSalesReplyNodes(resolvedConfig);
 
-  return new StateGraph(WeddingSalesStateAnnotation)
+  const workflow = new StateGraph(WeddingSalesStateAnnotation)
     .addNode("analyze", analyzeWeddingSalesMessage)
     .addNode("ask_missing_info", replyNodes.askMissingInfo)
     .addNode("ask_wedding_year", replyNodes.askWeddingYear)
@@ -100,17 +110,33 @@ export function buildWeddingSalesGraph(config?: Partial<WeddingSalesConfig>) {
     .addEdge("check_availability", END)
     .addEdge("check_calendar", END)
     .addEdge("book_call", END)
-    .addEdge("ignored", END)
-    .compile();
+    .addEdge("ignored", END);
+
+  return workflow.compile(checkpointer ? { checkpointer } : undefined);
 }
 
 export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInput) {
-  const graph = buildWeddingSalesGraph(input.config);
+  const checkpointer = input.checkpoint ? await getLangGraphPostgresSaver() : null;
+  const graph = buildWeddingSalesGraph({
+    config: input.config,
+    checkpointer,
+  });
   const initialState = createInitialWeddingSalesState({
     channel: input.channel,
     message: input.message,
     previousState: input.previousState,
   });
 
-  return graph.invoke(initialState);
+  const configurable =
+    input.checkpoint && input.tenantId && input.agentId && input.contactId
+      ? {
+          thread_id: buildLangGraphThreadId({
+            tenantId: input.tenantId,
+            agentId: input.agentId,
+            contactId: input.contactId,
+          }),
+        }
+      : undefined;
+
+  return graph.invoke(initialState, configurable ? { configurable } : undefined);
 }
