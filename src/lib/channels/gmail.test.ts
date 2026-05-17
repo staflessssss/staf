@@ -55,6 +55,33 @@ ${signature}`,
   );
 });
 
+test("gmail helper does not append duplicate signature when existing signature uses markdown spacing", () => {
+  const signature = `Taras Mynd
+Founder & Creative Director / MYNDFUL FILMS LLC
+www.myndfulfilms.co
+contact@myndfulfilms.com`;
+  const existing = `Thanks so much 🤍
+
+Taras Mynd  
+Founder & Creative Director / MYNDFUL FILMS LLC  
+www.myndfulfilms.co  
+contact@myndfulfilms.com`;
+  const withSignature = gmailAdapterTestHelpers.appendSignature(existing, {
+    signatureText: signature,
+  });
+
+  assert.equal((withSignature.match(/Taras Mynd/g) ?? []).length, 1);
+});
+
+test("gmail helper strips localized Gmail quoted reply headers", () => {
+  const cleaned = gmailAdapterTestHelpers.stripQuotedReply(`Sure, we are Anna and Mark. Our wedding is June 14 in Charlotte.
+
+вс, 17 мая 2026 г. в 16:54, Fhdh Fhdh <fhdhf2211@gmail.com>:
+> prior reply`);
+
+  assert.equal(cleaned, "Sure, we are Anna and Mark. Our wedding is June 14 in Charlotte.");
+});
+
 test("gmail helper recognizes pricing replies beyond one exact phrase", () => {
   assert.equal(
     gmailAdapterTestHelpers.isPricingReply("Our pricing starts at $2,750 and I can send more details."),

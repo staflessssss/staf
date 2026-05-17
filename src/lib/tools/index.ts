@@ -19,6 +19,7 @@ type ResolveToolsArgs = {
   toolFeatures: RuntimeToolFeature[];
   testMode?: boolean;
   defaultEmail?: string;
+  currentMessage?: string;
   onToolResult?: (entry: ToolExecutionLog) => void;
 };
 
@@ -132,11 +133,71 @@ function extractCanonicalToolFields(steps: Array<{
   };
 }
 
+function stripLikelyQuotedHeader(text: string) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => !/<[^>\s]+@[^>]+>:\s*$/.test(line.trim()))
+    .join("\n")
+    .trim();
+}
+
+const monthNamePattern =
+  "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+
+function hasExplicitYear(text: string) {
+  return /\b(?:19|20)\d{2}\b/.test(text);
+}
+
+function hasMonthDayWithoutYear(text: string) {
+  const normalized = stripLikelyQuotedHeader(text).toLowerCase();
+  const monthDay = new RegExp(`\\b${monthNamePattern}\\s+\\d{1,2}(?:st|nd|rd|th)?\\b`, "i");
+  const dayMonth = new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${monthNamePattern}\\b`, "i");
+  const numericMonthDay = /\b\d{1,2}[/-]\d{1,2}\b/.test(normalized);
+
+  return !hasExplicitYear(normalized) && (monthDay.test(normalized) || dayMonth.test(normalized) || numericMonthDay);
+}
+
+function isWeddingAvailabilityFeature(feature: RuntimeToolFeature) {
+  const featureName = feature.name.toLowerCase();
+
+  return (
+    featureName.includes("wedding availability") ||
+    feature.steps.some((step) => step.action.toLowerCase().includes("capacity availability"))
+  );
+}
+
+function buildMissingWeddingYearToolResult(args: {
+  featureName: string;
+  request: string;
+  date?: string;
+  weddingDate?: string;
+  location?: string;
+  email?: string;
+  channel?: string;
+}) {
+  return {
+    feature: args.featureName,
+    request: args.request,
+    status: "needs_year",
+    ...(args.date ? { date: args.date } : {}),
+    ...(args.weddingDate ? { weddingDate: args.weddingDate } : {}),
+    ...(args.location ? { location: args.location } : {}),
+    ...(args.email ? { email: args.email } : {}),
+    ...(args.channel ? { channel: args.channel } : {}),
+    steps: [],
+    summary:
+      "The customer gave a wedding month/day without a year. Ask for the wedding year before checking availability.",
+  };
+}
+
 export function resolveTools({
   tenantId,
   toolFeatures,
   testMode,
   defaultEmail,
+  currentMessage,
   onToolResult,
 }: ResolveToolsArgs) {
   return toolFeatures
@@ -208,6 +269,38 @@ export function resolveTools({
         }) => {
           const startedAt = Date.now();
           const steps = [];
+
+          if (
+            isWeddingAvailabilityFeature(feature) &&
+            currentMessage &&
+            hasMonthDayWithoutYear(currentMessage)
+          ) {
+            const output = buildMissingWeddingYearToolResult({
+              featureName: feature.name,
+              request,
+              date,
+              weddingDate,
+              location,
+              email,
+              channel,
+            });
+
+            onToolResult?.({
+              toolName: feature.name,
+              toolInput: {
+                request,
+                ...(date ? { date } : {}),
+                ...(weddingDate ? { weddingDate } : {}),
+                ...(location ? { location } : {}),
+                ...(email ? { email } : {}),
+                ...(channel ? { channel } : {}),
+              },
+              toolResult: toJsonValue(output),
+              durationMs: Date.now() - startedAt,
+            });
+
+            return toJsonValue(output);
+          }
 
           for (const step of feature.steps) {
             const result = await executeIntegrationStep({
@@ -291,4 +384,6 @@ export function resolveTools({
 
 export const toolResolutionTestHelpers = {
   extractCanonicalToolFields,
+  hasMonthDayWithoutYear,
+  isWeddingAvailabilityFeature,
 };

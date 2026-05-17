@@ -717,6 +717,34 @@ function buildSchedulingNudge(args: {
   return "";
 }
 
+function messageHasWeddingMonthDayWithoutYear(message: string) {
+  const withoutQuotedHeader = message
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => !/<[^>\s]+@[^>]+>:\s*$/.test(line.trim()))
+    .join("\n")
+    .toLowerCase();
+  const hasYear = /\b(?:19|20)\d{2}\b/.test(withoutQuotedHeader);
+  const monthName =
+    "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+  const monthDay = new RegExp(`\\b${monthName}\\s+\\d{1,2}(?:st|nd|rd|th)?\\b`, "i");
+  const dayMonth = new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${monthName}\\b`, "i");
+
+  return !hasYear && (monthDay.test(withoutQuotedHeader) || dayMonth.test(withoutQuotedHeader));
+}
+
+function buildIncompleteWeddingDateNudge(currentMessage: string) {
+  if (!messageHasWeddingMonthDayWithoutYear(currentMessage)) {
+    return "";
+  }
+
+  return `Wedding date nudge:
+- The incoming customer message gives a wedding month/day without a year.
+- Ask which year the wedding is before checking availability, pricing availability, or saying the date is available.
+- Ignore any year that appears only in quoted Gmail headers or email metadata.`;
+}
+
 function buildHistoryAppend(args: {
   toolExecutions: Array<{
     toolName: string;
@@ -1021,6 +1049,7 @@ async function runModelInvocation(args: {
     tenantId: args.agent.tenantId,
     toolFeatures: args.toolFeatures,
     testMode: Boolean(args.input.testMode),
+    currentMessage: args.input.message,
     defaultEmail:
       args.input.contactEmail ??
       (String(args.input.channel).toUpperCase() === "GMAIL" && args.input.contactId.includes("@")
@@ -1050,6 +1079,7 @@ async function runModelInvocation(args: {
     historyMessages: args.historyMessages,
     currentMessage: args.input.message,
   });
+  const incompleteWeddingDateNudge = buildIncompleteWeddingDateNudge(args.input.message);
 
   const controlRuntimeRules = buildControlRuntimeRules(args.control);
   const runtimeContextLines = buildRuntimeContextLines({
@@ -1070,7 +1100,7 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
   ${runtimeContextLines ? `${runtimeContextLines}\n` : ""}Incoming customer message:
   ${args.input.message}
 
-  ${schedulingNudge}`.trim(),
+  ${[schedulingNudge, incompleteWeddingDateNudge].filter(Boolean).join("\n\n")}`.trim(),
     ...(hasTools
       ? {
           tools,

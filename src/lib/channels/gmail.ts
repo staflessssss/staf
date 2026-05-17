@@ -303,6 +303,10 @@ function stripQuotedReply(text: string) {
       break;
     }
 
+    if (/<[^>\s]+@[^>]+>:\s*$/.test(trimmed)) {
+      break;
+    }
+
     if (/^from:\s+/i.test(trimmed) || /^sent:\s+/i.test(trimmed) || /^subject:\s+/i.test(trimmed)) {
       break;
     }
@@ -355,11 +359,16 @@ function appendSignature(text: string, config: GmailFormatConfig) {
     return text.trim();
   }
 
-  if (text.includes(config.signatureText.trim())) {
+  const signaturePattern = new RegExp(buildFlexibleBlockPattern(config.signatureText.trim()), "i");
+
+  if (signaturePattern.test(text)) {
     return text.trim();
   }
 
-  return `${text.trim()}\n\n${config.signatureText.trim()}`;
+  return collapseDuplicateSignatureBlocks(
+    `${text.trim()}\n\n${config.signatureText.trim()}`,
+    config,
+  );
 }
 
 function encodeHeaderText(value: string) {
