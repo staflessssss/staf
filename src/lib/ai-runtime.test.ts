@@ -946,6 +946,111 @@ test("handleIncomingEventWithDeps auto-replies through the channel adapter when 
   assert.equal(capturedInvokeAgentArgs.subject, "Question");
 });
 
+test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when runtime flag is enabled", async () => {
+  let invokeAgentCalled = false;
+  let sentMessage: unknown = null;
+  const createdMessages: Array<{ role: string; content: string; model?: string }> = [];
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "GMAIL" as never,
+      payload: { text: "hello" },
+    },
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({
+            id: "agent-1",
+            tenantId: "tenant-1",
+            channelConfig: {
+              runtimeType: "langgraph_wedding_sales",
+            },
+            channel: {
+              type: "GMAIL",
+              credentialsEnc: "gmail-credentials",
+            },
+          }),
+        },
+        message: {
+          findFirst: async () => null,
+          create: async (args: { data: { role: string; content: string; model?: string } }) => {
+            createdMessages.push(args.data);
+            return { id: "message-1" };
+          },
+        },
+        conversation: {
+          findUnique: async () => null,
+        },
+        $transaction: async (
+          callback: (tx: {
+            conversation: {
+              findUnique: () => Promise<null>;
+              create: () => Promise<{ id: string; status: ConversationStatus }>;
+            };
+            message: {
+              create: (args: {
+                data: { role: string; content: string; model?: string };
+              }) => Promise<{ id: string }>;
+            };
+          }) => Promise<unknown>,
+        ) =>
+          callback({
+            conversation: {
+              findUnique: async () => null,
+              create: async () => ({
+                id: "conv-langgraph",
+                status: ConversationStatus.ACTIVE,
+              }),
+            },
+            message: {
+              create: async (args) => {
+                createdMessages.push(args.data);
+                return { id: "message-1" };
+              },
+            },
+          }),
+        delayedDelivery: {
+          updateMany: async () => ({ count: 0 }),
+          create: async () => ({ id: "delivery-1" }),
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => {
+        invokeAgentCalled = true;
+        throw new Error("legacy invokeAgent should not run for the LangGraph runtime flag");
+      },
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "contact@example.com",
+            contactEmail: "contact@example.com",
+            message: "We are Anna and Mark. Our wedding is June 14 in Charlotte.",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async (args: { message: unknown }) => {
+            sentMessage = args.message;
+            return { delivered: true };
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(invokeAgentCalled, false);
+  assert.match(String(sentMessage), /year/i);
+  assert.equal(
+    createdMessages.some(
+      (message) =>
+        message.role === "ASSISTANT" &&
+        message.model === "langgraph_wedding_sales" &&
+        /year/i.test(message.content),
+    ),
+    true,
+  );
+});
+
 test("control user message limit can suppress replies without a fallback message", () => {
   const intercept = aiRuntimeTestHelpers.getAntiSpamIntercept({
     control: {

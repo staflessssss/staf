@@ -924,6 +924,7 @@ const scheduleWindowSchema = z.object({
 
 export const channelConfigSchema = z
   .object({
+    runtimeType: z.enum(["legacy", "langgraph_wedding_sales"]).optional().default("legacy"),
     priceAttachmentFileId: z
       .string()
       .trim()
@@ -1145,6 +1146,7 @@ export const channelConfigSchema = z
     functionBlocks: z.array(functionBlockSchema).optional(),
   })
   .default({
+    runtimeType: "legacy",
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,
@@ -1158,6 +1160,7 @@ export const channelConfigSchema = z
   });
 
 const agentManagedChannelConfigKeys = [
+  "runtimeType",
   "priceAttachmentFileId",
   "priceAttachmentFileName",
   "priceAttachmentMimeType",
@@ -1184,6 +1187,7 @@ export const agentDraftSchema = z.object({
   channelId: z.string().trim().min(1),
   status: z.nativeEnum(AgentStatus).optional().default(AgentStatus.ACTIVE),
   channelConfig: channelConfigSchema.optional().default({
+    runtimeType: "legacy",
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,

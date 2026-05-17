@@ -29,6 +29,7 @@ import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { invokeWeddingSalesGraph } from "@/lib/lang/graphs/wedding-sales/graph";
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
 import { resolveTools } from "@/lib/tools";
@@ -597,6 +598,14 @@ function isGmailClientClassifierEnabled(channelConfig: unknown) {
       : null;
 
   return classifier?.enabled === true;
+}
+
+function getRuntimeType(channelConfig: unknown) {
+  const rawChannelConfig = getChannelConfigObject(channelConfig as never);
+
+  return rawChannelConfig.runtimeType === "langgraph_wedding_sales"
+    ? "langgraph_wedding_sales"
+    : "legacy";
 }
 
 function classifyGmailClientMessage(args: {
@@ -1745,18 +1754,78 @@ async function handleIncomingEventWithDeps(
     };
   }
 
-  const result = await deps.invokeAgent({
-    tenantId: agent.tenantId,
-    agentId: agent.id,
-    channel: args.channel,
-    contactId: incoming.contactId,
-    contactEmail: incoming.contactEmail,
-    message: incoming.message,
-    messageId: incoming.messageId,
-    gmailMessageId: incoming.gmailMessageId,
-    threadId: incoming.threadId,
-    subject: incoming.subject,
-  });
+  const runtimeType = getRuntimeType(agent.channelConfig);
+  const result =
+    args.channel === ChannelType.GMAIL && runtimeType === "langgraph_wedding_sales"
+      ? await (async (): Promise<InvokeAgentResult> => {
+          const conversation = await recordInboundMessageWithDb(deps.db, {
+            agentId: agent.id,
+            contactId: incoming.contactId,
+            channel: agent.channel.type,
+            message: incoming.message,
+            messageId: incoming.messageId,
+            gmailMessageId: incoming.gmailMessageId,
+            threadId: incoming.threadId,
+            subject: incoming.subject,
+            conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
+          });
+
+          await cancelPendingDelayedDeliveriesWithDb({
+            database: deps.db,
+            conversationId: conversation.id,
+            kinds: [DelayedDeliveryKind.FOLLOW_UP],
+          });
+
+          const graphResult = await invokeWeddingSalesGraph({
+            tenantId: agent.tenantId,
+            agentId: agent.id,
+            contactId: incoming.contactId,
+            channel: "gmail",
+            message: incoming.message,
+            checkpoint: deps.db === db,
+          });
+          const message = graphResult.responseDraft ?? "";
+
+          if (!message) {
+            return {
+              message: "",
+              promptPreview: "langgraph_wedding_sales",
+              usedTooling: [],
+              conversationId: conversation.id,
+              model: "langgraph_wedding_sales",
+              suppressReply: true,
+            };
+          }
+
+          await deps.db.message.create({
+            data: {
+              conversationId: conversation.id,
+              role: MessageRole.ASSISTANT,
+              content: message,
+              model: "langgraph_wedding_sales",
+            },
+          });
+
+          return {
+            message,
+            promptPreview: "langgraph_wedding_sales",
+            usedTooling: [],
+            conversationId: conversation.id,
+            model: "langgraph_wedding_sales",
+          };
+        })()
+      : await deps.invokeAgent({
+          tenantId: agent.tenantId,
+          agentId: agent.id,
+          channel: args.channel,
+          contactId: incoming.contactId,
+          contactEmail: incoming.contactEmail,
+          message: incoming.message,
+          messageId: incoming.messageId,
+          gmailMessageId: incoming.gmailMessageId,
+          threadId: incoming.threadId,
+          subject: incoming.subject,
+        });
 
   if (result.suppressReply) {
     if (result.conversationId) {
