@@ -209,6 +209,24 @@ test("finalizeAssistantText rewrites successful test-mode booking into simulatio
   assert.doesNotMatch(finalized, /invite is on the way/i);
 });
 
+test("finalizeAssistantText asks for wedding year before guide or availability when year is missing", () => {
+  const finalized = aiRuntimeTestHelpers.finalizeAssistantText({
+    currentMessage: `Sure, we are Anna and Mark. Our wedding is June 14 in Charlotte.
+
+вс, 17 мая 2026 г. в 16:54, Fhdh Fhdh <fhdhf2211@gmail.com>:`,
+    text: `Thank you so much, Anna and Mark! Is your wedding on June 14th of this year, or 2025?
+
+Also, here are a couple of our recent wedding films:
+Callista and Kevin - Online Gallery
+
+We'd be honored to create something timeless for you both 🤍`,
+    toolExecutions: [],
+  });
+
+  assert.match(finalized, /which year your wedding is on June 14/i);
+  assert.doesNotMatch(finalized, /this year|2025|collections guide|recent wedding films|Google Reviews/i);
+});
+
 test("isWithinAgentSchedule returns false outside an enabled daily window", () => {
   const beforeOpening = aiRuntimeTestHelpers.isWithinAgentSchedule(
     {

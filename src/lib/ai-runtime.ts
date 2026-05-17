@@ -515,6 +515,7 @@ function getAntiSpamIntercept(args: {
 
 function finalizeAssistantText(args: {
   text: string;
+  currentMessage?: string;
   toolExecutions: Array<{
     toolName: string;
     toolResult: unknown;
@@ -525,9 +526,14 @@ function finalizeAssistantText(args: {
     text: noRogueEmoji,
     toolExecutions: args.toolExecutions,
   });
-  return convertSimulatedBookingLanguage({
+  const simulatedText = convertSimulatedBookingLanguage({
     text: guardedText,
     toolExecutions: args.toolExecutions,
+  });
+
+  return rewriteIncompleteWeddingDateReply({
+    text: simulatedText,
+    currentMessage: args.currentMessage,
   });
 }
 
@@ -743,6 +749,37 @@ function buildIncompleteWeddingDateNudge(currentMessage: string) {
 - The incoming customer message gives a wedding month/day without a year.
 - Ask which year the wedding is before checking availability, pricing availability, or saying the date is available.
 - Ignore any year that appears only in quoted Gmail headers or email metadata.`;
+}
+
+function extractIncompleteWeddingDateLabel(message: string) {
+  const withoutQuotedHeader = message
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => !/<[^>\s]+@[^>]+>:\s*$/.test(line.trim()))
+    .join("\n");
+  const monthName =
+    "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+  const monthDay = new RegExp(`\\b(${monthName}\\s+\\d{1,2}(?:st|nd|rd|th)?)\\b`, "i");
+  const dayMonth = new RegExp(`\\b(\\d{1,2}(?:st|nd|rd|th)?\\s+${monthName})\\b`, "i");
+
+  return withoutQuotedHeader.match(monthDay)?.[1] ?? withoutQuotedHeader.match(dayMonth)?.[1] ?? "that date";
+}
+
+function rewriteIncompleteWeddingDateReply(args: {
+  text: string;
+  currentMessage?: string;
+}) {
+  if (!args.currentMessage || !messageHasWeddingMonthDayWithoutYear(args.currentMessage)) {
+    return args.text;
+  }
+
+  const dateLabel = extractIncompleteWeddingDateLabel(args.currentMessage);
+
+  return [
+    "Thank you for sharing that.",
+    `Could you confirm which year your wedding is on ${dateLabel}? Once I have the year, I can check availability for you.`,
+  ].join("\n\n");
 }
 
 function buildHistoryAppend(args: {
@@ -1208,6 +1245,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     });
     const finalizedText = finalizeAssistantText({
       text: modelResult.text,
+      currentMessage: input.message,
       toolExecutions: modelResult.toolExecutions,
     });
 
@@ -1296,6 +1334,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
   });
   const finalizedText = finalizeAssistantText({
     text: modelResult.text,
+    currentMessage: input.message,
     toolExecutions: modelResult.toolExecutions,
   });
 
