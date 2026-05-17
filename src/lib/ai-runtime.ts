@@ -439,9 +439,25 @@ function buildRuntimeContextLines(args: {
   prompting: PromptingConfig;
   input: Pick<InvokeAgentInput, "channel" | "contactId" | "contactEmail">;
 }) {
-  void args;
+  const lines: string[] = [];
 
-  return "";
+  if (args.prompting.showContactIdentity) {
+    const knownEmail =
+      args.input.contactEmail ??
+      (args.input.contactId.includes("@") ? args.input.contactId : null);
+
+    if (knownEmail) {
+      lines.push(
+        `Known customer email: ${knownEmail}. Use it for booking invites and lead logging; do not ask the customer to repeat it unless they request a different address.`,
+      );
+    }
+  }
+
+  if (args.prompting.showChannelContext) {
+    lines.push(`Current channel: ${String(args.input.channel).toLowerCase()}.`);
+  }
+
+  return lines.join("\n");
 }
 
 type AntiSpamIntercept =

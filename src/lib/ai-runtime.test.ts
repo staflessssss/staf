@@ -410,7 +410,8 @@ test("buildRuntimeContextLines does not expose hidden prompting visibility flags
   });
 
   assert.equal(hidden, "");
-  assert.equal(visible, "");
+  assert.match(visible, /Known customer email: lead@example\.com/);
+  assert.match(visible, /Current channel: instagram/);
 });
 
 test("handleIncomingEventWithDeps records inbound and does not auto-reply when manual activation is required", async () => {
