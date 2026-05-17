@@ -164,8 +164,84 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeEmailText(value: string) {
+  return value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+}
+
+function stripAttachmentPlaceholders(value: string) {
+  return normalizeEmailText(value)
+    .split("\n")
+    .filter((line) => {
+      const normalized = line
+        .trim()
+        .replace(/^\(+/, "")
+        .replace(/\)+$/, "")
+        .replace(/[.。…]+$/, "")
+        .trim()
+        .toLowerCase();
+
+      return !(
+        /^(attaching|attached|attachment)\b/.test(normalized) &&
+        (normalized.includes("collections guide") || normalized.includes("pricing guide"))
+      );
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function buildFlexibleBlockPattern(block: string) {
+  return block
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => escapeRegExp(line.trim()))
+    .join("\\s*\\n\\s*");
+}
+
+function collapseDuplicateSignatureBlocks(value: string, config: GmailFormatConfig) {
+  const knownSignatures = [
+    config.signatureText?.trim(),
+    "Taras Mynd\nFounder & Creative Director / MYNDFUL FILMS LLC\nwww.myndfulfilms.co\ncontact@myndfulfilms.com",
+  ].filter((signature): signature is string => Boolean(signature?.trim()));
+
+  let text = normalizeEmailText(value);
+
+  for (const signature of knownSignatures) {
+    const pattern = new RegExp(buildFlexibleBlockPattern(signature), "gi");
+    const matches = text.match(pattern);
+
+    if (!matches || matches.length <= 1) {
+      continue;
+    }
+
+    const canonical = matches[matches.length - 1]?.trim() ?? signature.trim();
+    text = text.replace(pattern, "").replace(/\n{3,}/g, "\n\n").trim();
+    text = `${text}\n\n${canonical}`.trim();
+  }
+
+  return text;
+}
+
+function cleanGeneratedEmailText(value: string, config: GmailFormatConfig) {
+  return collapseDuplicateSignatureBlocks(stripAttachmentPlaceholders(value), config);
+}
+
 function convertMarkdownishToHtml(value: string) {
-  let html = escapeHtml(value.trim())
+  const anchors: string[] = [];
+  const withAnchorTokens = value.trim().replace(
+    /<a\s+href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+    (_match, url: string, label: string) => {
+      const token = `__GMAIL_ANCHOR_${anchors.length}__`;
+      anchors.push(`<a href="${escapeHtml(url)}">${escapeHtml(label.replace(/<[^>]+>/g, "").trim() || url)}</a>`);
+      return token;
+    },
+  );
+
+  let html = escapeHtml(withAnchorTokens)
     .replace(/\n\n/g, "<br><br>")
     .replace(/\n/g, "<br>");
 
@@ -182,7 +258,33 @@ function convertMarkdownishToHtml(value: string) {
     return `${prefix}<a href="${url}">${url}</a>`;
   });
 
+  anchors.forEach((anchor, index) => {
+    html = html.replaceAll(`__GMAIL_ANCHOR_${index}__`, anchor);
+  });
+
   return html;
+}
+
+function htmlAnchorsToPlainText(value: string) {
+  return normalizeEmailText(value)
+    .replace(
+      /<a\s+href=["'](https?:\/\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
+      (_match, url: string, label: string) => {
+        const plainLabel = label.replace(/<[^>]+>/g, "").trim();
+        return plainLabel && plainLabel !== url ? `${plainLabel}: ${url}` : url;
+      },
+    )
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_match, label: string, url: string) =>
+      label && label !== url ? `${label}: ${url}` : url,
+    )
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function stripQuotedReply(text: string) {
@@ -439,23 +541,26 @@ function collectDeliveryAttachments(args: {
 }
 
 function normalizeReplyMessage(message: GmailSendReplyParams["message"], config: GmailChannelConfig) {
-  const text = Array.isArray(message)
+  const rawText = Array.isArray(message)
     ? message.join("\n\n")
     : typeof message === "string"
       ? message
       : message.text;
   const html = Array.isArray(message) || typeof message === "string" ? undefined : message.html;
-  const withPricingBlock = appendPricingBlock(text, config);
+  const cleanText = cleanGeneratedEmailText(rawText, config);
+  const withPricingBlock = appendPricingBlock(cleanText, config);
   const withSignature = appendSignature(withPricingBlock, config);
 
   return {
-    text: withSignature,
+    text: htmlAnchorsToPlainText(withSignature),
     html: html ?? convertMarkdownishToHtml(withSignature),
   };
 }
 
 export const gmailAdapterTestHelpers = {
   convertMarkdownishToHtml,
+  cleanGeneratedEmailText,
+  htmlAnchorsToPlainText,
   appendPricingBlock,
   appendSignature,
   collectAutoAttachments,

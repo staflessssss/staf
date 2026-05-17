@@ -11,6 +11,50 @@ test("gmail helper converts markdown links into html anchors", () => {
   assert.match(html, /<a href="https:\/\/galleries\.vidflow\.co\/rwjo8nz2">gallery<\/a>/i);
 });
 
+test("gmail helper preserves model-provided html anchors as clickable links", () => {
+  const html = gmailAdapterTestHelpers.convertMarkdownishToHtml(
+    'See <a href="https://galleries.vidflow.co/rwjo8nz2">Callista and Kevin</a>',
+  );
+
+  assert.match(
+    html,
+    /See <a href="https:\/\/galleries\.vidflow\.co\/rwjo8nz2">Callista and Kevin<\/a>/i,
+  );
+  assert.doesNotMatch(html, /&lt;a href=/i);
+});
+
+test("gmail helper converts html anchors to readable plain text", () => {
+  const text = gmailAdapterTestHelpers.htmlAnchorsToPlainText(
+    'See <a href="https://galleries.vidflow.co/rwjo8nz2">Callista and Kevin</a>',
+  );
+
+  assert.equal(text, "See Callista and Kevin: https://galleries.vidflow.co/rwjo8nz2");
+});
+
+test("gmail helper strips attachment placeholders and duplicate Myndful signatures", () => {
+  const signature = `Taras Mynd
+Founder & Creative Director / MYNDFUL FILMS LLC
+www.myndfulfilms.co
+contact@myndfulfilms.com`;
+  const cleaned = gmailAdapterTestHelpers.cleanGeneratedEmailText(
+    `I’m attaching the collections guide.
+
+${signature}
+
+(Attaching collections guide…)
+
+${signature}`,
+    {},
+  );
+
+  assert.equal(
+    cleaned,
+    `I’m attaching the collections guide.
+
+${signature}`,
+  );
+});
+
 test("gmail helper recognizes pricing replies beyond one exact phrase", () => {
   assert.equal(
     gmailAdapterTestHelpers.isPricingReply("Our pricing starts at $2,750 and I can send more details."),
