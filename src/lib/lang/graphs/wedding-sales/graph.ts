@@ -147,5 +147,14 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
         }
       : undefined;
 
-  return graph.invoke(initialState, configurable ? { configurable } : undefined);
+  const graphInput =
+    configurable && !input.previousState
+      ? {
+          channel: input.channel,
+          latestCustomerMessage: input.message,
+          toolObservations: [],
+        }
+      : initialState;
+
+  return graph.invoke(graphInput, configurable ? { configurable } : undefined);
 }

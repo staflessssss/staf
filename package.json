@@ -10,6 +10,7 @@
     "test": "tsx --test src/**/*.test.ts",
     "eval:wedding-sales": "node --env-file=.env --import tsx scripts/eval-wedding-sales.ts",
     "dry-run:wedding-sales": "node --env-file=.env --import tsx scripts/dry-run-wedding-sales.ts",
+    "smoke:wedding-sales-checkpoint": "node --env-file=.env --import tsx scripts/smoke-wedding-sales-checkpoint.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "db:seed": "node --env-file=.env --import tsx prisma/seed.ts"
