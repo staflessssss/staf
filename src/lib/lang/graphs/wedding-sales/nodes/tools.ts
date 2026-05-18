@@ -82,6 +82,27 @@ export function createWeddingSalesToolNodes(args: {
         };
       }
 
+      if (config.coverage.unavailableDates?.includes(state.weddingDate)) {
+        return {
+          availability: "unavailable",
+          leadStage: "availability_checked",
+          responseDraft: appendSignature(
+            "Thank you for sharing those details. I checked the date and it looks unavailable on my end. If you have flexibility, I can help look at alternative dates.",
+            config.signature,
+          ),
+          toolObservations: [
+            {
+              toolName: "check_wedding_availability",
+              result: JSON.stringify({
+                status: "unavailable",
+                date: state.weddingDate,
+                summary: "Configured unavailable date.",
+              }),
+            },
+          ],
+        };
+      }
+
       const result = await invokeTool(checkWeddingAvailabilityTool(toolContext), {
         request: state.latestCustomerMessage ?? `Check wedding availability for ${state.weddingDate}.`,
         date: state.weddingDate,
@@ -160,7 +181,7 @@ export function createWeddingSalesToolNodes(args: {
         leadStage: available ? "call_proposed" : "checking_calendar",
         responseDraft: available
           ? "That consultation time looks available. Would you like me to book it?"
-          : "That time does not look available on the calendar. Could you send another weekday time between 9 AM and 2 PM Eastern?",
+          : "That time does not look available on the calendar. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?",
         toolObservations: [{ toolName: "check_consultation_calendar", result }],
       };
     },

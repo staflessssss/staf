@@ -179,7 +179,8 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
 ];
 
 function includesCaseInsensitive(value: string, needle: string) {
-  return value.toLowerCase().includes(needle.toLowerCase());
+  const normalize = (entry: string) => entry.toLowerCase().replace(/[_-]+/g, " ");
+  return normalize(value).includes(normalize(needle));
 }
 
 export function evaluateWeddingSalesCase(args: {

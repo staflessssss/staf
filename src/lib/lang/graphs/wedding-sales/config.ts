@@ -21,6 +21,7 @@ export type WeddingSalesConfig = {
   coverage: {
     regions: string[];
     capacityPerDate: number;
+    unavailableDates?: string[];
   };
   callBookingWindow: {
     timezone: string;
@@ -54,6 +55,7 @@ export const defaultWeddingSalesConfig: WeddingSalesConfig = {
   coverage: {
     regions: ["NC", "SC", "GA"],
     capacityPerDate: 2,
+    unavailableDates: [],
   },
   callBookingWindow: {
     timezone: "America/New_York",

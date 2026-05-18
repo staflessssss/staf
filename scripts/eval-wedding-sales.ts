@@ -1,12 +1,14 @@
 import { MessageRole } from "@prisma/client";
 
 import { invokeAgent, type RuntimeHistoryMessage } from "@/lib/ai-runtime";
+import { invokeWeddingSalesGraph } from "@/lib/lang/graphs/wedding-sales/graph";
 import {
   evaluateWeddingSalesCase,
   weddingSalesStressCases,
   type WeddingSalesEvalResult,
   type WeddingSalesEvalRuntime,
 } from "@/lib/lang/graphs/wedding-sales/evals/stress-cases";
+import type { WeddingSalesToolContext } from "@/lib/lang/tools/wedding-sales";
 
 function readRuntime(): WeddingSalesEvalRuntime {
   const runtime = process.env.WEDDING_SALES_EVAL_RUNTIME;
@@ -43,12 +45,156 @@ async function runLegacyCase(args: {
   });
 }
 
+function getLangGraphFixtureToolContext(): WeddingSalesToolContext {
+  return {
+    tenantId: "eval-tenant",
+    testMode: true,
+    defaultEmail: "eval@example.com",
+    weddingAvailability: {
+      action: "capacity availability",
+      params: {
+        operation: "capacity_availability",
+        spreadsheetId: "eval-sheet",
+        sheetName: "Bookings",
+        headerRow: 1,
+        dateColumn: "Wedding Date",
+        statusColumn: "Status",
+        regionColumn: "Region",
+        bookedStatusValue: "Booked",
+        capacityRules: [
+          { region: "NC", aliases: ["NC", "Charlotte"], capacity: 2 },
+          { region: "SC", aliases: ["SC", "Charleston"], capacity: 2 },
+          { region: "GA", aliases: ["GA", "Atlanta"], capacity: 2 },
+        ],
+        suggestionSearchDays: 14,
+      },
+    },
+    consultationCalendar: {
+      action: "check calendar",
+      params: {
+        calendarId: "primary",
+        timeZone: "America/New_York",
+        availabilityDateSource: "time_text",
+        availabilityDateValue: "",
+        bookingDateSource: "time_text",
+        bookingDateValue: "",
+        bookingTimeSource: "time_text",
+        bookingTimeValue: "",
+        inviteEmailSource: "default_email",
+        inviteEmailValue: "",
+        slotDurationMinutes: 30,
+        businessWindowStartHour: 9,
+        businessWindowEndHour: 14,
+        businessDays: [1, 2, 3, 4, 5],
+        checkConflictsBeforeBooking: true,
+        inviteCustomerByEmail: true,
+        createMeetLink: true,
+        reminderEnabled: false,
+        reminderMinutesBefore: 60,
+        eventSummaryTemplate: "Consultation with {{coupleName}}",
+        eventDescriptionTemplate: "Wedding date: {{weddingDate}}\nLocation: {{location}}",
+        syncLeadToSheets: false,
+        leadHeaderRow: 1,
+        leadColumns: {
+          coupleName: "Couple Name",
+          weddingDate: "Wedding Date",
+          location: "Location",
+          callDate: "Call Date",
+          callTime: "Call Time",
+          email: "Email",
+          channel: "Channel",
+        },
+      },
+    },
+    bookConsultation: {
+      action: "book call",
+      params: {
+        calendarId: "primary",
+        timeZone: "America/New_York",
+        availabilityDateSource: "time_text",
+        availabilityDateValue: "",
+        bookingDateSource: "time_text",
+        bookingDateValue: "",
+        bookingTimeSource: "time_text",
+        bookingTimeValue: "",
+        inviteEmailSource: "default_email",
+        inviteEmailValue: "",
+        slotDurationMinutes: 30,
+        businessWindowStartHour: 9,
+        businessWindowEndHour: 14,
+        businessDays: [1, 2, 3, 4, 5],
+        checkConflictsBeforeBooking: true,
+        inviteCustomerByEmail: true,
+        createMeetLink: true,
+        reminderEnabled: false,
+        reminderMinutesBefore: 60,
+        eventSummaryTemplate: "Consultation with {{coupleName}}",
+        eventDescriptionTemplate: "Wedding date: {{weddingDate}}\nLocation: {{location}}",
+        syncLeadToSheets: false,
+        leadHeaderRow: 1,
+        leadColumns: {
+          coupleName: "Couple Name",
+          weddingDate: "Wedding Date",
+          location: "Location",
+          callDate: "Call Date",
+          callTime: "Call Time",
+          email: "Email",
+          channel: "Channel",
+        },
+      },
+    },
+  };
+}
+
+function buildPreviousState(testCase: (typeof weddingSalesStressCases)[number]) {
+  const historyText = (testCase.input.history ?? []).map((entry) => entry.content).join("\n");
+
+  if (!historyText) {
+    return undefined;
+  }
+
+  return {
+    names: /Anna and Mark/i.test(historyText) ? "Anna and Mark" : undefined,
+    weddingDate: /June 14,\s*2027/i.test(historyText) ? "2027-06-14" : undefined,
+    weddingYearKnown: /(?:19|20)\d{2}/.test(historyText),
+    location: /Charlotte/i.test(historyText) ? "Charlotte" : undefined,
+    guideSent: /collections|guide/i.test(historyText),
+    callProposed: /consultation|call/i.test(historyText),
+    proposedCallTime: /Monday at 10 AM Eastern/i.test(historyText)
+      ? "Monday at 10 AM Eastern"
+      : undefined,
+    calendarStatus: /looks available/i.test(historyText) ? ("available" as const) : undefined,
+    bookingConfirmed: false,
+  };
+}
+
+async function runLangGraphCase(testCase: (typeof weddingSalesStressCases)[number]) {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: testCase.input.message,
+    previousState: buildPreviousState(testCase),
+    config: {
+      coverage: {
+        regions: ["NC", "SC", "GA"],
+        capacityPerDate: 2,
+        unavailableDates: ["2026-09-06"],
+      },
+    },
+    toolContext: getLangGraphFixtureToolContext(),
+  });
+
+  return {
+    message: result.responseDraft ?? "",
+    usedTooling: result.toolObservations.map((observation) => observation.toolName),
+  };
+}
+
 async function main() {
   const tenantId = process.env.WEDDING_SALES_EVAL_TENANT_ID;
   const agentId = process.env.WEDDING_SALES_EVAL_AGENT_ID;
   const runtime = readRuntime();
 
-  if (!tenantId || !agentId) {
+  if (runtime === "legacy" && (!tenantId || !agentId)) {
     console.log(
       "Skipping wedding_sales evals: set WEDDING_SALES_EVAL_TENANT_ID and WEDDING_SALES_EVAL_AGENT_ID to run against a local agent.",
     );
@@ -58,18 +204,10 @@ async function main() {
   const results: WeddingSalesEvalResult[] = [];
 
   for (const testCase of weddingSalesStressCases) {
-    if (runtime === "langgraph_wedding_sales") {
-      results.push({
-        caseId: testCase.id,
-        runtime,
-        passed: false,
-        failures: ["LangGraph runtime is not wired to the eval runner yet."],
-        skipped: true,
-      });
-      continue;
-    }
-
-    const result = await runLegacyCase({ tenantId, agentId, testCase });
+    const result =
+      runtime === "langgraph_wedding_sales"
+        ? await runLangGraphCase(testCase)
+        : await runLegacyCase({ tenantId: tenantId!, agentId: agentId!, testCase });
     results.push(
       evaluateWeddingSalesCase({
         testCase,
