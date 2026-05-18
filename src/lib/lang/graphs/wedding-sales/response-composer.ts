@@ -10,6 +10,7 @@ export type WeddingSalesResponseIntent =
   | "calendar_time_missing"
   | "calendar_available"
   | "calendar_busy"
+  | "calendar_outside_window"
   | "booking_tool_missing"
   | "booking_confirmed"
   | "booking_failed";
@@ -101,7 +102,7 @@ function formatLocationSuffix(location?: string) {
 }
 
 function appendSignatureForIntent(intent: WeddingSalesResponseIntent) {
-  return !["calendar_available", "calendar_busy", "calendar_time_missing"].includes(intent);
+  return !["calendar_available", "calendar_busy", "calendar_outside_window", "calendar_time_missing"].includes(intent);
 }
 
 export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
@@ -164,6 +165,8 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         return "That time looks available on the calendar. Would you like me to book it?";
       case "calendar_busy":
         return "That time is already taken on the calendar, so I do not want to book the wrong slot. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?";
+      case "calendar_outside_window":
+        return `${summary || "Consultation calls are only available Monday through Friday between 9 AM and 2 PM Eastern."} Could you send another time in that window?`;
       case "booking_tool_missing":
         return "I can book the consultation once I have the confirmed time and booking tool configured.";
       case "booking_confirmed":

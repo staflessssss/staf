@@ -120,3 +120,31 @@ test("wedding sales graph does not book a previously busy consultation slot", as
   assert.equal(result.toolObservations.length, 0);
   assert.match(result.responseDraft ?? "", /another time/i);
 });
+
+test("wedding sales graph treats day and time replies as consultation time after call proposal", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: "Could we do Sunday at 4 PM Eastern?",
+    previousState: {
+      names: "Anna and Mark",
+      weddingDate: "2027-06-14",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      bookingConfirmed: false,
+      leadStage: "availability_checked",
+    },
+  });
+
+  assert.equal(result.leadStage, "checking_calendar");
+  assert.equal(result.proposedCallTime, "Could we do Sunday at 4 PM Eastern?");
+  assert.doesNotMatch(result.responseDraft ?? "", /June 14, 2027.*available/i);
+});
+
+test("wedding sales analyzer recognizes bare weekday time proposals in call context", () => {
+  assert.equal(weddingSalesAnalyzeTestHelpers.proposesCallTime("What about Monday at 10 AM Eastern?"), true);
+  assert.equal(weddingSalesAnalyzeTestHelpers.proposesCallTime("Could we do Sunday at 4 PM Eastern?"), true);
+  assert.equal(weddingSalesAnalyzeTestHelpers.proposesCallTime("Sunday works for us."), false);
+});

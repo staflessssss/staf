@@ -23,7 +23,7 @@ function parseToolJson(result: string) {
 }
 
 function getStepResults(toolResult: Record<string, unknown>) {
-  return Array.isArray(toolResult.steps)
+  const stepResults = Array.isArray(toolResult.steps)
     ? toolResult.steps
         .map((step) => {
           if (!step || typeof step !== "object" || Array.isArray(step) || !("result" in step)) {
@@ -37,6 +37,8 @@ function getStepResults(toolResult: Record<string, unknown>) {
         })
         .filter((result): result is Record<string, unknown> => Boolean(result))
     : [];
+
+  return typeof toolResult.status === "string" ? [toolResult, ...stepResults] : stepResults;
 }
 
 function getSummary(toolResult: Record<string, unknown>) {
@@ -152,14 +154,19 @@ export function createWeddingSalesToolNodes(args: {
       const parsedResult = parseToolJson(result);
       const steps = getStepResults(parsedResult);
       const available = steps.some((step) => step.status === "available");
+      const outsideWindow = steps.some(
+        (step) => step.status === "outside_business_days" || step.status === "outside_business_hours",
+      );
+      const summary = getSummary(parsedResult) || steps.map(getSummary).find(Boolean);
 
       return {
         calendarStatus: available ? "available" : "busy",
         leadStage: available ? "call_proposed" : "checking_calendar",
         responseDraft: composeWeddingSalesResponse({
-          intent: available ? "calendar_available" : "calendar_busy",
+          intent: available ? "calendar_available" : outsideWindow ? "calendar_outside_window" : "calendar_busy",
           config,
           state,
+          summary,
         }),
         toolObservations: [{ toolName: "check_consultation_calendar", result }],
       };

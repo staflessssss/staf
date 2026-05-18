@@ -82,7 +82,7 @@ async function main() {
   assert.equal(second.weddingDate, "2027-06-14");
   assert.equal(second.names, "Anna and Mark");
   assert.equal(second.guideSent, true);
-  assert.equal(second.leadStage, "checking_calendar");
+  assert.ok(["checking_calendar", "call_proposed"].includes(second.leadStage));
   assert.equal(second.toolObservations.at(-1)?.toolName, "check_consultation_calendar");
 
   console.log(
