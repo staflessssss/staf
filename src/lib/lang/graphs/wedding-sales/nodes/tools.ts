@@ -45,6 +45,16 @@ function getSummary(toolResult: Record<string, unknown>) {
   return typeof toolResult.summary === "string" ? toolResult.summary : "";
 }
 
+function getBookingOutcome(toolResult: Record<string, unknown>) {
+  const steps = getStepResults(toolResult);
+  const bookedStep = steps.find((step) => step.status === "booked");
+
+  return {
+    bookingConfirmed: Boolean(bookedStep),
+    eventId: typeof bookedStep?.eventId === "string" ? bookedStep.eventId : undefined,
+  };
+}
+
 async function invokeTool(toolInstance: StructuredToolInterface, input: Record<string, unknown>) {
   const result = await toolInstance.invoke(input);
   return typeof result === "string" ? result : JSON.stringify(result);
@@ -191,16 +201,14 @@ export function createWeddingSalesToolNodes(args: {
         channel: state.channel,
       });
       const parsedResult = parseToolJson(result);
-      const steps = getStepResults(parsedResult);
-      const bookedStep = steps.find((step) => step.status === "booked");
-      const eventId = typeof bookedStep?.eventId === "string" ? bookedStep.eventId : undefined;
+      const { bookingConfirmed, eventId } = getBookingOutcome(parsedResult);
 
       return {
-        bookingConfirmed: Boolean(eventId),
+        bookingConfirmed,
         bookedEventId: eventId,
-        leadStage: eventId ? "booked" : "ready_to_book",
+        leadStage: bookingConfirmed ? "booked" : "ready_to_book",
         responseDraft: composeWeddingSalesResponse({
-          intent: eventId ? "booking_confirmed" : "booking_failed",
+          intent: bookingConfirmed ? "booking_confirmed" : "booking_failed",
           config,
           state,
         }),
@@ -209,3 +217,7 @@ export function createWeddingSalesToolNodes(args: {
     },
   };
 }
+
+export const weddingSalesToolNodeTestHelpers = {
+  getBookingOutcome,
+};

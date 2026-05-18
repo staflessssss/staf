@@ -170,9 +170,9 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       case "booking_tool_missing":
         return "I can book the consultation once I have the confirmed time and booking tool configured.";
       case "booking_confirmed":
-        return `You are all set. The calendar invite has been created${state.proposedCallTime ? ` for ${state.proposedCallTime}` : ""}.`;
+        return "You are all set. The calendar invite has been created.";
       case "booking_failed":
-        return "I could not confirm the booking yet. I will need to retry the calendar booking step.";
+        return "I am sorry, I could not get the calendar invite fully confirmed on my end. Could you send one more time option Monday through Friday between 9 AM and 2 PM Eastern?";
     }
   })();
 

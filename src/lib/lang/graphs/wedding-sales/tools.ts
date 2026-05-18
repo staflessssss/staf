@@ -49,14 +49,14 @@ export function createWeddingSalesToolContextFromFeatures(args: {
     args.toolFeatures,
     (feature, step) =>
       step.integration.type === IntegrationType.GOOGLE_CALENDAR &&
-      (includesAny(feature.name, ["check calendar", "availability"]) ||
-        includesAny(step.action, ["check calendar", "availability"])),
+      (includesAny(feature.name, ["check calendar", "check consultation calendar"]) ||
+        includesAny(step.action, ["check calendar", "check consultation calendar", "check consultation"])),
   );
   const bookConsultation = findStep(
     args.toolFeatures,
     (feature, step) =>
       step.integration.type === IntegrationType.GOOGLE_CALENDAR &&
-      (includesAny(feature.name, ["book", "consultation"]) ||
+      (includesAny(feature.name, ["book"]) ||
         includesAny(step.action, ["book", "create consultation", "schedule consultation"])),
   );
 

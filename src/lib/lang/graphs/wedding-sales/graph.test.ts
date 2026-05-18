@@ -87,7 +87,16 @@ test("wedding sales graph records availability tool observations", async () => {
       },
       bookConsultation: {
         action: "book call",
-        params: {},
+        params: {
+          businessDays: [1, 2, 3, 4, 5],
+          businessWindowStartHour: 9,
+          businessWindowEndHour: 14,
+          slotDurationMinutes: 30,
+          inviteEmailSource: "customer_email",
+          bookingDateSource: "time_text",
+          bookingTimeSource: "time_text",
+        },
+        credentialsEnc: "test-credentials",
       },
     },
   });
