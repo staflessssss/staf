@@ -77,7 +77,7 @@ export function createInitialWeddingSalesState(args: {
     calendarStatus: args.previousState?.calendarStatus,
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
     bookedEventId: args.previousState?.bookedEventId,
-    toolObservations: args.previousState?.toolObservations ?? [],
+    toolObservations: [],
     latestCustomerMessage: args.message,
     responseDraft: undefined,
   };

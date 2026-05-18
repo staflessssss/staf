@@ -29,6 +29,7 @@ import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { buildWeddingSalesConfigFromChannelConfig } from "@/lib/lang/graphs/wedding-sales/config-from-agent";
 import { invokeWeddingSalesGraph } from "@/lib/lang/graphs/wedding-sales/graph";
 import { createWeddingSalesToolContextFromFeatures } from "@/lib/lang/graphs/wedding-sales/tools";
 import { traceLangRuntime } from "@/lib/lang/langsmith";
@@ -1796,6 +1797,7 @@ async function handleIncomingEventWithDeps(
             contactId: incoming.contactId,
             channel: "gmail",
             message: incoming.message,
+            config: buildWeddingSalesConfigFromChannelConfig(agent.channelConfig),
             toolContext,
             checkpoint: deps.db === db,
           });
