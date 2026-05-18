@@ -124,6 +124,10 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     return { ...baseUpdate, leadStage: "ready_to_book", bookingConfirmed: true };
   }
 
+  if (state.calendarStatus === "busy" && confirmsBooking(message)) {
+    return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: undefined };
+  }
+
   if (asksForCall(message)) {
     return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: message };
   }

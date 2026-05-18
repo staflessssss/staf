@@ -96,3 +96,27 @@ test("wedding sales graph records availability tool observations", async () => {
   assert.equal(result.toolObservations[0]?.toolName, "check_wedding_availability");
   assert.match(result.responseDraft ?? "", /collections start/i);
 });
+
+test("wedding sales graph does not book a previously busy consultation slot", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: "Yes, please book it.",
+    previousState: {
+      names: "Anna and Mark",
+      weddingDate: "2027-06-14",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "Monday at 10 AM Eastern",
+      calendarStatus: "busy",
+      bookingConfirmed: false,
+      leadStage: "checking_calendar",
+    },
+  });
+
+  assert.equal(result.bookingConfirmed, false);
+  assert.equal(result.toolObservations.length, 0);
+  assert.match(result.responseDraft ?? "", /another time/i);
+});

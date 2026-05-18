@@ -159,8 +159,9 @@ export function createWeddingSalesToolNodes(args: {
     checkCalendar: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
-          responseDraft:
-            "I can check that consultation time once the calendar tool and requested time are available.",
+          responseDraft: state.calendarStatus === "busy"
+            ? "That time was not available, so I cannot book it yet. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?"
+            : "I can check that consultation time once the calendar tool and requested time are available.",
         };
       }
 
