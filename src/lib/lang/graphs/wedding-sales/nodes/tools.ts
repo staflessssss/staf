@@ -8,6 +8,7 @@ import {
 } from "@/lib/lang/tools/wedding-sales";
 
 import type { WeddingSalesConfig } from "../config";
+import { composeWeddingSalesResponse } from "../response-composer";
 import type { WeddingSalesState } from "../state";
 
 function parseToolJson(result: string) {
@@ -47,24 +48,6 @@ async function invokeTool(toolInstance: StructuredToolInterface, input: Record<s
   return typeof result === "string" ? result : JSON.stringify(result);
 }
 
-function appendSignature(text: string, signature: string) {
-  return signature ? `${text.trim()}\n\n${signature.trim()}` : text.trim();
-}
-
-function formatPortfolioLinks(config: WeddingSalesConfig) {
-  return config.portfolio
-    .map((item) => {
-      if (!item.url) {
-        return item.label;
-      }
-
-      return config.channelFormatting.gmail.richLinks
-        ? `<a href="${item.url}">${item.label}</a>`
-        : `${item.label}: ${item.url}`;
-    })
-    .join("\n");
-}
-
 export function createWeddingSalesToolNodes(args: {
   config: WeddingSalesConfig;
   toolContext?: WeddingSalesToolContext | null;
@@ -75,10 +58,11 @@ export function createWeddingSalesToolNodes(args: {
     checkAvailability: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.weddingDate) {
         return {
-          responseDraft: appendSignature(
-            "I have enough details to check the wedding date, but the availability tool is not configured yet.",
-            config.signature,
-          ),
+          responseDraft: composeWeddingSalesResponse({
+            intent: "availability_tool_missing",
+            config,
+            state,
+          }),
         };
       }
 
@@ -86,10 +70,12 @@ export function createWeddingSalesToolNodes(args: {
         return {
           availability: "unavailable",
           leadStage: "availability_checked",
-          responseDraft: appendSignature(
-            "Thank you for sharing those details. I checked the date and it looks unavailable on my end. If you have flexibility, I can help look at alternative dates.",
-            config.signature,
-          ),
+          responseDraft: composeWeddingSalesResponse({
+            intent: "availability_unavailable",
+            config,
+            state,
+            summary: "If you have flexibility, I can help look at alternative dates.",
+          }),
           toolObservations: [
             {
               toolName: "check_wedding_availability",
@@ -116,22 +102,17 @@ export function createWeddingSalesToolNodes(args: {
       const available = steps.some((step) => step.status === "available");
       const unavailable = steps.some((step) => step.status === "unavailable");
       const summary = getSummary(parsedResult);
-      const links = formatPortfolioLinks(config);
-      const guideText = config.guide.link
-        ? `You can review the collections guide here: ${config.guide.link}`
-        : "I am attaching the collections guide so you can review the details.";
-      const reviewsText = config.reviews.url
-        ? `${config.reviews.label}: ${config.reviews.url}`
-        : config.reviews.label;
 
       if (unavailable && !available) {
         return {
           availability: "unavailable",
           leadStage: "availability_checked",
-          responseDraft: appendSignature(
-            `Thank you for sharing those details. I checked the date and it looks unavailable on my end. ${summary || "I can help look at another date if you have flexibility."}`,
-            config.signature,
-          ),
+          responseDraft: composeWeddingSalesResponse({
+            intent: "availability_unavailable",
+            config,
+            state,
+            summary,
+          }),
           toolObservations: [{ toolName: "check_wedding_availability", result }],
         };
       }
@@ -141,27 +122,22 @@ export function createWeddingSalesToolNodes(args: {
         guideSent: true,
         callProposed: true,
         leadStage: "availability_checked",
-        responseDraft: appendSignature(
-          [
-            `Thank you for sharing those details. I checked ${state.weddingDate} and it looks available for Myndful.`,
-            `Our collections start at ${config.pricing.startPrice}. ${guideText}`,
-            links ? `Here are a few recent wedding films:\n${links}` : "",
-            reviewsText ? `And here are reviews from couples: ${reviewsText}` : "",
-            "Would you be open to a 30-minute consultation Monday through Friday between 9 AM and 2 PM Eastern?",
-          ]
-            .filter(Boolean)
-            .join("\n\n"),
-          config.signature,
-        ),
+        responseDraft: composeWeddingSalesResponse({
+          intent: "availability_available",
+          config,
+          state,
+        }),
         toolObservations: [{ toolName: "check_wedding_availability", result }],
       };
     },
     checkCalendar: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
-          responseDraft: state.calendarStatus === "busy"
-            ? "That time was not available, so I cannot book it yet. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?"
-            : "I can check that consultation time once the calendar tool and requested time are available.",
+          responseDraft: composeWeddingSalesResponse({
+            intent: "calendar_time_missing",
+            config,
+            state,
+          }),
         };
       }
 
@@ -180,19 +156,22 @@ export function createWeddingSalesToolNodes(args: {
       return {
         calendarStatus: available ? "available" : "busy",
         leadStage: available ? "call_proposed" : "checking_calendar",
-        responseDraft: available
-          ? "That consultation time looks available. Would you like me to book it?"
-          : "That time does not look available on the calendar. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?",
+        responseDraft: composeWeddingSalesResponse({
+          intent: available ? "calendar_available" : "calendar_busy",
+          config,
+          state,
+        }),
         toolObservations: [{ toolName: "check_consultation_calendar", result }],
       };
     },
     bookCall: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
-          responseDraft: appendSignature(
-            "I can book the consultation once I have the confirmed time and booking tool configured.",
-            config.signature,
-          ),
+          responseDraft: composeWeddingSalesResponse({
+            intent: "booking_tool_missing",
+            config,
+            state,
+          }),
         };
       }
 
@@ -213,12 +192,11 @@ export function createWeddingSalesToolNodes(args: {
         bookingConfirmed: Boolean(eventId),
         bookedEventId: eventId,
         leadStage: eventId ? "booked" : "ready_to_book",
-        responseDraft: eventId
-          ? appendSignature("You are all set. The calendar invite has been created.", config.signature)
-          : appendSignature(
-              "I could not confirm the booking yet. I will need to retry the calendar booking step.",
-              config.signature,
-            ),
+        responseDraft: composeWeddingSalesResponse({
+          intent: eventId ? "booking_confirmed" : "booking_failed",
+          config,
+          state,
+        }),
         toolObservations: [{ toolName: "book_consultation", result }],
       };
     },

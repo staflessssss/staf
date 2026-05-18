@@ -1,37 +1,43 @@
 import type { WeddingSalesConfig } from "../config";
-function appendSignature(text: string, signature: string) {
-  return signature ? `${text.trim()}\n\n${signature.trim()}` : text.trim();
-}
+import { composeWeddingSalesResponse } from "../response-composer";
+import type { WeddingSalesState } from "../state";
 
 export function createWeddingSalesReplyNodes(config: WeddingSalesConfig) {
   return {
-    askMissingInfo: async () => ({
-      responseDraft: appendSignature(
-        "Thank you so much for reaching out. Could you share both of your names and your wedding date so I can check availability and send the most helpful details?",
-        config.signature,
-      ),
+    askMissingInfo: async (state: WeddingSalesState) => ({
+      responseDraft: composeWeddingSalesResponse({
+        intent: "ask_missing_info",
+        config,
+        state,
+      }),
     }),
-    askWeddingYear: async () => ({
-      responseDraft: appendSignature(
-        "Thank you so much. Just so I check the right date, could you share the wedding year?",
-        config.signature,
-      ),
+    askWeddingYear: async (state: WeddingSalesState) => ({
+      responseDraft: composeWeddingSalesResponse({
+        intent: "ask_wedding_year",
+        config,
+        state,
+      }),
     }),
-    checkAvailability: async () => ({
-      responseDraft: appendSignature(
-        `I have enough details to check the wedding date against our availability. If available, I will send the collections guide and note that collections start at ${config.pricing.startPrice}.`,
-        config.signature,
-      ),
+    checkAvailability: async (state: WeddingSalesState) => ({
+      responseDraft: composeWeddingSalesResponse({
+        intent: "availability_tool_missing",
+        config,
+        state,
+      }),
     }),
-    checkCalendar: async () => ({
-      responseDraft:
-        "I will check that consultation time against the calendar before calling it confirmed.",
+    checkCalendar: async (state: WeddingSalesState) => ({
+      responseDraft: composeWeddingSalesResponse({
+        intent: "calendar_time_missing",
+        config,
+        state,
+      }),
     }),
-    bookCall: async () => ({
-      responseDraft: appendSignature(
-        "I will book that consultation now and only confirm once the calendar event is created.",
-        config.signature,
-      ),
+    bookCall: async (state: WeddingSalesState) => ({
+      responseDraft: composeWeddingSalesResponse({
+        intent: "booking_tool_missing",
+        config,
+        state,
+      }),
     }),
     ignored: async () => ({
       responseDraft: "",
