@@ -28,6 +28,10 @@ export type WeddingSalesState = {
   calendarStatus?: "available" | "busy";
   bookingConfirmed: boolean;
   bookedEventId?: string;
+  toolObservations: Array<{
+    toolName: string;
+    result: string;
+  }>;
   latestCustomerMessage?: string;
   responseDraft?: string;
 };
@@ -46,6 +50,10 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   calendarStatus: Annotation<"available" | "busy" | undefined>(),
   bookingConfirmed: Annotation<boolean>(),
   bookedEventId: Annotation<string | undefined>(),
+  toolObservations: Annotation<Array<{ toolName: string; result: string }>>({
+    reducer: (current, update) => [...(current ?? []), ...(update ?? [])],
+    default: () => [],
+  }),
   latestCustomerMessage: Annotation<string | undefined>(),
   responseDraft: Annotation<string | undefined>(),
 });
@@ -69,6 +77,7 @@ export function createInitialWeddingSalesState(args: {
     calendarStatus: args.previousState?.calendarStatus,
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
     bookedEventId: args.previousState?.bookedEventId,
+    toolObservations: args.previousState?.toolObservations ?? [],
     latestCustomerMessage: args.message,
     responseDraft: undefined,
   };

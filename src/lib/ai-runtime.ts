@@ -30,6 +30,7 @@ import { getChannelAdapter } from "@/lib/channels";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { invokeWeddingSalesGraph } from "@/lib/lang/graphs/wedding-sales/graph";
+import { createWeddingSalesToolContextFromFeatures } from "@/lib/lang/graphs/wedding-sales/tools";
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
 import { resolveTools } from "@/lib/tools";
@@ -1775,6 +1776,19 @@ async function handleIncomingEventWithDeps(
             conversationId: conversation.id,
             kinds: [DelayedDeliveryKind.FOLLOW_UP],
           });
+          const toolFeatures = await hydrateFunctionBlocksForRuntime(
+            {
+              id: agent.id,
+              tenantId: agent.tenantId,
+              channelConfig: agent.channelConfig,
+            },
+            deps.db,
+          );
+          const toolContext = createWeddingSalesToolContextFromFeatures({
+            tenantId: agent.tenantId,
+            toolFeatures,
+            defaultEmail: incoming.contactEmail ?? incoming.contactId,
+          });
 
           const graphResult = await invokeWeddingSalesGraph({
             tenantId: agent.tenantId,
@@ -1782,6 +1796,7 @@ async function handleIncomingEventWithDeps(
             contactId: incoming.contactId,
             channel: "gmail",
             message: incoming.message,
+            toolContext,
             checkpoint: deps.db === db,
           });
           const message = graphResult.responseDraft ?? "";
@@ -1809,7 +1824,7 @@ async function handleIncomingEventWithDeps(
           return {
             message,
             promptPreview: "langgraph_wedding_sales",
-            usedTooling: [],
+            usedTooling: graphResult.toolObservations.map((observation) => observation.toolName),
             conversationId: conversation.id,
             model: "langgraph_wedding_sales",
           };

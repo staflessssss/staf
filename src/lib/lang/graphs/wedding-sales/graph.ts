@@ -1,10 +1,12 @@
 import { END, START, StateGraph } from "@langchain/langgraph";
 
 import { buildLangGraphThreadId, getLangGraphPostgresSaver } from "@/lib/lang/checkpointing";
+import type { WeddingSalesToolContext } from "@/lib/lang/tools/wedding-sales";
 
 import { defaultWeddingSalesConfig, type WeddingSalesConfig } from "./config";
 import { analyzeWeddingSalesMessage } from "./nodes/analyze";
 import { createWeddingSalesReplyNodes } from "./nodes/reply";
+import { createWeddingSalesToolNodes } from "./nodes/tools";
 import {
   createInitialWeddingSalesState,
   WeddingSalesStateAnnotation,
@@ -28,6 +30,7 @@ export type InvokeWeddingSalesGraphInput = {
   contactId?: string;
   previousState?: Partial<WeddingSalesState>;
   config?: Partial<WeddingSalesConfig>;
+  toolContext?: WeddingSalesToolContext | null;
   checkpoint?: boolean;
 };
 
@@ -82,19 +85,24 @@ function mergeWeddingSalesConfig(config?: Partial<WeddingSalesConfig>): WeddingS
 
 export function buildWeddingSalesGraph(args: {
   config?: Partial<WeddingSalesConfig>;
+  toolContext?: WeddingSalesToolContext | null;
   checkpointer?: Awaited<ReturnType<typeof getLangGraphPostgresSaver>>;
 } = {}) {
-  const { config, checkpointer } = args;
+  const { config, toolContext, checkpointer } = args;
   const resolvedConfig = mergeWeddingSalesConfig(config);
   const replyNodes = createWeddingSalesReplyNodes(resolvedConfig);
+  const toolNodes = createWeddingSalesToolNodes({
+    config: resolvedConfig,
+    toolContext,
+  });
 
   const workflow = new StateGraph(WeddingSalesStateAnnotation)
     .addNode("analyze", analyzeWeddingSalesMessage)
     .addNode("ask_missing_info", replyNodes.askMissingInfo)
     .addNode("ask_wedding_year", replyNodes.askWeddingYear)
-    .addNode("check_availability", replyNodes.checkAvailability)
-    .addNode("check_calendar", replyNodes.checkCalendar)
-    .addNode("book_call", replyNodes.bookCall)
+    .addNode("check_availability", toolNodes.checkAvailability)
+    .addNode("check_calendar", toolNodes.checkCalendar)
+    .addNode("book_call", toolNodes.bookCall)
     .addNode("ignored", replyNodes.ignored)
     .addEdge(START, "analyze")
     .addConditionalEdges("analyze", routeWeddingSalesState, {
@@ -119,6 +127,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
   const checkpointer = input.checkpoint ? await getLangGraphPostgresSaver() : null;
   const graph = buildWeddingSalesGraph({
     config: input.config,
+    toolContext: input.toolContext,
     checkpointer,
   });
   const initialState = createInitialWeddingSalesState({
