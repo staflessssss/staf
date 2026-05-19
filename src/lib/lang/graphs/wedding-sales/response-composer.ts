@@ -241,14 +241,28 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
 }
 
 function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
+  const isContinuation = Boolean(args.state.responseDraft) || args.state.leadStage !== "new";
+  const isSchedulingReply = [
+    "calendar_available",
+    "calendar_busy",
+    "calendar_outside_window",
+    "calendar_time_missing",
+    "booking_confirmed",
+    "booking_failed",
+  ].includes(args.intent);
   const signatureInstruction = appendSignatureForIntent(args.intent)
     ? `End with this exact signature once:\n${args.config.signature || "(no signature configured)"}`
     : "Do not include the email signature for this short scheduling reply.";
+  const greetingInstruction = isSchedulingReply || isContinuation
+    ? "Do not start with a greeting like Hi, Hello, Hey, or Hi Anna and Mark. Continue the existing thread naturally."
+    : "A short natural greeting is okay only for the first reply in a new thread.";
 
   return [
     "You write final customer-facing replies for Myndful Films wedding leads.",
     "Sound like Taras, the warm founder of a premium wedding videography company. Be human, specific, and natural.",
     "Never sound like a generic bot or status message. Avoid repeating the previous assistant response.",
+    greetingInstruction,
+    isSchedulingReply ? "For scheduling and booking replies, answer directly in 1-2 short paragraphs. No greeting, no sign-off, no signature." : "Do not over-email-format mid-thread replies.",
     "Use the provided facts only. Do not invent availability, calendar status, prices, links, event IDs, or bookings.",
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
     "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
@@ -257,6 +271,66 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Write concise email paragraphs, usually 2-4 short paragraphs.",
     signatureInstruction,
   ].join("\n");
+}
+
+function stripSignatureLikeBlock(text: string) {
+  const lines = text.trim().split(/\r?\n/);
+  const signatureStartIndex = lines.findIndex((line, index) => {
+    const trimmed = line.trim();
+    const nextLines = lines
+      .slice(index + 1, index + 5)
+      .map((nextLine) => nextLine.trim())
+      .join("\n");
+
+    if (/^Taras Mynd\b/i.test(trimmed)) {
+      return true;
+    }
+
+    if (/^(warmly|best|thanks|thank you|looking forward),?\s*$/i.test(trimmed) && /Taras\b/i.test(nextLines)) {
+      return true;
+    }
+
+    return /^(warmly|best|thanks|thank you|looking forward),?\s*Taras\b/i.test(trimmed);
+  });
+
+  return (signatureStartIndex === -1 ? text : lines.slice(0, signatureStartIndex).join("\n")).trim();
+}
+
+function isSchedulingIntent(intent: WeddingSalesResponseIntent) {
+  return [
+    "calendar_available",
+    "calendar_busy",
+    "calendar_outside_window",
+    "calendar_time_missing",
+    "booking_confirmed",
+    "booking_failed",
+  ].includes(intent);
+}
+
+function stripGreetingLikeOpening(text: string) {
+  return text
+    .replace(/^\s*(hi|hello|hey)\s+[^,\n]+(?:\s+and\s+[^,\n]+)?[,]?\s*\n+/i, "")
+    .replace(/^\s*(hi|hello|hey)\s+there[,]?\s*\n+/i, "")
+    .trim();
+}
+
+function normalizeMarkdownLinksForRichEmail(text: string) {
+  return text.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
+}
+
+export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { text: string }) {
+  const formatting = getChannelFormatting(args.config, args.state);
+  const withoutModelSignature = stripSignatureLikeBlock(args.text);
+  const withoutThreadGreeting = isSchedulingIntent(args.intent)
+    ? stripGreetingLikeOpening(withoutModelSignature)
+    : withoutModelSignature;
+  const normalizedLinks = formatting.richLinks
+    ? normalizeMarkdownLinksForRichEmail(withoutThreadGreeting)
+    : withoutThreadGreeting;
+
+  return appendSignatureForIntent(args.intent)
+    ? appendSignatureOnce(normalizedLinks, args.config.signature)
+    : normalizedLinks.trim();
 }
 
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
@@ -284,9 +358,7 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
       return fallback;
     }
 
-    return appendSignatureForIntent(args.intent)
-      ? appendSignatureOnce(trimmed, args.config.signature)
-      : trimmed;
+    return finalizeLlmWeddingSalesResponse({ ...args, text: trimmed });
   } catch (error) {
     console.warn("[wedding-sales] LLM response composer failed; using fallback.", error);
     return fallback;

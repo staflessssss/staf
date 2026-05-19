@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { defaultWeddingSalesConfig } from "./config";
-import { composeWeddingSalesResponse } from "./response-composer";
+import { composeWeddingSalesResponse, finalizeLlmWeddingSalesResponse } from "./response-composer";
 import type { WeddingSalesState } from "./state";
 
 const baseState: WeddingSalesState = {
@@ -97,4 +97,59 @@ test("wedding sales composer confirms consultation booking warmly without weddin
   assert.doesNotMatch(response, /wedding.*booked/i);
   assert.doesNotMatch(response, /date.*reserved/i);
   assert.equal(response.match(/Taras Mynd/g)?.length, 1);
+});
+
+test("LLM wedding sales finalizer removes model-added duplicate signatures", () => {
+  const response = finalizeLlmWeddingSalesResponse({
+    intent: "availability_available",
+    config,
+    state: baseState,
+    text: [
+      "Hi Anna and Mark,",
+      "",
+      "June 14, 2027 is available, and I would love to hear more about your plans.",
+      "",
+      "Warmly,",
+      "Taras Mynd",
+      "Founder & Creative Director / MYNDFUL FILMS LLC",
+      "www.myndfulfilms.co",
+    ].join("\n"),
+  });
+
+  assert.equal(response.match(/Taras Mynd/g)?.length, 1);
+  assert.match(response, /MYNDFUL FILMS$/);
+});
+
+test("LLM wedding sales finalizer strips greetings and signatures from scheduling replies", () => {
+  const response = finalizeLlmWeddingSalesResponse({
+    intent: "calendar_busy",
+    config,
+    state: {
+      ...baseState,
+      responseDraft: "Would you be open to a 30-minute consultation?",
+    },
+    text: [
+      "Hi Anna and Mark,",
+      "",
+      "Monday at 10 AM Eastern is already booked, but 9 AM, 9:30 AM, or 10:30 AM are open. Would one of those work?",
+      "",
+      "Warmly,",
+      "Taras",
+    ].join("\n"),
+  });
+
+  assert.doesNotMatch(response, /^Hi\b/i);
+  assert.doesNotMatch(response, /Taras/i);
+  assert.match(response, /^Monday at 10 AM Eastern/i);
+});
+
+test("LLM wedding sales finalizer converts markdown links for rich Gmail replies", () => {
+  const response = finalizeLlmWeddingSalesResponse({
+    intent: "availability_available",
+    config,
+    state: baseState,
+    text: "Here is a recent film: [Callista and Kevin](https://example.com/film)",
+  });
+
+  assert.match(response, /<a href="https:\/\/example.com\/film">Callista and Kevin<\/a>/);
 });
