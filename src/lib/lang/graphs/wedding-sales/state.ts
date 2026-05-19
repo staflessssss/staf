@@ -34,6 +34,16 @@ export type WeddingSalesState = {
   }>;
   latestCustomerMessage?: string;
   responseDraft?: string;
+  assistantReplyCount: number;
+  hasGreeted: boolean;
+  signatureSent: boolean;
+  portfolioSent: boolean;
+  reviewsSent: boolean;
+  guideOffered: boolean;
+  askedForNames: boolean;
+  askedForWeddingYear: boolean;
+  askedForCallTime: boolean;
+  lastAssistantIntent?: string;
 };
 
 export const WeddingSalesStateAnnotation = Annotation.Root({
@@ -56,6 +66,16 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   }),
   latestCustomerMessage: Annotation<string | undefined>(),
   responseDraft: Annotation<string | undefined>(),
+  assistantReplyCount: Annotation<number>(),
+  hasGreeted: Annotation<boolean>(),
+  signatureSent: Annotation<boolean>(),
+  portfolioSent: Annotation<boolean>(),
+  reviewsSent: Annotation<boolean>(),
+  guideOffered: Annotation<boolean>(),
+  askedForNames: Annotation<boolean>(),
+  askedForWeddingYear: Annotation<boolean>(),
+  askedForCallTime: Annotation<boolean>(),
+  lastAssistantIntent: Annotation<string | undefined>(),
 });
 
 export function createInitialWeddingSalesState(args: {
@@ -80,5 +100,15 @@ export function createInitialWeddingSalesState(args: {
     toolObservations: [],
     latestCustomerMessage: args.message,
     responseDraft: undefined,
+    assistantReplyCount: args.previousState?.assistantReplyCount ?? 0,
+    hasGreeted: args.previousState?.hasGreeted ?? false,
+    signatureSent: args.previousState?.signatureSent ?? false,
+    portfolioSent: args.previousState?.portfolioSent ?? false,
+    reviewsSent: args.previousState?.reviewsSent ?? false,
+    guideOffered: args.previousState?.guideOffered ?? false,
+    askedForNames: args.previousState?.askedForNames ?? false,
+    askedForWeddingYear: args.previousState?.askedForWeddingYear ?? false,
+    askedForCallTime: args.previousState?.askedForCallTime ?? false,
+    lastAssistantIntent: args.previousState?.lastAssistantIntent,
   };
 }

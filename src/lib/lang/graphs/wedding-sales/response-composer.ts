@@ -2,6 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
 import type { WeddingSalesConfig } from "./config";
+import { buildWeddingSalesDialogPolicy, type WeddingSalesDialogPolicy } from "./policy";
 import type { WeddingSalesState } from "./state";
 
 export type WeddingSalesResponseIntent =
@@ -23,6 +24,7 @@ type ComposeWeddingSalesResponseArgs = {
   config: WeddingSalesConfig;
   state: WeddingSalesState;
   summary?: string;
+  policy?: WeddingSalesDialogPolicy;
 };
 
 const DEFAULT_RESPONSE_MODEL = "gpt-4.1-mini";
@@ -106,12 +108,9 @@ function formatLocationSuffix(location?: string) {
   return location ? ` in ${location}` : "";
 }
 
-function appendSignatureForIntent(intent: WeddingSalesResponseIntent) {
-  return !["calendar_available", "calendar_busy", "calendar_outside_window", "calendar_time_missing"].includes(intent);
-}
-
 export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
   const { intent, config, state, summary } = args;
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
   const weddingDate = formatWeddingDateForReply(state.weddingDate);
   const location = formatLocationSuffix(state.location);
 
@@ -184,7 +183,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
     }
   })();
 
-  return appendSignatureForIntent(intent)
+  return policy.includeSignature
     ? appendSignatureOnce(response, config.signature)
     : response.trim();
 }
@@ -202,6 +201,7 @@ function safeJson(value: unknown) {
 
 function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
   const { config, state, intent, summary } = args;
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
 
   return {
     intent,
@@ -237,32 +237,32 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
       richLinks: getChannelFormatting(config, state).richLinks,
       allowAttachments: getChannelFormatting(config, state).allowAttachments,
     },
+    dialogPolicy: policy,
   };
 }
 
 function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
-  const isContinuation = Boolean(args.state.responseDraft) || args.state.leadStage !== "new";
-  const isSchedulingReply = [
-    "calendar_available",
-    "calendar_busy",
-    "calendar_outside_window",
-    "calendar_time_missing",
-    "booking_confirmed",
-    "booking_failed",
-  ].includes(args.intent);
-  const signatureInstruction = appendSignatureForIntent(args.intent)
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+  const signatureInstruction = policy.includeSignature
     ? `End with this exact signature once:\n${args.config.signature || "(no signature configured)"}`
-    : "Do not include the email signature for this short scheduling reply.";
-  const greetingInstruction = isSchedulingReply || isContinuation
-    ? "Do not start with a greeting like Hi, Hello, Hey, or Hi Anna and Mark. Continue the existing thread naturally."
-    : "A short natural greeting is okay only for the first reply in a new thread.";
+    : "Do not include an email signature or sign-off.";
+  const greetingInstruction = policy.allowGreeting
+    ? "A short natural greeting is allowed."
+    : "Do not start with a greeting like Hi, Hello, Hey, or Hi Anna and Mark. Continue the existing thread naturally.";
+  const modeInstruction = policy.replyMode === "scheduling_reply"
+    ? "For scheduling and booking replies, answer directly in 1-2 short paragraphs. No greeting, no sign-off, no signature."
+    : "Do not over-email-format mid-thread replies.";
 
   return [
     "You write final customer-facing replies for Myndful Films wedding leads.",
     "Sound like Taras, the warm founder of a premium wedding videography company. Be human, specific, and natural.",
     "Never sound like a generic bot or status message. Avoid repeating the previous assistant response.",
     greetingInstruction,
-    isSchedulingReply ? "For scheduling and booking replies, answer directly in 1-2 short paragraphs. No greeting, no sign-off, no signature." : "Do not over-email-format mid-thread replies.",
+    `Reply mode: ${policy.replyMode}. Maximum paragraphs: ${policy.maxParagraphs}. Link style: ${policy.linkStyle}.`,
+    modeInstruction,
+    policy.mustInclude.length ? `Must include:\n- ${policy.mustInclude.join("\n- ")}` : "",
+    policy.mustNotRepeat.length ? `Must not repeat:\n- ${policy.mustNotRepeat.join("\n- ")}` : "",
+    policy.forbiddenPhrases.length ? `Forbidden phrases or concepts:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
     "Use the provided facts only. Do not invent availability, calendar status, prices, links, event IDs, or bookings.",
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
     "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
@@ -270,7 +270,7 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Allowed emojis only: 🤍 ✨ 🎥. Use at most one emoji unless the customer is very enthusiastic.",
     "Write concise email paragraphs, usually 2-4 short paragraphs.",
     signatureInstruction,
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 function stripSignatureLikeBlock(text: string) {
@@ -296,17 +296,6 @@ function stripSignatureLikeBlock(text: string) {
   return (signatureStartIndex === -1 ? text : lines.slice(0, signatureStartIndex).join("\n")).trim();
 }
 
-function isSchedulingIntent(intent: WeddingSalesResponseIntent) {
-  return [
-    "calendar_available",
-    "calendar_busy",
-    "calendar_outside_window",
-    "calendar_time_missing",
-    "booking_confirmed",
-    "booking_failed",
-  ].includes(intent);
-}
-
 function stripGreetingLikeOpening(text: string) {
   return text
     .replace(/^\s*(hi|hello|hey)\s+[^,\n]+(?:\s+and\s+[^,\n]+)?[,]?\s*\n+/i, "")
@@ -320,15 +309,16 @@ function normalizeMarkdownLinksForRichEmail(text: string) {
 
 export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { text: string }) {
   const formatting = getChannelFormatting(args.config, args.state);
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
   const withoutModelSignature = stripSignatureLikeBlock(args.text);
-  const withoutThreadGreeting = isSchedulingIntent(args.intent)
+  const withoutThreadGreeting = !policy.allowGreeting
     ? stripGreetingLikeOpening(withoutModelSignature)
     : withoutModelSignature;
   const normalizedLinks = formatting.richLinks
     ? normalizeMarkdownLinksForRichEmail(withoutThreadGreeting)
     : withoutThreadGreeting;
 
-  return appendSignatureForIntent(args.intent)
+  return policy.includeSignature
     ? appendSignatureOnce(normalizedLinks, args.config.signature)
     : normalizedLinks.trim();
 }

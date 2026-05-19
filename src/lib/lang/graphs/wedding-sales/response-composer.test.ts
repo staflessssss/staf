@@ -17,6 +17,15 @@ const baseState: WeddingSalesState = {
   callProposed: false,
   bookingConfirmed: false,
   toolObservations: [],
+  assistantReplyCount: 0,
+  hasGreeted: false,
+  signatureSent: false,
+  portfolioSent: false,
+  reviewsSent: false,
+  guideOffered: false,
+  askedForNames: false,
+  askedForWeddingYear: false,
+  askedForCallTime: false,
 };
 
 const config = {
@@ -96,7 +105,7 @@ test("wedding sales composer confirms consultation booking warmly without weddin
   assert.match(response, /looking forward/i);
   assert.doesNotMatch(response, /wedding.*booked/i);
   assert.doesNotMatch(response, /date.*reserved/i);
-  assert.equal(response.match(/Taras Mynd/g)?.length, 1);
+  assert.equal(response.match(/Taras Mynd/g)?.length ?? 0, 0);
 });
 
 test("LLM wedding sales finalizer removes model-added duplicate signatures", () => {

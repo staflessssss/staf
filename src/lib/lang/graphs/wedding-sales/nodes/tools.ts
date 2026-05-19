@@ -8,7 +8,9 @@ import {
 } from "@/lib/lang/tools/wedding-sales";
 
 import type { WeddingSalesConfig } from "../config";
+import { buildWeddingSalesDialogPolicy, getWeddingSalesBehavioralStateUpdate } from "../policy";
 import { composeHumanWeddingSalesResponse } from "../response-composer";
+import type { WeddingSalesResponseIntent } from "../response-composer";
 import type { WeddingSalesState } from "../state";
 
 function parseToolJson(result: string) {
@@ -60,6 +62,20 @@ async function invokeTool(toolInstance: StructuredToolInterface, input: Record<s
   return typeof result === "string" ? result : JSON.stringify(result);
 }
 
+async function composeReplyUpdate(args: {
+  intent: WeddingSalesResponseIntent;
+  config: WeddingSalesConfig;
+  state: WeddingSalesState;
+  summary?: string;
+}) {
+  const policy = buildWeddingSalesDialogPolicy(args);
+
+  return {
+    responseDraft: await composeHumanWeddingSalesResponse({ ...args, policy }),
+    ...getWeddingSalesBehavioralStateUpdate({ ...args, policy }),
+  };
+}
+
 export function createWeddingSalesToolNodes(args: {
   config: WeddingSalesConfig;
   toolContext?: WeddingSalesToolContext | null;
@@ -70,11 +86,11 @@ export function createWeddingSalesToolNodes(args: {
     checkAvailability: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.weddingDate) {
         return {
-          responseDraft: await composeHumanWeddingSalesResponse({
+          ...(await composeReplyUpdate({
             intent: "availability_tool_missing",
             config,
             state,
-          }),
+          })),
         };
       }
 
@@ -82,12 +98,12 @@ export function createWeddingSalesToolNodes(args: {
         return {
           availability: "unavailable",
           leadStage: "availability_checked",
-          responseDraft: await composeHumanWeddingSalesResponse({
+          ...(await composeReplyUpdate({
             intent: "availability_unavailable",
             config,
             state,
             summary: "If you have flexibility, I can help look at alternative dates.",
-          }),
+          })),
           toolObservations: [
             {
               toolName: "check_wedding_availability",
@@ -119,12 +135,12 @@ export function createWeddingSalesToolNodes(args: {
         return {
           availability: "unavailable",
           leadStage: "availability_checked",
-          responseDraft: await composeHumanWeddingSalesResponse({
+          ...(await composeReplyUpdate({
             intent: "availability_unavailable",
             config,
             state,
             summary,
-          }),
+          })),
           toolObservations: [{ toolName: "check_wedding_availability", result }],
         };
       }
@@ -134,22 +150,22 @@ export function createWeddingSalesToolNodes(args: {
         guideSent: true,
         callProposed: true,
         leadStage: "availability_checked",
-        responseDraft: await composeHumanWeddingSalesResponse({
+        ...(await composeReplyUpdate({
           intent: "availability_available",
           config,
           state,
-        }),
+        })),
         toolObservations: [{ toolName: "check_wedding_availability", result }],
       };
     },
     checkCalendar: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
-          responseDraft: await composeHumanWeddingSalesResponse({
+          ...(await composeReplyUpdate({
             intent: "calendar_time_missing",
             config,
             state,
-          }),
+          })),
         };
       }
 
@@ -172,23 +188,23 @@ export function createWeddingSalesToolNodes(args: {
       return {
         calendarStatus: available ? "available" : "busy",
         leadStage: available ? "call_proposed" : "checking_calendar",
-        responseDraft: await composeHumanWeddingSalesResponse({
+        ...(await composeReplyUpdate({
           intent: available ? "calendar_available" : outsideWindow ? "calendar_outside_window" : "calendar_busy",
           config,
           state,
           summary,
-        }),
+        })),
         toolObservations: [{ toolName: "check_consultation_calendar", result }],
       };
     },
     bookCall: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
-          responseDraft: await composeHumanWeddingSalesResponse({
+          ...(await composeReplyUpdate({
             intent: "booking_tool_missing",
             config,
             state,
-          }),
+          })),
         };
       }
 
@@ -207,11 +223,11 @@ export function createWeddingSalesToolNodes(args: {
         bookingConfirmed,
         bookedEventId: eventId,
         leadStage: bookingConfirmed ? "booked" : "ready_to_book",
-        responseDraft: await composeHumanWeddingSalesResponse({
+        ...(await composeReplyUpdate({
           intent: bookingConfirmed ? "booking_confirmed" : "booking_failed",
           config,
           state,
-        }),
+        })),
         toolObservations: [{ toolName: "book_consultation", result }],
       };
     },
