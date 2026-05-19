@@ -10,6 +10,8 @@ const baseState: WeddingSalesState = {
   leadStage: "availability_checked",
   names: "Anna and Mark",
   weddingDate: "2027-06-14",
+  weddingDateText: "June 14",
+  weddingYear: "2027",
   weddingYearKnown: true,
   location: "Charlotte",
   availability: "available",

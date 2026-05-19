@@ -19,6 +19,8 @@ export type WeddingSalesState = {
   leadStage: WeddingSalesLeadStage;
   names?: string;
   weddingDate?: string;
+  weddingDateText?: string;
+  weddingYear?: string;
   weddingYearKnown: boolean;
   location?: string;
   availability?: "available" | "unavailable";
@@ -51,6 +53,8 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   leadStage: Annotation<WeddingSalesLeadStage>(),
   names: Annotation<string | undefined>(),
   weddingDate: Annotation<string | undefined>(),
+  weddingDateText: Annotation<string | undefined>(),
+  weddingYear: Annotation<string | undefined>(),
   weddingYearKnown: Annotation<boolean>(),
   location: Annotation<string | undefined>(),
   availability: Annotation<"available" | "unavailable" | undefined>(),
@@ -88,6 +92,8 @@ export function createInitialWeddingSalesState(args: {
     leadStage: args.previousState?.leadStage ?? "new",
     names: args.previousState?.names,
     weddingDate: args.previousState?.weddingDate,
+    weddingDateText: args.previousState?.weddingDateText,
+    weddingYear: args.previousState?.weddingYear,
     weddingYearKnown: args.previousState?.weddingYearKnown ?? false,
     location: args.previousState?.location,
     availability: args.previousState?.availability,

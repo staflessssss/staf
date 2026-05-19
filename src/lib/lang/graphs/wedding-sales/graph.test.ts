@@ -11,7 +11,28 @@ test("wedding sales graph asks for year before checking availability", async () 
   });
 
   assert.equal(result.leadStage, "waiting_wedding_year");
+  assert.equal(result.weddingDateText, "June 14");
   assert.match(result.responseDraft ?? "", /year/i);
+});
+
+test("wedding sales graph combines a previously mentioned month-day with a later year", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: "2027. The venue is in Charlotte, NC.",
+    previousState: {
+      names: "Anna and Mark",
+      weddingDateText: "June 14",
+      weddingYearKnown: false,
+      location: "Charlotte",
+      bookingConfirmed: false,
+      leadStage: "waiting_wedding_year",
+    },
+  });
+
+  assert.equal(result.leadStage, "ready_for_availability");
+  assert.equal(result.weddingDate, "2027-06-14");
+  assert.equal(result.weddingYear, "2027");
+  assert.doesNotMatch(result.responseDraft ?? "", /exact date/i);
 });
 
 test("wedding sales graph routes complete wedding info to availability check", async () => {

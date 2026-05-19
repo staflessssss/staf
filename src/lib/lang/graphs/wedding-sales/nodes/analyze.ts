@@ -33,6 +33,10 @@ function hasYear(text: string) {
   return /\b(?:19|20)\d{2}\b/.test(text);
 }
 
+function extractYear(text: string) {
+  return text.match(/\b((?:19|20)\d{2})\b/)?.[1];
+}
+
 function hasWeddingDate(text: string) {
   return new RegExp(monthNamePattern, "i").test(text) || /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(text);
 }
@@ -103,6 +107,14 @@ function extractWeddingDate(text: string) {
   };
 }
 
+function combineWeddingDateTextWithYear(dateText: string | undefined, year: string | undefined) {
+  if (!dateText || !year) {
+    return undefined;
+  }
+
+  return extractWeddingDate(`${dateText}, ${year}`)?.iso;
+}
+
 function extractNames(text: string) {
   const match = text.match(/\b(?:we are|we're|this is)\s+([A-Z][A-Za-z .'-]+?)(?:\.|,|\s+and\s+our|\s+our|\s+wedding|\s+from|\s+in\b|$)/i);
   return match?.[1]?.trim();
@@ -116,11 +128,18 @@ function extractLocation(text: string) {
 export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Promise<Partial<WeddingSalesState>> {
   const message = state.latestCustomerMessage ?? "";
   const extractedDate = extractWeddingDate(message);
+  const extractedYear = extractYear(message);
   const extractedNames = extractNames(message);
   const extractedLocation = extractLocation(message);
+  const combinedWeddingDate =
+    extractedDate?.iso ??
+    combineWeddingDateTextWithYear(extractedDate?.display, state.weddingYear) ??
+    combineWeddingDateTextWithYear(state.weddingDateText, extractedYear);
   const baseUpdate: Partial<WeddingSalesState> = {
     ...(extractedNames ? { names: extractedNames } : {}),
-    ...(extractedDate?.iso ? { weddingDate: extractedDate.iso } : {}),
+    ...(combinedWeddingDate ? { weddingDate: combinedWeddingDate } : {}),
+    ...(extractedDate?.display && !combinedWeddingDate ? { weddingDateText: extractedDate.display } : {}),
+    ...(extractedYear ? { weddingYear: extractedYear } : {}),
     ...(extractedLocation ? { location: extractedLocation } : {}),
   };
 
@@ -140,8 +159,8 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: message };
   }
 
-  const dateKnown = Boolean(state.weddingDate) || hasWeddingDate(message);
-  const yearKnown = state.weddingYearKnown || hasYear(message) || Boolean(extractedDate?.yearKnown);
+  const dateKnown = Boolean(state.weddingDate) || Boolean(combinedWeddingDate) || Boolean(state.weddingDateText) || hasWeddingDate(message);
+  const yearKnown = state.weddingYearKnown || hasYear(message) || Boolean(extractedDate?.yearKnown) || Boolean(state.weddingYear);
   const namesKnown = Boolean(state.names) || hasNames(message);
   const locationKnown = Boolean(state.location) || hasLocation(message);
 

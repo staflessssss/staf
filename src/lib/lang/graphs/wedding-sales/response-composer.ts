@@ -211,6 +211,8 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
       leadStage: state.leadStage,
       names: state.names,
       weddingDate: state.weddingDate,
+      weddingDateText: state.weddingDateText,
+      weddingYear: state.weddingYear,
       weddingYearKnown: state.weddingYearKnown,
       location: state.location,
       availability: state.availability,
