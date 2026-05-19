@@ -8,7 +8,7 @@ import {
 } from "@/lib/lang/tools/wedding-sales";
 
 import type { WeddingSalesConfig } from "../config";
-import { composeWeddingSalesResponse } from "../response-composer";
+import { composeHumanWeddingSalesResponse } from "../response-composer";
 import type { WeddingSalesState } from "../state";
 
 function parseToolJson(result: string) {
@@ -70,7 +70,7 @@ export function createWeddingSalesToolNodes(args: {
     checkAvailability: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.weddingDate) {
         return {
-          responseDraft: composeWeddingSalesResponse({
+          responseDraft: await composeHumanWeddingSalesResponse({
             intent: "availability_tool_missing",
             config,
             state,
@@ -82,7 +82,7 @@ export function createWeddingSalesToolNodes(args: {
         return {
           availability: "unavailable",
           leadStage: "availability_checked",
-          responseDraft: composeWeddingSalesResponse({
+          responseDraft: await composeHumanWeddingSalesResponse({
             intent: "availability_unavailable",
             config,
             state,
@@ -119,7 +119,7 @@ export function createWeddingSalesToolNodes(args: {
         return {
           availability: "unavailable",
           leadStage: "availability_checked",
-          responseDraft: composeWeddingSalesResponse({
+          responseDraft: await composeHumanWeddingSalesResponse({
             intent: "availability_unavailable",
             config,
             state,
@@ -134,7 +134,7 @@ export function createWeddingSalesToolNodes(args: {
         guideSent: true,
         callProposed: true,
         leadStage: "availability_checked",
-        responseDraft: composeWeddingSalesResponse({
+        responseDraft: await composeHumanWeddingSalesResponse({
           intent: "availability_available",
           config,
           state,
@@ -145,7 +145,7 @@ export function createWeddingSalesToolNodes(args: {
     checkCalendar: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
-          responseDraft: composeWeddingSalesResponse({
+          responseDraft: await composeHumanWeddingSalesResponse({
             intent: "calendar_time_missing",
             config,
             state,
@@ -172,7 +172,7 @@ export function createWeddingSalesToolNodes(args: {
       return {
         calendarStatus: available ? "available" : "busy",
         leadStage: available ? "call_proposed" : "checking_calendar",
-        responseDraft: composeWeddingSalesResponse({
+        responseDraft: await composeHumanWeddingSalesResponse({
           intent: available ? "calendar_available" : outsideWindow ? "calendar_outside_window" : "calendar_busy",
           config,
           state,
@@ -184,7 +184,7 @@ export function createWeddingSalesToolNodes(args: {
     bookCall: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
-          responseDraft: composeWeddingSalesResponse({
+          responseDraft: await composeHumanWeddingSalesResponse({
             intent: "booking_tool_missing",
             config,
             state,
@@ -207,7 +207,7 @@ export function createWeddingSalesToolNodes(args: {
         bookingConfirmed,
         bookedEventId: eventId,
         leadStage: bookingConfirmed ? "booked" : "ready_to_book",
-        responseDraft: composeWeddingSalesResponse({
+        responseDraft: await composeHumanWeddingSalesResponse({
           intent: bookingConfirmed ? "booking_confirmed" : "booking_failed",
           config,
           state,

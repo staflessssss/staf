@@ -79,3 +79,22 @@ test("wedding sales composer uses plain links for instagram", () => {
   assert.doesNotMatch(response, /<a href=/);
   assert.match(response, /Callista and Kevin: https:\/\/example.com\/film/);
 });
+
+test("wedding sales composer confirms consultation booking warmly without wedding-booking language", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "booking_confirmed",
+    config,
+    state: {
+      ...baseState,
+      leadStage: "booked",
+      bookingConfirmed: true,
+    },
+  });
+
+  assert.match(response, /calendar invite/i);
+  assert.match(response, /consultation/i);
+  assert.match(response, /looking forward/i);
+  assert.doesNotMatch(response, /wedding.*booked/i);
+  assert.doesNotMatch(response, /date.*reserved/i);
+  assert.equal(response.match(/Taras Mynd/g)?.length, 1);
+});
