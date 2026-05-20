@@ -1,6 +1,8 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
+import { traceLangRuntime } from "@/lib/lang/langsmith";
+
 import type { WeddingSalesConfig } from "./config";
 import { buildWeddingSalesDialogPolicy, type WeddingSalesDialogPolicy } from "./policy";
 import type { WeddingSalesState } from "./state";
@@ -26,6 +28,12 @@ type ComposeWeddingSalesResponseArgs = {
   state: WeddingSalesState;
   summary?: string;
   policy?: WeddingSalesDialogPolicy;
+};
+
+type WeddingSalesReflectionReview = {
+  status: "pass" | "rewrite";
+  revisedText: string;
+  issues: string[];
 };
 
 const DEFAULT_RESPONSE_MODEL = "gpt-4.1-mini";
@@ -266,6 +274,26 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
   };
 }
 
+function buildTraceMetadata(args: ComposeWeddingSalesResponseArgs, extra: Record<string, unknown> = {}) {
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+
+  return {
+    runtimeType: "langgraph_wedding_sales" as const,
+    channel: args.state.channel,
+    intent: args.intent,
+    leadStage: args.state.leadStage,
+    replyMode: policy.replyMode,
+    allowGreeting: policy.allowGreeting,
+    includeSignature: policy.includeSignature,
+    assistantReplyCount: args.state.assistantReplyCount,
+    hasGreeted: args.state.hasGreeted,
+    signatureSent: args.state.signatureSent,
+    guideOffered: args.state.guideOffered,
+    lastAssistantIntent: args.state.lastAssistantIntent,
+    ...extra,
+  };
+}
+
 function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
   const signatureInstruction = policy.includeSignature
@@ -382,14 +410,75 @@ export function parseWeddingSalesReflectionJson(text: string) {
       status: parsed.status === "rewrite" ? "rewrite" : "pass",
       revisedText: typeof parsed.revisedText === "string" ? parsed.revisedText.trim() : "",
       issues: Array.isArray(parsed.issues) ? parsed.issues.filter((issue): issue is string => typeof issue === "string") : [],
-    };
+    } satisfies WeddingSalesReflectionReview;
   } catch {
     return {
       status: "pass" as const,
       revisedText: "",
       issues: [],
-    };
+    } satisfies WeddingSalesReflectionReview;
   }
+}
+
+async function generateWeddingSalesComposerDraft(args: ComposeWeddingSalesResponseArgs) {
+  return traceLangRuntime(
+    "wedding_sales.response.composer",
+    buildTraceMetadata(args, {
+      composerModel: process.env.WEDDING_SALES_RESPONSE_MODEL || DEFAULT_RESPONSE_MODEL,
+    }),
+    async () => {
+      const { text } = await generateText({
+        model: openai(process.env.WEDDING_SALES_RESPONSE_MODEL || DEFAULT_RESPONSE_MODEL),
+        system: buildComposerSystemPrompt(args),
+        prompt: [
+          "Create the next reply from these facts.",
+          "If previousAssistantResponse is similar to what you are about to write, change the wording and move the conversation forward.",
+          "Do not treat this as a fresh conversation unless assistantReplyCount is 0.",
+          "Facts:",
+          safeJson(buildComposerFacts(args)),
+        ].join("\n\n"),
+        temperature: 0.7,
+        frequencyPenalty: 0.4,
+        presencePenalty: 0.2,
+      });
+
+      return {
+        text,
+        textLength: text.length,
+      };
+    },
+  );
+}
+
+async function reviewWeddingSalesComposerDraft(args: ComposeWeddingSalesResponseArgs & { draft: string }) {
+  return traceLangRuntime(
+    "wedding_sales.response.reflection",
+    buildTraceMetadata(args, {
+      reflectionModel: process.env.WEDDING_SALES_REFLECTION_MODEL || DEFAULT_REFLECTION_MODEL,
+      draftLength: args.draft.length,
+    }),
+    async () => {
+      const { text } = await generateText({
+        model: openai(process.env.WEDDING_SALES_REFLECTION_MODEL || DEFAULT_REFLECTION_MODEL),
+        system: buildReflectionSystemPrompt(args),
+        prompt: [
+          "Review this draft and either pass it or rewrite it.",
+          "Facts and policy:",
+          safeJson(buildComposerFacts(args)),
+          "Draft:",
+          args.draft,
+        ].join("\n\n"),
+        temperature: 0.2,
+      });
+      const review = parseWeddingSalesReflectionJson(text);
+
+      return {
+        ...review,
+        rawReviewLength: text.length,
+        revisedTextLength: review.revisedText.length,
+      };
+    },
+  );
 }
 
 async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { draft: string }) {
@@ -398,19 +487,7 @@ async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs
   }
 
   try {
-    const { text } = await generateText({
-      model: openai(process.env.WEDDING_SALES_REFLECTION_MODEL || DEFAULT_REFLECTION_MODEL),
-      system: buildReflectionSystemPrompt(args),
-      prompt: [
-        "Review this draft and either pass it or rewrite it.",
-        "Facts and policy:",
-        safeJson(buildComposerFacts(args)),
-        "Draft:",
-        args.draft,
-      ].join("\n\n"),
-      temperature: 0.2,
-    });
-    const review = parseWeddingSalesReflectionJson(text);
+    const review = await reviewWeddingSalesComposerDraft(args);
 
     if (review.status !== "rewrite" || !review.revisedText) {
       return args.draft;
@@ -431,20 +508,7 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
   }
 
   try {
-    const { text } = await generateText({
-      model: openai(process.env.WEDDING_SALES_RESPONSE_MODEL || DEFAULT_RESPONSE_MODEL),
-      system: buildComposerSystemPrompt(args),
-      prompt: [
-        "Create the next reply from these facts.",
-        "If previousAssistantResponse is similar to what you are about to write, change the wording and move the conversation forward.",
-        "Do not treat this as a fresh conversation unless assistantReplyCount is 0.",
-        "Facts:",
-        safeJson(buildComposerFacts(args)),
-      ].join("\n\n"),
-      temperature: 0.7,
-      frequencyPenalty: 0.4,
-      presencePenalty: 0.2,
-    });
+    const { text } = await generateWeddingSalesComposerDraft(args);
 
     const trimmed = text.trim();
 
