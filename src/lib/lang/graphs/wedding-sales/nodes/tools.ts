@@ -8,6 +8,7 @@ import {
 } from "@/lib/lang/tools/wedding-sales";
 
 import type { WeddingSalesConfig } from "../config";
+import { buildWeddingSalesConversationSummary } from "../memory";
 import { buildWeddingSalesDialogPolicy, getWeddingSalesBehavioralStateUpdate } from "../policy";
 import { composeHumanWeddingSalesResponse } from "../response-composer";
 import type { WeddingSalesResponseIntent } from "../response-composer";
@@ -67,12 +68,41 @@ async function composeReplyUpdate(args: {
   config: WeddingSalesConfig;
   state: WeddingSalesState;
   summary?: string;
+  statePatch?: Partial<WeddingSalesState>;
+  summaryStatePatch?: Partial<WeddingSalesState>;
 }) {
-  const policy = buildWeddingSalesDialogPolicy(args);
+  const stateForPolicy = {
+    ...args.state,
+    ...args.statePatch,
+  };
+  const policy = buildWeddingSalesDialogPolicy({
+    ...args,
+    state: stateForPolicy,
+  });
+  const responseDraft = await composeHumanWeddingSalesResponse({
+    ...args,
+    state: stateForPolicy,
+    policy,
+  });
+  const behavioralUpdate = getWeddingSalesBehavioralStateUpdate({
+    ...args,
+    state: stateForPolicy,
+    policy,
+  });
+  const nextState = {
+    ...stateForPolicy,
+    ...(args.summaryStatePatch ?? args.statePatch),
+    ...behavioralUpdate,
+    responseDraft,
+  };
 
   return {
-    responseDraft: await composeHumanWeddingSalesResponse({ ...args, policy }),
-    ...getWeddingSalesBehavioralStateUpdate({ ...args, policy }),
+    responseDraft,
+    ...behavioralUpdate,
+    conversationSummary: buildWeddingSalesConversationSummary({
+      state: nextState,
+      intent: args.intent,
+    }),
   };
 }
 
@@ -103,6 +133,10 @@ export function createWeddingSalesToolNodes(args: {
             config,
             state,
             summary: "If you have flexibility, I can help look at alternative dates.",
+            statePatch: {
+              availability: "unavailable",
+              leadStage: "availability_checked",
+            },
           })),
           toolObservations: [
             {
@@ -140,6 +174,10 @@ export function createWeddingSalesToolNodes(args: {
             config,
             state,
             summary,
+            statePatch: {
+              availability: "unavailable",
+              leadStage: "availability_checked",
+            },
           })),
           toolObservations: [{ toolName: "check_wedding_availability", result }],
         };
@@ -154,6 +192,16 @@ export function createWeddingSalesToolNodes(args: {
           intent: "availability_available",
           config,
           state,
+          statePatch: {
+            availability: "available",
+            leadStage: "availability_checked",
+          },
+          summaryStatePatch: {
+            availability: "available",
+            guideSent: true,
+            callProposed: true,
+            leadStage: "availability_checked",
+          },
         })),
         toolObservations: [{ toolName: "check_wedding_availability", result }],
       };
@@ -193,6 +241,10 @@ export function createWeddingSalesToolNodes(args: {
           config,
           state,
           summary,
+          statePatch: {
+            calendarStatus: available ? "available" : "busy",
+            leadStage: available ? "call_proposed" : "checking_calendar",
+          },
         })),
         toolObservations: [{ toolName: "check_consultation_calendar", result }],
       };
@@ -227,6 +279,11 @@ export function createWeddingSalesToolNodes(args: {
           intent: bookingConfirmed ? "booking_confirmed" : "booking_failed",
           config,
           state,
+          statePatch: {
+            bookingConfirmed,
+            bookedEventId: eventId,
+            leadStage: bookingConfirmed ? "booked" : "ready_to_book",
+          },
         })),
         toolObservations: [{ toolName: "book_consultation", result }],
       };

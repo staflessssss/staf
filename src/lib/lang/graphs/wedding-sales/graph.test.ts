@@ -89,6 +89,8 @@ test("wedding sales graph answers pricing and travel questions without recheckin
   assert.equal(result.toolObservations.length, 0);
   assert.match(result.responseDraft ?? "", /\$2,750/);
   assert.match(result.responseDraft ?? "", /travel/i);
+  assert.match(result.conversationSummary ?? "", /Latest customer message: Could you send pricing again\? Also do you travel\?/);
+  assert.match(result.conversationSummary ?? "", /Last assistant intent: answer_question/);
 });
 
 test("wedding sales graph routes complete wedding info to availability check", async () => {
@@ -181,6 +183,9 @@ test("wedding sales graph records availability tool observations", async () => {
   assert.equal(result.availability, "available");
   assert.equal(result.toolObservations[0]?.toolName, "check_wedding_availability");
   assert.match(result.responseDraft ?? "", /collections start/i);
+  assert.match(result.conversationSummary ?? "", /Wedding date: 2027-06-14/);
+  assert.match(result.conversationSummary ?? "", /Wedding availability: available/);
+  assert.match(result.conversationSummary ?? "", /Consultation call has been proposed/);
 });
 
 test("wedding sales graph does not book a previously busy consultation slot", async () => {

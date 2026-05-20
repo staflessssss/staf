@@ -1,4 +1,5 @@
 import type { WeddingSalesConfig } from "../config";
+import { buildWeddingSalesConversationSummary } from "../memory";
 import { buildWeddingSalesDialogPolicy, getWeddingSalesBehavioralStateUpdate } from "../policy";
 import { composeHumanWeddingSalesResponse } from "../response-composer";
 import type { WeddingSalesResponseIntent } from "../response-composer";
@@ -10,10 +11,21 @@ async function composeReplyUpdate(args: {
   state: WeddingSalesState;
 }) {
   const policy = buildWeddingSalesDialogPolicy(args);
+  const responseDraft = await composeHumanWeddingSalesResponse({ ...args, policy });
+  const behavioralUpdate = getWeddingSalesBehavioralStateUpdate({ ...args, policy });
+  const nextState = {
+    ...args.state,
+    ...behavioralUpdate,
+    responseDraft,
+  };
 
   return {
-    responseDraft: await composeHumanWeddingSalesResponse({ ...args, policy }),
-    ...getWeddingSalesBehavioralStateUpdate({ ...args, policy }),
+    responseDraft,
+    ...behavioralUpdate,
+    conversationSummary: buildWeddingSalesConversationSummary({
+      state: nextState,
+      intent: args.intent,
+    }),
   };
 }
 

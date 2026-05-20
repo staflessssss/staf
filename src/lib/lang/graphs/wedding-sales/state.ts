@@ -35,6 +35,7 @@ export type WeddingSalesState = {
     toolName: string;
     result: string;
   }>;
+  conversationSummary?: string;
   latestCustomerMessage?: string;
   responseDraft?: string;
   assistantReplyCount: number;
@@ -69,6 +70,7 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
     reducer: (current, update) => [...(current ?? []), ...(update ?? [])],
     default: () => [],
   }),
+  conversationSummary: Annotation<string | undefined>(),
   latestCustomerMessage: Annotation<string | undefined>(),
   responseDraft: Annotation<string | undefined>(),
   assistantReplyCount: Annotation<number>(),
@@ -105,6 +107,7 @@ export function createInitialWeddingSalesState(args: {
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
     bookedEventId: args.previousState?.bookedEventId,
     toolObservations: [],
+    conversationSummary: args.previousState?.conversationSummary,
     latestCustomerMessage: args.message,
     responseDraft: undefined,
     assistantReplyCount: args.previousState?.assistantReplyCount ?? 0,

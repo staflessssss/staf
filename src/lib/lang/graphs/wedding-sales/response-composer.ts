@@ -226,6 +226,7 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
     intent,
     customerMessage: state.latestCustomerMessage,
     previousAssistantResponse: state.responseDraft,
+    conversationSummary: state.conversationSummary,
     leadState: {
       leadStage: state.leadStage,
       names: state.names,
