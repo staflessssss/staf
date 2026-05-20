@@ -60,6 +60,13 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
       ].filter(Boolean);
     case "availability_unavailable":
       return [summary || "say the wedding date is unavailable", "offer alternative dates if they have flexibility"];
+    case "answer_question":
+      return [
+        "answer only the customer's current question",
+        "if pricing is asked, say collections start at the configured starting price",
+        "if travel is asked, say Myndful travels and travel miles are included by collection, with exact travel details handled after venue/location is known",
+        "end with one natural next step toward consultation",
+      ];
     case "calendar_available":
       return ["say the proposed consultation time is available", "ask for permission to book it"];
     case "calendar_busy":

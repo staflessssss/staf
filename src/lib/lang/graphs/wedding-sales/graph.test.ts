@@ -35,6 +35,62 @@ test("wedding sales graph combines a previously mentioned month-day with a later
   assert.doesNotMatch(result.responseDraft ?? "", /exact date/i);
 });
 
+test("wedding sales graph ignores Gmail quote dates when analyzing replies", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: [
+      "Could you send pricing again? Also do you travel?",
+      "",
+      "On Wed, May 20, 2026 at 5:05 AM Taras <contact@myndfulfilms.com> wrote:",
+      "> June 14, 2027, in Charlotte is wide open on my calendar.",
+      "> Our collections start at $2,750.",
+    ].join("\n"),
+    previousState: {
+      names: "Anna and Mark",
+      weddingDate: "2027-06-14",
+      weddingDateText: "June 14",
+      weddingYear: "2027",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      bookingConfirmed: false,
+      leadStage: "availability_checked",
+    },
+  });
+
+  assert.equal(result.weddingDate, "2027-06-14");
+  assert.equal(result.weddingYear, "2027");
+  assert.notEqual(result.weddingDate, "2026-05-20");
+});
+
+test("wedding sales graph answers pricing and travel questions without rechecking availability", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: "Could you send pricing again? Also do you travel?",
+    previousState: {
+      names: "Anna and Mark",
+      weddingDate: "2027-06-14",
+      weddingDateText: "June 14",
+      weddingYear: "2027",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      bookingConfirmed: false,
+      leadStage: "availability_checked",
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.equal(result.weddingDate, "2027-06-14");
+  assert.equal(result.toolObservations.length, 0);
+  assert.match(result.responseDraft ?? "", /\$2,750/);
+  assert.match(result.responseDraft ?? "", /travel/i);
+});
+
 test("wedding sales graph routes complete wedding info to availability check", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "gmail",

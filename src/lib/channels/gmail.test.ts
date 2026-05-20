@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { gmailAdapterTestHelpers } from "@/lib/channels/gmail";
+import { gmailAdapter, gmailAdapterTestHelpers } from "@/lib/channels/gmail";
 
 test("gmail helper converts markdown links into html anchors", () => {
   const html = gmailAdapterTestHelpers.convertMarkdownishToHtml(
@@ -137,4 +137,30 @@ On Wed, Apr 15, 2026 at 12:08 PM <test@example.com> wrote:
 > Would any of those times work for you both?`);
 
   assert.equal(cleaned, "10-00 looks good");
+});
+
+test("gmail parseIncoming drops quote-only reply payloads instead of replaying history", () => {
+  const parsed = gmailAdapter.parseIncoming({
+    from: "anna@example.com",
+    subject: "Re: Wedding films",
+    text: `On Wed, May 20, 2026 at 5:05 AM Taras <contact@myndfulfilms.com> wrote:
+> June 14, 2027, in Charlotte is wide open on my calendar.
+> Our collections start at $2,750.`,
+  });
+
+  assert.equal(parsed.message, "");
+});
+
+test("gmail parseIncoming keeps only the new client text before quoted history", () => {
+  const parsed = gmailAdapter.parseIncoming({
+    from: "anna@example.com",
+    subject: "Re: Wedding films",
+    text: `Could you send pricing again? Also do you travel?
+
+On Wed, May 20, 2026 at 5:05 AM Taras <contact@myndfulfilms.com> wrote:
+> June 14, 2027, in Charlotte is wide open on my calendar.
+> Our collections start at $2,750.`,
+  });
+
+  assert.equal(parsed.message, "Could you send pricing again? Also do you travel?");
 });

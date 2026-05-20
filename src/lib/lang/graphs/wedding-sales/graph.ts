@@ -17,6 +17,7 @@ import {
 type WeddingSalesRoute =
   | "ask_missing_info"
   | "ask_wedding_year"
+  | "answer_question"
   | "check_availability"
   | "check_calendar"
   | "book_call"
@@ -40,6 +41,8 @@ export function routeWeddingSalesState(state: WeddingSalesState): WeddingSalesRo
       return "ignored";
     case "waiting_wedding_year":
       return "ask_wedding_year";
+    case "answering_question":
+      return "answer_question";
     case "ready_for_availability":
       return "check_availability";
     case "checking_calendar":
@@ -100,6 +103,7 @@ export function buildWeddingSalesGraph(args: {
     .addNode("analyze", analyzeWeddingSalesMessage)
     .addNode("ask_missing_info", replyNodes.askMissingInfo)
     .addNode("ask_wedding_year", replyNodes.askWeddingYear)
+    .addNode("answer_question", replyNodes.answerQuestion)
     .addNode("check_availability", toolNodes.checkAvailability)
     .addNode("check_calendar", toolNodes.checkCalendar)
     .addNode("book_call", toolNodes.bookCall)
@@ -108,6 +112,7 @@ export function buildWeddingSalesGraph(args: {
     .addConditionalEdges("analyze", routeWeddingSalesState, {
       ask_missing_info: "ask_missing_info",
       ask_wedding_year: "ask_wedding_year",
+      answer_question: "answer_question",
       check_availability: "check_availability",
       check_calendar: "check_calendar",
       book_call: "book_call",
@@ -115,6 +120,7 @@ export function buildWeddingSalesGraph(args: {
     })
     .addEdge("ask_missing_info", END)
     .addEdge("ask_wedding_year", END)
+    .addEdge("answer_question", END)
     .addEdge("check_availability", END)
     .addEdge("check_calendar", END)
     .addEdge("book_call", END)

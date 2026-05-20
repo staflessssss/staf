@@ -292,7 +292,8 @@ function stripQuotedReply(text: string) {
     return "";
   }
 
-  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const withoutHtmlQuote = text.replace(/<blockquote[\s\S]*$/i, "");
+  const normalized = withoutHtmlQuote.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = normalized.split("\n");
   const kept: string[] = [];
 
@@ -319,6 +320,28 @@ function stripQuotedReply(text: string) {
   }
 
   return kept.join("\n").trim();
+}
+
+function looksLikeQuotedReplyOnly(text: string) {
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+
+  if (!normalized) {
+    return false;
+  }
+
+  if (/^on .+ wrote:?\s*$/im.test(normalized)) {
+    return true;
+  }
+
+  if (/^>/.test(normalized) || /\n>/.test(normalized)) {
+    return true;
+  }
+
+  if (/<blockquote[\s\S]*<\/blockquote>/i.test(normalized)) {
+    return true;
+  }
+
+  return /^from:\s+/im.test(normalized) || /^sent:\s+/im.test(normalized) || /^subject:\s+/im.test(normalized);
 }
 
 function isPricingReply(text: string) {
@@ -576,6 +599,7 @@ export const gmailAdapterTestHelpers = {
   collectDeliveryAttachments,
   isPricingReply,
   stripQuotedReply,
+  looksLikeQuotedReplyOnly,
 };
 
 export const gmailAdapter = {
@@ -588,11 +612,12 @@ export const gmailAdapter = {
     );
     const rawMessage = String(payload.text ?? payload.message ?? payload.body ?? payload.html ?? "");
     const cleanedMessage = stripQuotedReply(rawMessage);
+    const message = cleanedMessage || (looksLikeQuotedReplyOnly(rawMessage) ? "" : rawMessage.trim());
 
     return {
       contactId: contactEmail,
       contactEmail,
-      message: cleanedMessage || rawMessage,
+      message,
       messageId: String(payload.messageId ?? payload.inReplyTo ?? payload.replyToMessageId ?? ""),
       gmailMessageId: String(payload.gmailMessageId ?? ""),
       threadId: String(payload.threadId ?? ""),

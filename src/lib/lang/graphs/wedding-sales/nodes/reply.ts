@@ -31,6 +31,12 @@ export function createWeddingSalesReplyNodes(config: WeddingSalesConfig) {
         config,
         state,
       }),
+    answerQuestion: async (state: WeddingSalesState) =>
+      composeReplyUpdate({
+        intent: "answer_question",
+        config,
+        state,
+      }),
     checkAvailability: async (state: WeddingSalesState) =>
       composeReplyUpdate({
         intent: "availability_tool_missing",

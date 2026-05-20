@@ -11,6 +11,7 @@ export type WeddingSalesResponseIntent =
   | "availability_tool_missing"
   | "availability_available"
   | "availability_unavailable"
+  | "answer_question"
   | "calendar_time_missing"
   | "calendar_available"
   | "calendar_busy"
@@ -161,6 +162,11 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           .filter(Boolean)
           .join("\n\n");
       }
+      case "answer_question":
+        return [
+          `Our collections start at ${config.pricing.startPrice}. Yes, we do travel for weddings.`,
+          "Each collection includes travel miles, and if the venue is beyond the included mileage, I can check the exact travel details for your location before the call.",
+        ].join("\n\n");
       case "calendar_time_missing":
         return state.calendarStatus === "busy"
           ? "That time was not available, so I cannot book it yet. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?"

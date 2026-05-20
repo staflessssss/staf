@@ -8,6 +8,7 @@ export type WeddingSalesLeadStage =
   | "waiting_wedding_year"
   | "ready_for_availability"
   | "availability_checked"
+  | "answering_question"
   | "call_proposed"
   | "checking_calendar"
   | "ready_to_book"

@@ -37,6 +37,36 @@ function extractYear(text: string) {
   return text.match(/\b((?:19|20)\d{2})\b/)?.[1];
 }
 
+function stripQuotedEmailText(text: string) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        return true;
+      }
+
+      if (trimmed.startsWith(">")) {
+        return false;
+      }
+
+      if (/^on .+ wrote:?\s*$/i.test(trimmed)) {
+        return false;
+      }
+
+      if (/^from:\s+/i.test(trimmed) || /^sent:\s+/i.test(trimmed) || /^subject:\s+/i.test(trimmed)) {
+        return false;
+      }
+
+      return true;
+    })
+    .join("\n")
+    .trim();
+}
+
 function hasWeddingDate(text: string) {
   return new RegExp(monthNamePattern, "i").test(text) || /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(text);
 }
@@ -67,6 +97,10 @@ function proposesCallTime(text: string) {
 
 function confirmsBooking(text: string) {
   return /\b(?:yes|yep|perfect|sounds good|please book|book it|confirm)\b/i.test(text);
+}
+
+function asksGeneralQuestion(text: string) {
+  return /\?/.test(text) || /\b(?:pricing|price|cost|travel|fee|venue|coi|insurance|style|included|include|timeline|delivery|music|photographer)\b/i.test(text);
 }
 
 function pad2(value: number) {
@@ -126,7 +160,7 @@ function extractLocation(text: string) {
 }
 
 export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Promise<Partial<WeddingSalesState>> {
-  const message = state.latestCustomerMessage ?? "";
+  const message = stripQuotedEmailText(state.latestCustomerMessage ?? "");
   const extractedDate = extractWeddingDate(message);
   const extractedYear = extractYear(message);
   const extractedNames = extractNames(message);
@@ -157,6 +191,16 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
 
   if (asksForCall(message) || ((state.callProposed || state.availability === "available") && proposesCallTime(message))) {
     return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: message };
+  }
+
+  if (
+    state.availability === "available" &&
+    state.callProposed &&
+    asksGeneralQuestion(message) &&
+    !hasWeddingDate(message) &&
+    !hasYear(message)
+  ) {
+    return { ...baseUpdate, leadStage: "answering_question" };
   }
 
   const dateKnown = Boolean(state.weddingDate) || Boolean(combinedWeddingDate) || Boolean(state.weddingDateText) || hasWeddingDate(message);
