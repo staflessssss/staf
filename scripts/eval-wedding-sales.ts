@@ -10,14 +10,30 @@ import {
 } from "@/lib/lang/graphs/wedding-sales/evals/stress-cases";
 import type { WeddingSalesToolContext } from "@/lib/lang/tools/wedding-sales";
 
-function readRuntime(): WeddingSalesEvalRuntime {
+type WeddingSalesEvalRunMode = WeddingSalesEvalRuntime | "both";
+
+function readRuntime(): WeddingSalesEvalRunMode {
   const runtime = process.env.WEDDING_SALES_EVAL_RUNTIME;
 
   if (runtime === "langgraph_wedding_sales") {
     return runtime;
   }
 
+  if (runtime === "both") {
+    return runtime;
+  }
+
   return "legacy";
+}
+
+function readCaseFilter() {
+  const raw = process.env.WEDDING_SALES_EVAL_CASES?.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  return new Set(raw.split(",").map((entry) => entry.trim()).filter(Boolean));
 }
 
 function mapHistory(history: NonNullable<(typeof weddingSalesStressCases)[number]["input"]["history"]>): RuntimeHistoryMessage[] {
@@ -147,7 +163,9 @@ function getLangGraphFixtureToolContext(): WeddingSalesToolContext {
 }
 
 function buildPreviousState(testCase: (typeof weddingSalesStressCases)[number]) {
-  const historyText = (testCase.input.history ?? []).map((entry) => entry.content).join("\n");
+  const history = testCase.input.history ?? [];
+  const historyText = history.map((entry) => entry.content).join("\n");
+  const assistantHistory = history.filter((entry) => entry.role === "ASSISTANT");
 
   if (!historyText) {
     return undefined;
@@ -155,11 +173,23 @@ function buildPreviousState(testCase: (typeof weddingSalesStressCases)[number]) 
 
   return {
     names: /Anna and Mark/i.test(historyText) ? "Anna and Mark" : undefined,
-    weddingDate: /June 14,\s*2027/i.test(historyText) ? "2027-06-14" : undefined,
+    weddingDate: /June 14,?\s*2027/i.test(historyText) ? "2027-06-14" : undefined,
+    weddingDateText: /June 14/i.test(historyText) ? "June 14" : undefined,
+    weddingYear: /2027/.test(historyText) ? "2027" : undefined,
     weddingYearKnown: /(?:19|20)\d{2}/.test(historyText),
     location: /Charlotte/i.test(historyText) ? "Charlotte" : undefined,
+    availability: /available/i.test(historyText) ? ("available" as const) : undefined,
     guideSent: /collections|guide/i.test(historyText),
     callProposed: /consultation|call/i.test(historyText),
+    portfolioSent: /Callista|McCord|Valeriia|portfolio|recent wedding films/i.test(historyText),
+    reviewsSent: /Google Reviews|reviews/i.test(historyText),
+    guideOffered: /collections|guide/i.test(historyText),
+    hasGreeted: /\b(?:hi|hello|hey)\b/i.test(assistantHistory.at(0)?.content ?? ""),
+    signatureSent: /Taras Mynd|MYNDFUL FILMS/i.test(historyText),
+    assistantReplyCount: assistantHistory.length,
+    askedForNames: /names/i.test(historyText),
+    askedForWeddingYear: /wedding year|year/i.test(historyText),
+    askedForCallTime: /consultation|call|Monday through Friday|9 AM/i.test(historyText),
     proposedCallTime: /Monday at 10 AM Eastern/i.test(historyText)
       ? "Monday at 10 AM Eastern"
       : undefined,
@@ -192,30 +222,48 @@ async function runLangGraphCase(testCase: (typeof weddingSalesStressCases)[numbe
 async function main() {
   const tenantId = process.env.WEDDING_SALES_EVAL_TENANT_ID;
   const agentId = process.env.WEDDING_SALES_EVAL_AGENT_ID;
-  const runtime = readRuntime();
+  const runMode = readRuntime();
+  const caseFilter = readCaseFilter();
 
-  if (runtime === "legacy" && (!tenantId || !agentId)) {
+  if ((runMode === "legacy" || runMode === "both") && (!tenantId || !agentId)) {
     console.log(
-      "Skipping wedding_sales evals: set WEDDING_SALES_EVAL_TENANT_ID and WEDDING_SALES_EVAL_AGENT_ID to run against a local agent.",
+      runMode === "both"
+        ? "Skipping legacy side of wedding_sales evals: set WEDDING_SALES_EVAL_TENANT_ID and WEDDING_SALES_EVAL_AGENT_ID to compare against a local agent."
+        : "Skipping wedding_sales evals: set WEDDING_SALES_EVAL_TENANT_ID and WEDDING_SALES_EVAL_AGENT_ID to run against a local agent.",
     );
-    return;
+    if (runMode === "legacy") {
+      return;
+    }
   }
 
   const results: WeddingSalesEvalResult[] = [];
+  const runtimes: WeddingSalesEvalRuntime[] =
+    runMode === "both"
+      ? [
+          ...(tenantId && agentId ? (["legacy"] as const) : []),
+          "langgraph_wedding_sales",
+        ]
+      : [runMode];
 
-  for (const testCase of weddingSalesStressCases) {
-    const result =
-      runtime === "langgraph_wedding_sales"
-        ? await runLangGraphCase(testCase)
-        : await runLegacyCase({ tenantId: tenantId!, agentId: agentId!, testCase });
-    results.push(
-      evaluateWeddingSalesCase({
-        testCase,
-        runtime,
-        response: result.message,
-        usedTooling: result.usedTooling,
-      }),
-    );
+  for (const runtime of runtimes) {
+    for (const testCase of weddingSalesStressCases) {
+      if (caseFilter && !caseFilter.has(testCase.id)) {
+        continue;
+      }
+
+      const result =
+        runtime === "langgraph_wedding_sales"
+          ? await runLangGraphCase(testCase)
+          : await runLegacyCase({ tenantId: tenantId!, agentId: agentId!, testCase });
+      results.push(
+        evaluateWeddingSalesCase({
+          testCase,
+          runtime,
+          response: result.message,
+          usedTooling: result.usedTooling,
+        }),
+      );
+    }
   }
 
   const failed = results.filter((result) => !result.passed && !result.skipped);

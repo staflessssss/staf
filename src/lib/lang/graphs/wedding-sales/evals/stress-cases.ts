@@ -16,6 +16,8 @@ export type WeddingSalesEvalCase = {
     description: string;
     mustInclude?: string[];
     mustNotInclude?: string[];
+    mustNotStartWith?: string[];
+    mustNotRepeatFromHistory?: string[];
     usedToolingIncludes?: string[];
   }>;
 };
@@ -176,6 +178,139 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
       },
     ],
   },
+  {
+    id: "quality-no-repeat-greeting-mid-thread",
+    title: "Mid-thread reply does not greet again",
+    input: {
+      contactId: "eval-quality-no-greeting@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "Hi, we love your films and want more info about wedding video.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "Hi there! I would love to hear more. Could you share both of your names and your wedding date?",
+        },
+      ],
+      message: "We are Anna and Mark. Our wedding is June 14 in Charlotte.",
+    },
+    assertions: [
+      {
+        id: "no-repeat-greeting",
+        description: "Reply continues the thread without greeting again.",
+        mustNotStartWith: ["hi", "hello", "hey"],
+      },
+    ],
+  },
+  {
+    id: "quality-no-repeat-availability-intro",
+    title: "Pricing/travel question does not repeat availability intro",
+    input: {
+      contactId: "eval-quality-no-repeat-availability@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "Amazing, thank you so much, Anna and Mark. June 14, 2027 in Charlotte is available for Myndful, so you reached out at a great time. Our collections start at $2,750.",
+        },
+      ],
+      message: "Could you send pricing again? Also do you travel?",
+    },
+    assertions: [
+      {
+        id: "answers-current-question",
+        description: "Reply answers pricing and travel directly.",
+        mustInclude: ["$2,750", "travel"],
+      },
+      {
+        id: "does-not-repeat-availability-intro",
+        description: "Reply does not repeat the previous availability intro.",
+        mustNotInclude: ["June 14, 2027 in Charlotte is available", "you reached out at a great time"],
+        mustNotRepeatFromHistory: ["Amazing, thank you so much, Anna and Mark"],
+      },
+    ],
+  },
+  {
+    id: "quality-no-repeat-assets-after-guide",
+    title: "Follow-up after guide does not resend portfolio/reviews block",
+    input: {
+      contactId: "eval-quality-no-repeat-assets@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "Our collections start at $2,750. Here are a few recent wedding films: Callista and Kevin, McCord & Kristopher, Valeriia and Kirk. Google Reviews. Would you be open to a consultation?",
+        },
+      ],
+      message: "Thanks, that helps. What is included in the starting package?",
+    },
+    assertions: [
+      {
+        id: "does-not-resend-assets",
+        description: "Reply does not resend portfolio or reviews block.",
+        mustNotInclude: ["Callista and Kevin", "McCord", "Google Reviews"],
+      },
+    ],
+  },
+  {
+    id: "quality-booking-confirmation-warm",
+    title: "Booking confirmation is warm and not a dry status line",
+    input: {
+      contactId: "eval-quality-booking-warm@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "Monday at 10 AM Eastern looks available on the calendar. Would you like me to book it?",
+        },
+      ],
+      message: "Yes, please!",
+    },
+    assertions: [
+      {
+        id: "warm-booking-confirmation",
+        description: "Reply confirms the consultation warmly.",
+        mustInclude: ["calendar invite"],
+        mustNotInclude: ["has been created."],
+      },
+    ],
+  },
+  {
+    id: "quality-long-thread-summary-keeps-context",
+    title: "Long thread keeps names/date/location context",
+    input: {
+      contactId: "eval-quality-long-thread@example.com",
+      history: [
+        { role: "USER", content: "Hi, we love your films." },
+        { role: "ASSISTANT", content: "Could you share your names and wedding date?" },
+        { role: "USER", content: "We are Anna and Mark. Our wedding is June 14 in Charlotte." },
+        { role: "ASSISTANT", content: "Could you share the wedding year?" },
+        { role: "USER", content: "2027. The venue is in Charlotte, NC." },
+        { role: "ASSISTANT", content: "June 14, 2027 in Charlotte is available. Our collections start at $2,750. Would you be open to a consultation?" },
+        { role: "USER", content: "Could we do Monday at 10 AM Eastern?" },
+        { role: "ASSISTANT", content: "Monday at 10 AM Eastern looks available. Would you like me to book it?" },
+      ],
+      message: "Yes, please book it.",
+    },
+    assertions: [
+      {
+        id: "books-with-context",
+        description: "Runtime books the call without losing context.",
+        usedToolingIncludes: ["Book"],
+        mustNotInclude: ["names", "wedding date", "year"],
+      },
+    ],
+  },
 ];
 
 function includesCaseInsensitive(value: string, needle: string) {
@@ -201,6 +336,18 @@ export function evaluateWeddingSalesCase(args: {
     for (const needle of assertion.mustNotInclude ?? []) {
       if (includesCaseInsensitive(args.response, needle)) {
         failures.push(`${assertion.id}: response must not include "${needle}".`);
+      }
+    }
+
+    for (const needle of assertion.mustNotStartWith ?? []) {
+      if (args.response.trim().toLowerCase().startsWith(needle.toLowerCase())) {
+        failures.push(`${assertion.id}: response must not start with "${needle}".`);
+      }
+    }
+
+    for (const needle of assertion.mustNotRepeatFromHistory ?? []) {
+      if (includesCaseInsensitive(args.response, needle)) {
+        failures.push(`${assertion.id}: response must not repeat historical wording "${needle}".`);
       }
     }
 

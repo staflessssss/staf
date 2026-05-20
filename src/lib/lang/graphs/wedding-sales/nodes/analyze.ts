@@ -195,7 +195,6 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
 
   if (
     state.availability === "available" &&
-    state.callProposed &&
     asksGeneralQuestion(message) &&
     !hasWeddingDate(message) &&
     !hasYear(message)
