@@ -29,6 +29,7 @@ type ComposeWeddingSalesResponseArgs = {
 };
 
 const DEFAULT_RESPONSE_MODEL = "gpt-4.1-mini";
+const DEFAULT_REFLECTION_MODEL = "gpt-4.1-mini";
 
 function appendSignatureOnce(text: string, signature: string) {
   const body = text.trim();
@@ -201,6 +202,10 @@ function shouldUseLlmComposer() {
   return Boolean(process.env.OPENAI_API_KEY) && process.env.WEDDING_SALES_LLM_COMPOSER !== "false" && (explicitlyEnabled || productionRuntime);
 }
 
+function shouldUseReflection() {
+  return shouldUseLlmComposer() && process.env.WEDDING_SALES_REFLECTION !== "false";
+}
+
 function safeJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
@@ -227,6 +232,18 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
       proposedCallTime: state.proposedCallTime,
       calendarStatus: state.calendarStatus,
       bookingConfirmed: state.bookingConfirmed,
+    },
+    behavioralMemory: {
+      assistantReplyCount: state.assistantReplyCount,
+      hasGreeted: state.hasGreeted,
+      signatureSent: state.signatureSent,
+      portfolioSent: state.portfolioSent,
+      reviewsSent: state.reviewsSent,
+      guideOffered: state.guideOffered,
+      askedForNames: state.askedForNames,
+      askedForWeddingYear: state.askedForWeddingYear,
+      askedForCallTime: state.askedForCallTime,
+      lastAssistantIntent: state.lastAssistantIntent,
     },
     toolSummary: summary,
     toolObservations: state.toolObservations
@@ -264,20 +281,39 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
   return [
     "You write final customer-facing replies for Myndful Films wedding leads.",
     "Sound like Taras, the warm founder of a premium wedding videography company. Be human, specific, and natural.",
-    "Never sound like a generic bot or status message. Avoid repeating the previous assistant response.",
+    "This is a real ongoing email thread. Write only the next reply, not a generic bot status update.",
+    "Never repeat the previous assistant response. Never restate the same availability intro, same guide pitch, or same call proposal unless the current customer message asks for it.",
+    "Move the conversation forward from the customer's latest message. Answer their current question before adding the next step.",
     greetingInstruction,
     `Reply mode: ${policy.replyMode}. Maximum paragraphs: ${policy.maxParagraphs}. Link style: ${policy.linkStyle}.`,
     modeInstruction,
     policy.mustInclude.length ? `Must include:\n- ${policy.mustInclude.join("\n- ")}` : "",
-    policy.mustNotRepeat.length ? `Must not repeat:\n- ${policy.mustNotRepeat.join("\n- ")}` : "",
-    policy.forbiddenPhrases.length ? `Forbidden phrases or concepts:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
+    policy.mustNotRepeat.length ? `Strictly must not repeat:\n- ${policy.mustNotRepeat.join("\n- ")}` : "",
+    policy.forbiddenPhrases.length ? `Forbidden phrases or concepts. Do not use these even if they seem natural:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
     "Use the provided facts only. Do not invent availability, calendar status, prices, links, event IDs, or bookings.",
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
     "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
     "Gmail can use HTML links. Instagram and Telegram must use plain URLs.",
     "Allowed emojis only: 🤍 ✨ 🎥. Use at most one emoji unless the customer is very enthusiastic.",
-    "Write concise email paragraphs, usually 2-4 short paragraphs.",
+    "Avoid filler openings like 'Thanks for sharing' on every turn. Vary phrasing naturally.",
+    "Write concise email paragraphs, usually 2-4 short paragraphs. Scheduling replies should usually be 1 paragraph.",
     signatureInstruction,
+  ].filter(Boolean).join("\n");
+}
+
+function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+
+  return [
+    "You are the final quality reviewer for a Myndful Films sales email.",
+    "Your job is to enforce dialog policy, remove robotic repetition, and keep the response warm and human.",
+    "Return only valid JSON with this shape:",
+    '{"status":"pass"|"rewrite","issues":["short issue"],"revisedText":"final reply if rewrite, otherwise empty string"}',
+    "Rewrite only when needed. If rewriting, preserve all required facts and do not invent any new facts.",
+    "Fail and rewrite if the draft repeats the previous assistant response, greets mid-thread, includes a forbidden signature, sounds like a bot status message, ignores the customer's latest question, or exceeds the paragraph limit.",
+    policy.mustInclude.length ? `The final reply must include:\n- ${policy.mustInclude.join("\n- ")}` : "",
+    policy.mustNotRepeat.length ? `The final reply must not repeat:\n- ${policy.mustNotRepeat.join("\n- ")}` : "",
+    policy.forbiddenPhrases.length ? `Forbidden phrases/concepts:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -331,6 +367,62 @@ export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesRespons
     : normalizedLinks.trim();
 }
 
+export function parseWeddingSalesReflectionJson(text: string) {
+  const trimmed = text.trim();
+  const jsonText = trimmed.match(/\{[\s\S]*\}/)?.[0] ?? trimmed;
+
+  try {
+    const parsed = JSON.parse(jsonText) as {
+      status?: unknown;
+      revisedText?: unknown;
+      issues?: unknown;
+    };
+
+    return {
+      status: parsed.status === "rewrite" ? "rewrite" : "pass",
+      revisedText: typeof parsed.revisedText === "string" ? parsed.revisedText.trim() : "",
+      issues: Array.isArray(parsed.issues) ? parsed.issues.filter((issue): issue is string => typeof issue === "string") : [],
+    };
+  } catch {
+    return {
+      status: "pass" as const,
+      revisedText: "",
+      issues: [],
+    };
+  }
+}
+
+async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { draft: string }) {
+  if (!shouldUseReflection()) {
+    return args.draft;
+  }
+
+  try {
+    const { text } = await generateText({
+      model: openai(process.env.WEDDING_SALES_REFLECTION_MODEL || DEFAULT_REFLECTION_MODEL),
+      system: buildReflectionSystemPrompt(args),
+      prompt: [
+        "Review this draft and either pass it or rewrite it.",
+        "Facts and policy:",
+        safeJson(buildComposerFacts(args)),
+        "Draft:",
+        args.draft,
+      ].join("\n\n"),
+      temperature: 0.2,
+    });
+    const review = parseWeddingSalesReflectionJson(text);
+
+    if (review.status !== "rewrite" || !review.revisedText) {
+      return args.draft;
+    }
+
+    return finalizeLlmWeddingSalesResponse({ ...args, text: review.revisedText });
+  } catch (error) {
+    console.warn("[wedding-sales] LLM response reflection failed; using composer draft.", error);
+    return args.draft;
+  }
+}
+
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
   const fallback = composeWeddingSalesResponse(args);
 
@@ -345,9 +437,13 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
       prompt: [
         "Create the next reply from these facts.",
         "If previousAssistantResponse is similar to what you are about to write, change the wording and move the conversation forward.",
+        "Do not treat this as a fresh conversation unless assistantReplyCount is 0.",
         "Facts:",
         safeJson(buildComposerFacts(args)),
       ].join("\n\n"),
+      temperature: 0.7,
+      frequencyPenalty: 0.4,
+      presencePenalty: 0.2,
     });
 
     const trimmed = text.trim();
@@ -356,7 +452,9 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
       return fallback;
     }
 
-    return finalizeLlmWeddingSalesResponse({ ...args, text: trimmed });
+    const draft = finalizeLlmWeddingSalesResponse({ ...args, text: trimmed });
+
+    return reflectWeddingSalesResponse({ ...args, draft });
   } catch (error) {
     console.warn("[wedding-sales] LLM response composer failed; using fallback.", error);
     return fallback;

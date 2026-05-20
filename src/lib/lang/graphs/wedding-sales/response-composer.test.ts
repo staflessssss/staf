@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { defaultWeddingSalesConfig } from "./config";
-import { composeWeddingSalesResponse, finalizeLlmWeddingSalesResponse } from "./response-composer";
+import {
+  composeWeddingSalesResponse,
+  finalizeLlmWeddingSalesResponse,
+  parseWeddingSalesReflectionJson,
+} from "./response-composer";
 import type { WeddingSalesState } from "./state";
 
 const baseState: WeddingSalesState = {
@@ -163,4 +167,23 @@ test("LLM wedding sales finalizer converts markdown links for rich Gmail replies
   });
 
   assert.match(response, /<a href="https:\/\/example.com\/film">Callista and Kevin<\/a>/);
+});
+
+test("wedding sales reflection parser accepts JSON wrapped in model prose", () => {
+  const review = parseWeddingSalesReflectionJson([
+    "Here is the review:",
+    '{"status":"rewrite","issues":["repeated greeting"],"revisedText":"Monday at 10 AM works. Want me to book it?"}',
+  ].join("\n"));
+
+  assert.equal(review.status, "rewrite");
+  assert.deepEqual(review.issues, ["repeated greeting"]);
+  assert.equal(review.revisedText, "Monday at 10 AM works. Want me to book it?");
+});
+
+test("wedding sales reflection parser fails open on invalid JSON", () => {
+  const review = parseWeddingSalesReflectionJson("not json");
+
+  assert.equal(review.status, "pass");
+  assert.equal(review.revisedText, "");
+  assert.deepEqual(review.issues, []);
 });
