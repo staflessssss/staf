@@ -19,6 +19,7 @@ export type WeddingSalesEvalCase = {
     mustNotStartWith?: string[];
     mustNotRepeatFromHistory?: string[];
     usedToolingIncludes?: string[];
+    usedToolingExcludes?: string[];
   }>;
 };
 
@@ -260,6 +261,85 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
     ],
   },
   {
+    id: "quality-explicit-same-date-rechecks-availability",
+    title: "Explicit repeat of the same wedding date rechecks availability",
+    input: {
+      contactId: "eval-quality-repeat-explicit-date@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "June 14, 2027 in Charlotte is available for Myndful. Our collections start at $2,750.",
+        },
+      ],
+      message: "Just double checking, is June 14, 2027 still available?",
+    },
+    assertions: [
+      {
+        id: "rechecks-explicit-date",
+        description: "Runtime checks Sheets again when the customer names an explicit date.",
+        usedToolingIncludes: ["Wedding availability"],
+        mustNotInclude: ["names", "wedding year"],
+      },
+    ],
+  },
+  {
+    id: "quality-explicit-new-date-rechecks-availability",
+    title: "Explicit different wedding date rechecks availability",
+    input: {
+      contactId: "eval-quality-new-explicit-date@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "June 14, 2027 in Charlotte is available for Myndful. Our collections start at $2,750.",
+        },
+      ],
+      message: "What about June 21, 2027 instead?",
+    },
+    assertions: [
+      {
+        id: "rechecks-new-date",
+        description: "Runtime checks Sheets when the customer changes the date.",
+        usedToolingIncludes: ["Wedding availability"],
+        mustNotInclude: ["names", "wedding year"],
+      },
+    ],
+  },
+  {
+    id: "quality-implicit-date-question-uses-memory",
+    title: "Implicit date question uses state instead of repeating availability flow",
+    input: {
+      contactId: "eval-quality-implicit-date-memory@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "June 14, 2027 in Charlotte is available for Myndful. Our collections start at $2,750.",
+        },
+      ],
+      message: "Just double checking, is our date still available?",
+    },
+    assertions: [
+      {
+        id: "answers-from-memory",
+        description: "Reply answers from known state without rerunning Sheets or switching to pricing/travel.",
+        mustInclude: ["available"],
+        mustNotInclude: ["$2,750", "travel", "collections start"],
+        usedToolingExcludes: ["Wedding availability"],
+      },
+    ],
+  },
+  {
     id: "quality-booking-confirmation-warm",
     title: "Booking confirmation is warm and not a dry status line",
     input: {
@@ -354,6 +434,12 @@ export function evaluateWeddingSalesCase(args: {
     for (const needle of assertion.usedToolingIncludes ?? []) {
       if (!args.usedTooling.some((toolName) => includesCaseInsensitive(toolName, needle))) {
         failures.push(`${assertion.id}: usedTooling must include "${needle}".`);
+      }
+    }
+
+    for (const needle of assertion.usedToolingExcludes ?? []) {
+      if (args.usedTooling.some((toolName) => includesCaseInsensitive(toolName, needle))) {
+        failures.push(`${assertion.id}: usedTooling must not include "${needle}".`);
       }
     }
   }

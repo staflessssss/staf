@@ -118,6 +118,14 @@ function formatLocationSuffix(location?: string) {
   return location ? ` in ${location}` : "";
 }
 
+function asksAboutKnownWeddingAvailability(message?: string) {
+  if (!message) {
+    return false;
+  }
+
+  return /\b(?:available|availability|still open|still available|our date|the date|wedding date)\b/i.test(message);
+}
+
 export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
   const { intent, config, state, summary } = args;
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
@@ -171,11 +179,21 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           .filter(Boolean)
           .join("\n\n");
       }
-      case "answer_question":
+      case "answer_question": {
+        if (state.availability === "available" && asksAboutKnownWeddingAvailability(state.latestCustomerMessage)) {
+          return [
+            `${weddingDate}${location} is still showing available on my end.`,
+            state.callProposed
+              ? "The next step is still the quick consultation, so I can hear more about your day and answer anything you are weighing."
+              : "The next step would be a quick consultation, so I can hear more about your day and answer anything you are weighing.",
+          ].join("\n\n");
+        }
+
         return [
           `Our collections start at ${config.pricing.startPrice}. Yes, we do travel for weddings.`,
           "Each collection includes travel miles, and if the venue is beyond the included mileage, I can check the exact travel details for your location before the call.",
         ].join("\n\n");
+      }
       case "calendar_time_missing":
         return state.calendarStatus === "busy"
           ? "That time was not available, so I cannot book it yet. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?"
