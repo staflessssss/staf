@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageRole } from "@prisma/client";
+import { MessageRole, type Prisma } from "@prisma/client";
 
 import { StatusBadge } from "@/components/stafless/foundation";
 import {
@@ -37,6 +37,55 @@ function getLastMessagePreview(messages: Array<{ content: string; role: MessageR
   }
 
   return content.length > 92 ? `${content.slice(0, 89)}...` : content;
+}
+
+function buildAgentWorkOutcome(event: {
+  toolName: string | null;
+  toolResult: Prisma.JsonValue | null;
+  conversation: { contactId: string; agent: { name: string } };
+  createdAt: Date;
+}) {
+  const details = getLeadDetails(event, event.conversation.contactId);
+  const status = getToolStatusLabel(event.toolResult);
+
+  if (event.toolName === "book_consultation") {
+    return {
+      title: "Consultation booked",
+      detail:
+        [details.coupleName ?? details.contactId, [details.callDate, details.callTime].filter(Boolean).join(" at ")]
+          .filter(Boolean)
+          .join(" - ") || getToolSummary(event.toolResult) || status,
+      meta: `${event.conversation.agent.name} - ${formatDateTime(event.createdAt)}`,
+    };
+  }
+
+  if (event.toolName === "check_consultation_calendar") {
+    return {
+      title: status === "Available" ? "Call time available" : "Call time reviewed",
+      detail:
+        [[details.callDate, details.callTime].filter(Boolean).join(" at "), status]
+          .filter(Boolean)
+          .join(" - ") || getToolSummary(event.toolResult) || status,
+      meta: `${event.conversation.agent.name} - ${formatDateTime(event.createdAt)}`,
+    };
+  }
+
+  if (event.toolName === "check_wedding_availability") {
+    return {
+      title: status === "Available" ? "Wedding date available" : "Wedding date reviewed",
+      detail:
+        [details.weddingDate, details.location, details.capacity ? `${details.bookedCount ?? 0}/${details.capacity} booked` : null]
+          .filter(Boolean)
+          .join(" - ") || getToolSummary(event.toolResult) || status,
+      meta: `${event.conversation.agent.name} - ${formatDateTime(event.createdAt)}`,
+    };
+  }
+
+  return {
+    title: getToolActionLabel(event.toolName),
+    detail: getToolSummary(event.toolResult) ?? status,
+    meta: `${event.conversation.agent.name} - ${formatDateTime(event.createdAt)}`,
+  };
 }
 
 function buildSmoothPath(points: Array<{ x: number; y: number }>) {
@@ -384,161 +433,184 @@ export default async function ClientDashboardPage() {
           </span>
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-[26px] border border-[#e4e8ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,255,0.78))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-            <svg
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              className="h-[340px] w-full overflow-visible"
-              role="img"
-              aria-label="Agent activity line chart"
-            >
-              <defs>
-                <linearGradient id="customerLineGradient" x1="0" x2="1" y1="0" y2="0">
-                  <stop offset="0%" stopColor="#15c5d4" />
-                  <stop offset="100%" stopColor="#61eadb" />
-                </linearGradient>
-                <linearGradient id="agentLineGradient" x1="0" x2="1" y1="0" y2="0">
-                  <stop offset="0%" stopColor="#6d6ff2" />
-                  <stop offset="100%" stopColor="#b9a7ff" />
-                </linearGradient>
-                <filter id="lineGlow" x="-20%" y="-80%" width="140%" height="260%">
-                  <feGaussianBlur stdDeviation="5" result="coloredBlur" />
-                  <feMerge>
-                    <feMergeNode in="coloredBlur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
+        <div className="rounded-[26px] border border-[#e4e8ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,255,0.78))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            className="h-[340px] w-full overflow-visible"
+            role="img"
+            aria-label="Agent activity line chart"
+          >
+            <defs>
+              <linearGradient id="customerLineGradient" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stopColor="#15c5d4" />
+                <stop offset="100%" stopColor="#61eadb" />
+              </linearGradient>
+              <linearGradient id="agentLineGradient" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stopColor="#6d6ff2" />
+                <stop offset="100%" stopColor="#b9a7ff" />
+              </linearGradient>
+              <filter id="lineGlow" x="-20%" y="-80%" width="140%" height="260%">
+                <feGaussianBlur stdDeviation="5" result="coloredBlur" />
+                <feMerge>
+                  <feMergeNode in="coloredBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
 
-              <rect
-                x="1"
-                y="1"
-                width={chartWidth - 2}
-                height={chartHeight - 2}
-                rx="24"
-                fill="rgba(255,255,255,0.58)"
-                stroke="#edf0ff"
-              />
-              {yAxisTicks.map((tick) => {
-                const y = chartPadding.top + chartInnerHeight - (tick / yAxisMax) * chartInnerHeight;
+            <rect
+              x="1"
+              y="1"
+              width={chartWidth - 2}
+              height={chartHeight - 2}
+              rx="24"
+              fill="rgba(255,255,255,0.58)"
+              stroke="#edf0ff"
+            />
+            {yAxisTicks.map((tick) => {
+              const y = chartPadding.top + chartInnerHeight - (tick / yAxisMax) * chartInnerHeight;
 
-                return (
-                  <g key={tick}>
-                    <line
-                      x1={chartPadding.left}
-                      x2={chartWidth - chartPadding.right}
-                      y1={y}
-                      y2={y}
-                      stroke="#e9edff"
-                      strokeDasharray="4 8"
+              return (
+                <g key={tick}>
+                  <line
+                    x1={chartPadding.left}
+                    x2={chartWidth - chartPadding.right}
+                    y1={y}
+                    y2={y}
+                    stroke="#e9edff"
+                    strokeDasharray="4 8"
+                  />
+                  <text
+                    x={chartPadding.left - 16}
+                    y={y + 4}
+                    textAnchor="end"
+                    className="fill-[#8a8fa8] text-[11px] font-semibold"
+                  >
+                    {tick}
+                  </text>
+                </g>
+              );
+            })}
+
+            <path
+              d={customerPath}
+              fill="none"
+              stroke="url(#customerLineGradient)"
+              strokeWidth="4"
+              strokeLinecap="round"
+              filter="url(#lineGlow)"
+            />
+            <path
+              d={agentPath}
+              fill="none"
+              stroke="url(#agentLineGradient)"
+              strokeWidth="4"
+              strokeLinecap="round"
+              filter="url(#lineGlow)"
+            />
+
+            {dayBuckets.map((bucket, index) => {
+              const customerPoint = customerPoints[index];
+              const agentPoint = agentPoints[index];
+              const eventY =
+                chartPadding.top + chartInnerHeight - (bucket.functionCalls / yAxisMax) * chartInnerHeight;
+
+              return (
+                <g key={bucket.key}>
+                  <title>
+                    {`${bucket.label}: ${bucket.customerMessages} customer, ${bucket.agentReplies} agent, ${bucket.functionCalls} function, ${bucket.targetActions} target`}
+                  </title>
+                  <line
+                    x1={customerPoint.x}
+                    x2={customerPoint.x}
+                    y1={chartPadding.top}
+                    y2={chartPadding.top + chartInnerHeight}
+                    stroke="transparent"
+                    strokeWidth="16"
+                  />
+                  <circle cx={customerPoint.x} cy={customerPoint.y} r="4.5" fill="#fff" stroke="#15c5d4" strokeWidth="2.5" />
+                  <circle cx={agentPoint.x} cy={agentPoint.y} r="4.5" fill="#fff" stroke="#7a7cff" strokeWidth="2.5" />
+                  {bucket.functionCalls > 0 ? (
+                    <circle cx={customerPoint.x} cy={eventY} r="4" fill="#70d6c7" opacity="0.9" />
+                  ) : null}
+                  {bucket.targetActions > 0 ? (
+                    <rect
+                      x={customerPoint.x - 4}
+                      y={Math.min(customerPoint.y, agentPoint.y) - 22}
+                      width="8"
+                      height="8"
+                      fill="#181836"
+                      transform={`rotate(45 ${customerPoint.x} ${Math.min(customerPoint.y, agentPoint.y) - 18})`}
                     />
-                    <text
-                      x={chartPadding.left - 16}
-                      y={y + 4}
-                      textAnchor="end"
-                      className="fill-[#8a8fa8] text-[11px] font-semibold"
-                    >
-                      {tick}
-                    </text>
-                  </g>
-                );
-              })}
-
-              <path
-                d={customerPath}
-                fill="none"
-                stroke="url(#customerLineGradient)"
-                strokeWidth="4"
-                strokeLinecap="round"
-                filter="url(#lineGlow)"
-              />
-              <path
-                d={agentPath}
-                fill="none"
-                stroke="url(#agentLineGradient)"
-                strokeWidth="4"
-                strokeLinecap="round"
-                filter="url(#lineGlow)"
-              />
-
-              {dayBuckets.map((bucket, index) => {
-                const customerPoint = customerPoints[index];
-                const agentPoint = agentPoints[index];
-                const eventY =
-                  chartPadding.top + chartInnerHeight - (bucket.functionCalls / yAxisMax) * chartInnerHeight;
-
-                return (
-                  <g key={bucket.key}>
-                    <title>
-                      {`${bucket.label}: ${bucket.customerMessages} customer, ${bucket.agentReplies} agent, ${bucket.functionCalls} function, ${bucket.targetActions} target`}
-                    </title>
-                    <line
-                      x1={customerPoint.x}
-                      x2={customerPoint.x}
-                      y1={chartPadding.top}
-                      y2={chartPadding.top + chartInnerHeight}
-                      stroke="transparent"
-                      strokeWidth="16"
-                    />
-                    <circle cx={customerPoint.x} cy={customerPoint.y} r="4.5" fill="#fff" stroke="#15c5d4" strokeWidth="2.5" />
-                    <circle cx={agentPoint.x} cy={agentPoint.y} r="4.5" fill="#fff" stroke="#7a7cff" strokeWidth="2.5" />
-                    {bucket.functionCalls > 0 ? (
-                      <circle cx={customerPoint.x} cy={eventY} r="4" fill="#70d6c7" opacity="0.9" />
-                    ) : null}
-                    {bucket.targetActions > 0 ? (
-                      <rect
-                        x={customerPoint.x - 4}
-                        y={Math.min(customerPoint.y, agentPoint.y) - 22}
-                        width="8"
-                        height="8"
-                        fill="#181836"
-                        transform={`rotate(45 ${customerPoint.x} ${Math.min(customerPoint.y, agentPoint.y) - 18})`}
-                      />
-                    ) : null}
-                    <text
-                      x={customerPoint.x}
-                      y={chartHeight - 18}
-                      textAnchor="middle"
-                      className="fill-[#737892] text-[10px] font-semibold"
-                    >
-                      {bucket.label}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-            <div className="mt-2 flex items-center justify-between border-t border-[#eef0ff] pt-4 text-xs text-[#6b6a78]">
-              <span>Last 12 days</span>
-              <span>
-                Last activity: {latestActivity ? formatDateTime(latestActivity.createdAt) : "No activity yet"}
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-[26px] border border-[#e4e8ff] bg-white/72 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]">
-            <div className="mb-5 flex items-center justify-between">
-              <h4 className="font-heading text-lg font-bold text-[#181836]">Event Timeline</h4>
-              <span className="rounded-lg bg-[#efecff] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4648d4]">
-                Live
-              </span>
-            </div>
-            <div className="space-y-4">
-              {recentEvents.length === 0 ? (
-                <p className="text-sm text-[#464554]">No function events yet.</p>
-              ) : (
-                recentEvents.map((event) => (
-                  <div key={event.id} className="border-l-2 border-[#d8d6fe] pl-4">
-                    <p className="text-sm font-bold text-[#181836]">{getToolActionLabel(event.toolName)}</p>
-                    <p className="mt-1 text-xs text-[#464554]">{getToolSummary(event.toolResult) ?? getToolStatusLabel(event.toolResult)}</p>
-                    <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6a78]">
-                      {formatDateTime(event.createdAt)}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
+                  ) : null}
+                  <text
+                    x={customerPoint.x}
+                    y={chartHeight - 18}
+                    textAnchor="middle"
+                    className="fill-[#737892] text-[10px] font-semibold"
+                  >
+                    {bucket.label}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+          <div className="mt-2 flex items-center justify-between border-t border-[#eef0ff] pt-4 text-xs text-[#6b6a78]">
+            <span>Last 12 days</span>
+            <span>
+              Last activity: {latestActivity ? formatDateTime(latestActivity.createdAt) : "No activity yet"}
+            </span>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-[28px] border border-[#dfe4ff] bg-[linear-gradient(135deg,#ffffff_0%,#fbfbff_62%,#f4fbff_100%)] p-8 shadow-[0_18px_46px_rgba(24,24,54,0.06)] md:p-10">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h3 className="font-heading text-2xl font-bold tracking-tight text-[#181836]">
+              Agent Work Feed
+            </h3>
+            <p className="mt-2 text-[#464554]">
+              Recent availability checks, calendar decisions, and booked consultations.
+            </p>
+          </div>
+          <Link href="/client/leads" className="text-xs font-bold uppercase tracking-[0.18em] text-[#4648d4]">
+            Open Leads
+          </Link>
+        </div>
+        {recentEvents.length === 0 ? (
+          <div className="rounded-[22px] bg-[#f8f8ff] p-6 text-sm text-[#464554] ring-1 ring-[#eef0ff]">
+            No completed agent work yet.
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {recentEvents.map((event) => {
+              const outcome = buildAgentWorkOutcome(event);
+
+              return (
+                <Link
+                  key={event.id}
+                  href={`/client/dialogs?conversation=${event.conversationId}`}
+                  className="group rounded-[22px] bg-white/84 p-5 ring-1 ring-[#e8ebff] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_18px_36px_rgba(24,24,54,0.08)]"
+                >
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <span className="rounded-full bg-[#effffb] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#137d86] ring-1 ring-[#c9f4ed]">
+                      {getToolStatusLabel(event.toolResult)}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#6b6a78]">
+                      {formatShortDate(event.createdAt)}
+                    </span>
+                  </div>
+                  <h4 className="font-heading text-lg font-bold text-[#181836]">{outcome.title}</h4>
+                  <p className="mt-2 min-h-10 text-sm leading-5 text-[#464554]">{outcome.detail}</p>
+                  <p className="mt-4 border-t border-[#eef0ff] pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6a78] transition group-hover:text-[#4648d4]">
+                    {outcome.meta}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="grid grid-cols-1 gap-12 lg:grid-cols-2">
