@@ -95,6 +95,46 @@ function proposesCallTime(text: string) {
   return hasDayOrRelativeDate && hasTime;
 }
 
+function hasBareTimeSelection(text: string) {
+  return /\b\d{1,2}:\d{2}\b/.test(text) || /\b\d{1,2}\s*(?:am|pm)\b/i.test(text);
+}
+
+function isSchedulingContinuationContext(state: WeddingSalesState) {
+  return (
+    state.leadStage === "checking_calendar" ||
+    state.leadStage === "call_proposed" ||
+    state.lastAssistantIntent === "calendar_busy" ||
+    state.lastAssistantIntent === "calendar_available" ||
+    state.lastAssistantIntent === "calendar_outside_window"
+  );
+}
+
+function extractWeekday(text?: string) {
+  return text?.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)?.[1];
+}
+
+function extractMeridiem(text?: string) {
+  return text?.match(/\b(am|pm)\b/i)?.[1]?.toUpperCase();
+}
+
+function extractTimezoneText(text?: string) {
+  return text?.match(/\b(?:Eastern|ET|EST|EDT)\b/i)?.[0];
+}
+
+function normalizeBareTimeSelection(text: string, previousTime?: string) {
+  const timeMatch = text.match(/\b(\d{1,2}(?::\d{2})?)\s*(am|pm)?\b/i);
+  if (!timeMatch) {
+    return text;
+  }
+
+  const weekday = extractWeekday(text) ?? extractWeekday(previousTime);
+  const meridiem = timeMatch[2]?.toUpperCase() ?? extractMeridiem(previousTime);
+  const timezone = extractTimezoneText(text) ?? extractTimezoneText(previousTime);
+  const time = [timeMatch[1], meridiem].filter(Boolean).join(" ");
+
+  return [weekday, "at", time, timezone].filter(Boolean).join(" ");
+}
+
 function confirmsBooking(text: string) {
   return /\b(?:yes|yep|perfect|sounds good|please book|book it|confirm)\b/i.test(text);
 }
@@ -189,6 +229,14 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: undefined };
   }
 
+  if (isSchedulingContinuationContext(state) && hasBareTimeSelection(message)) {
+    return {
+      ...baseUpdate,
+      leadStage: "checking_calendar",
+      proposedCallTime: normalizeBareTimeSelection(message, state.proposedCallTime),
+    };
+  }
+
   if (asksForCall(message) || ((state.callProposed || state.availability === "available") && proposesCallTime(message))) {
     return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: message };
   }
@@ -242,5 +290,6 @@ export const weddingSalesAnalyzeTestHelpers = {
   extractLocation,
   extractNames,
   extractWeddingDate,
+  normalizeBareTimeSelection,
   proposesCallTime,
 };

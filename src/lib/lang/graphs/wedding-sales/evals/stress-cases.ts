@@ -366,6 +366,41 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
     ],
   },
   {
+    id: "quality-time-only-after-busy-checks-calendar",
+    title: "Time-only reply after busy alternatives checks Calendar, not wedding availability",
+    input: {
+      contactId: "eval-quality-time-only-after-busy@example.com",
+      history: [
+        {
+          role: "USER",
+          content: "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
+        },
+        {
+          role: "ASSISTANT",
+          content: "June 14, 2027 in Charlotte is available. Our collections start at $2,750. Would you be open to a consultation?",
+        },
+        {
+          role: "USER",
+          content: "What about Monday at 10 AM Eastern?",
+        },
+        {
+          role: "ASSISTANT",
+          content: "Monday at 10:00 AM Eastern is already taken, but I have openings at 9:00, 9:30, and 10:30 AM that day. Would any of those times work for you?",
+        },
+      ],
+      message: "10:30 works for me.",
+    },
+    assertions: [
+      {
+        id: "checks-calendar-not-wedding",
+        description: "Runtime treats the short time answer as scheduling continuation.",
+        usedToolingIncludes: ["Calendar"],
+        usedToolingExcludes: ["Wedding availability"],
+        mustNotInclude: ["$2,750", "wedding date", "collections start"],
+      },
+    ],
+  },
+  {
     id: "quality-long-thread-summary-keeps-context",
     title: "Long thread keeps names/date/location context",
     input: {

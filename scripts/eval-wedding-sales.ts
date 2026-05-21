@@ -193,7 +193,16 @@ function buildPreviousState(testCase: (typeof weddingSalesStressCases)[number]) 
     proposedCallTime: /Monday at 10 AM Eastern/i.test(historyText)
       ? "Monday at 10 AM Eastern"
       : undefined,
-    calendarStatus: /looks available/i.test(historyText) ? ("available" as const) : undefined,
+    calendarStatus: /already taken|not available|busy/i.test(historyText)
+      ? ("busy" as const)
+      : /looks available|time looks available/i.test(historyText)
+        ? ("available" as const)
+        : undefined,
+    lastAssistantIntent: /already taken|not available|busy/i.test(historyText)
+      ? "calendar_busy"
+      : /looks available|time looks available/i.test(historyText)
+        ? "calendar_available"
+        : undefined,
     bookingConfirmed: false,
   };
 }

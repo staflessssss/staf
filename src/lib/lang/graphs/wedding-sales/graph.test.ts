@@ -239,3 +239,36 @@ test("wedding sales analyzer recognizes bare weekday time proposals in call cont
   assert.equal(weddingSalesAnalyzeTestHelpers.proposesCallTime("Could we do Sunday at 4 PM Eastern?"), true);
   assert.equal(weddingSalesAnalyzeTestHelpers.proposesCallTime("Sunday works for us."), false);
 });
+
+test("wedding sales graph treats time-only replies after busy calendar alternatives as consultation time", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: "10:30 works for me.",
+    previousState: {
+      names: "Anna and Mark",
+      weddingDate: "2027-06-14",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "Monday at 10 AM Eastern",
+      calendarStatus: "busy",
+      bookingConfirmed: false,
+      leadStage: "checking_calendar",
+      lastAssistantIntent: "calendar_busy",
+    },
+  });
+
+  assert.equal(result.leadStage, "checking_calendar");
+  assert.equal(result.proposedCallTime, "Monday at 10:30 AM Eastern");
+  assert.doesNotMatch(result.responseDraft ?? "", /June 14, 2027.*available/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /\$2,750/);
+});
+
+test("wedding sales analyzer binds bare time selection to previous weekday and timezone", () => {
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.normalizeBareTimeSelection("10:30 works for me.", "Monday at 10 AM Eastern"),
+    "Monday at 10:30 AM Eastern",
+  );
+});
