@@ -39,6 +39,27 @@ function getLastMessagePreview(messages: Array<{ content: string; role: MessageR
   return content.length > 92 ? `${content.slice(0, 89)}...` : content;
 }
 
+function buildSmoothPath(points: Array<{ x: number; y: number }>) {
+  if (points.length === 0) {
+    return "";
+  }
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${points[0].y}`;
+  }
+
+  return points.reduce((path, point, index) => {
+    if (index === 0) {
+      return `M ${point.x} ${point.y}`;
+    }
+
+    const previous = points[index - 1];
+    const controlX = previous.x + (point.x - previous.x) / 2;
+
+    return `${path} C ${controlX} ${previous.y}, ${controlX} ${point.y}, ${point.x} ${point.y}`;
+  }, "");
+}
+
 export default async function ClientDashboardPage() {
   const session = await requireClientSession();
   const tenantId = session.user.tenantId;
@@ -205,13 +226,28 @@ export default async function ClientDashboardPage() {
     }
   }
 
-  const maxBucketCount = Math.max(
+  const chartWidth = 840;
+  const chartHeight = 300;
+  const chartPadding = { top: 24, right: 28, bottom: 46, left: 52 };
+  const chartInnerWidth = chartWidth - chartPadding.left - chartPadding.right;
+  const chartInnerHeight = chartHeight - chartPadding.top - chartPadding.bottom;
+  const maxLineValue = Math.max(
     1,
-    ...dayBuckets.map(
-      (bucket) =>
-        bucket.customerMessages + bucket.agentReplies + bucket.functionCalls,
+    ...dayBuckets.map((bucket) =>
+      Math.max(bucket.customerMessages, bucket.agentReplies, bucket.functionCalls, bucket.targetActions),
     ),
   );
+  const yAxisMax = Math.max(5, Math.ceil(maxLineValue / 5) * 5);
+  const xStep = dayBuckets.length > 1 ? chartInnerWidth / (dayBuckets.length - 1) : 0;
+  const getChartPoint = (value: number, index: number) => ({
+    x: chartPadding.left + xStep * index,
+    y: chartPadding.top + chartInnerHeight - (value / yAxisMax) * chartInnerHeight,
+  });
+  const customerPoints = dayBuckets.map((bucket, index) => getChartPoint(bucket.customerMessages, index));
+  const agentPoints = dayBuckets.map((bucket, index) => getChartPoint(bucket.agentReplies, index));
+  const customerPath = buildSmoothPath(customerPoints);
+  const agentPath = buildSmoothPath(agentPoints);
+  const yAxisTicks = [yAxisMax, Math.round(yAxisMax * 0.75), Math.round(yAxisMax * 0.5), Math.round(yAxisMax * 0.25), 0];
   const actionRate = toolCallCount > 0 ? Math.round((targetActions.length / toolCallCount) * 100) : 0;
   const latestActivity = [...recentMessages, ...toolMessages].sort(
     (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
@@ -304,14 +340,14 @@ export default async function ClientDashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] bg-white p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80 md:p-10">
+      <section className="overflow-hidden rounded-[28px] border border-[#dfe4ff] bg-[linear-gradient(145deg,rgba(255,255,255,0.94),rgba(247,249,255,0.86))] p-8 shadow-[0_24px_70px_rgba(36,44,94,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur md:p-10">
         <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
           <div>
             <h3 className="font-heading text-2xl font-bold tracking-tight text-[#181836]">
               Agent Activity
             </h3>
             <p className="mt-2 text-[#464554]">
-              Daily message flow, function calls, and completed target actions.
+              Message momentum and agent response flow over the last 12 days.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-right md:grid-cols-4">
@@ -321,7 +357,7 @@ export default async function ClientDashboardPage() {
               ["Actions", targetActions.length],
               ["Action rate", `${actionRate}%`],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl bg-[#f8f8ff] px-4 py-3 ring-1 ring-[#d8d6fe]/70">
+              <div key={label} className="rounded-[22px] border border-[#dfe4ff] bg-white/70 px-5 py-3 shadow-[0_12px_26px_rgba(36,44,94,0.05),inset_0_1px_0_rgba(255,255,255,0.85)]">
                 <p className="text-lg font-bold text-[#181836]">{value}</p>
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6b6a78]">{label}</p>
               </div>
@@ -329,18 +365,18 @@ export default async function ClientDashboardPage() {
           </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center gap-4 text-xs font-semibold text-[#464554]">
+        <div className="mb-6 flex flex-wrap items-center gap-5 text-xs font-semibold text-[#464554]">
           <span className="flex items-center gap-2">
-            <span className="size-3 rounded-sm bg-[#4648d4]" />
-            Customers
+            <span className="h-1.5 w-6 rounded-full bg-[linear-gradient(90deg,#15c5d4,#61eadb)] shadow-[0_0_12px_rgba(21,197,212,0.38)]" />
+            Customer messages
           </span>
           <span className="flex items-center gap-2">
-            <span className="size-3 rounded-sm bg-[#8e91ff]" />
+            <span className="h-1.5 w-6 rounded-full bg-[linear-gradient(90deg,#7a7cff,#b9a7ff)] shadow-[0_0_12px_rgba(122,124,255,0.32)]" />
             Agent replies
           </span>
           <span className="flex items-center gap-2">
-            <span className="size-3 rounded-sm bg-[#70d6c7]" />
-            Function calls
+            <span className="size-2 rounded-full bg-[#70d6c7]" />
+            Function events
           </span>
           <span className="flex items-center gap-2">
             <span className="size-3 rotate-45 bg-[#181836]" />
@@ -349,40 +385,129 @@ export default async function ClientDashboardPage() {
         </div>
 
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-h-80 rounded-[22px] bg-[#fbfbff] p-6 ring-1 ring-[#eef0ff]">
-            <div className="flex h-64 items-end gap-3">
-              {dayBuckets.map((bucket) => {
-                const total =
-                  bucket.customerMessages + bucket.agentReplies + bucket.functionCalls;
-                const height = Math.max(10, (total / maxBucketCount) * 100);
+          <div className="rounded-[26px] border border-[#e4e8ff] bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(248,250,255,0.78))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+            <svg
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              className="h-[340px] w-full overflow-visible"
+              role="img"
+              aria-label="Agent activity line chart"
+            >
+              <defs>
+                <linearGradient id="customerLineGradient" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0%" stopColor="#15c5d4" />
+                  <stop offset="100%" stopColor="#61eadb" />
+                </linearGradient>
+                <linearGradient id="agentLineGradient" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0%" stopColor="#6d6ff2" />
+                  <stop offset="100%" stopColor="#b9a7ff" />
+                </linearGradient>
+                <filter id="lineGlow" x="-20%" y="-80%" width="140%" height="260%">
+                  <feGaussianBlur stdDeviation="5" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              <rect
+                x="1"
+                y="1"
+                width={chartWidth - 2}
+                height={chartHeight - 2}
+                rx="24"
+                fill="rgba(255,255,255,0.58)"
+                stroke="#edf0ff"
+              />
+              {yAxisTicks.map((tick) => {
+                const y = chartPadding.top + chartInnerHeight - (tick / yAxisMax) * chartInnerHeight;
 
                 return (
-                  <div
-                    key={bucket.key}
-                    className="flex h-full flex-1 flex-col items-center justify-end gap-3"
-                    title={`${bucket.label}: ${bucket.customerMessages} customer, ${bucket.agentReplies} agent, ${bucket.functionCalls} function, ${bucket.targetActions} target`}
-                  >
-                    <div className="flex w-full flex-col justify-end overflow-hidden rounded-t-xl bg-[#f0efff]" style={{ height: `${height}%` }}>
-                      {bucket.targetActions > 0 ? <div className="mx-auto mb-1 size-2 rotate-45 bg-[#181836]" /> : null}
-                      <div
-                        className="w-full bg-[#70d6c7]"
-                        style={{ height: `${Math.max(0, (bucket.functionCalls / Math.max(1, total)) * 100)}%` }}
-                      />
-                      <div
-                        className="w-full bg-[#8e91ff]"
-                        style={{ height: `${Math.max(0, (bucket.agentReplies / Math.max(1, total)) * 100)}%` }}
-                      />
-                      <div
-                        className="w-full bg-[#4648d4]"
-                        style={{ height: `${Math.max(0, (bucket.customerMessages / Math.max(1, total)) * 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-medium text-[#6b6a78]">{bucket.label}</span>
-                  </div>
+                  <g key={tick}>
+                    <line
+                      x1={chartPadding.left}
+                      x2={chartWidth - chartPadding.right}
+                      y1={y}
+                      y2={y}
+                      stroke="#e9edff"
+                      strokeDasharray="4 8"
+                    />
+                    <text
+                      x={chartPadding.left - 16}
+                      y={y + 4}
+                      textAnchor="end"
+                      className="fill-[#8a8fa8] text-[11px] font-semibold"
+                    >
+                      {tick}
+                    </text>
+                  </g>
                 );
               })}
-            </div>
-            <div className="mt-4 flex items-center justify-between border-t border-[#eef0ff] pt-4 text-xs text-[#6b6a78]">
+
+              <path
+                d={customerPath}
+                fill="none"
+                stroke="url(#customerLineGradient)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                filter="url(#lineGlow)"
+              />
+              <path
+                d={agentPath}
+                fill="none"
+                stroke="url(#agentLineGradient)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                filter="url(#lineGlow)"
+              />
+
+              {dayBuckets.map((bucket, index) => {
+                const customerPoint = customerPoints[index];
+                const agentPoint = agentPoints[index];
+                const eventY =
+                  chartPadding.top + chartInnerHeight - (bucket.functionCalls / yAxisMax) * chartInnerHeight;
+
+                return (
+                  <g key={bucket.key}>
+                    <title>
+                      {`${bucket.label}: ${bucket.customerMessages} customer, ${bucket.agentReplies} agent, ${bucket.functionCalls} function, ${bucket.targetActions} target`}
+                    </title>
+                    <line
+                      x1={customerPoint.x}
+                      x2={customerPoint.x}
+                      y1={chartPadding.top}
+                      y2={chartPadding.top + chartInnerHeight}
+                      stroke="transparent"
+                      strokeWidth="16"
+                    />
+                    <circle cx={customerPoint.x} cy={customerPoint.y} r="4.5" fill="#fff" stroke="#15c5d4" strokeWidth="2.5" />
+                    <circle cx={agentPoint.x} cy={agentPoint.y} r="4.5" fill="#fff" stroke="#7a7cff" strokeWidth="2.5" />
+                    {bucket.functionCalls > 0 ? (
+                      <circle cx={customerPoint.x} cy={eventY} r="4" fill="#70d6c7" opacity="0.9" />
+                    ) : null}
+                    {bucket.targetActions > 0 ? (
+                      <rect
+                        x={customerPoint.x - 4}
+                        y={Math.min(customerPoint.y, agentPoint.y) - 22}
+                        width="8"
+                        height="8"
+                        fill="#181836"
+                        transform={`rotate(45 ${customerPoint.x} ${Math.min(customerPoint.y, agentPoint.y) - 18})`}
+                      />
+                    ) : null}
+                    <text
+                      x={customerPoint.x}
+                      y={chartHeight - 18}
+                      textAnchor="middle"
+                      className="fill-[#737892] text-[10px] font-semibold"
+                    >
+                      {bucket.label}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+            <div className="mt-2 flex items-center justify-between border-t border-[#eef0ff] pt-4 text-xs text-[#6b6a78]">
               <span>Last 12 days</span>
               <span>
                 Last activity: {latestActivity ? formatDateTime(latestActivity.createdAt) : "No activity yet"}
@@ -390,7 +515,7 @@ export default async function ClientDashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[22px] bg-[#fbfbff] p-6 ring-1 ring-[#eef0ff]">
+          <div className="rounded-[26px] border border-[#e4e8ff] bg-white/72 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.88)]">
             <div className="mb-5 flex items-center justify-between">
               <h4 className="font-heading text-lg font-bold text-[#181836]">Event Timeline</h4>
               <span className="rounded-lg bg-[#efecff] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4648d4]">
