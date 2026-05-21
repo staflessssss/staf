@@ -169,6 +169,32 @@ test("LLM wedding sales finalizer converts markdown links for rich Gmail replies
   assert.match(response, /<a href="https:\/\/example.com\/film">Callista and Kevin<\/a>/);
 });
 
+test("LLM wedding sales finalizer adds one brand emoji to warm availability replies", () => {
+  const response = finalizeLlmWeddingSalesResponse({
+    intent: "availability_available",
+    config,
+    state: baseState,
+    text: "June 14, 2027 is available, and I would love to hear more about your plans.",
+  });
+
+  assert.match(response, /🤍/);
+  assert.equal((response.match(/[🤍✨🎥]/gu) ?? []).length, 1);
+});
+
+test("LLM wedding sales finalizer keeps routine scheduling replies emoji-free", () => {
+  const response = finalizeLlmWeddingSalesResponse({
+    intent: "calendar_busy",
+    config,
+    state: {
+      ...baseState,
+      responseDraft: "Would you be open to a 30-minute consultation?",
+    },
+    text: "Monday at 10 AM Eastern is already taken, but 10:30 AM is open. Would that work?",
+  });
+
+  assert.equal((response.match(/[🤍✨🎥]/gu) ?? []).length, 0);
+});
+
 test("wedding sales reflection parser accepts JSON wrapped in model prose", () => {
   const review = parseWeddingSalesReflectionJson([
     "Here is the review:",

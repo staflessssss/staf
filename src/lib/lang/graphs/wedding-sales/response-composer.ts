@@ -38,6 +38,13 @@ type WeddingSalesReflectionReview = {
 
 const DEFAULT_RESPONSE_MODEL = "gpt-4.1-mini";
 const DEFAULT_REFLECTION_MODEL = "gpt-4.1-mini";
+const BRAND_EMOJIS = ["🤍", "✨", "🎥"] as const;
+const BRAND_EMOJI_BY_INTENT: Partial<Record<WeddingSalesResponseIntent, (typeof BRAND_EMOJIS)[number]>> = {
+  ask_missing_info: "🤍",
+  availability_available: "🤍",
+  availability_unavailable: "🤍",
+  booking_confirmed: "✨",
+};
 
 function appendSignatureOnce(text: string, signature: string) {
   const body = text.trim();
@@ -48,6 +55,31 @@ function appendSignatureOnce(text: string, signature: string) {
   }
 
   return `${body}\n\n${trimmedSignature}`;
+}
+
+function hasBrandEmoji(text: string) {
+  return BRAND_EMOJIS.some((emoji) => text.includes(emoji));
+}
+
+function insertEmojiAfterFirstSentence(text: string, emoji: string) {
+  const trimmed = text.trim();
+  const firstSentence = trimmed.match(/^([\s\S]*?[.!?])(\s|$)/);
+
+  if (!firstSentence) {
+    return `${trimmed} ${emoji}`;
+  }
+
+  return `${firstSentence[1]} ${emoji}${trimmed.slice(firstSentence[1].length)}`;
+}
+
+function applyBrandEmojiCadence(args: ComposeWeddingSalesResponseArgs & { text: string }) {
+  const emoji = BRAND_EMOJI_BY_INTENT[args.intent];
+
+  if (!emoji || hasBrandEmoji(args.text)) {
+    return args.text.trim();
+  }
+
+  return insertEmojiAfterFirstSentence(args.text, emoji);
 }
 
 function getChannelFormatting(config: WeddingSalesConfig, state: WeddingSalesState) {
@@ -341,7 +373,8 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
     "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
     "Gmail can use HTML links. Instagram and Telegram must use plain URLs.",
-    "Allowed emojis only: 🤍 ✨ 🎥. Use at most one emoji unless the customer is very enthusiastic.",
+    "Brand voice: warm, reassuring, lightly excited, and founder-like. Use natural contractions when they fit.",
+    "Allowed emojis only: 🤍 ✨ 🎥. Use exactly one brand emoji in warm first replies, availability replies, and booking confirmations. For routine scheduling/error replies, usually use no emoji. Never use more than one emoji unless the customer is very enthusiastic.",
     "Avoid filler openings like 'Thanks for sharing' on every turn. Vary phrasing naturally.",
     "Write concise email paragraphs, usually 2-4 short paragraphs. Scheduling replies should usually be 1 paragraph.",
     signatureInstruction,
@@ -358,6 +391,7 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     '{"status":"pass"|"rewrite","issues":["short issue"],"revisedText":"final reply if rewrite, otherwise empty string"}',
     "Rewrite only when needed. If rewriting, preserve all required facts and do not invent any new facts.",
     "Fail and rewrite if the draft repeats the previous assistant response, greets mid-thread, includes a forbidden signature, sounds like a bot status message, ignores the customer's latest question, or exceeds the paragraph limit.",
+    "Keep the voice friendly and premium. Allowed emojis only: 🤍 ✨ 🎥. Warm first replies, availability replies, and booking confirmations should contain one brand emoji; routine scheduling replies usually should not.",
     policy.mustInclude.length ? `The final reply must include:\n- ${policy.mustInclude.join("\n- ")}` : "",
     policy.mustNotRepeat.length ? `The final reply must not repeat:\n- ${policy.mustNotRepeat.join("\n- ")}` : "",
     policy.forbiddenPhrases.length ? `Forbidden phrases/concepts:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
@@ -409,9 +443,11 @@ export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesRespons
     ? normalizeMarkdownLinksForRichEmail(withoutThreadGreeting)
     : withoutThreadGreeting;
 
+  const withBrandEmoji = applyBrandEmojiCadence({ ...args, text: normalizedLinks });
+
   return policy.includeSignature
-    ? appendSignatureOnce(normalizedLinks, args.config.signature)
-    : normalizedLinks.trim();
+    ? appendSignatureOnce(withBrandEmoji, args.config.signature)
+    : withBrandEmoji.trim();
 }
 
 export function parseWeddingSalesReflectionJson(text: string) {
