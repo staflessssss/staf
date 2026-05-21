@@ -2,6 +2,12 @@ import Link from "next/link";
 import { MessageRole } from "@prisma/client";
 
 import { StatusBadge } from "@/components/stafless/foundation";
+import {
+  getLeadDetails,
+  getToolActionLabel,
+  getToolStatusLabel,
+  getToolSummary,
+} from "@/lib/client-analytics";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
 import { isQualifiedLeadToolMessage } from "@/lib/lead-qualification";
@@ -11,6 +17,26 @@ function formatShortDate(value: Date) {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatDateTime(value: Date) {
+  return value.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getLastMessagePreview(messages: Array<{ content: string; role: MessageRole }>) {
+  const message = messages.find((item) => item.role === MessageRole.USER || item.role === MessageRole.ASSISTANT);
+  const content = message?.content.trim();
+
+  if (!content) {
+    return "No visible messages yet.";
+  }
+
+  return content.length > 92 ? `${content.slice(0, 89)}...` : content;
 }
 
 export default async function ClientDashboardPage() {
@@ -50,8 +76,18 @@ export default async function ClientDashboardPage() {
       include: {
         agent: true,
         messages: {
+          where: {
+            role: {
+              in: [MessageRole.USER, MessageRole.ASSISTANT],
+            },
+          },
           orderBy: { createdAt: "desc" },
-          take: 1,
+          take: 3,
+        },
+        _count: {
+          select: {
+            messages: true,
+          },
         },
       },
       orderBy: { updatedAt: "desc" },
@@ -105,6 +141,13 @@ export default async function ClientDashboardPage() {
           toolName: null,
         },
       },
+      include: {
+        conversation: {
+          include: {
+            agent: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 500,
     }),
@@ -118,6 +161,7 @@ export default async function ClientDashboardPage() {
       toolResult: message.toolResult,
     }),
   );
+  const targetActionIds = new Set(targetActions.map((message) => message.id));
   const activeAgents = agents.filter((agent) => agent.status === "ACTIVE");
   const dayBuckets = Array.from({ length: 12 }, (_, index) => {
     const date = new Date();
@@ -127,7 +171,10 @@ export default async function ClientDashboardPage() {
     return {
       key: date.toISOString().slice(0, 10),
       label: formatShortDate(date),
-      count: 0,
+      customerMessages: 0,
+      agentReplies: 0,
+      functionCalls: 0,
+      targetActions: 0,
     };
   });
   const bucketByKey = new Map(dayBuckets.map((bucket) => [bucket.key, bucket]));
@@ -136,12 +183,40 @@ export default async function ClientDashboardPage() {
     const key = message.createdAt.toISOString().slice(0, 10);
     const bucket = bucketByKey.get(key);
 
-    if (bucket) {
-      bucket.count += 1;
+    if (!bucket) continue;
+
+    if (message.role === MessageRole.USER) {
+      bucket.customerMessages += 1;
+    } else if (message.role === MessageRole.ASSISTANT) {
+      bucket.agentReplies += 1;
     }
   }
 
-  const maxBucketCount = Math.max(1, ...dayBuckets.map((bucket) => bucket.count));
+  for (const message of toolMessages) {
+    const key = message.createdAt.toISOString().slice(0, 10);
+    const bucket = bucketByKey.get(key);
+
+    if (!bucket) continue;
+
+    bucket.functionCalls += 1;
+
+    if (targetActionIds.has(message.id)) {
+      bucket.targetActions += 1;
+    }
+  }
+
+  const maxBucketCount = Math.max(
+    1,
+    ...dayBuckets.map(
+      (bucket) =>
+        bucket.customerMessages + bucket.agentReplies + bucket.functionCalls,
+    ),
+  );
+  const actionRate = toolCallCount > 0 ? Math.round((targetActions.length / toolCallCount) * 100) : 0;
+  const latestActivity = [...recentMessages, ...toolMessages].sort(
+    (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+  )[0];
+  const recentEvents = toolMessages.slice(0, 6);
 
   return (
     <div className="space-y-12">
@@ -155,8 +230,8 @@ export default async function ClientDashboardPage() {
               Your agents are active and assisting customers
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-[#464554]">
-              Real-time engagement is steady across your connected channels. Use this dashboard to
-              track business activity, not technical setup.
+              Track conversations, function calls, and booked outcomes from the agents working across
+              your connected channels.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -203,25 +278,25 @@ export default async function ClientDashboardPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
-        <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
+        <div className="rounded-[24px] bg-white p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
           <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{conversationCount}</h3>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
             Total Dialogs
           </p>
         </div>
-        <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
+        <div className="rounded-[24px] bg-white p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
           <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{visibleMessageCount}</h3>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
             Total Messages
           </p>
         </div>
-        <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
+        <div className="rounded-[24px] bg-white p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
           <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{toolCallCount}</h3>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
             Function Calls
           </p>
         </div>
-        <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
+        <div className="rounded-[24px] bg-white p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
           <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{targetActions.length}</h3>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
             Target Actions
@@ -229,34 +304,115 @@ export default async function ClientDashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-[28px] bg-white p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80 md:p-12">
-        <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
+      <section className="rounded-[28px] bg-white p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80 md:p-10">
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-6">
           <div>
             <h3 className="font-heading text-2xl font-bold tracking-tight text-[#181836]">
-              Engagement Activity
+              Agent Activity
             </h3>
             <p className="mt-2 text-[#464554]">
-              Message volume across active agents.
+              Daily message flow, function calls, and completed target actions.
             </p>
           </div>
-          <div className="rounded-lg bg-[#efecff] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#4648d4]">
-            Last 12 days
+          <div className="grid grid-cols-2 gap-3 text-right md:grid-cols-4">
+            {[
+              ["Messages", visibleMessageCount],
+              ["Functions", toolCallCount],
+              ["Actions", targetActions.length],
+              ["Action rate", `${actionRate}%`],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-2xl bg-[#f8f8ff] px-4 py-3 ring-1 ring-[#d8d6fe]/70">
+                <p className="text-lg font-bold text-[#181836]">{value}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6b6a78]">{label}</p>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="flex h-64 items-end gap-4">
-          {dayBuckets.map((bucket) => (
-            <div
-              key={bucket.key}
-              className="flex h-full flex-1 flex-col items-center justify-end gap-2"
-              title={`${bucket.label}: ${bucket.count} messages`}
-            >
-              <div
-                className="w-full rounded-t-lg bg-[linear-gradient(180deg,rgba(70,72,212,0.28),rgba(70,72,212,0.08))]"
-                style={{ height: `${Math.max(8, (bucket.count / maxBucketCount) * 100)}%` }}
-              />
-              <span className="text-[10px] font-medium text-[#6b6a78]">{bucket.label}</span>
+
+        <div className="mb-6 flex flex-wrap items-center gap-4 text-xs font-semibold text-[#464554]">
+          <span className="flex items-center gap-2">
+            <span className="size-3 rounded-sm bg-[#4648d4]" />
+            Customers
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="size-3 rounded-sm bg-[#8e91ff]" />
+            Agent replies
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="size-3 rounded-sm bg-[#70d6c7]" />
+            Function calls
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="size-3 rotate-45 bg-[#181836]" />
+            Target actions
+          </span>
+        </div>
+
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-h-80 rounded-[22px] bg-[#fbfbff] p-6 ring-1 ring-[#eef0ff]">
+            <div className="flex h-64 items-end gap-3">
+              {dayBuckets.map((bucket) => {
+                const total =
+                  bucket.customerMessages + bucket.agentReplies + bucket.functionCalls;
+                const height = Math.max(10, (total / maxBucketCount) * 100);
+
+                return (
+                  <div
+                    key={bucket.key}
+                    className="flex h-full flex-1 flex-col items-center justify-end gap-3"
+                    title={`${bucket.label}: ${bucket.customerMessages} customer, ${bucket.agentReplies} agent, ${bucket.functionCalls} function, ${bucket.targetActions} target`}
+                  >
+                    <div className="flex w-full flex-col justify-end overflow-hidden rounded-t-xl bg-[#f0efff]" style={{ height: `${height}%` }}>
+                      {bucket.targetActions > 0 ? <div className="mx-auto mb-1 size-2 rotate-45 bg-[#181836]" /> : null}
+                      <div
+                        className="w-full bg-[#70d6c7]"
+                        style={{ height: `${Math.max(0, (bucket.functionCalls / Math.max(1, total)) * 100)}%` }}
+                      />
+                      <div
+                        className="w-full bg-[#8e91ff]"
+                        style={{ height: `${Math.max(0, (bucket.agentReplies / Math.max(1, total)) * 100)}%` }}
+                      />
+                      <div
+                        className="w-full bg-[#4648d4]"
+                        style={{ height: `${Math.max(0, (bucket.customerMessages / Math.max(1, total)) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-medium text-[#6b6a78]">{bucket.label}</span>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+            <div className="mt-4 flex items-center justify-between border-t border-[#eef0ff] pt-4 text-xs text-[#6b6a78]">
+              <span>Last 12 days</span>
+              <span>
+                Last activity: {latestActivity ? formatDateTime(latestActivity.createdAt) : "No activity yet"}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-[22px] bg-[#fbfbff] p-6 ring-1 ring-[#eef0ff]">
+            <div className="mb-5 flex items-center justify-between">
+              <h4 className="font-heading text-lg font-bold text-[#181836]">Event Timeline</h4>
+              <span className="rounded-lg bg-[#efecff] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4648d4]">
+                Live
+              </span>
+            </div>
+            <div className="space-y-4">
+              {recentEvents.length === 0 ? (
+                <p className="text-sm text-[#464554]">No function events yet.</p>
+              ) : (
+                recentEvents.map((event) => (
+                  <div key={event.id} className="border-l-2 border-[#d8d6fe] pl-4">
+                    <p className="text-sm font-bold text-[#181836]">{getToolActionLabel(event.toolName)}</p>
+                    <p className="mt-1 text-xs text-[#464554]">{getToolSummary(event.toolResult) ?? getToolStatusLabel(event.toolResult)}</p>
+                    <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6a78]">
+                      {formatDateTime(event.createdAt)}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -280,24 +436,30 @@ export default async function ClientDashboardPage() {
                 <Link
                   key={conversation.id}
                   href={`/client/dialogs?conversation=${conversation.id}`}
-                  className="flex items-center gap-4 rounded-[20px] bg-white p-5 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(24,24,54,0.08)]"
+                  className="grid gap-4 rounded-[20px] bg-white p-5 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 transition hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(24,24,54,0.08)] md:grid-cols-[auto_minmax(0,1fr)_auto]"
                 >
                   <div className="flex size-12 items-center justify-center rounded-full bg-[#efecff] text-sm font-bold text-[#4648d4]">
                     {conversation.contactId.slice(0, 2).toUpperCase()}
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold">{conversation.contactId}</p>
-                    <p className="text-xs text-[#554336]">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{conversation.contactId}</p>
+                    <p className="mt-1 text-xs text-[#554336]">
                       Handled by <span className="text-[#4648d4]">{conversation.agent.name}</span>
                     </p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#464554]">
+                      {getLastMessagePreview(conversation.messages)}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#636563]">
+                  <div className="flex items-start gap-2 md:flex-col md:text-right">
+                    <span className="rounded-lg bg-[#f5f2ff] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#5c5c7e]">
                       {conversation.channel}
-                    </p>
-                    <p className="mt-1 text-[11px] text-[#636563]">
+                    </span>
+                    <span className="rounded-lg bg-[#f8f8ff] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#6b6a78]">
+                      {conversation._count.messages} events
+                    </span>
+                    <span className="text-[11px] text-[#636563]">
                       {formatShortDate(conversation.updatedAt)}
-                    </p>
+                    </span>
                   </div>
                 </Link>
               ))
@@ -314,41 +476,45 @@ export default async function ClientDashboardPage() {
               Open Leads
             </Link>
           </div>
-          <div className="overflow-hidden rounded-[20px] bg-white shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="bg-[#f5f2ff]">
-                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[#5c5c7e]">
-                    Action
-                  </th>
-                  <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[#5c5c7e]">
-                    Date
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#eef0ff]">
-                {targetActions.slice(0, 4).map((message) => (
-                  <tr key={message.id} className="hover:bg-[#f8f8ff]">
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-[#181836]">{message.toolName}</span>
-                        <span className="text-[10px] text-[#5c5c7e]">Lead action recorded</span>
+          <div className="space-y-3">
+            {targetActions.length === 0 ? (
+              <div className="rounded-[20px] bg-white p-5 text-sm text-[#464554] shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70">
+                No lead actions yet.
+              </div>
+            ) : (
+              targetActions.slice(0, 4).map((message) => {
+                const details = getLeadDetails(message, message.conversation.contactId);
+
+                return (
+                  <details
+                    key={message.id}
+                    className="group rounded-[20px] bg-white p-5 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 open:shadow-[0_18px_36px_rgba(24,24,54,0.08)]"
+                  >
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-[#181836]">{details.contactId}</p>
+                        <p className="mt-1 text-xs text-[#464554]">
+                          {details.action} by <span className="text-[#4648d4]">{message.conversation.agent.name}</span>
+                        </p>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-[#464554]">
-                      {message.createdAt.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-                {targetActions.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="px-6 py-6 text-sm text-[#464554]">
-                      No lead actions yet.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-[#181836]">{details.callTime ?? details.status}</p>
+                        <p className="text-[11px] text-[#6b6a78]">{formatDateTime(message.createdAt)}</p>
+                      </div>
+                    </summary>
+                    <div className="mt-5 grid gap-3 border-t border-[#eef0ff] pt-5 text-xs text-[#464554] sm:grid-cols-2">
+                      <span>Wedding: {details.weddingDate ?? "Not captured"}</span>
+                      <span>Location: {details.location ?? "Not captured"}</span>
+                      <span>Call: {[details.callDate, details.callTime].filter(Boolean).join(" at ") || "Not captured"}</span>
+                      <span>Mode: {details.mode ?? "live"}</span>
+                      <Link href={`/client/dialogs?conversation=${message.conversationId}`} className="font-bold text-[#4648d4]">
+                        Open dialog
+                      </Link>
+                    </div>
+                  </details>
+                );
+              })
+            )}
           </div>
         </div>
       </section>

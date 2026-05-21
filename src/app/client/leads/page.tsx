@@ -1,13 +1,19 @@
 import Link from "next/link";
-import { MessageRole, type Prisma } from "@prisma/client";
+import { MessageRole } from "@prisma/client";
 
+import { getLeadDetails, getToolActionLabel, getToolStatusLabel } from "@/lib/client-analytics";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
 import { isQualifiedLeadToolMessage } from "@/lib/lead-qualification";
 
-function getObjectEntries(value: Prisma.JsonValue | null) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  return Object.entries(value as Record<string, unknown>).slice(0, 4);
+function formatDateTime(value: Date) {
+  return value.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 export default async function ClientLeadsPage() {
@@ -32,7 +38,7 @@ export default async function ClientLeadsPage() {
           NOT: { toolName: null },
         },
         orderBy: { createdAt: "desc" },
-        take: 1,
+        take: 12,
       },
     },
     orderBy: { updatedAt: "desc" },
@@ -50,11 +56,12 @@ export default async function ClientLeadsPage() {
       return qualifiedMessage
         ? {
             ...thread,
-            messages: [qualifiedMessage],
+            qualifiedMessage,
+            details: getLeadDetails(qualifiedMessage, thread.contactId),
           }
         : null;
     })
-    .filter((thread): thread is (typeof leadThreads)[number] => Boolean(thread));
+    .filter((thread): thread is NonNullable<typeof thread> => Boolean(thread));
 
   const actionedCount = Math.max(
     0,
@@ -73,7 +80,7 @@ export default async function ClientLeadsPage() {
               Leads
             </h1>
             <p className="mt-3 text-lg leading-8 text-[#464554]">
-              Centralized overview of qualified outcomes captured by your agents.
+              Qualified outcomes captured by your agents, with the source details collected during each dialog.
             </p>
           </div>
           <Link
@@ -91,7 +98,7 @@ export default async function ClientLeadsPage() {
             {qualifiedLeadThreads.length}
           </h2>
           <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-            New Leads
+            Qualified Leads
           </p>
         </div>
         <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-3">
@@ -105,106 +112,111 @@ export default async function ClientLeadsPage() {
         <div className="relative overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#4648d4_0%,#6063ee_100%)] p-8 text-white shadow-[0_18px_40px_rgba(70,72,212,0.18)] md:col-span-6">
           <h3 className="font-heading text-2xl font-bold">Lead Health</h3>
           <p className="mt-2 text-sm text-white/80">
-            Leads only appear here when an agent completes one of your business target actions.
+            Qualified leads include the captured wedding details, consultation status, and source function timeline.
           </p>
         </div>
       </section>
 
       <section className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70">
-        <div className="mb-8 flex flex-wrap items-center gap-4 border-b border-[#eef0ff] pb-8">
-          <div className="relative min-w-[260px] flex-1">
-            <input
-              className="w-full rounded-2xl bg-[#f8f8ff] px-4 py-3 text-sm outline-none ring-1 ring-[#d8d6fe]/70"
-              placeholder="Search by lead, agent or captured field..."
-              readOnly
-            />
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[#eef0ff] pb-8">
+          <div>
+            <h2 className="font-heading text-2xl font-bold text-[#181836]">Qualified Outcomes</h2>
+            <p className="mt-2 text-sm text-[#464554]">
+              Latest booked or completed business actions from active agent conversations.
+            </p>
           </div>
-          <div className="rounded-lg bg-[#efecff] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[#4648d4]">
-            Qualified outcomes
+          <div className="rounded-lg bg-[#efecff] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#4648d4]">
+            Latest first
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-[#eef0ff] text-left">
-                <th className="px-4 pb-6 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-                  Lead Details
-                </th>
-                <th className="px-4 pb-6 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-                  Source Agent
-                </th>
-                <th className="px-4 pb-6 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-                  Captured Details
-                </th>
-                <th className="px-4 pb-6 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-                  Date Captured
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#eef0ff]">
-              {qualifiedLeadThreads.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-sm text-[#464554]">
-                    No lead actions recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                qualifiedLeadThreads.map((thread) => {
-                  const leadMessage = thread.messages[0];
-                  const capturedFields = [
-                    ...getObjectEntries(leadMessage?.toolInput ?? null),
-                    ...getObjectEntries(leadMessage?.toolResult ?? null),
-                  ].slice(0, 3);
+        <div className="space-y-4">
+          {qualifiedLeadThreads.length === 0 ? (
+            <div className="rounded-[20px] bg-[#f8f8ff] p-8 text-sm text-[#464554]">
+              No lead actions recorded yet.
+            </div>
+          ) : (
+            qualifiedLeadThreads.map((thread) => {
+              const details = thread.details;
 
-                  return (
-                    <tr key={thread.id} className="hover:bg-[#f8f8ff]">
-                      <td className="px-4 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="flex size-10 items-center justify-center rounded-2xl bg-[#efecff] text-xs font-bold text-[#4648d4]">
-                            {thread.contactId.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-bold text-[#181836]">{thread.contactId}</p>
-                            <p className="text-xs text-[#5c5c7e]">
-                              {leadMessage?.toolName ?? "Lead action"}
+              return (
+                <details
+                  key={thread.id}
+                  className="group rounded-[22px] bg-[#fbfbff] p-5 ring-1 ring-[#eef0ff] open:bg-white open:shadow-[0_18px_36px_rgba(24,24,54,0.08)]"
+                >
+                  <summary className="grid cursor-pointer list-none gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#efecff] text-xs font-bold text-[#4648d4]">
+                        {thread.contactId.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-[#181836]">{details.coupleName ?? thread.contactId}</p>
+                        <p className="mt-1 truncate text-xs text-[#5c5c7e]">{thread.contactId}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#5c5c7e]">
+                        Outcome
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[#181836]">{details.action}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#5c5c7e]">
+                        Captured
+                      </p>
+                      <p className="mt-1 text-sm text-[#464554]">{formatDateTime(thread.qualifiedMessage.createdAt)}</p>
+                    </div>
+                    <span className="rounded-lg bg-[#efecff] px-3 py-2 text-xs font-bold text-[#4648d4]">
+                      Details
+                    </span>
+                  </summary>
+
+                  <div className="mt-6 grid gap-6 border-t border-[#eef0ff] pt-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[
+                        ["Wedding date", details.weddingDate],
+                        ["Location", details.location],
+                        ["Consultation", [details.callDate, details.callTime].filter(Boolean).join(" at ")],
+                        ["Email", details.email],
+                        ["Mode", details.mode ?? "live"],
+                        ["Status", details.status],
+                        ["Capacity", details.capacity ? `${details.bookedCount ?? 0}/${details.capacity} booked` : null],
+                        ["Event ID", details.eventId],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-2xl bg-[#f8f8ff] p-4 ring-1 ring-[#eef0ff]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6b6a78]">{label}</p>
+                          <p className="mt-2 break-words text-sm font-semibold text-[#181836]">
+                            {value || "Not captured"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-2xl bg-[#f8f8ff] p-5 ring-1 ring-[#eef0ff]">
+                      <h4 className="font-heading text-lg font-bold text-[#181836]">Function Timeline</h4>
+                      <div className="mt-4 space-y-4">
+                        {thread.messages.map((message) => (
+                          <div key={message.id} className="border-l-2 border-[#d8d6fe] pl-4">
+                            <p className="text-sm font-bold text-[#181836]">{getToolActionLabel(message.toolName)}</p>
+                            <p className="mt-1 text-xs text-[#464554]">{getToolStatusLabel(message.toolResult)}</p>
+                            <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6a78]">
+                              {formatDateTime(message.createdAt)}
                             </p>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-6 text-sm font-medium text-[#181836]">
-                        {thread.agent.name}
-                      </td>
-                      <td className="px-4 py-6">
-                        <div className="flex flex-wrap gap-2">
-                          {capturedFields.length > 0 ? (
-                            capturedFields.map(([key, value]) => (
-                              <span
-                                key={`${thread.id}-${key}`}
-                                className="rounded-lg bg-[#f5f2ff] px-3 py-1 text-xs font-medium text-[#464554]"
-                              >
-                                {key}: {String(value)}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-xs text-[#5c5c7e]">Base lead fields only</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-6 text-sm text-[#464554]">
-                        <Link
-                          href={`/client/dialogs?conversation=${thread.id}`}
-                          className="font-medium text-[#4648d4] hover:underline"
-                        >
-                          {thread.updatedAt.toLocaleString()}
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        ))}
+                      </div>
+                      <Link
+                        href={`/client/dialogs?conversation=${thread.id}`}
+                        className="mt-5 inline-flex rounded-xl bg-[#4648d4] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#3d3fbd]"
+                      >
+                        Open dialog
+                      </Link>
+                    </div>
+                  </div>
+                </details>
+              );
+            })
+          )}
         </div>
       </section>
     </div>
