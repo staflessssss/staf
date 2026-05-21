@@ -4,6 +4,7 @@ import { MessageRole } from "@prisma/client";
 import { StatusBadge } from "@/components/stafless/foundation";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
+import { isQualifiedLeadToolMessage } from "@/lib/lead-qualification";
 
 function formatShortDate(value: Date) {
   return value.toLocaleDateString("en-US", {
@@ -16,7 +17,16 @@ export default async function ClientDashboardPage() {
   const session = await requireClientSession();
   const tenantId = session.user.tenantId;
 
-  const [tenant, agents, recentConversations, conversationCount, messages] = await Promise.all([
+  const [
+    tenant,
+    agents,
+    recentConversations,
+    conversationCount,
+    visibleMessageCount,
+    toolCallCount,
+    recentMessages,
+    toolMessages,
+  ] = await Promise.all([
     db.tenant.findUnique({
       where: { id: tenantId },
       include: {
@@ -52,24 +62,86 @@ export default async function ClientDashboardPage() {
         agent: { tenantId },
       },
     }),
+    db.message.count({
+      where: {
+        conversation: {
+          agent: { tenantId },
+        },
+        role: {
+          in: [MessageRole.USER, MessageRole.ASSISTANT],
+        },
+      },
+    }),
+    db.message.count({
+      where: {
+        conversation: {
+          agent: { tenantId },
+        },
+        role: MessageRole.TOOL,
+        NOT: {
+          toolName: null,
+        },
+      },
+    }),
     db.message.findMany({
       where: {
         conversation: {
           agent: { tenantId },
         },
+        role: {
+          in: [MessageRole.USER, MessageRole.ASSISTANT],
+        },
       },
       orderBy: { createdAt: "desc" },
-      take: 200,
+      take: 500,
+    }),
+    db.message.findMany({
+      where: {
+        conversation: {
+          agent: { tenantId },
+        },
+        role: MessageRole.TOOL,
+        NOT: {
+          toolName: null,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 500,
     }),
   ]);
 
   if (!tenant) return <div>Client not found.</div>;
 
-  const leadActions = messages.filter(
-    (message) => message.role === MessageRole.TOOL && message.toolName,
+  const targetActions = toolMessages.filter((message) =>
+    isQualifiedLeadToolMessage({
+      toolName: message.toolName,
+      toolResult: message.toolResult,
+    }),
   );
   const activeAgents = agents.filter((agent) => agent.status === "ACTIVE");
-  const bars = [40, 55, 35, 75, 90, 65, 45, 30, 50, 60, 40, 25];
+  const dayBuckets = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (11 - index));
+    date.setHours(0, 0, 0, 0);
+
+    return {
+      key: date.toISOString().slice(0, 10),
+      label: formatShortDate(date),
+      count: 0,
+    };
+  });
+  const bucketByKey = new Map(dayBuckets.map((bucket) => [bucket.key, bucket]));
+
+  for (const message of recentMessages) {
+    const key = message.createdAt.toISOString().slice(0, 10);
+    const bucket = bucketByKey.get(key);
+
+    if (bucket) {
+      bucket.count += 1;
+    }
+  }
+
+  const maxBucketCount = Math.max(1, ...dayBuckets.map((bucket) => bucket.count));
 
   return (
     <div className="space-y-12">
@@ -130,7 +202,7 @@ export default async function ClientDashboardPage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-8 md:grid-cols-3">
+      <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
         <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
           <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{conversationCount}</h3>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
@@ -138,15 +210,21 @@ export default async function ClientDashboardPage() {
           </p>
         </div>
         <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
-          <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{messages.length}</h3>
+          <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{visibleMessageCount}</h3>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
             Total Messages
           </p>
         </div>
         <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
-          <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{leadActions.length}</h3>
+          <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{toolCallCount}</h3>
           <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
-            New Leads
+            Function Calls
+          </p>
+        </div>
+        <div className="rounded-[24px] bg-white p-10 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80">
+          <h3 className="font-heading text-4xl font-bold tracking-tight text-[#181836]">{targetActions.length}</h3>
+          <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#636563]">
+            Target Actions
           </p>
         </div>
       </section>
@@ -158,20 +236,26 @@ export default async function ClientDashboardPage() {
               Engagement Activity
             </h3>
             <p className="mt-2 text-[#464554]">
-              Hourly interaction distribution across active agents.
+              Message volume across active agents.
             </p>
           </div>
           <div className="rounded-lg bg-[#efecff] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-[#4648d4]">
-            This month
+            Last 12 days
           </div>
         </div>
         <div className="flex h-64 items-end gap-4">
-          {bars.map((bar, index) => (
+          {dayBuckets.map((bucket) => (
             <div
-              key={bar + index}
-              className="flex-1 rounded-t-lg bg-[linear-gradient(180deg,rgba(70,72,212,0.18),rgba(70,72,212,0.06))]"
-              style={{ height: `${bar}%` }}
-            />
+              key={bucket.key}
+              className="flex h-full flex-1 flex-col items-center justify-end gap-2"
+              title={`${bucket.label}: ${bucket.count} messages`}
+            >
+              <div
+                className="w-full rounded-t-lg bg-[linear-gradient(180deg,rgba(70,72,212,0.28),rgba(70,72,212,0.08))]"
+                style={{ height: `${Math.max(8, (bucket.count / maxBucketCount) * 100)}%` }}
+              />
+              <span className="text-[10px] font-medium text-[#6b6a78]">{bucket.label}</span>
+            </div>
           ))}
         </div>
       </section>
@@ -243,7 +327,7 @@ export default async function ClientDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eef0ff]">
-                {leadActions.slice(0, 4).map((message) => (
+                {targetActions.slice(0, 4).map((message) => (
                   <tr key={message.id} className="hover:bg-[#f8f8ff]">
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
@@ -256,7 +340,7 @@ export default async function ClientDashboardPage() {
                     </td>
                   </tr>
                 ))}
-                {leadActions.length === 0 ? (
+                {targetActions.length === 0 ? (
                   <tr>
                     <td colSpan={2} className="px-6 py-6 text-sm text-[#464554]">
                       No lead actions yet.

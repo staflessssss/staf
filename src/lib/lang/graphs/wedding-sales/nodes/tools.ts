@@ -63,6 +63,13 @@ async function invokeTool(toolInstance: StructuredToolInterface, input: Record<s
   return typeof result === "string" ? result : JSON.stringify(result);
 }
 
+function buildToolObservationUpdate(observation: { toolName: string; result: string }) {
+  return {
+    toolObservations: [observation],
+    turnToolObservations: [observation],
+  };
+}
+
 async function composeReplyUpdate(args: {
   intent: WeddingSalesResponseIntent;
   config: WeddingSalesConfig;
@@ -138,16 +145,14 @@ export function createWeddingSalesToolNodes(args: {
               leadStage: "availability_checked",
             },
           })),
-          toolObservations: [
-            {
-              toolName: "check_wedding_availability",
-              result: JSON.stringify({
-                status: "unavailable",
-                date: state.weddingDate,
-                summary: "Configured unavailable date.",
-              }),
-            },
-          ],
+          ...buildToolObservationUpdate({
+            toolName: "check_wedding_availability",
+            result: JSON.stringify({
+              status: "unavailable",
+              date: state.weddingDate,
+              summary: "Configured unavailable date.",
+            }),
+          }),
         };
       }
 
@@ -179,7 +184,7 @@ export function createWeddingSalesToolNodes(args: {
               leadStage: "availability_checked",
             },
           })),
-          toolObservations: [{ toolName: "check_wedding_availability", result }],
+          ...buildToolObservationUpdate({ toolName: "check_wedding_availability", result }),
         };
       }
 
@@ -203,7 +208,7 @@ export function createWeddingSalesToolNodes(args: {
             leadStage: "availability_checked",
           },
         })),
-        toolObservations: [{ toolName: "check_wedding_availability", result }],
+        ...buildToolObservationUpdate({ toolName: "check_wedding_availability", result }),
       };
     },
     checkCalendar: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
@@ -246,7 +251,7 @@ export function createWeddingSalesToolNodes(args: {
             leadStage: available ? "call_proposed" : "checking_calendar",
           },
         })),
-        toolObservations: [{ toolName: "check_consultation_calendar", result }],
+        ...buildToolObservationUpdate({ toolName: "check_consultation_calendar", result }),
       };
     },
     bookCall: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
@@ -285,7 +290,7 @@ export function createWeddingSalesToolNodes(args: {
             leadStage: bookingConfirmed ? "booked" : "ready_to_book",
           },
         })),
-        toolObservations: [{ toolName: "book_consultation", result }],
+        ...buildToolObservationUpdate({ toolName: "book_consultation", result }),
       };
     },
   };

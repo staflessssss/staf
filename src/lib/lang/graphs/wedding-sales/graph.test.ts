@@ -182,6 +182,7 @@ test("wedding sales graph records availability tool observations", async () => {
 
   assert.equal(result.availability, "available");
   assert.equal(result.toolObservations[0]?.toolName, "check_wedding_availability");
+  assert.equal(result.turnToolObservations[0]?.toolName, "check_wedding_availability");
   assert.match(result.responseDraft ?? "", /collections start/i);
   assert.match(result.conversationSummary ?? "", /Wedding date: 2027-06-14/);
   assert.match(result.conversationSummary ?? "", /Wedding availability: available/);
@@ -209,6 +210,7 @@ test("wedding sales graph does not book a previously busy consultation slot", as
 
   assert.equal(result.bookingConfirmed, false);
   assert.equal(result.toolObservations.length, 0);
+  assert.equal(result.turnToolObservations.length, 0);
   assert.match(result.responseDraft ?? "", /another time/i);
 });
 

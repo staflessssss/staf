@@ -159,6 +159,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
           channel: input.channel,
           latestCustomerMessage: input.message,
           toolObservations: [],
+          turnToolObservations: [],
         }
       : initialState;
 

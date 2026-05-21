@@ -35,6 +35,10 @@ export type WeddingSalesState = {
     toolName: string;
     result: string;
   }>;
+  turnToolObservations: Array<{
+    toolName: string;
+    result: string;
+  }>;
   conversationSummary?: string;
   latestCustomerMessage?: string;
   responseDraft?: string;
@@ -68,6 +72,10 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   bookedEventId: Annotation<string | undefined>(),
   toolObservations: Annotation<Array<{ toolName: string; result: string }>>({
     reducer: (current, update) => [...(current ?? []), ...(update ?? [])],
+    default: () => [],
+  }),
+  turnToolObservations: Annotation<Array<{ toolName: string; result: string }>>({
+    reducer: (_current, update) => update ?? [],
     default: () => [],
   }),
   conversationSummary: Annotation<string | undefined>(),
@@ -107,6 +115,7 @@ export function createInitialWeddingSalesState(args: {
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
     bookedEventId: args.previousState?.bookedEventId,
     toolObservations: [],
+    turnToolObservations: [],
     conversationSummary: args.previousState?.conversationSummary,
     latestCustomerMessage: args.message,
     responseDraft: undefined,

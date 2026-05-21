@@ -949,7 +949,7 @@ test("handleIncomingEventWithDeps auto-replies through the channel adapter when 
 test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when runtime flag is enabled", async () => {
   let invokeAgentCalled = false;
   let sentMessage: unknown = null;
-  const createdMessages: Array<{ role: string; content: string; model?: string }> = [];
+  const createdMessages: Array<{ role: string; content: string; model?: string; toolName?: string | null }> = [];
 
   const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
     {
@@ -974,7 +974,7 @@ test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when 
         },
         message: {
           findFirst: async () => null,
-          create: async (args: { data: { role: string; content: string; model?: string } }) => {
+          create: async (args: { data: { role: string; content: string; model?: string; toolName?: string | null } }) => {
             createdMessages.push(args.data);
             return { id: "message-1" };
           },
@@ -990,7 +990,7 @@ test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when 
             };
             message: {
               create: (args: {
-                data: { role: string; content: string; model?: string };
+                data: { role: string; content: string; model?: string; toolName?: string | null };
               }) => Promise<{ id: string }>;
             };
           }) => Promise<unknown>,
@@ -1048,6 +1048,12 @@ test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when 
         /year/i.test(message.content),
     ),
     true,
+  );
+  assert.equal(
+    createdMessages.some(
+      (message) => message.role === "TOOL" && message.model === "langgraph_wedding_sales",
+    ),
+    false,
   );
 });
 

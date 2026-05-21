@@ -139,6 +139,11 @@ type HandleIncomingEventDeps = {
   sleep: (ms: number) => Promise<void>;
 };
 
+type LangGraphToolObservation = {
+  toolName: string;
+  result: string;
+};
+
 export type InvokeAgentResult = {
   message: string;
   promptPreview: string;
@@ -167,6 +172,53 @@ const FALSE_CONFIRMATION_PATTERNS = [
   /\blet'?s consider it set\b/i,
   /\binvite (?:is|will be) (?:on the way|coming|sent)\b/i,
 ] as const;
+
+function parseLangGraphToolResult(result: string) {
+  try {
+    return JSON.parse(result);
+  } catch {
+    return { raw: result };
+  }
+}
+
+function summarizeLangGraphToolResult(toolName: string, result: string) {
+  const parsed = parseLangGraphToolResult(result);
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const objectValue = parsed as Record<string, unknown>;
+    const summary = typeof objectValue.summary === "string" ? objectValue.summary : null;
+    const status = typeof objectValue.status === "string" ? objectValue.status : null;
+
+    if (summary) {
+      return summary;
+    }
+
+    if (status) {
+      return `${toolName}: ${status}`;
+    }
+  }
+
+  return `${toolName} completed`;
+}
+
+async function recordLangGraphToolObservationsWithDb(args: {
+  database: typeof db;
+  conversationId: string;
+  observations: LangGraphToolObservation[];
+}) {
+  for (const observation of args.observations) {
+    await args.database.message.create({
+      data: {
+        conversationId: args.conversationId,
+        role: MessageRole.TOOL,
+        content: summarizeLangGraphToolResult(observation.toolName, observation.result),
+        toolName: observation.toolName,
+        toolResult: parseLangGraphToolResult(observation.result),
+        model: "langgraph_wedding_sales",
+      },
+    });
+  }
+}
 
 function splitSignature(text: string) {
   const signatureStart = text.search(/\n{2,}[A-Z][A-Za-z .'-]+\nFounder & Creative Director/i);
@@ -1813,6 +1865,12 @@ async function handleIncomingEventWithDeps(
               suppressReply: true,
             };
           }
+
+          await recordLangGraphToolObservationsWithDb({
+            database: deps.db,
+            conversationId: conversation.id,
+            observations: graphResult.turnToolObservations,
+          });
 
           await deps.db.message.create({
             data: {

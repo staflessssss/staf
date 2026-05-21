@@ -19,6 +19,7 @@ const baseState: WeddingSalesState = {
   callProposed: true,
   bookingConfirmed: false,
   toolObservations: [],
+  turnToolObservations: [],
   assistantReplyCount: 1,
   hasGreeted: true,
   signatureSent: true,
