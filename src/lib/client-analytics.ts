@@ -59,9 +59,94 @@ function getNumberFromObject(objectValue: Record<string, Prisma.JsonValue> | nul
 function titleCase(value: string) {
   return value
     .replace(/[_-]+/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function stringifyCapturedValue(value: Prisma.JsonValue) {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    const primitiveItems = value
+      .filter((item) => typeof item === "string" || typeof item === "number" || typeof item === "boolean")
+      .map(String)
+      .filter(Boolean);
+
+    return primitiveItems.length > 0 ? primitiveItems.join(", ") : null;
+  }
+
+  return null;
+}
+
+function getCapturedFieldLabel(key: string) {
+  const labels: Record<string, string> = {
+    bookedCount: "Booked Count",
+    callDate: "Call Date",
+    callTime: "Call Time",
+    coupleName: "Names",
+    eventId: "Event ID",
+    meetLink: "Meet Link",
+    requestedDate: "Requested Date",
+    requestedRegion: "Requested Region",
+    weddingDate: "Wedding Date",
+  };
+
+  return labels[key] ?? titleCase(key);
+}
+
+function shouldSkipCapturedField(key: string) {
+  return [
+    "ok",
+    "raw",
+    "rows",
+    "steps",
+    "summary",
+    "tool",
+    "toolName",
+  ].includes(key);
+}
+
+export function getCapturedLeadFields(message: ToolMessage) {
+  const directResult = asObject(message.toolResult);
+  const stepResults = getStepResults(message.toolResult);
+  const fields = new Map<string, { label: string; value: string }>();
+
+  for (const source of [directResult, ...stepResults]) {
+    if (!source) {
+      continue;
+    }
+
+    for (const [key, value] of Object.entries(source)) {
+      if (shouldSkipCapturedField(key)) {
+        continue;
+      }
+
+      const capturedValue = stringifyCapturedValue(value);
+
+      if (!capturedValue) {
+        continue;
+      }
+
+      const normalizedKey = key.toLowerCase();
+
+      if (!fields.has(normalizedKey)) {
+        fields.set(normalizedKey, {
+          label: getCapturedFieldLabel(key),
+          value: capturedValue,
+        });
+      }
+    }
+  }
+
+  return Array.from(fields.values()).slice(0, 24);
 }
 
 export function getToolActionLabel(toolName?: string | null) {
@@ -124,6 +209,7 @@ export function getLeadDetails(message: ToolMessage, contactId: string) {
 }
 
 export const clientAnalyticsTestHelpers = {
+  getCapturedLeadFields,
   getLeadDetails,
   getToolActionLabel,
   getToolStatusLabel,

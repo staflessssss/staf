@@ -55,3 +55,30 @@ test("client analytics extracts capacity details from availability tool results"
   assert.equal(details.bookedCount, 0);
   assert.equal(details.capacity, 2);
 });
+
+test("client analytics builds generic captured fields from direct and step tool results", () => {
+  const fields = clientAnalyticsTestHelpers.getCapturedLeadFields({
+    toolName: "custom_lead_capture",
+    createdAt: new Date("2026-05-21T10:00:00Z"),
+    toolResult: {
+      status: "qualified",
+      companyName: "Acme Studio",
+      budget: 7500,
+      steps: [
+        {
+          result: {
+            preferredService: "Video production",
+            summary: "Captured lead details",
+          },
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(fields, [
+    { label: "Status", value: "qualified" },
+    { label: "Company Name", value: "Acme Studio" },
+    { label: "Budget", value: "7500" },
+    { label: "Preferred Service", value: "Video production" },
+  ]);
+});
