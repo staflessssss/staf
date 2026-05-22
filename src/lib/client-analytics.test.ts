@@ -76,9 +76,34 @@ test("client analytics builds generic captured fields from direct and step tool 
   });
 
   assert.deepEqual(fields, [
-    { label: "Status", value: "qualified" },
     { label: "Company Name", value: "Acme Studio" },
     { label: "Budget", value: "7500" },
     { label: "Preferred Service", value: "Video production" },
   ]);
+});
+
+test("client analytics hides executor internals from captured lead fields", () => {
+  const fields = clientAnalyticsTestHelpers.getCapturedLeadFields({
+    toolName: "check_wedding_availability",
+    createdAt: new Date("2026-05-21T10:00:00Z"),
+    toolResult: {
+      integration: "GOOGLE_SHEETS",
+      message: "11:00 on 2026-05-25 is available.",
+      reason: "NC/SC/GA has 0/2 booked slot(s) used.",
+      region: "NC/SC/GA",
+      result: "2027-06-14 is AVAILABLE in NC/SC/GA",
+      capacity: 2,
+      available: true,
+      operation: "capacity_availability",
+      sheetName: "Bookings",
+      bookedCount: 0,
+      requestedDate: "2027-06-14",
+      spreadsheetId: "sheet-1",
+      requestedRegion: "NC/SC/GA",
+      spreadsheetTitle: "Bookings",
+      status: "available",
+    },
+  });
+
+  assert.deepEqual(fields, [{ label: "Wedding Date", value: "2027-06-14" }]);
 });

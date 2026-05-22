@@ -88,30 +88,84 @@ function stringifyCapturedValue(value: Prisma.JsonValue) {
 
 function getCapturedFieldLabel(key: string) {
   const labels: Record<string, string> = {
-    bookedCount: "Booked Count",
-    callDate: "Call Date",
-    callTime: "Call Time",
+    callDate: "Consultation Date",
+    callTime: "Consultation Time",
     coupleName: "Names",
-    eventId: "Event ID",
-    meetLink: "Meet Link",
-    requestedDate: "Requested Date",
-    requestedRegion: "Requested Region",
+    requestedDate: "Wedding Date",
     weddingDate: "Wedding Date",
   };
 
   return labels[key] ?? titleCase(key);
 }
 
-function shouldSkipCapturedField(key: string) {
-  return [
+function getCapturedFieldInfo(toolName: string | null, key: string) {
+  const normalizedKey = key.toLowerCase();
+  const technicalKeys = new Set([
+    "action",
+    "available",
+    "bookedcount",
+    "capacity",
+    "eventid",
+    "integration",
+    "meetlink",
+    "message",
+    "mode",
     "ok",
+    "operation",
     "raw",
+    "reason",
+    "request",
+    "result",
     "rows",
+    "sheetname",
+    "spreadsheetid",
+    "spreadsheettitle",
+    "status",
     "steps",
     "summary",
     "tool",
-    "toolName",
-  ].includes(key);
+    "toolname",
+  ]);
+
+  if (technicalKeys.has(normalizedKey)) {
+    return null;
+  }
+
+  if (normalizedKey === "date") {
+    return toolName === "book_consultation" || toolName === "check_consultation_calendar"
+      ? { key: "consultationDate", label: "Consultation Date" }
+      : { key: "weddingDate", label: "Wedding Date" };
+  }
+
+  if (normalizedKey === "time") {
+    return { key: "consultationTime", label: "Consultation Time" };
+  }
+
+  if (["requesteddate", "weddingdate"].includes(normalizedKey)) {
+    return { key: "weddingDate", label: "Wedding Date" };
+  }
+
+  if (["location", "venue"].includes(normalizedKey)) {
+    return { key: normalizedKey === "venue" ? "venue" : "location", label: normalizedKey === "venue" ? "Venue" : "Location" };
+  }
+
+  if (["calltime"].includes(normalizedKey)) {
+    return { key: "consultationTime", label: "Consultation Time" };
+  }
+
+  if (["calldate"].includes(normalizedKey)) {
+    return { key: "consultationDate", label: "Consultation Date" };
+  }
+
+  if (["couplename", "names", "name"].includes(normalizedKey)) {
+    return { key: "names", label: "Names" };
+  }
+
+  if (["email", "phone", "companyname", "budget", "service", "preferredservice"].includes(normalizedKey)) {
+    return { key: normalizedKey, label: getCapturedFieldLabel(key) };
+  }
+
+  return null;
 }
 
 export function getCapturedLeadFields(message: ToolMessage) {
@@ -125,7 +179,9 @@ export function getCapturedLeadFields(message: ToolMessage) {
     }
 
     for (const [key, value] of Object.entries(source)) {
-      if (shouldSkipCapturedField(key)) {
+      const fieldInfo = getCapturedFieldInfo(message.toolName, key);
+
+      if (!fieldInfo) {
         continue;
       }
 
@@ -135,11 +191,9 @@ export function getCapturedLeadFields(message: ToolMessage) {
         continue;
       }
 
-      const normalizedKey = key.toLowerCase();
-
-      if (!fields.has(normalizedKey)) {
-        fields.set(normalizedKey, {
-          label: getCapturedFieldLabel(key),
+      if (!fields.has(fieldInfo.key)) {
+        fields.set(fieldInfo.key, {
+          label: fieldInfo.label,
           value: capturedValue,
         });
       }

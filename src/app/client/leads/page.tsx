@@ -6,7 +6,6 @@ import {
   getLeadDetails,
   getToolActionLabel,
   getToolStatusLabel,
-  getToolSummary,
 } from "@/lib/client-analytics";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
@@ -20,6 +19,16 @@ function formatDateTime(value: Date) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function buildLeadPreview(fields: Array<{ label: string; value: string }>) {
+  const preview = fields
+    .filter((field) => ["Names", "Wedding Date", "Venue", "Location", "Consultation Date", "Consultation Time"].includes(field.label))
+    .slice(0, 3)
+    .map((field) => `${field.label}: ${field.value}`)
+    .join(" - ");
+
+  return preview || `${fields.length} collected field${fields.length === 1 ? "" : "s"}`;
 }
 
 type ClientLeadsPageProps = {
@@ -88,7 +97,6 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
     }),
   ).length;
   const selectedLead = qualifiedLeadThreads.find((thread) => thread.id === lead) ?? qualifiedLeadThreads[0] ?? null;
-  const capturedFieldCount = selectedLead?.capturedFields.length ?? 0;
   const selectedTimeline = selectedLead?.messages ?? [];
 
   return (
@@ -116,7 +124,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
       </header>
 
       <section className="grid grid-cols-1 gap-6 md:grid-cols-12">
-        <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-3">
+        <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-4">
           <h2 className="font-heading text-3xl font-bold tracking-tight text-[#181836]">
             {qualifiedLeadThreads.length}
           </h2>
@@ -124,7 +132,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
             Qualified Leads
           </p>
         </div>
-        <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-3">
+        <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-4">
           <h2 className="font-heading text-3xl font-bold tracking-tight text-[#181836]">
             {bookedLeadCount}
           </h2>
@@ -132,18 +140,10 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
             Booked
           </p>
         </div>
-        <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-3">
-          <h2 className="font-heading text-3xl font-bold tracking-tight text-[#181836]">
-            {capturedFieldCount}
-          </h2>
-          <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-            Fields On Selected
-          </p>
-        </div>
-        <div className="relative overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#4648d4_0%,#18b7c4_100%)] p-8 text-white shadow-[0_18px_40px_rgba(70,72,212,0.18)] md:col-span-3">
-          <h3 className="font-heading text-2xl font-bold">Lead Profile</h3>
+        <div className="relative overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#4648d4_0%,#18b7c4_100%)] p-8 text-white shadow-[0_18px_40px_rgba(70,72,212,0.18)] md:col-span-4">
+          <h3 className="font-heading text-2xl font-bold">Client Details</h3>
           <p className="mt-2 text-sm text-white/80">
-            Shows the fields each agent actually captured for the selected lead.
+            Only the information shared by the lead is shown here.
           </p>
         </div>
       </section>
@@ -190,7 +190,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                         {details.action} by {thread.agent.name}
                       </p>
                       <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#464554]">
-                        {getToolSummary(thread.qualifiedMessage.toolResult) ?? `${thread.capturedFields.length} captured fields`}
+                        {buildLeadPreview(thread.capturedFields)}
                       </p>
                     </div>
                     <div className="flex items-start gap-2 md:flex-col md:text-right">
@@ -214,7 +214,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#eef0ff] pb-6">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#5c5c7e]">
-                    Lead Detail
+                    Lead Details
                   </p>
                   <h2 className="mt-2 truncate font-heading text-3xl font-bold tracking-tight text-[#181836]">
                     {selectedLead.details.coupleName ?? selectedLead.contactId}
@@ -243,7 +243,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
               </div>
 
               <div>
-                <h3 className="font-heading text-xl font-bold text-[#181836]">Collected Information</h3>
+                <h3 className="font-heading text-xl font-bold text-[#181836]">What the lead shared</h3>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {selectedLead.capturedFields.length === 0 ? (
                     <div className="rounded-2xl bg-white/80 p-5 text-sm text-[#464554] ring-1 ring-[#eef0ff] sm:col-span-2">
@@ -261,7 +261,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
               </div>
 
               <div>
-                <h3 className="font-heading text-xl font-bold text-[#181836]">Agent Work</h3>
+                <h3 className="font-heading text-xl font-bold text-[#181836]">Agent Actions</h3>
                 <div className="mt-4 space-y-4">
                   {selectedTimeline.map((message) => (
                     <div key={message.id} className="rounded-2xl bg-white/84 p-4 ring-1 ring-[#eef0ff]">
@@ -269,7 +269,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                         <div>
                           <p className="text-sm font-bold text-[#181836]">{getToolActionLabel(message.toolName)}</p>
                           <p className="mt-1 text-xs leading-5 text-[#464554]">
-                            {getToolSummary(message.toolResult) ?? getToolStatusLabel(message.toolResult)}
+                            {getToolStatusLabel(message.toolResult)}
                           </p>
                         </div>
                         <span className="rounded-lg bg-[#efecff] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#4648d4]">
