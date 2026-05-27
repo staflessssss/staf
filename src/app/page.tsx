@@ -20,7 +20,6 @@ import {
   Mail,
   MessageSquareText,
   MoreVertical,
-  PauseCircle,
   PhoneCall,
   Plug,
   Search,

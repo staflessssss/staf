@@ -93,9 +93,6 @@ export function OrbitVisual({ className }: { className?: string }) {
 }
 
 export function StackFeatureSection() {
-  const orbitCount = 3;
-  const iconsPerOrbit = Math.ceil(orbitItems.length / orbitCount);
-
   return (
     <section className="mx-auto my-20 max-w-7xl px-5 md:px-8">
       <div className="relative grid min-h-[30rem] overflow-hidden rounded-[2rem] border border-black/[0.08] bg-white shadow-[0_28px_90px_rgba(0,0,0,0.08)] lg:grid-cols-[0.9fr_1.1fr]">
