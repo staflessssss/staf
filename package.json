@@ -27,6 +27,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "framer-motion": "^12.40.0",
     "googleapis": "^171.4.0",
     "langsmith": "^0.7.1",
     "lucide-react": "^1.7.0",

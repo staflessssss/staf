@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Behalfy | AI agents for your business",
-  description: "A simple way to reply to leads, check calendars, share pricing, and move customers toward a booking.",
+  title: "Behalfy | Managed AI agents that actually control customer conversations",
+  description: "Operator-managed AI assistants for your channels and tools. Full visibility, instant takeover, and real business logic — without exposing technical setup to your clients.",
 };
 
 export default function RootLayout({

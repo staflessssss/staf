@@ -129,7 +129,7 @@
       linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent 20%);
   }
   html {
-    @apply font-sans;
+    @apply font-sans scroll-smooth;
   }
   ::selection {
     background: rgba(70, 72, 212, 0.18);
