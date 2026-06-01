@@ -1,18 +1,9 @@
 import { MessageRole } from "@prisma/client";
 
+import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
 import { OverviewView, type OverviewAgentRow } from "./overview-view";
-
-function getInitials(value: string) {
-  const cleaned = value.includes("@") ? value.split("@")[0] : value;
-  const parts = cleaned
-    .replace(/[^a-zA-Z0-9\s._-]/g, " ")
-    .split(/[\s._-]+/)
-    .filter(Boolean);
-
-  return (parts[0]?.[0] ?? "C").toUpperCase() + (parts[1]?.[0] ?? "").toUpperCase();
-}
 
 type Tally = { conversations: number; messages: number; tools: number; lastActivity: Date | null };
 
@@ -82,7 +73,7 @@ export default async function ClientOverviewPage() {
 
   const totalMessages = agentRows.reduce((sum, row) => sum + row.messages, 0);
   const totalTools = agentRows.reduce((sum, row) => sum + row.tools, 0);
-  const userLabel = session.user.name ?? session.user.email ?? "Client";
+  const userLabel = getCabinetUserName(session.user);
 
   return (
     <OverviewView

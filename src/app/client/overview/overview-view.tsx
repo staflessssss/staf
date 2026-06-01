@@ -134,7 +134,7 @@ export function OverviewView({
                           {agent.tools}
                         </td>
                         <td className="px-6 py-4 text-right text-xs text-white/55">
-                          {agent.lastActivity ? agent.lastActivity.toLocaleDateString() : "—"}
+                          {agent.lastActivity ? agent.lastActivity.toLocaleDateString() : "-"}
                         </td>
                       </tr>
                     );

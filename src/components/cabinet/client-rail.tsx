@@ -20,7 +20,7 @@ type NavItem = { icon: LucideIcon; label: string; href: string };
 
 const NAV: NavItem[] = [
   { icon: BarChart3, label: "Overview", href: "/client/overview" },
-  { icon: MessageSquareText, label: "Dialogs", href: "/client" },
+  { icon: MessageSquareText, label: "Dialogs", href: "/client/dialogs" },
   { icon: Bot, label: "Agents", href: "/client/agents" },
   { icon: UsersRound, label: "Leads", href: "/client/leads" },
   { icon: Plug, label: "Connections", href: "/client/connections" },
@@ -29,7 +29,10 @@ const NAV: NavItem[] = [
 const STORAGE_KEY = "behalfy.rail.collapsed";
 
 function isActive(pathname: string, href: string) {
-  if (href === "/client") return pathname === "/client";
+  if (href === "/client/overview") {
+    return pathname === "/client" || pathname === href;
+  }
+
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -59,42 +62,50 @@ export function ClientRail({
     <aside
       data-collapsed={collapsed}
       className={[
-        "relative z-10 flex shrink-0 flex-col border-r border-white/[0.09] bg-[#10100e]/88 transition-[width] duration-200 ease-out",
-        collapsed ? "w-[78px] items-center px-3 py-6" : "w-[248px] px-5 py-6",
+        "relative z-10 flex w-full shrink-0 items-center gap-3 overflow-x-auto border-b border-white/[0.09] bg-[#10100e]/88 px-3 py-3 md:flex-col md:items-stretch md:overflow-visible md:border-b-0 md:border-r md:transition-[width] md:duration-200 md:ease-out",
+        collapsed ? "md:w-[78px] md:items-center md:px-3 md:py-6" : "md:w-[248px] md:px-5 md:py-6",
       ].join(" ")}
     >
-      {/* Brand + collapse toggle */}
       <div
         className={[
-          "flex items-center",
-          collapsed ? "flex-col gap-3" : "justify-between",
+          "flex shrink-0 items-center",
+          collapsed ? "md:flex-col md:gap-3" : "md:justify-between",
         ].join(" ")}
       >
-        <Link href="/client" title="Behalfy" className="flex items-center gap-3">
+        <Link href="/client/overview" title="Behalfy" className="flex items-center gap-2 md:gap-3">
           <span
-            className="block size-9 shrink-0 bg-[#d7a96d]"
+            className="block size-8 shrink-0 bg-[#d7a96d] md:size-9"
             style={{
               WebkitMask: "url('/assets/landing/behalfy-mark.svg') center / contain no-repeat",
               mask: "url('/assets/landing/behalfy-mark.svg') center / contain no-repeat",
             }}
           />
-          {!collapsed ? (
-            <span className="text-2xl font-semibold tracking-[-0.06em] text-white">Behalfy</span>
-          ) : null}
+          <span
+            className={[
+              "hidden text-xl font-semibold tracking-[-0.06em] text-white sm:inline md:text-2xl",
+              collapsed ? "md:hidden" : "",
+            ].join(" ")}
+          >
+            Behalfy
+          </span>
         </Link>
         <button
           type="button"
           onClick={toggle}
           title={collapsed ? "Expand" : "Collapse"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="grid size-9 place-items-center rounded-lg text-white/55 transition hover:bg-white/[0.05] hover:text-white"
+          className="hidden size-9 place-items-center rounded-lg text-white/55 transition hover:bg-white/[0.05] hover:text-white md:grid"
         >
           {collapsed ? <PanelLeft className="size-5" /> : <ChevronLeft className="size-5" />}
         </button>
       </div>
 
-      {/* Primary nav */}
-      <nav className={["mt-9 flex flex-col gap-1.5", collapsed ? "items-center" : ""].join(" ")}>
+      <nav
+        className={[
+          "flex min-w-0 flex-1 gap-1.5 overflow-x-auto md:mt-9 md:flex-none md:flex-col md:overflow-visible",
+          collapsed ? "md:items-center" : "",
+        ].join(" ")}
+      >
         {NAV.map(({ icon: Icon, label, href }) => {
           const active = isActive(pathname, href);
           return (
@@ -104,25 +115,32 @@ export function ClientRail({
               title={collapsed ? label : undefined}
               aria-label={label}
               className={[
-                "flex items-center rounded-xl transition",
-                collapsed ? "size-11 justify-center" : "gap-3.5 px-3.5 py-3 text-[15px]",
+                "flex shrink-0 items-center rounded-xl transition",
+                collapsed
+                  ? "gap-2.5 px-3 py-2.5 text-sm md:size-11 md:justify-center md:p-0"
+                  : "gap-2.5 px-3 py-2.5 text-sm md:gap-3.5 md:px-3.5 md:py-3 md:text-[15px]",
                 active
                   ? "bg-[#3a2c1e] text-[#e9be86] ring-1 ring-[#d7a96d]/34 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]"
                   : "text-white/60 hover:bg-white/[0.05] hover:text-white",
               ].join(" ")}
             >
               <Icon className="size-5 shrink-0" />
-              {!collapsed ? <span>{label}</span> : null}
+              <span className={["hidden sm:inline", collapsed ? "md:hidden" : ""].join(" ")}>
+                {label}
+              </span>
             </Link>
           );
         })}
       </nav>
 
-      {/* Account */}
+      <div className="shrink-0 md:hidden">
+        <LogoutButton variant="rail" label="Sign out" />
+      </div>
+
       <div
         className={[
-          "mt-auto border-t border-white/[0.09] pt-5",
-          collapsed ? "flex flex-col items-center gap-3" : "",
+          "mt-auto hidden border-t border-white/[0.09] pt-5 md:block",
+          collapsed ? "md:flex md:flex-col md:items-center md:gap-3" : "",
         ].join(" ")}
       >
         {collapsed ? (

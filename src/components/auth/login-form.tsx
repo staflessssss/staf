@@ -45,10 +45,10 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
       <label className="block space-y-2">
-        <span className="text-sm font-semibold text-[#181836]">Email</span>
+        <span className="text-sm font-semibold text-white/74">Email</span>
         <input
           autoComplete="email"
-          className="w-full rounded-[18px] border border-[#d8d6fe] bg-[#f8f8ff] px-4 py-3 text-sm text-[#181836] outline-none transition placeholder:text-[#5c5c7e]/60 focus:border-[#4648d4]/40 focus:bg-white focus:ring-4 focus:ring-[#4648d4]/10"
+          className="w-full rounded-[1rem] border border-white/[0.1] bg-black/22 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/28 focus:border-[#d4a66f]/46 focus:bg-black/32 focus:ring-4 focus:ring-[#d4a66f]/10"
           name="email"
           onChange={(event) => setEmail(event.target.value)}
           required
@@ -57,10 +57,10 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         />
       </label>
       <label className="block space-y-2">
-        <span className="text-sm font-semibold text-[#181836]">Password</span>
+        <span className="text-sm font-semibold text-white/74">Password</span>
         <input
           autoComplete="current-password"
-          className="w-full rounded-[18px] border border-[#d8d6fe] bg-[#f8f8ff] px-4 py-3 text-sm text-[#181836] outline-none transition placeholder:text-[#5c5c7e]/60 focus:border-[#4648d4]/40 focus:bg-white focus:ring-4 focus:ring-[#4648d4]/10"
+          className="w-full rounded-[1rem] border border-white/[0.1] bg-black/22 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/28 focus:border-[#d4a66f]/46 focus:bg-black/32 focus:ring-4 focus:ring-[#d4a66f]/10"
           name="password"
           onChange={(event) => setPassword(event.target.value)}
           required
@@ -69,12 +69,12 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
         />
       </label>
       {error ? (
-        <div className="rounded-[18px] bg-[#fff0ef] px-4 py-3 text-sm text-destructive ring-1 ring-[#efc4c1]">
+        <div className="rounded-[1rem] border border-[#d4a66f]/22 bg-[#1b1410]/72 px-4 py-3 text-sm text-[#f0b58b]">
           {error}
         </div>
       ) : null}
       <button
-        className="w-full rounded-xl bg-[linear-gradient(135deg,#4648d4_0%,#6063ee_100%)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(70,72,212,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl bg-[linear-gradient(135deg,#f1c88d_0%,#b98245_52%,#6b4424_100%)] px-4 py-3 text-sm font-black text-black shadow-[0_18px_42px_rgba(212,166,111,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_52px_rgba(212,166,111,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
         disabled={isPending}
         type="submit"
       >

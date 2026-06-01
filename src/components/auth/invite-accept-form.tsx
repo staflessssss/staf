@@ -70,14 +70,14 @@ export function InviteAcceptForm({
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
-      <div className="rounded-[20px] bg-[#f5f2ff] px-4 py-4 text-sm text-[#5c5c7e] ring-1 ring-[#d8d6fe]">
-        <div className="font-semibold text-[#181836]">{tenantName}</div>
-        <div className="mt-1">{defaultEmail}</div>
+      <div className="rounded-[1.15rem] border border-white/[0.1] bg-white/[0.045] px-4 py-4 text-sm text-white/52 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="font-semibold text-white">{tenantName}</div>
+        <div className="mt-1 truncate">{defaultEmail}</div>
       </div>
       <label className="block space-y-2">
-        <span className="text-sm font-semibold text-[#181836]">Your name</span>
+        <span className="text-sm font-semibold text-white/74">Your name</span>
         <input
-          className="w-full rounded-[18px] border border-[#d8d6fe] bg-[#f8f8ff] px-4 py-3 text-sm text-[#181836] outline-none transition placeholder:text-[#5c5c7e]/60 focus:border-[#4648d4]/40 focus:bg-white focus:ring-4 focus:ring-[#4648d4]/10"
+          className="w-full rounded-[1rem] border border-white/[0.1] bg-black/22 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/28 focus:border-[#d4a66f]/46 focus:bg-black/32 focus:ring-4 focus:ring-[#d4a66f]/10"
           name="name"
           onChange={(event) => setName(event.target.value)}
           required
@@ -86,9 +86,9 @@ export function InviteAcceptForm({
         />
       </label>
       <label className="block space-y-2">
-        <span className="text-sm font-semibold text-[#181836]">Create password</span>
+        <span className="text-sm font-semibold text-white/74">Create password</span>
         <input
-          className="w-full rounded-[18px] border border-[#d8d6fe] bg-[#f8f8ff] px-4 py-3 text-sm text-[#181836] outline-none transition placeholder:text-[#5c5c7e]/60 focus:border-[#4648d4]/40 focus:bg-white focus:ring-4 focus:ring-[#4648d4]/10"
+          className="w-full rounded-[1rem] border border-white/[0.1] bg-black/22 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/28 focus:border-[#d4a66f]/46 focus:bg-black/32 focus:ring-4 focus:ring-[#d4a66f]/10"
           minLength={8}
           name="password"
           onChange={(event) => setPassword(event.target.value)}
@@ -98,12 +98,12 @@ export function InviteAcceptForm({
         />
       </label>
       {error ? (
-        <div className="rounded-[18px] bg-[#fff0ef] px-4 py-3 text-sm text-destructive ring-1 ring-[#efc4c1]">
+        <div className="rounded-[1rem] border border-[#d4a66f]/22 bg-[#1b1410]/72 px-4 py-3 text-sm text-[#f0b58b]">
           {error}
         </div>
       ) : null}
       <button
-        className="w-full rounded-xl bg-[linear-gradient(135deg,#4648d4_0%,#6063ee_100%)] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(70,72,212,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl bg-[linear-gradient(135deg,#f1c88d_0%,#b98245_52%,#6b4424_100%)] px-4 py-3 text-sm font-black text-black shadow-[0_18px_42px_rgba(212,166,111,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_52px_rgba(212,166,111,0.28)] disabled:cursor-not-allowed disabled:opacity-60"
         disabled={isPending}
         type="submit"
       >

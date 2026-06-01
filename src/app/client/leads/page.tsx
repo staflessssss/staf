@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { MessageRole } from "@prisma/client";
+import { ArrowUpRight, CheckCircle2, Clock3, UsersRound } from "lucide-react";
 
+import { CabinetShell } from "@/components/cabinet/cabinet-shell";
+import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import {
   getCapturedLeadFields,
   getLeadDetails,
@@ -23,12 +26,35 @@ function formatDateTime(value: Date) {
 
 function buildLeadPreview(fields: Array<{ label: string; value: string }>) {
   const preview = fields
-    .filter((field) => ["Names", "Wedding Date", "Venue", "Location", "Consultation Date", "Consultation Time"].includes(field.label))
+    .filter((field) =>
+      [
+        "Names",
+        "Wedding Date",
+        "Venue",
+        "Location",
+        "Consultation Date",
+        "Consultation Time",
+      ].includes(field.label),
+    )
     .slice(0, 3)
     .map((field) => `${field.label}: ${field.value}`)
     .join(" - ");
 
   return preview || `${fields.length} collected field${fields.length === 1 ? "" : "s"}`;
+}
+
+function statusClassName(status: string) {
+  const normalized = status.toLowerCase();
+
+  if (
+    normalized.includes("book") ||
+    normalized.includes("confirm") ||
+    normalized.includes("available")
+  ) {
+    return "border-[#47c978]/34 bg-[#47c978]/[0.08] text-[#62d990]";
+  }
+
+  return "border-[#d7a96d]/36 bg-[#3a2c1e] text-[#e9be86]";
 }
 
 type ClientLeadsPageProps = {
@@ -96,73 +122,90 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
       toolResult: thread.qualifiedMessage.toolResult,
     }),
   ).length;
-  const selectedLead = qualifiedLeadThreads.find((thread) => thread.id === lead) ?? qualifiedLeadThreads[0] ?? null;
+  const selectedLead =
+    qualifiedLeadThreads.find((thread) => thread.id === lead) ?? qualifiedLeadThreads[0] ?? null;
   const selectedTimeline = selectedLead?.messages ?? [];
+  const userName = getCabinetUserName(session.user);
+
+  const header = (
+    <>
+      <div>
+        <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/62">
+          <span className="size-2 rounded-full bg-[#ff6a1a]" />
+          Lead review
+        </p>
+        <h1 className="mt-3 font-serif text-4xl font-normal leading-[1.02] tracking-[-0.055em] text-white">
+          Leads
+        </h1>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-white/60">
+        <span className="rounded-lg border border-white/[0.1] px-4 py-2">
+          {qualifiedLeadThreads.length} qualified
+        </span>
+        <span className="rounded-lg border border-[#47c978]/30 bg-[#47c978]/[0.06] px-4 py-2 text-[#62d990]">
+          {bookedLeadCount} booked
+        </span>
+      </div>
+    </>
+  );
 
   return (
-    <div className="space-y-12">
-      <header className="rounded-[28px] bg-[linear-gradient(135deg,#ffffff_0%,#f4f2ff_52%,#e9edff_100%)] p-8 shadow-[0_18px_40px_rgba(24,24,54,0.06)] ring-1 ring-[#d8d6fe]/80 md:p-10">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#5c5c7e]">
-              Lead review
+    <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
+      <section className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        {[
+          {
+            icon: UsersRound,
+            label: "Qualified leads",
+            value: qualifiedLeadThreads.length,
+            sub: "captured by agents",
+          },
+          {
+            icon: CheckCircle2,
+            label: "Booked",
+            value: bookedLeadCount,
+            sub: "high-intent outcomes",
+          },
+          {
+            icon: Clock3,
+            label: "Latest activity",
+            value: selectedLead ? formatDateTime(selectedLead.qualifiedMessage.createdAt) : "-",
+            sub: "from the active lead list",
+          },
+        ].map(({ icon: Icon, label, value, sub }) => (
+          <div key={label} className="rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/42">
+                {label}
+              </p>
+              <span className="grid size-9 place-items-center rounded-xl border border-[#d7a96d]/28 bg-[#20201d] text-[#e9be86]">
+                <Icon className="size-4" />
+              </span>
+            </div>
+            <p className="mt-5 break-words font-serif text-3xl font-normal tracking-[-0.04em] text-white">
+              {value}
             </p>
-            <h1 className="mt-2 font-heading text-5xl font-bold tracking-tight text-[#181836]">
-              Leads
-            </h1>
-            <p className="mt-3 text-lg leading-8 text-[#464554]">
-              Qualified outcomes captured by your agents, with the source details collected during each dialog.
-            </p>
+            <p className="mt-2 text-xs text-white/45">{sub}</p>
           </div>
-          <Link
-            href="/client/dialogs"
-            className="rounded-xl bg-[#efecff] px-6 py-3 text-sm font-bold text-[#4648d4] transition hover:bg-[#e8e5ff]"
-          >
-            Open Dialogs
-          </Link>
-        </div>
-      </header>
-
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-12">
-        <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-4">
-          <h2 className="font-heading text-3xl font-bold tracking-tight text-[#181836]">
-            {qualifiedLeadThreads.length}
-          </h2>
-          <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-            Qualified Leads
-          </p>
-        </div>
-        <div className="rounded-[24px] bg-white p-8 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70 md:col-span-4">
-          <h2 className="font-heading text-3xl font-bold tracking-tight text-[#181836]">
-            {bookedLeadCount}
-          </h2>
-          <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-[#5c5c7e]">
-            Booked
-          </p>
-        </div>
-        <div className="relative overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#4648d4_0%,#18b7c4_100%)] p-8 text-white shadow-[0_18px_40px_rgba(70,72,212,0.18)] md:col-span-4">
-          <h3 className="font-heading text-2xl font-bold">Client Details</h3>
-          <p className="mt-2 text-sm text-white/80">
-            Only the information shared by the lead is shown here.
-          </p>
-        </div>
+        ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,0.82fr)_minmax(440px,1fr)]">
-        <div className="rounded-[28px] bg-white p-6 shadow-[0_12px_28px_rgba(24,24,54,0.05)] ring-1 ring-[#d8d6fe]/70">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-[#eef0ff] pb-6">
+      <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.88fr)_minmax(380px,0.92fr)]">
+        <div className="overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313]">
+          <div className="flex flex-col gap-3 border-b border-white/[0.08] px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
             <div>
-              <h2 className="font-heading text-2xl font-bold text-[#181836]">Qualified Outcomes</h2>
-              <p className="mt-2 text-sm text-[#464554]">Latest leads captured by active agents.</p>
+              <h2 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
+                Qualified outcomes
+              </h2>
+              <p className="mt-1 text-sm text-white/45">Latest leads captured by active agents.</p>
             </div>
-            <span className="rounded-lg bg-[#efecff] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[#4648d4]">
+            <span className="w-fit rounded-lg border border-[#d7a96d]/32 bg-[#d7a96d]/[0.06] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#e9be86]">
               Latest first
             </span>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-3 p-4 md:p-5">
             {qualifiedLeadThreads.length === 0 ? (
-              <div className="rounded-[20px] bg-[#f8f8ff] p-8 text-sm text-[#464554]">
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-6 text-sm text-white/55">
                 No lead actions recorded yet.
               </div>
             ) : (
@@ -175,29 +218,36 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                     key={thread.id}
                     href={`/client/leads?lead=${thread.id}`}
                     className={[
-                      "grid gap-4 rounded-[22px] p-5 ring-1 transition md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center",
+                      "grid gap-4 rounded-xl border p-4 transition md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center",
                       isSelected
-                        ? "bg-[#f5fbff] ring-[#8fdfe7] shadow-[0_16px_34px_rgba(24,24,54,0.08)]"
-                        : "bg-[#fbfbff] ring-[#eef0ff] hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_30px_rgba(24,24,54,0.07)]",
+                        ? "border-[#d7a96d]/42 bg-[#27231e] shadow-[0_0_30px_rgba(215,169,109,0.1)]"
+                        : "border-white/[0.08] bg-black/16 hover:border-white/[0.14] hover:bg-white/[0.035]",
                     ].join(" ")}
                   >
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#efecff] text-xs font-bold text-[#4648d4]">
-                      {thread.contactId.slice(0, 2).toUpperCase()}
+                    <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-[#d7a96d]/28 bg-[#20201d] text-xs font-bold text-[#e9be86]">
+                      {getInitials(details.coupleName ?? thread.contactId)}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate font-bold text-[#181836]">{details.coupleName ?? thread.contactId}</p>
-                      <p className="mt-1 truncate text-xs text-[#5c5c7e]">
+                      <p className="truncate font-semibold text-white">
+                        {details.coupleName ?? thread.contactId}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-white/42">
                         {details.action} by {thread.agent.name}
                       </p>
-                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#464554]">
+                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/62">
                         {buildLeadPreview(thread.capturedFields)}
                       </p>
                     </div>
                     <div className="flex items-start gap-2 md:flex-col md:text-right">
-                      <span className="rounded-lg bg-[#effffb] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#137d86] ring-1 ring-[#c9f4ed]">
+                      <span
+                        className={[
+                          "rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
+                          statusClassName(details.status),
+                        ].join(" ")}
+                      >
                         {details.status}
                       </span>
-                      <span className="text-[11px] font-semibold text-[#6b6a78]">
+                      <span className="text-[11px] font-medium text-white/42">
                         {formatDateTime(thread.qualifiedMessage.createdAt)}
                       </span>
                     </div>
@@ -208,24 +258,25 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
           </div>
         </div>
 
-        <aside className="rounded-[28px] bg-[linear-gradient(135deg,#ffffff_0%,#fbfbff_60%,#f4fbff_100%)] p-6 shadow-[0_18px_46px_rgba(24,24,54,0.07)] ring-1 ring-[#dfe4ff] xl:sticky xl:top-8 xl:self-start">
+        <aside className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5 xl:sticky xl:top-0 xl:self-start md:p-6">
           {selectedLead ? (
             <div className="space-y-6">
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#eef0ff] pb-6">
+              <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-6 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#5c5c7e]">
-                    Lead Details
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/42">
+                    Lead details
                   </p>
-                  <h2 className="mt-2 truncate font-heading text-3xl font-bold tracking-tight text-[#181836]">
+                  <h2 className="mt-2 truncate font-serif text-3xl font-normal tracking-[-0.055em] text-white">
                     {selectedLead.details.coupleName ?? selectedLead.contactId}
                   </h2>
-                  <p className="mt-2 truncate text-sm text-[#464554]">{selectedLead.contactId}</p>
+                  <p className="mt-2 truncate text-sm text-white/45">{selectedLead.contactId}</p>
                 </div>
                 <Link
                   href={`/client/dialogs?conversation=${selectedLead.id}`}
-                  className="rounded-xl bg-[#4648d4] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#3d3fbd]"
+                  className="inline-flex w-fit items-center gap-2 rounded-lg border border-[#d7a96d]/38 bg-[#3a3028] px-4 py-2.5 text-sm font-semibold text-[#e9be86] transition hover:bg-[#473a2f]"
                 >
-                  Open Dialog
+                  Open dialog
+                  <ArrowUpRight className="size-4" />
                 </Link>
               </div>
 
@@ -235,25 +286,36 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                   ["Status", selectedLead.details.status],
                   ["Captured", formatDateTime(selectedLead.qualifiedMessage.createdAt)],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl bg-white/80 p-4 ring-1 ring-[#eef0ff]">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6b6a78]">{label}</p>
-                    <p className="mt-2 break-words text-sm font-semibold text-[#181836]">{value}</p>
+                  <div key={label} className="rounded-xl border border-white/[0.08] bg-black/16 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/38">
+                      {label}
+                    </p>
+                    <p className="mt-2 break-words text-sm font-semibold text-white">{value}</p>
                   </div>
                 ))}
               </div>
 
               <div>
-                <h3 className="font-heading text-xl font-bold text-[#181836]">What the lead shared</h3>
+                <h3 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
+                  What the lead shared
+                </h3>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {selectedLead.capturedFields.length === 0 ? (
-                    <div className="rounded-2xl bg-white/80 p-5 text-sm text-[#464554] ring-1 ring-[#eef0ff] sm:col-span-2">
+                    <div className="rounded-xl border border-white/[0.08] bg-black/16 p-5 text-sm text-white/55 sm:col-span-2">
                       No structured fields captured for this lead yet.
                     </div>
                   ) : (
                     selectedLead.capturedFields.map((field) => (
-                      <div key={`${field.label}:${field.value}`} className="rounded-2xl bg-white/84 p-4 ring-1 ring-[#eef0ff]">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6b6a78]">{field.label}</p>
-                        <p className="mt-2 break-words text-sm font-semibold text-[#181836]">{field.value}</p>
+                      <div
+                        key={`${field.label}:${field.value}`}
+                        className="rounded-xl border border-white/[0.08] bg-black/16 p-4"
+                      >
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/38">
+                          {field.label}
+                        </p>
+                        <p className="mt-2 break-words text-sm font-semibold text-white">
+                          {field.value}
+                        </p>
                       </div>
                     ))
                   )}
@@ -261,36 +323,50 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
               </div>
 
               <div>
-                <h3 className="font-heading text-xl font-bold text-[#181836]">Agent Actions</h3>
-                <div className="mt-4 space-y-4">
-                  {selectedTimeline.map((message) => (
-                    <div key={message.id} className="rounded-2xl bg-white/84 p-4 ring-1 ring-[#eef0ff]">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold text-[#181836]">{getToolActionLabel(message.toolName)}</p>
-                          <p className="mt-1 text-xs leading-5 text-[#464554]">
-                            {getToolStatusLabel(message.toolResult)}
-                          </p>
+                <h3 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
+                  Agent actions
+                </h3>
+                <div className="mt-4 space-y-3">
+                  {selectedTimeline.map((message) => {
+                    const status = getToolStatusLabel(message.toolResult);
+
+                    return (
+                      <div
+                        key={message.id}
+                        className="rounded-xl border border-white/[0.08] bg-black/16 p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-white">
+                              {getToolActionLabel(message.toolName)}
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-white/52">{status}</p>
+                          </div>
+                          <span
+                            className={[
+                              "rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]",
+                              statusClassName(status),
+                            ].join(" ")}
+                          >
+                            {status}
+                          </span>
                         </div>
-                        <span className="rounded-lg bg-[#efecff] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#4648d4]">
-                          {getToolStatusLabel(message.toolResult)}
-                        </span>
+                        <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/38">
+                          {formatDateTime(message.createdAt)}
+                        </p>
                       </div>
-                      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6b6a78]">
-                        {formatDateTime(message.createdAt)}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="rounded-[22px] bg-white/80 p-8 text-sm text-[#464554] ring-1 ring-[#eef0ff]">
+            <div className="rounded-xl border border-white/[0.08] bg-black/16 p-8 text-sm text-white/55">
               Select a lead to review collected information.
             </div>
           )}
         </aside>
       </section>
-    </div>
+    </CabinetShell>
   );
 }

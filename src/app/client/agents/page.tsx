@@ -1,16 +1,7 @@
 import { AgentsView } from "./agents-view";
+import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
-
-function getInitials(value: string) {
-  const cleaned = value.includes("@") ? value.split("@")[0] : value;
-  const parts = cleaned
-    .replace(/[^a-zA-Z0-9\s._-]/g, " ")
-    .split(/[\s._-]+/)
-    .filter(Boolean);
-
-  return (parts[0]?.[0] ?? "C").toUpperCase() + (parts[1]?.[0] ?? "").toUpperCase();
-}
 
 export default async function ClientAgentsPage() {
   const session = await requireClientSession();
@@ -32,7 +23,7 @@ export default async function ClientAgentsPage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  const userLabel = session.user.name ?? session.user.email ?? "Client";
+  const userLabel = getCabinetUserName(session.user);
   const userInitials = getInitials(userLabel);
 
   return (
