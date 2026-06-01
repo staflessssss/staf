@@ -668,7 +668,14 @@ function shouldUseWeddingSalesRuntime(args: {
   channel: ChannelType;
   runtimeType: ReturnType<typeof getRuntimeType>;
 }) {
-  return args.channel === ChannelType.GMAIL && args.runtimeType === "langgraph_wedding_sales";
+  return (
+    (args.channel === ChannelType.GMAIL || args.channel === ChannelType.INSTAGRAM) &&
+    args.runtimeType === "langgraph_wedding_sales"
+  );
+}
+
+function getWeddingSalesGraphChannel(channel: ChannelType) {
+  return channel === ChannelType.INSTAGRAM ? "instagram" : "gmail";
 }
 
 function classifyGmailClientMessage(args: {
@@ -1026,6 +1033,7 @@ async function runWeddingSalesRuntime(args: {
   database: typeof db;
   agent: IncomingEventAgent;
   incoming: ParsedIncomingMessage;
+  channel: ChannelType;
   existingConversationStatus?: ConversationStatus;
 }): Promise<InvokeAgentResult> {
   const conversation = await recordInboundMessageWithDb(args.database, {
@@ -1063,7 +1071,7 @@ async function runWeddingSalesRuntime(args: {
     tenantId: args.agent.tenantId,
     agentId: args.agent.id,
     contactId: args.incoming.contactId,
-    channel: "gmail",
+    channel: getWeddingSalesGraphChannel(args.channel),
     message: args.incoming.message,
     config: buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig),
     toolContext,
@@ -1908,6 +1916,7 @@ async function handleIncomingEventWithDeps(
           database: deps.db,
           agent,
           incoming,
+          channel: args.channel,
           existingConversationStatus: existingConversation?.status,
         })
       : await deps.invokeAgent({

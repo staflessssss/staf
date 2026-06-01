@@ -1057,6 +1057,110 @@ test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when 
   );
 });
 
+test("handleIncomingEventWithDeps routes Instagram through wedding sales graph when runtime flag is enabled", async () => {
+  let invokeAgentCalled = false;
+  let sentMessage: unknown = null;
+  const createdMessages: Array<{ role: string; content: string; model?: string; toolName?: string | null }> = [];
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "INSTAGRAM" as never,
+      payload: { text: "hello" },
+    },
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({
+            id: "agent-1",
+            tenantId: "tenant-1",
+            channelConfig: {
+              runtimeType: "langgraph_wedding_sales",
+            },
+            channel: {
+              type: "INSTAGRAM",
+              credentialsEnc: "instagram-credentials",
+            },
+          }),
+        },
+        message: {
+          findFirst: async () => null,
+          create: async (args: { data: { role: string; content: string; model?: string; toolName?: string | null } }) => {
+            createdMessages.push(args.data);
+            return { id: "message-1" };
+          },
+        },
+        conversation: {
+          findUnique: async () => null,
+        },
+        $transaction: async (
+          callback: (tx: {
+            conversation: {
+              findUnique: () => Promise<null>;
+              create: () => Promise<{ id: string; status: ConversationStatus }>;
+            };
+            message: {
+              create: (args: {
+                data: { role: string; content: string; model?: string; toolName?: string | null };
+              }) => Promise<{ id: string }>;
+            };
+          }) => Promise<unknown>,
+        ) =>
+          callback({
+            conversation: {
+              findUnique: async () => null,
+              create: async () => ({
+                id: "conv-instagram-langgraph",
+                status: ConversationStatus.ACTIVE,
+              }),
+            },
+            message: {
+              create: async (args) => {
+                createdMessages.push(args.data);
+                return { id: "message-1" };
+              },
+            },
+          }),
+        delayedDelivery: {
+          updateMany: async () => ({ count: 0 }),
+          create: async () => ({ id: "delivery-1" }),
+        },
+      } as never,
+      decrypt: (value: string) => `decrypted:${value}`,
+      invokeAgent: async () => {
+        invokeAgentCalled = true;
+        throw new Error("legacy invokeAgent should not run for Instagram LangGraph runtime");
+      },
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "ig-user-1",
+            message: "We are Anna and Mark. Our wedding is June 14 in Charlotte.",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async (args: { message: unknown }) => {
+            sentMessage = args.message;
+            return { mode: "meta_send_pending" };
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(invokeAgentCalled, false);
+  assert.match(String(sentMessage), /year/i);
+  assert.equal(
+    createdMessages.some(
+      (message) =>
+        message.role === "ASSISTANT" &&
+        message.model === "langgraph_wedding_sales" &&
+        /year/i.test(message.content),
+    ),
+    true,
+  );
+});
+
 test("control user message limit can suppress replies without a fallback message", () => {
   const intercept = aiRuntimeTestHelpers.getAntiSpamIntercept({
     control: {
