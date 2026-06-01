@@ -1,18 +1,6 @@
 import Link from "next/link";
-import { ConversationStatus, MessageRole, type Prisma } from "@prisma/client";
-import {
-  CalendarCheck2,
-  ChevronDown,
-  FileText,
-  ImageIcon,
-  LinkIcon,
-  MessageSquareText,
-  MoreVertical,
-  Paperclip,
-  Search,
-  Send,
-  Wrench,
-} from "lucide-react";
+import { ChannelType, ConversationStatus, MessageRole, type Prisma } from "@prisma/client";
+import { CalendarCheck2, Wrench } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
 import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
@@ -28,8 +16,35 @@ import { db } from "@/lib/db";
 import { isQualifiedLeadToolMessage } from "@/lib/lead-qualification";
 
 type DialogsPageProps = {
-  searchParams: Promise<{ agent?: string; conversation?: string }>;
+  searchParams: Promise<{
+    agent?: string;
+    channel?: string;
+    conversation?: string;
+    sort?: string;
+    tab?: string;
+  }>;
 };
+
+type DialogTab = "conversation" | "lead" | "activity";
+type DialogSort = "newest" | "oldest";
+
+const CHANNEL_FILTERS: Array<{ label: string; value?: ChannelType }> = [
+  { label: "All" },
+  { label: "Gmail", value: ChannelType.GMAIL },
+  { label: "Instagram", value: ChannelType.INSTAGRAM },
+  { label: "Telegram", value: ChannelType.TELEGRAM },
+];
+
+const SORT_OPTIONS: Array<{ label: string; value: DialogSort }> = [
+  { label: "Newest", value: "newest" },
+  { label: "Oldest", value: "oldest" },
+];
+
+const DIALOG_TABS: Array<{ label: string; value: DialogTab }> = [
+  { label: "Conversation", value: "conversation" },
+  { label: "Lead details", value: "lead" },
+  { label: "Activity", value: "activity" },
+];
 
 function formatRelative(value: Date) {
   const diffMs = Date.now() - value.getTime();
@@ -77,6 +92,18 @@ function getLastMessagePreview(messages: Array<{ content: string; role: MessageR
   return content.length > 84 ? `${content.slice(0, 81)}...` : content;
 }
 
+function parseChannelFilter(value?: string) {
+  return CHANNEL_FILTERS.find((item) => item.value === value)?.value;
+}
+
+function parseSort(value?: string): DialogSort {
+  return value === "oldest" ? "oldest" : "newest";
+}
+
+function parseTab(value?: string): DialogTab {
+  return DIALOG_TABS.some((item) => item.value === value) ? (value as DialogTab) : "conversation";
+}
+
 function buildToolCallView(message: {
   toolName: string | null;
   toolResult: Prisma.JsonValue | null;
@@ -116,14 +143,63 @@ function conversationStatusClassName(status: ConversationStatus) {
   }
 }
 
-function buildDialogsHref(params: { agent?: string; conversation?: string }) {
+function buildDialogsHref(params: {
+  agent?: string;
+  channel?: ChannelType;
+  conversation?: string;
+  sort?: DialogSort;
+  tab?: DialogTab;
+}) {
   const query = new URLSearchParams();
 
   if (params.agent) query.set("agent", params.agent);
+  if (params.channel) query.set("channel", params.channel);
   if (params.conversation) query.set("conversation", params.conversation);
+  if (params.sort && params.sort !== "newest") query.set("sort", params.sort);
+  if (params.tab && params.tab !== "conversation") query.set("tab", params.tab);
 
   const text = query.toString();
   return text ? `/client/dialogs?${text}` : "/client/dialogs";
+}
+
+function getDialogBadge(args: {
+  status: ConversationStatus;
+  hasQualifiedLead: boolean;
+  hasBookedAction: boolean;
+  isSelected: boolean;
+}) {
+  if (args.status === ConversationStatus.ESCALATED) {
+    return {
+      label: "Needs review",
+      className: "border-[#e9be86]/45 text-[#e9be86]",
+    };
+  }
+
+  if (args.status === ConversationStatus.CLOSED) {
+    return {
+      label: "Closed",
+      className: "border-white/[0.12] text-white/52",
+    };
+  }
+
+  if (args.hasBookedAction) {
+    return {
+      label: "Booked",
+      className: "border-[#54b67a]/45 text-[#78d49a]",
+    };
+  }
+
+  if (args.hasQualifiedLead) {
+    return {
+      label: "Qualified",
+      className: "border-[#5d82c8]/45 text-[#8aa9ed]",
+    };
+  }
+
+  return {
+    label: args.isSelected ? "Active" : "New",
+    className: args.isSelected ? "border-[#d7a96d]/45 text-[#e9be86]" : "border-white/[0.14] text-white/54",
+  };
 }
 
 function buildAgentWorkOutcome(event: {
@@ -187,7 +263,10 @@ function buildAgentWorkOutcome(event: {
 export default async function ClientDialogsPage({ searchParams }: DialogsPageProps) {
   const session = await requireClientSession();
   const tenantId = session.user.tenantId;
-  const { agent, conversation } = await searchParams;
+  const { agent, channel, conversation, sort, tab } = await searchParams;
+  const channelFilter = parseChannelFilter(channel);
+  const sortOrder = parseSort(sort);
+  const activeTab = parseTab(tab);
 
   const [tenant, agents, conversations, conversationCount, visibleMessageCount, toolMessages] =
     await Promise.all([
@@ -205,6 +284,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             tenantId,
             ...(agent ? { id: agent } : {}),
           },
+          ...(channelFilter ? { channel: channelFilter } : {}),
           messages: {
             some: {},
           },
@@ -234,7 +314,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             select: { messages: true },
           },
         },
-        orderBy: { updatedAt: "desc" },
+        orderBy: { updatedAt: sortOrder === "oldest" ? "asc" : "desc" },
         take: 60,
       }),
       db.conversation.count({
@@ -282,6 +362,9 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
         .filter((message) => !isBusinessManualMessage(message))
         .reverse()
     : [];
+  const selectedToolMessages = selectedMessages.filter(
+    (message) => message.role === MessageRole.TOOL,
+  );
   const selectedContactName = selectedConversation
     ? getContactName(selectedConversation.contactId)
     : "No conversation yet";
@@ -303,8 +386,20 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
     targetActions[0] ??
     toolMessages[0] ??
     null;
+  const selectedQualifiedActions = selectedConversation
+    ? targetActions.filter((message) => message.conversationId === selectedConversation.id)
+    : [];
+  const selectedLatestOutcome =
+    selectedQualifiedActions[0] ??
+    (selectedConversation
+      ? toolMessages.find((message) => message.conversationId === selectedConversation.id)
+      : null) ??
+    null;
   const latestLeadDetails = latestOutcome
     ? getLeadDetails(latestOutcome, latestOutcome.conversation.contactId)
+    : null;
+  const selectedLeadDetails = selectedLatestOutcome
+    ? getLeadDetails(selectedLatestOutcome, selectedLatestOutcome.conversation.contactId)
     : null;
   const latestWork = latestOutcome ? buildAgentWorkOutcome(latestOutcome) : null;
   const leadScore = Math.min(
@@ -312,7 +407,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
     58 + targetActions.length * 14 + Math.min(agents.length, 3) * 4,
   );
   const leadRows = [
-    ["Name", latestLeadDetails?.coupleName ?? selectedContactName],
+    ["Name", selectedLeadDetails?.coupleName ?? latestLeadDetails?.coupleName ?? selectedContactName],
     [
       "Email",
       selectedConversation?.contactId.includes("@")
@@ -321,8 +416,15 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
     ],
     ["Channel", selectedChannel],
     ["Agent", selectedConversation?.agent.name ?? agents[0]?.name ?? "No active agent"],
-    ["Date", latestLeadDetails?.weddingDate ?? latestLeadDetails?.callDate ?? "Not captured yet"],
-    ["Location", latestLeadDetails?.location ?? "Not captured yet"],
+    [
+      "Date",
+      selectedLeadDetails?.weddingDate ??
+        selectedLeadDetails?.callDate ??
+        latestLeadDetails?.weddingDate ??
+        latestLeadDetails?.callDate ??
+        "Not captured yet",
+    ],
+    ["Location", selectedLeadDetails?.location ?? latestLeadDetails?.location ?? "Not captured yet"],
   ];
 
   const header = (
@@ -365,7 +467,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
 
             <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
               <Link
-                href="/client/dialogs"
+                href={buildDialogsHref({ channel: channelFilter, sort: sortOrder })}
                 className={[
                   "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
                   !agent
@@ -378,7 +480,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               {agents.slice(0, 4).map((item) => (
                 <Link
                   key={item.id}
-                  href={buildDialogsHref({ agent: item.id })}
+                  href={buildDialogsHref({ agent: item.id, channel: channelFilter, sort: sortOrder })}
                   className={[
                     "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
                     agent === item.id
@@ -391,14 +493,51 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               ))}
             </div>
 
-            <div className="mt-4 flex items-center gap-3">
-              <span className="inline-flex items-center gap-2 rounded-lg border border-white/[0.1] px-3 py-2 text-xs text-white/58">
-                All channels <ChevronDown className="size-3" />
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-lg border border-white/[0.1] px-3 py-2 text-xs text-white/58">
-                Newest <ChevronDown className="size-3" />
-              </span>
-              <Search className="ml-auto size-4 text-white/44" />
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {CHANNEL_FILTERS.map((item) => {
+                  const isActive = item.value === channelFilter || (!item.value && !channelFilter);
+
+                  return (
+                    <Link
+                      key={item.label}
+                      href={buildDialogsHref({ agent, channel: item.value, sort: sortOrder })}
+                      className={[
+                        "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
+                        isActive
+                          ? "border-[#d7a96d]/45 bg-[#3a2c1e] text-[#e9be86]"
+                          : "border-white/[0.1] text-white/58 hover:text-white",
+                      ].join(" ")}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                {SORT_OPTIONS.map((item) => {
+                  const isActive = item.value === sortOrder;
+
+                  return (
+                    <Link
+                      key={item.value}
+                      href={buildDialogsHref({
+                        agent,
+                        channel: channelFilter,
+                        sort: item.value,
+                      })}
+                      className={[
+                        "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
+                        isActive
+                          ? "border-white/[0.14] bg-white/[0.08] text-white"
+                          : "border-white/[0.1] text-white/50 hover:text-white",
+                      ].join(" ")}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -413,12 +552,29 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                 const channel = formatChannel(item.channel);
                 const preview = getLastMessagePreview(item.messages);
                 const isSelected = selectedConversation?.id === item.id;
-                const isBooked = targetActions.some((action) => action.conversationId === item.id);
+                const itemTargetActions = targetActions.filter(
+                  (action) => action.conversationId === item.id,
+                );
+                const hasBookedAction = itemTargetActions.some((action) =>
+                  (action.toolName ?? "").toLowerCase().includes("book"),
+                );
+                const badge = getDialogBadge({
+                  status: item.status,
+                  hasQualifiedLead: itemTargetActions.length > 0,
+                  hasBookedAction,
+                  isSelected,
+                });
 
                 return (
                   <Link
                     key={item.id}
-                    href={buildDialogsHref({ agent, conversation: item.id })}
+                    href={buildDialogsHref({
+                      agent,
+                      channel: channelFilter,
+                      conversation: item.id,
+                      sort: sortOrder,
+                      tab: activeTab,
+                    })}
                     className={[
                       "block border-b border-white/[0.075] px-5 py-5 transition hover:bg-white/[0.035]",
                       isSelected ? "bg-[#27231e]" : "",
@@ -434,14 +590,10 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                           <span
                             className={[
                               "shrink-0 rounded-md border px-2.5 py-1 text-[11px] font-semibold",
-                              isBooked
-                                ? "border-[#54b67a]/45 text-[#78d49a]"
-                                : isSelected
-                                  ? "border-[#d7a96d]/45 text-[#e9be86]"
-                                  : "border-[#5d82c8]/45 text-[#8aa9ed]",
+                              badge.className,
                             ].join(" ")}
                           >
-                            {isBooked ? "Booked" : isSelected ? "New" : "Lead"}
+                            {badge.label}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-white/42">
@@ -488,62 +640,167 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                     {conversationStatusLabel(selectedConversation.status)}
                   </span>
                 ) : null}
-                <span className="grid size-10 place-items-center rounded-full border border-white/[0.09] text-white/54">
-                  <MoreVertical className="size-5" />
-                </span>
               </div>
             </div>
 
             <div className="mt-7 flex gap-6 overflow-x-auto text-sm">
-              {["Conversation", "Lead details", "Notes", "Activity"].map((tab, index) => (
-                <span
-                  key={tab}
-                  className={
-                    index === 0
-                      ? "shrink-0 border-b-2 border-[#e9be86] pb-3 text-[#e9be86]"
-                      : "shrink-0 pb-3 text-white/48"
-                  }
+              {DIALOG_TABS.map((item) => (
+                <Link
+                  key={item.value}
+                  href={buildDialogsHref({
+                    agent,
+                    channel: channelFilter,
+                    conversation: selectedConversation?.id,
+                    sort: sortOrder,
+                    tab: item.value,
+                  })}
+                  className={[
+                    "shrink-0 pb-3 transition",
+                    activeTab === item.value
+                      ? "border-b-2 border-[#e9be86] text-[#e9be86]"
+                      : "text-white/48 hover:text-white",
+                  ].join(" ")}
                 >
-                  {tab}
-                </span>
+                  {item.label}
+                </Link>
               ))}
             </div>
           </div>
 
-          <div className="flex-1 space-y-5 overflow-y-auto p-5 md:p-7">
-            {selectedMessages.length === 0 ? (
-              <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] p-5 text-white/56">
-                Customer conversations will appear here once the assistant starts replying.
-              </div>
-            ) : (
-              selectedMessages.map((message) => {
-                if (message.role === MessageRole.TOOL) {
-                  const toolCall = buildToolCallView(message);
+          <div className="flex-1 overflow-y-auto p-5 md:p-7">
+            {activeTab === "conversation" ? (
+              <div className="space-y-5">
+                {selectedMessages.length === 0 ? (
+                  <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] p-5 text-white/56">
+                    Customer conversations will appear here once the assistant starts replying.
+                  </div>
+                ) : (
+                  selectedMessages.map((message) => {
+                    if (message.role === MessageRole.TOOL) {
+                      const toolCall = buildToolCallView(message);
 
-                  return (
-                    <div key={message.id} className="flex justify-center">
-                      <div className="w-full max-w-[86%] rounded-xl border border-[#d7a96d]/22 bg-[#211b15] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex min-w-0 gap-3">
-                            <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-[#d7a96d]/32 bg-[#3a2c1e] text-[#e9be86]">
-                              <Wrench className="size-4" />
-                            </span>
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e9be86]">
-                                Agent called
-                              </p>
-                              <p className="mt-1 truncate text-sm font-semibold text-white">
-                                {toolCall.title}
-                              </p>
-                              {toolCall.summary ? (
-                                <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/52">
-                                  {toolCall.summary}
-                                </p>
-                              ) : null}
+                      return (
+                        <div key={message.id} className="flex justify-center">
+                          <div className="w-full max-w-[86%] rounded-xl border border-[#d7a96d]/22 bg-[#211b15] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="flex min-w-0 gap-3">
+                                <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-[#d7a96d]/32 bg-[#3a2c1e] text-[#e9be86]">
+                                  <Wrench className="size-4" />
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e9be86]">
+                                    Agent called
+                                  </p>
+                                  <p className="mt-1 truncate text-sm font-semibold text-white">
+                                    {toolCall.title}
+                                  </p>
+                                  {toolCall.summary ? (
+                                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/52">
+                                      {toolCall.summary}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 flex-col gap-1 sm:items-end">
+                                <span className="w-fit rounded-md border border-white/[0.1] bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/62">
+                                  {toolCall.status}
+                                </span>
+                                <span className="text-[11px] text-white/34">
+                                  {formatMessageTime(message.createdAt)}
+                                </span>
+                              </div>
                             </div>
                           </div>
+                        </div>
+                      );
+                    }
+
+                    const isAssistant = message.role === MessageRole.ASSISTANT;
+
+                    return (
+                      <div
+                        key={message.id}
+                        className={isAssistant ? "flex justify-end" : "flex items-start gap-3"}
+                      >
+                        {!isAssistant ? (
+                          <span className="mt-1 grid size-9 shrink-0 place-items-center rounded-full border border-white/[0.1] bg-white/[0.07] text-xs font-semibold text-white/62">
+                            {selectedInitials}
+                          </span>
+                        ) : null}
+                        <div
+                          className={[
+                            "max-w-[82%] rounded-xl px-4 py-3 text-sm leading-6 md:text-base",
+                            isAssistant
+                              ? "bg-[#60442b] text-white"
+                              : "bg-white/[0.08] text-white/82",
+                          ].join(" ")}
+                        >
+                          <p className="mb-1 text-xs text-white/46">
+                            {isAssistant ? "Behalfy AI" : selectedContactName.split("@")[0]} -{" "}
+                            {formatMessageTime(message.createdAt)}
+                          </p>
+                          {message.content}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            ) : null}
+
+            {activeTab === "lead" ? (
+              <div className="space-y-5">
+                <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] p-5">
+                  <p className="text-sm font-semibold text-white">Captured lead details</p>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    {leadRows.map(([label, value]) => (
+                      <div key={label} className="rounded-lg border border-white/[0.08] bg-black/16 p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/38">
+                          {label}
+                        </p>
+                        <p className="mt-2 break-words text-sm font-semibold text-white">
+                          {value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] p-5">
+                  <p className="text-sm font-semibold text-white">Latest outcome</p>
+                  <p className="mt-3 text-sm leading-6 text-white/56">
+                    {selectedLatestOutcome
+                      ? buildAgentWorkOutcome(selectedLatestOutcome).detail
+                      : "No tool outcomes captured for this conversation yet."}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "activity" ? (
+              <div className="space-y-4">
+                {selectedToolMessages.length === 0 ? (
+                  <div className="rounded-xl border border-white/[0.09] bg-white/[0.04] p-5 text-white/56">
+                    No agent tool calls recorded for this conversation yet.
+                  </div>
+                ) : (
+                  selectedToolMessages.map((message) => {
+                    const toolCall = buildToolCallView(message);
+
+                    return (
+                      <div
+                        key={message.id}
+                        className="rounded-xl border border-white/[0.08] bg-black/16 p-4"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-white">{toolCall.title}</p>
+                            <p className="mt-2 text-xs leading-5 text-white/52">
+                              {toolCall.summary || "Tool call completed."}
+                            </p>
+                          </div>
                           <div className="flex shrink-0 flex-col gap-1 sm:items-end">
-                            <span className="w-fit rounded-md border border-white/[0.1] bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/62">
+                            <span className="w-fit rounded-md border border-[#d7a96d]/28 bg-[#3a2c1e] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#e9be86]">
                               {toolCall.status}
                             </span>
                             <span className="text-[11px] text-white/34">
@@ -552,68 +809,17 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                }
-
-                const isAssistant = message.role === MessageRole.ASSISTANT;
-
-                return (
-                  <div
-                    key={message.id}
-                    className={isAssistant ? "flex justify-end" : "flex items-start gap-3"}
-                  >
-                    {!isAssistant ? (
-                      <span className="mt-1 grid size-9 shrink-0 place-items-center rounded-full border border-white/[0.1] bg-white/[0.07] text-xs font-semibold text-white/62">
-                        {selectedInitials}
-                      </span>
-                    ) : null}
-                    <div
-                      className={[
-                        "max-w-[82%] rounded-xl px-4 py-3 text-sm leading-6 md:text-base",
-                        isAssistant ? "bg-[#60442b] text-white" : "bg-white/[0.08] text-white/82",
-                      ].join(" ")}
-                    >
-                      <p className="mb-1 text-xs text-white/46">
-                        {isAssistant ? "Behalfy AI" : selectedContactName.split("@")[0]} -{" "}
-                        {formatMessageTime(message.createdAt)}
-                      </p>
-                      {message.content}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div className="border-t border-white/[0.09] p-5 md:p-7">
-            <div className="rounded-xl border border-white/[0.09] bg-black/18 p-4">
-              <p className="text-sm text-white/38">
-                Dialogs are a read-only workspace for the client cabinet.
-              </p>
-              <div className="mt-5 flex items-center justify-between">
-                <div className="flex gap-4 text-white/36">
-                  <MessageSquareText className="size-5" />
-                  <Paperclip className="size-5" />
-                  <LinkIcon className="size-5" />
-                  <ImageIcon className="size-5" />
-                  <FileText className="size-5" />
-                  <CalendarCheck2 className="size-5" />
-                </div>
-                <span className="grid size-10 place-items-center rounded-full bg-[#e9be86] text-black">
-                  <Send className="size-4" />
-                </span>
+                    );
+                  })
+                )}
               </div>
-            </div>
+            ) : null}
           </div>
         </section>
 
         <aside className="space-y-4">
           <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-lg font-semibold text-white">Lead score</p>
-              <MoreVertical className="size-5 text-white/42" />
-            </div>
+            <p className="text-lg font-semibold text-white">Lead score</p>
             <div className="mt-6 flex items-center gap-5">
               <div className="grid size-20 shrink-0 place-items-center rounded-full border-[5px] border-[#d7a96d] text-2xl font-normal text-white">
                 {leadScore}

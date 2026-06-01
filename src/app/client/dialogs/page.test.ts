@@ -10,7 +10,9 @@ test("client dialogs do not expose manual business controls or messages", () => 
   assert.doesNotMatch(source, /api\/client\/conversations\/.*activate/);
   assert.doesNotMatch(source, /Operator<\/span>/);
   assert.match(source, /!isBusinessManualMessage/);
-  assert.match(source, /read-only workspace/);
+  assert.doesNotMatch(source, /Send className/);
+  assert.doesNotMatch(source, /Paperclip className/);
+  assert.doesNotMatch(source, /Notes/);
 });
 
 test("client dialogs show agent tool calls in the conversation timeline", () => {
