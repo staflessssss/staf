@@ -12,3 +12,9 @@ test("client dialogs do not expose manual business controls or messages", () => 
   assert.match(source, /!isBusinessManualMessage/);
   assert.match(source, /read-only workspace/);
 });
+
+test("client dialogs show agent tool calls in the conversation timeline", () => {
+  assert.match(source, /MessageRole\.TOOL/);
+  assert.match(source, /Agent called/);
+  assert.match(source, /buildToolCallView/);
+});

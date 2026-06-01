@@ -11,6 +11,7 @@ import {
   Paperclip,
   Search,
   Send,
+  Wrench,
 } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
@@ -74,6 +75,21 @@ function getLastMessagePreview(messages: Array<{ content: string; role: MessageR
   if (!content) return "No visible messages yet.";
 
   return content.length > 84 ? `${content.slice(0, 81)}...` : content;
+}
+
+function buildToolCallView(message: {
+  toolName: string | null;
+  toolResult: Prisma.JsonValue | null;
+  content: string;
+}) {
+  const status = getToolStatusLabel(message.toolResult);
+  const summary = getToolSummary(message.toolResult) ?? message.content.trim();
+
+  return {
+    title: getToolActionLabel(message.toolName),
+    status,
+    summary: summary.length > 110 ? `${summary.slice(0, 107)}...` : summary,
+  };
 }
 
 function conversationStatusLabel(status: ConversationStatus) {
@@ -197,9 +213,19 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           agent: true,
           messages: {
             where: {
-              role: {
-                in: [MessageRole.USER, MessageRole.ASSISTANT],
-              },
+              OR: [
+                {
+                  role: {
+                    in: [MessageRole.USER, MessageRole.ASSISTANT],
+                  },
+                },
+                {
+                  role: MessageRole.TOOL,
+                  NOT: {
+                    toolName: null,
+                  },
+                },
+              ],
             },
             orderBy: { createdAt: "desc" },
             take: 24,
@@ -491,6 +517,45 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               </div>
             ) : (
               selectedMessages.map((message) => {
+                if (message.role === MessageRole.TOOL) {
+                  const toolCall = buildToolCallView(message);
+
+                  return (
+                    <div key={message.id} className="flex justify-center">
+                      <div className="w-full max-w-[86%] rounded-xl border border-[#d7a96d]/22 bg-[#211b15] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="flex min-w-0 gap-3">
+                            <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-[#d7a96d]/32 bg-[#3a2c1e] text-[#e9be86]">
+                              <Wrench className="size-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#e9be86]">
+                                Agent called
+                              </p>
+                              <p className="mt-1 truncate text-sm font-semibold text-white">
+                                {toolCall.title}
+                              </p>
+                              {toolCall.summary ? (
+                                <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/52">
+                                  {toolCall.summary}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 flex-col gap-1 sm:items-end">
+                            <span className="w-fit rounded-md border border-white/[0.1] bg-white/[0.05] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/62">
+                              {toolCall.status}
+                            </span>
+                            <span className="text-[11px] text-white/34">
+                              {formatMessageTime(message.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const isAssistant = message.role === MessageRole.ASSISTANT;
 
                 return (
