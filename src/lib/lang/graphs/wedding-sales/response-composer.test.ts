@@ -94,6 +94,8 @@ test("wedding sales composer uses plain links for instagram", () => {
 
   assert.doesNotMatch(response, /<a href=/);
   assert.match(response, /Callista and Kevin: https:\/\/example.com\/film/);
+  assert.doesNotMatch(response, /Taras Mynd/);
+  assert.doesNotMatch(response, /MYNDFUL FILMS/);
 });
 
 test("wedding sales composer confirms consultation booking warmly without wedding-booking language", () => {

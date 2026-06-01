@@ -105,7 +105,7 @@ export function buildWeddingSalesDialogPolicy(args: BuildWeddingSalesDialogPolic
   const scheduling = isSchedulingIntent(intent);
   const firstReply = isFirstAssistantReply(state);
   const fullEmail = firstReply || ["availability_available", "availability_unavailable"].includes(intent);
-  const includeSignature = fullEmail && !state.signatureSent && !scheduling;
+  const includeSignature = state.channel === "gmail" && fullEmail && !state.signatureSent && !scheduling;
   const allowGreeting = firstReply && !state.hasGreeted && !scheduling;
 
   return {
