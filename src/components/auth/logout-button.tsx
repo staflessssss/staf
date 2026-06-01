@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 import { cn } from "@/lib/utils";
 
 type LogoutButtonProps = {
   label?: string;
-  variant?: "sidebar" | "header";
+  variant?: "sidebar" | "header" | "rail";
 };
 
 export function LogoutButton({
@@ -19,6 +20,21 @@ export function LogoutButton({
   async function handleLogout() {
     setIsPending(true);
     await signOut({ callbackUrl: "/login" });
+  }
+
+  if (variant === "rail") {
+    return (
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={isPending}
+        title={label}
+        aria-label={label}
+        className="grid size-11 place-items-center rounded-xl text-white/55 transition hover:bg-white/[0.05] hover:text-[#e9be86] disabled:opacity-60"
+      >
+        <LogOut className="size-5" />
+      </button>
+    );
   }
 
   return (
