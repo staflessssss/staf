@@ -20,7 +20,7 @@ type NavItem = { icon: LucideIcon; label: string; href: string };
 
 const NAV: NavItem[] = [
   { icon: BarChart3, label: "Overview", href: "/client/overview" },
-  { icon: MessageSquareText, label: "Dialogs", href: "/client/dialogs" },
+  { icon: MessageSquareText, label: "Conversations", href: "/client/dialogs" },
   { icon: Bot, label: "Agents", href: "/client/agents" },
   { icon: UsersRound, label: "Leads", href: "/client/leads" },
   { icon: Plug, label: "Connections", href: "/client/connections" },

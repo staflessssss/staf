@@ -268,12 +268,8 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   const sortOrder = parseSort(sort);
   const activeTab = parseTab(tab);
 
-  const [tenant, agents, conversations, conversationCount, visibleMessageCount, toolMessages] =
+  const [agents, conversations, conversationCount, visibleMessageCount, toolMessages] =
     await Promise.all([
-      db.tenant.findUnique({
-        where: { id: tenantId },
-        select: { name: true },
-      }),
       db.agent.findMany({
         where: { tenantId },
         orderBy: { updatedAt: "desc" },
@@ -428,25 +424,9 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   ];
 
   const header = (
-    <>
-      <div>
-        <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/62">
-          <span className="size-2 rounded-full bg-[#ff6a1a]" />
-          Conversations
-        </p>
-        <h1 className="mt-3 font-serif text-4xl font-normal leading-[1.02] tracking-[-0.055em] text-white">
-          Dialogs
-        </h1>
-      </div>
-      <div className="flex flex-wrap items-center gap-3 text-sm text-white/60">
-        <span className="rounded-lg border border-white/[0.1] px-4 py-2">
-          {conversationCount} dialogs
-        </span>
-        <span className="rounded-lg border border-[#d7a96d]/32 bg-[#d7a96d]/[0.06] px-4 py-2 text-[#e9be86]">
-          {visibleMessageCount} messages
-        </span>
-      </div>
-    </>
+    <h1 className="text-2xl font-semibold tracking-[-0.055em] text-white">
+      Conversations
+    </h1>
   );
 
   return (
@@ -455,17 +435,10 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
       userInitials={getInitials(userName)}
       userName={userName}
     >
-      <div className="grid min-h-full gap-5 xl:h-full xl:min-h-0 xl:overflow-hidden xl:grid-cols-[360px_minmax(520px,1fr)_340px] 2xl:grid-cols-[410px_minmax(680px,1fr)_380px]">
-        <section className="flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313] xl:h-full xl:min-h-0">
-          <div className="border-b border-white/[0.08] p-5">
-            <div>
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-white">
-                Inbox
-              </h2>
-              <p className="mt-1 text-sm text-white/42">{tenant?.name ?? "Client workspace"}</p>
-            </div>
-
-            <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
+      <div className="-mx-4 -my-5 grid min-h-[calc(100%+2.5rem)] gap-0 md:-mx-8 md:-my-7 md:min-h-[calc(100%+3.5rem)] xl:h-[calc(100%+3.5rem)] xl:min-h-0 xl:overflow-hidden xl:grid-cols-[360px_minmax(520px,1fr)_340px] 2xl:grid-cols-[410px_minmax(680px,1fr)_380px]">
+        <section className="flex min-h-[560px] flex-col overflow-hidden border-b border-white/[0.09] bg-[#10110f] xl:h-full xl:min-h-0 xl:border-b-0 xl:border-r">
+          <div className="border-b border-white/[0.08] p-5 md:p-6">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
               <Link
                 href={buildDialogsHref({ channel: channelFilter, sort: sortOrder })}
                 className={[
@@ -611,7 +584,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           </div>
         </section>
 
-        <section className="flex min-h-[620px] flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313] xl:h-full xl:min-h-0">
+        <section className="flex min-h-[620px] flex-col overflow-hidden border-b border-white/[0.09] bg-[#0f100f] xl:h-full xl:min-h-0 xl:border-b-0 xl:border-r">
           <div className="border-b border-white/[0.09] p-5 md:p-7">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
@@ -817,8 +790,8 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           </div>
         </section>
 
-        <aside className="space-y-4 xl:h-full xl:overflow-hidden">
-          <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5">
+        <aside className="bg-[#10100e] xl:h-full xl:overflow-hidden">
+          <div className="border-b border-white/[0.09] p-5">
             <p className="text-lg font-semibold text-white">Lead score</p>
             <div className="mt-6 flex items-center gap-5">
               <div className="grid size-20 shrink-0 place-items-center rounded-full border-[5px] border-[#d7a96d] text-2xl font-normal text-white">
@@ -837,7 +810,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5">
+          <div className="border-b border-white/[0.09] p-5">
             <p className="text-lg font-semibold text-white">Lead details</p>
             <div className="mt-5 space-y-3 text-sm">
               {leadRows.map(([label, value]) => (
@@ -855,7 +828,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             </Link>
           </div>
 
-          <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5">
+          <div className="border-b border-white/[0.09] p-5">
             <p className="text-lg font-semibold text-white">Next step</p>
             <div className="mt-5 flex gap-4">
               <div className="grid size-11 shrink-0 place-items-center rounded-lg border border-[#d7a96d]/32 text-[#e9be86]">
@@ -877,7 +850,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             </Link>
           </div>
 
-          <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5">
+          <div className="p-5">
             <p className="text-lg font-semibold text-white">Workspace</p>
             <div className="mt-5 grid grid-cols-3 gap-3 text-center">
               {[
