@@ -455,8 +455,8 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
       userInitials={getInitials(userName)}
       userName={userName}
     >
-      <div className="grid min-h-full gap-5 xl:grid-cols-[360px_minmax(520px,1fr)_340px] 2xl:grid-cols-[410px_minmax(680px,1fr)_380px]">
-        <section className="min-h-[560px] overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313]">
+      <div className="grid min-h-full gap-5 xl:h-full xl:min-h-0 xl:overflow-hidden xl:grid-cols-[360px_minmax(520px,1fr)_340px] 2xl:grid-cols-[410px_minmax(680px,1fr)_380px]">
+        <section className="flex min-h-[560px] flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313] xl:h-full xl:min-h-0">
           <div className="border-b border-white/[0.08] p-5">
             <div>
               <h2 className="text-xl font-semibold tracking-[-0.04em] text-white">
@@ -541,7 +541,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             </div>
           </div>
 
-          <div className="max-h-[720px] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {conversations.length === 0 ? (
               <div className="p-6 text-sm leading-6 text-white/48">
                 No customer conversations yet.
@@ -611,7 +611,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           </div>
         </section>
 
-        <section className="flex min-h-[620px] flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313]">
+        <section className="flex min-h-[620px] flex-col overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313] xl:h-full xl:min-h-0">
           <div className="border-b border-white/[0.09] p-5 md:p-7">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
@@ -667,7 +667,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 md:p-7">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-7">
             {activeTab === "conversation" ? (
               <div className="space-y-5">
                 {selectedMessages.length === 0 ? (
@@ -817,7 +817,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           </div>
         </section>
 
-        <aside className="space-y-4">
+        <aside className="space-y-4 xl:h-full xl:overflow-hidden">
           <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5">
             <p className="text-lg font-semibold text-white">Lead score</p>
             <div className="mt-6 flex items-center gap-5">
