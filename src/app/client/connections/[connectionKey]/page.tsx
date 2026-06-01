@@ -88,7 +88,7 @@ export default async function ConnectionDetailPage({
   if (!tenant) {
     return (
       <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
-        <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-8 text-sm text-white/58">
+        <div className="border-b border-white/[0.09] bg-[#10110f] p-8 text-sm text-white/58">
           Tenant not found.
         </div>
       </CabinetShell>
@@ -136,9 +136,9 @@ export default async function ConnectionDetailPage({
           </div>
         ) : null}
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.74fr)]">
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5 md:p-6">
+        <section className="grid bg-[#10110f] xl:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.74fr)]">
+          <div className="border-b border-white/[0.09] xl:border-b-0 xl:border-r">
+            <div className="border-b border-white/[0.09] p-5 md:p-6">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="rounded-md border border-white/[0.1] bg-white/[0.05] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/58">
                   Setup status
@@ -162,11 +162,11 @@ export default async function ConnectionDetailPage({
               </p>
             </div>
 
-            <div className="space-y-3">
+            <div className="divide-y divide-white/[0.08]">
               {definition.instructions.map((step, index) => (
                 <div
                   key={step}
-                  className="relative rounded-2xl border border-white/[0.08] bg-[#111313] p-5 pl-[4.5rem] md:pl-20"
+                  className="relative p-5 pl-[4.5rem] md:pl-20"
                 >
                   <div className="absolute left-5 top-5 grid size-10 place-items-center rounded-xl border border-[#d7a96d]/34 bg-[#3a2c1e] text-sm font-bold text-[#e9be86]">
                     {index + 1}
@@ -177,7 +177,7 @@ export default async function ConnectionDetailPage({
             </div>
 
             {definition.notes?.length ? (
-              <div className="rounded-2xl border border-[#d7a96d]/22 bg-[#2b241d] p-5">
+              <div className="border-t border-[#d7a96d]/22 bg-[#2b241d] p-5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#e9be86]">
                   Helpful note
                 </p>
@@ -192,7 +192,7 @@ export default async function ConnectionDetailPage({
             ) : null}
           </div>
 
-          <aside className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5 xl:sticky xl:top-0 xl:self-start md:p-6">
+          <aside className="p-5 xl:sticky xl:top-0 xl:self-start md:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/42">

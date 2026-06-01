@@ -72,65 +72,60 @@ export function AgentsView({
   return (
     <CabinetShell userInitials={userInitials} userName={userName} header={header}>
       {agents.length === 0 ? (
-              <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-8 text-base text-white/56">
-                Your team is still preparing the first agent for this account.
+        <div className="border-b border-white/[0.09] bg-[#10110f] p-8 text-base text-white/56">
+          Your team is still preparing the first agent for this account.
+        </div>
+      ) : (
+        <section className="divide-y divide-white/[0.08] bg-[#10110f]">
+          {agents.map((agent) => (
+            <div
+              key={agent.id}
+              className="grid gap-5 p-5 transition hover:bg-white/[0.025] md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center md:p-6"
+            >
+              <div className="flex size-12 items-center justify-center rounded-xl border border-[#d7a96d]/28 bg-[#20201d] text-[#e9be86]">
+                <Bot className="size-5" />
               </div>
-            ) : (
-              <section className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-5">
-                {agents.map((agent) => (
-                  <div
-                    key={agent.id}
-                    className="flex flex-col rounded-2xl border border-white/[0.09] bg-[#111313] p-6 transition hover:-translate-y-0.5 hover:border-[#d7a96d]/35 hover:shadow-[0_0_36px_rgba(215,169,109,0.12)]"
-                  >
-                    <div className="mb-6 flex items-start justify-between">
-                      <div className="flex size-12 items-center justify-center rounded-2xl border border-[#d7a96d]/28 bg-[#20201d] text-[#e9be86]">
-                        <Bot className="size-5" />
-                      </div>
-                      <AgentStatusPill status={agent.status} />
-                    </div>
 
-                    <h2 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
-                      {agent.name}
-                    </h2>
-                    <div className="mt-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#e9be86]">
-                      <span>{agent.channel.type}</span>
-                    </div>
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/56">
-                      {agent.persona}
-                    </p>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="truncate text-xl font-semibold tracking-[-0.04em] text-white">
+                    {agent.name}
+                  </h2>
+                  <AgentStatusPill status={agent.status} />
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#e9be86]">
+                    {agent.channel.type}
+                  </span>
+                </div>
+                <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-6 text-white/56">
+                  {agent.persona}
+                </p>
+                <p className="mt-3 text-xs text-white/42">
+                  Last activity:{" "}
+                  {agent.conversations[0]
+                    ? agent.conversations[0].updatedAt.toLocaleString()
+                    : "No dialog activity yet"}
+                </p>
+              </div>
 
-                    <div className="mt-5 border-t border-white/[0.08] pt-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/42">
-                          Last Activity
-                        </span>
-                        <span className="text-xs font-medium text-white/78">
-                          {agent.conversations[0]
-                            ? agent.conversations[0].updatedAt.toLocaleString()
-                            : "No dialog activity yet"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-auto flex flex-wrap items-center gap-3 pt-5">
-                      <Link
-                        href={`/client/dialogs?agent=${agent.id}`}
-                        className="inline-flex items-center gap-2 rounded-lg border border-[#d7a96d]/38 bg-[linear-gradient(135deg,#3c342c,#2a241f)] px-4 py-2.5 text-sm font-medium text-[#e9be86] transition hover:border-[#d7a96d]/60"
-                      >
-                        View dialogs
-                        <ArrowUpRight className="size-4" />
-                      </Link>
-                      {agent.status === "ACTIVE" ? (
-                        <AgentTestChatDrawer
-                          agentId={agent.id}
-                          agentName={agent.name}
-                          tenantId={tenantId}
-                          audience="client"
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
+              <div className="flex flex-wrap items-center gap-3 md:justify-end">
+                <Link
+                  href={`/client/dialogs?agent=${agent.id}`}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#d7a96d]/38 bg-[#3a3028] px-4 py-2.5 text-sm font-medium text-[#e9be86] transition hover:border-[#d7a96d]/60"
+                >
+                  View dialogs
+                  <ArrowUpRight className="size-4" />
+                </Link>
+                {agent.status === "ACTIVE" ? (
+                  <AgentTestChatDrawer
+                    agentId={agent.id}
+                    agentName={agent.name}
+                    tenantId={tenantId}
+                    audience="client"
+                  />
+                ) : null}
+              </div>
+            </div>
+          ))}
         </section>
       )}
     </CabinetShell>

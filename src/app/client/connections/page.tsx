@@ -63,7 +63,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
   if (!tenant) {
     return (
       <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
-        <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-8 text-sm text-white/58">
+        <div className="border-b border-white/[0.09] bg-[#10110f] p-8 text-sm text-white/58">
           Tenant not found.
         </div>
       </CabinetShell>
@@ -101,7 +101,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
           </div>
         ) : null}
 
-        <section className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <section className="grid grid-cols-1 overflow-hidden border-b border-white/[0.09] bg-[#10110f] sm:grid-cols-3">
           {[
             {
               icon: Radio,
@@ -122,7 +122,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
               sub: "Calendar, Sheets, Drive",
             },
           ].map(({ icon: Icon, label, value, sub }) => (
-            <div key={label} className="rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
+            <div key={label} className="border-b border-white/[0.08] p-6 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
               <div className="flex items-center justify-between gap-4">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/42">
                   {label}
@@ -139,8 +139,8 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
           ))}
         </section>
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          <section className="rounded-2xl border border-white/[0.09] bg-[#111313]">
+        <div className="grid grid-cols-1 bg-[#10110f] lg:grid-cols-2">
+          <section className="border-b border-white/[0.09] lg:border-b-0 lg:border-r">
             <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] px-5 py-5 md:px-6">
               <div>
                 <h2 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
@@ -153,7 +153,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
               </span>
             </div>
 
-            <div className="space-y-4 p-4 md:p-5">
+            <div className="divide-y divide-white/[0.08]">
               {channelDefinitions.map((definition) => {
                 const connection = tenant.channelConnections.find(
                   (item) => item.type === definition.type,
@@ -163,7 +163,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
                 return (
                   <div
                     key={definition.key}
-                    className="rounded-xl border border-white/[0.08] bg-black/16 p-5 transition hover:border-white/[0.14] hover:bg-white/[0.035]"
+                    className="p-5 transition hover:bg-white/[0.035]"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white">
@@ -204,7 +204,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/[0.09] bg-[#111313]">
+          <section>
             <div className="flex items-center justify-between gap-4 border-b border-white/[0.08] px-5 py-5 md:px-6">
               <div>
                 <h2 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
@@ -217,7 +217,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
               </span>
             </div>
 
-            <div className="space-y-4 p-4 md:p-5">
+            <div className="divide-y divide-white/[0.08]">
               {integrationDefinitions.map((definition) => {
                 const connection = tenant.integrationConnections.find(
                   (item) => item.type === definition.type,
@@ -229,7 +229,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
                 return (
                   <div
                     key={definition.key}
-                    className="rounded-xl border border-white/[0.08] bg-black/16 p-5 transition hover:border-white/[0.14] hover:bg-white/[0.035]"
+                    className="p-5 transition hover:bg-white/[0.035]"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-white">

@@ -60,10 +60,12 @@ export function OverviewView({
 
   return (
     <CabinetShell userInitials={userInitials} userName={userName} header={header}>
-      {/* KPI row */}
-      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 overflow-hidden border-b border-white/[0.09] bg-[#10110f] sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map(({ icon: Icon, label, value, sub }) => (
-          <div key={label} className="rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
+          <div
+            key={label}
+            className="border-b border-white/[0.08] p-6 last:border-b-0 sm:odd:border-r xl:border-b-0 xl:border-r xl:last:border-r-0"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/42">
                 {label}
@@ -80,9 +82,8 @@ export function OverviewView({
         ))}
       </section>
 
-      {/* Per-agent breakdown + top functions */}
-      <section className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
-        <div className="overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313]">
+      <section className="grid grid-cols-1 overflow-hidden bg-[#10110f] xl:grid-cols-[1fr_340px]">
+        <div className="overflow-hidden border-b border-white/[0.09] xl:border-b-0 xl:border-r">
           <div className="border-b border-white/[0.08] px-6 py-4">
             <h2 className="font-serif text-lg font-normal tracking-[-0.03em] text-white">Per agent</h2>
           </div>
@@ -145,7 +146,7 @@ export function OverviewView({
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
+        <div className="p-6">
           <h2 className="font-serif text-lg font-normal tracking-[-0.03em] text-white">
             Top functions
           </h2>

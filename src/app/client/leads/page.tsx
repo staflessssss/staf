@@ -151,7 +151,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
 
   return (
     <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
-      <section className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <section className="grid grid-cols-1 overflow-hidden border-b border-white/[0.09] bg-[#10110f] sm:grid-cols-3">
         {[
           {
             icon: UsersRound,
@@ -172,7 +172,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
             sub: "from the active lead list",
           },
         ].map(({ icon: Icon, label, value, sub }) => (
-          <div key={label} className="rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
+          <div key={label} className="border-b border-white/[0.08] p-6 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
             <div className="flex items-center justify-between gap-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/42">
                 {label}
@@ -189,8 +189,8 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
         ))}
       </section>
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,0.88fr)_minmax(380px,0.92fr)]">
-        <div className="overflow-hidden rounded-2xl border border-white/[0.09] bg-[#111313]">
+      <section className="grid xl:grid-cols-[minmax(0,0.88fr)_minmax(380px,0.92fr)]">
+        <div className="overflow-hidden border-b border-white/[0.09] bg-[#10110f] xl:border-b-0 xl:border-r">
           <div className="flex flex-col gap-3 border-b border-white/[0.08] px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
             <div>
               <h2 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
@@ -203,9 +203,9 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
             </span>
           </div>
 
-          <div className="space-y-3 p-4 md:p-5">
+          <div className="divide-y divide-white/[0.08]">
             {qualifiedLeadThreads.length === 0 ? (
-              <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-6 text-sm text-white/55">
+              <div className="p-6 text-sm text-white/55">
                 No lead actions recorded yet.
               </div>
             ) : (
@@ -218,10 +218,10 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                     key={thread.id}
                     href={`/client/leads?lead=${thread.id}`}
                     className={[
-                      "grid gap-4 rounded-xl border p-4 transition md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center",
+                      "grid gap-4 p-5 transition md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center",
                       isSelected
-                        ? "border-[#d7a96d]/42 bg-[#27231e] shadow-[0_0_30px_rgba(215,169,109,0.1)]"
-                        : "border-white/[0.08] bg-black/16 hover:border-white/[0.14] hover:bg-white/[0.035]",
+                        ? "bg-[#27231e]"
+                        : "hover:bg-white/[0.035]",
                     ].join(" ")}
                   >
                     <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-[#d7a96d]/28 bg-[#20201d] text-xs font-bold text-[#e9be86]">
@@ -258,7 +258,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
           </div>
         </div>
 
-        <aside className="rounded-2xl border border-white/[0.09] bg-[#111313] p-5 xl:sticky xl:top-0 xl:self-start md:p-6">
+        <aside className="bg-[#10100e] p-5 xl:sticky xl:top-0 xl:self-start md:p-6">
           {selectedLead ? (
             <div className="space-y-6">
               <div className="flex flex-col gap-4 border-b border-white/[0.08] pb-6 sm:flex-row sm:items-start sm:justify-between">
@@ -361,7 +361,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-white/[0.08] bg-black/16 p-8 text-sm text-white/55">
+            <div className="border-y border-white/[0.08] py-8 text-sm text-white/55">
               Select a lead to review collected information.
             </div>
           )}
