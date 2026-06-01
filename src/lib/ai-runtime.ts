@@ -139,6 +139,8 @@ type HandleIncomingEventDeps = {
   sleep: (ms: number) => Promise<void>;
 };
 
+type IncomingEventAgent = Pick<AgentWithConfigData, "id" | "tenantId" | "channelConfig" | "channel">;
+
 type LangGraphToolObservation = {
   toolName: string;
   result: string;
@@ -662,6 +664,13 @@ function getRuntimeType(channelConfig: unknown) {
     : "legacy";
 }
 
+function shouldUseWeddingSalesRuntime(args: {
+  channel: ChannelType;
+  runtimeType: ReturnType<typeof getRuntimeType>;
+}) {
+  return args.channel === ChannelType.GMAIL && args.runtimeType === "langgraph_wedding_sales";
+}
+
 function classifyGmailClientMessage(args: {
   from?: string;
   subject?: string;
@@ -1011,6 +1020,90 @@ async function recordBusinessManualMessageWithDb(
 
     return conversation;
   });
+}
+
+async function runWeddingSalesRuntime(args: {
+  database: typeof db;
+  agent: IncomingEventAgent;
+  incoming: ParsedIncomingMessage;
+  existingConversationStatus?: ConversationStatus;
+}): Promise<InvokeAgentResult> {
+  const conversation = await recordInboundMessageWithDb(args.database, {
+    agentId: args.agent.id,
+    contactId: args.incoming.contactId,
+    channel: args.agent.channel.type,
+    message: args.incoming.message,
+    messageId: args.incoming.messageId,
+    gmailMessageId: args.incoming.gmailMessageId,
+    threadId: args.incoming.threadId,
+    subject: args.incoming.subject,
+    conversationStatus: args.existingConversationStatus ?? ConversationStatus.ACTIVE,
+  });
+
+  await cancelPendingDelayedDeliveriesWithDb({
+    database: args.database,
+    conversationId: conversation.id,
+    kinds: [DelayedDeliveryKind.FOLLOW_UP],
+  });
+  const toolFeatures = await hydrateFunctionBlocksForRuntime(
+    {
+      id: args.agent.id,
+      tenantId: args.agent.tenantId,
+      channelConfig: args.agent.channelConfig,
+    },
+    args.database,
+  );
+  const toolContext = createWeddingSalesToolContextFromFeatures({
+    tenantId: args.agent.tenantId,
+    toolFeatures,
+    defaultEmail: args.incoming.contactEmail ?? args.incoming.contactId,
+  });
+
+  const graphResult = await invokeWeddingSalesGraph({
+    tenantId: args.agent.tenantId,
+    agentId: args.agent.id,
+    contactId: args.incoming.contactId,
+    channel: "gmail",
+    message: args.incoming.message,
+    config: buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig),
+    toolContext,
+    checkpoint: args.database === db,
+  });
+  const message = graphResult.responseDraft ?? "";
+
+  if (!message) {
+    return {
+      message: "",
+      promptPreview: "langgraph_wedding_sales",
+      usedTooling: [],
+      conversationId: conversation.id,
+      model: "langgraph_wedding_sales",
+      suppressReply: true,
+    };
+  }
+
+  await recordLangGraphToolObservationsWithDb({
+    database: args.database,
+    conversationId: conversation.id,
+    observations: graphResult.turnToolObservations,
+  });
+
+  await args.database.message.create({
+    data: {
+      conversationId: conversation.id,
+      role: MessageRole.ASSISTANT,
+      content: message,
+      model: "langgraph_wedding_sales",
+    },
+  });
+
+  return {
+    message,
+    promptPreview: "langgraph_wedding_sales",
+    usedTooling: graphResult.toolObservations.map((observation) => observation.toolName),
+    conversationId: conversation.id,
+    model: "langgraph_wedding_sales",
+  };
 }
 
 async function recordInboundMessage(args: {
@@ -1810,85 +1903,13 @@ async function handleIncomingEventWithDeps(
 
   const runtimeType = getRuntimeType(agent.channelConfig);
   const result =
-    args.channel === ChannelType.GMAIL && runtimeType === "langgraph_wedding_sales"
-      ? await (async (): Promise<InvokeAgentResult> => {
-          const conversation = await recordInboundMessageWithDb(deps.db, {
-            agentId: agent.id,
-            contactId: incoming.contactId,
-            channel: agent.channel.type,
-            message: incoming.message,
-            messageId: incoming.messageId,
-            gmailMessageId: incoming.gmailMessageId,
-            threadId: incoming.threadId,
-            subject: incoming.subject,
-            conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
-          });
-
-          await cancelPendingDelayedDeliveriesWithDb({
-            database: deps.db,
-            conversationId: conversation.id,
-            kinds: [DelayedDeliveryKind.FOLLOW_UP],
-          });
-          const toolFeatures = await hydrateFunctionBlocksForRuntime(
-            {
-              id: agent.id,
-              tenantId: agent.tenantId,
-              channelConfig: agent.channelConfig,
-            },
-            deps.db,
-          );
-          const toolContext = createWeddingSalesToolContextFromFeatures({
-            tenantId: agent.tenantId,
-            toolFeatures,
-            defaultEmail: incoming.contactEmail ?? incoming.contactId,
-          });
-
-          const graphResult = await invokeWeddingSalesGraph({
-            tenantId: agent.tenantId,
-            agentId: agent.id,
-            contactId: incoming.contactId,
-            channel: "gmail",
-            message: incoming.message,
-            config: buildWeddingSalesConfigFromChannelConfig(agent.channelConfig),
-            toolContext,
-            checkpoint: deps.db === db,
-          });
-          const message = graphResult.responseDraft ?? "";
-
-          if (!message) {
-            return {
-              message: "",
-              promptPreview: "langgraph_wedding_sales",
-              usedTooling: [],
-              conversationId: conversation.id,
-              model: "langgraph_wedding_sales",
-              suppressReply: true,
-            };
-          }
-
-          await recordLangGraphToolObservationsWithDb({
-            database: deps.db,
-            conversationId: conversation.id,
-            observations: graphResult.turnToolObservations,
-          });
-
-          await deps.db.message.create({
-            data: {
-              conversationId: conversation.id,
-              role: MessageRole.ASSISTANT,
-              content: message,
-              model: "langgraph_wedding_sales",
-            },
-          });
-
-          return {
-            message,
-            promptPreview: "langgraph_wedding_sales",
-            usedTooling: graphResult.toolObservations.map((observation) => observation.toolName),
-            conversationId: conversation.id,
-            model: "langgraph_wedding_sales",
-          };
-        })()
+    shouldUseWeddingSalesRuntime({ channel: args.channel, runtimeType })
+      ? await runWeddingSalesRuntime({
+          database: deps.db,
+          agent,
+          incoming,
+          existingConversationStatus: existingConversation?.status,
+        })
       : await deps.invokeAgent({
           tenantId: agent.tenantId,
           agentId: agent.id,
