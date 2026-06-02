@@ -839,6 +839,16 @@ export default function HomePage() {
                 <Link href="/login" className="transition hover:text-white/70">
                   App
                 </Link>
+                <span className="h-4 w-px bg-white/[0.12]" />
+                <Link href="/privacy" className="transition hover:text-white/70">
+                  Privacy
+                </Link>
+                <Link href="/terms" className="transition hover:text-white/70">
+                  Terms
+                </Link>
+                <Link href="/data-deletion" className="transition hover:text-white/70">
+                  Data deletion
+                </Link>
               </div>
             </div>
           </div>
