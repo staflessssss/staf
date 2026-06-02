@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 import {
   AgentStatus,
@@ -10,6 +10,23 @@ import {
 
 import type { AgentWithConfigData } from "@/lib/agent-config";
 import { assessAgentReadiness } from "@/lib/deploy";
+
+const originalAppBaseUrl = process.env.APP_BASE_URL;
+const originalNextAuthUrl = process.env.NEXTAUTH_URL;
+
+afterEach(() => {
+  if (originalAppBaseUrl === undefined) {
+    delete process.env.APP_BASE_URL;
+  } else {
+    process.env.APP_BASE_URL = originalAppBaseUrl;
+  }
+
+  if (originalNextAuthUrl === undefined) {
+    delete process.env.NEXTAUTH_URL;
+  } else {
+    process.env.NEXTAUTH_URL = originalNextAuthUrl;
+  }
+});
 
 function createAgentFixture(): AgentWithConfigData {
   return {
@@ -149,6 +166,7 @@ test("assessAgentReadiness allows deploys without tools for reply-only agents", 
 
 test("getDeployStatus keeps Instagram webhook paths free of embedded secrets", async () => {
   const { getDeployStatus } = await import("@/lib/deploy");
+  process.env.APP_BASE_URL = "https://app.stafless.test";
   const fixture = createAgentFixture();
   fixture.channel.type = ChannelType.INSTAGRAM;
   fixture.webhookSecret = "preview-secret";
@@ -160,6 +178,12 @@ test("getDeployStatus keeps Instagram webhook paths free of embedded secrets", a
       : {};
 
   assert.equal(channelConfig.webhookPath, "/api/webhooks/instagram?agentId=agent-1");
+  assert.equal(
+    channelConfig.webhookUrl,
+    "https://app.stafless.test/api/webhooks/instagram?agentId=agent-1",
+  );
+  assert.equal(channelConfig.webhookRegistration, "ready_to_register");
+  assert.equal(channelConfig.outboundMode, "meta_graph_api");
 });
 
 test("getDeployStatus keeps Gmail webhook paths authenticated for the relay boundary", async () => {

@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 
 import { requireClientSession } from "@/lib/client-auth";
+import { getInstagramCredentialsValidationError } from "@/lib/channels/instagram";
 import { upsertChannelConnection, upsertIntegrationConnection } from "@/lib/connection-store";
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
@@ -70,6 +71,14 @@ export async function saveChannelConnectionAction(formData: FormData) {
 
   if (metadata === null) {
     redirect("/client/connections?error=channel-metadata");
+  }
+
+  if (parsed.data.type === ChannelType.INSTAGRAM && parsed.data.status === ConnectionStatus.CONNECTED) {
+    const credentialsError = getInstagramCredentialsValidationError(parsed.data.credentials);
+
+    if (credentialsError) {
+      redirect("/client/connections?error=instagram-credentials");
+    }
   }
 
   await upsertChannelConnection({
@@ -133,6 +142,10 @@ export async function connectPresetChannelAction(formData: FormData) {
   }
 
   const type = parsed.data.type;
+
+  if (type === ChannelType.INSTAGRAM) {
+    redirect(`${redirectTo}?error=instagram-operator-managed`);
+  }
 
   await upsertChannelConnection({
     tenantId,

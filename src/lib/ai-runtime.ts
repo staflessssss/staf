@@ -862,6 +862,17 @@ function rewriteIncompleteWeddingDateReply(args: {
   ].join("\n\n");
 }
 
+function extractDelayedFollowUpGuidance(message: string) {
+  const marker = "Follow-up guidance:";
+  const markerIndex = message.indexOf(marker);
+
+  if (!message.startsWith("Internal delayed follow-up task.") || markerIndex === -1) {
+    return "";
+  }
+
+  return message.slice(markerIndex + marker.length).trim();
+}
+
 function buildHistoryAppend(args: {
   toolExecutions: Array<{
     toolName: string;
@@ -1035,24 +1046,55 @@ async function runWeddingSalesRuntime(args: {
   incoming: ParsedIncomingMessage;
   channel: ChannelType;
   existingConversationStatus?: ConversationStatus;
+  skipInboundPersistence?: boolean;
+  conversationId?: string;
 }): Promise<InvokeAgentResult> {
-  const conversation = await recordInboundMessageWithDb(args.database, {
-    agentId: args.agent.id,
-    contactId: args.incoming.contactId,
-    channel: args.agent.channel.type,
-    message: args.incoming.message,
-    messageId: args.incoming.messageId,
-    gmailMessageId: args.incoming.gmailMessageId,
-    threadId: args.incoming.threadId,
-    subject: args.incoming.subject,
-    conversationStatus: args.existingConversationStatus ?? ConversationStatus.ACTIVE,
-  });
+  const conversation =
+    args.skipInboundPersistence && args.conversationId
+      ? { id: args.conversationId }
+      : await recordInboundMessageWithDb(args.database, {
+          agentId: args.agent.id,
+          contactId: args.incoming.contactId,
+          channel: args.agent.channel.type,
+          message: args.incoming.message,
+          messageId: args.incoming.messageId,
+          gmailMessageId: args.incoming.gmailMessageId,
+          threadId: args.incoming.threadId,
+          subject: args.incoming.subject,
+          conversationStatus: args.existingConversationStatus ?? ConversationStatus.ACTIVE,
+        });
 
-  await cancelPendingDelayedDeliveriesWithDb({
-    database: args.database,
-    conversationId: conversation.id,
-    kinds: [DelayedDeliveryKind.FOLLOW_UP],
-  });
+  if (!args.skipInboundPersistence) {
+    await cancelPendingDelayedDeliveriesWithDb({
+      database: args.database,
+      conversationId: conversation.id,
+      kinds: [DelayedDeliveryKind.FOLLOW_UP],
+    });
+  }
+
+  const delayedFollowUpGuidance = args.skipInboundPersistence
+    ? extractDelayedFollowUpGuidance(args.incoming.message)
+    : "";
+
+  if (delayedFollowUpGuidance) {
+    await args.database.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: MessageRole.ASSISTANT,
+        content: delayedFollowUpGuidance,
+        model: "langgraph_wedding_sales_follow_up",
+      },
+    });
+
+    return {
+      message: delayedFollowUpGuidance,
+      promptPreview: "langgraph_wedding_sales_follow_up",
+      usedTooling: [],
+      conversationId: conversation.id,
+      model: "langgraph_wedding_sales_follow_up",
+    };
+  }
+
   const toolFeatures = await hydrateFunctionBlocksForRuntime(
     {
       id: args.agent.id,
@@ -1373,6 +1415,29 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
   }
 
   const runtimeBlocks = await mapAgentToRuntimeBlocks(agent);
+  const runtimeType = getRuntimeType(agent.channelConfig);
+  if (
+    !input.testMode &&
+    shouldUseWeddingSalesRuntime({ channel: agent.channel.type, runtimeType })
+  ) {
+    return runWeddingSalesRuntime({
+      database: db,
+      agent,
+      incoming: {
+        contactId: input.contactId,
+        contactEmail: input.contactEmail,
+        message: input.message,
+        messageId: input.messageId,
+        gmailMessageId: input.gmailMessageId,
+        threadId: input.threadId,
+        subject: input.subject,
+      },
+      channel: agent.channel.type,
+      skipInboundPersistence: input.skipInboundPersistence,
+      conversationId: input.conversationId,
+    });
+  }
+
   if (input.testMode) {
     const historyMessages = applyControlToHistory({
       historyMessages: input.historyMessages ?? [],
@@ -1553,6 +1618,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
 export const aiRuntimeTestHelpers = {
   sanitizeAllowedEmojis,
   softenFalseBookingConfirmation,
+  extractDelayedFollowUpGuidance,
   finalizeAssistantText,
   getInboundConversationPolicy,
   handleIncomingEventWithDeps,

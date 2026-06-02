@@ -23,3 +23,20 @@ test("admin connections route requires an admin session for read and write acces
     2,
   );
 });
+
+test("admin connections route validates connected Instagram credentials", () => {
+  const source = readFileSync(routePath, "utf8");
+
+  assert.match(source, /getInstagramCredentialsValidationError/);
+  assert.match(source, /parsed\.data\.type === ChannelType\.INSTAGRAM/);
+  assert.match(source, /parsed\.data\.status === "CONNECTED"/);
+});
+
+test("admin connections route validates connection type enums before Prisma writes", () => {
+  const source = readFileSync(routePath, "utf8");
+
+  assert.match(source, /z\.discriminatedUnion\("scope"/);
+  assert.match(source, /z\.nativeEnum\(ChannelType\)/);
+  assert.match(source, /z\.nativeEnum\(IntegrationType\)/);
+  assert.doesNotMatch(source, /as never/);
+});

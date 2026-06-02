@@ -111,6 +111,7 @@ export default async function ConnectionDetailPage({
 
   const isTelegram = definition.kind === "channel" && definition.type === ChannelType.TELEGRAM;
   const isGmail = definition.kind === "channel" && definition.type === ChannelType.GMAIL;
+  const isInstagram = definition.kind === "channel" && definition.type === ChannelType.INSTAGRAM;
   const isGoogleWorkspace =
     definition.kind === "integration" && definition.key === "google-workspace";
 
@@ -201,6 +202,8 @@ export default async function ConnectionDetailPage({
                 <h3 className="mt-2 font-serif text-2xl font-normal tracking-[-0.04em] text-white">
                   {isTelegram
                     ? "Enter your bot token"
+                    : isInstagram
+                      ? "Connect Meta account"
                     : isGoogleWorkspace
                       ? "Google Workspace access"
                       : `${definition.title} connection`}
@@ -208,6 +211,8 @@ export default async function ConnectionDetailPage({
                 <p className="mt-3 text-sm leading-6 text-white/56">
                   {isTelegram
                     ? "Paste the Telegram bot token from BotFather. It will be stored for this workspace only."
+                    : isInstagram
+                      ? "Sign in with Facebook/Meta and approve access to the Page connected to this Instagram account."
                     : isGoogleWorkspace
                       ? "Google Workspace is powered by the same Google account used for Gmail."
                       : "Confirm the connection here once you are ready."}
@@ -307,6 +312,32 @@ export default async function ConnectionDetailPage({
                     Connect Gmail first
                   </Link>
                 )}
+              </div>
+            ) : isInstagram ? (
+              <div className="mt-6 space-y-4">
+                <div className="rounded-xl border border-white/[0.08] bg-black/16 p-4 text-sm leading-6 text-white/56">
+                  Use the Facebook account that manages the Page connected to this Instagram
+                  Professional account.
+                </div>
+                <Link
+                  href={`/api/instagram/connect?redirectTo=${encodeURIComponent("/client/connections/instagram")}`}
+                  className={primaryButtonClassName()}
+                >
+                  {isConnected ? "Reconnect Instagram" : "Connect Instagram"}
+                </Link>
+                {connection ? (
+                  <form action={revokeChannelConnectionAction}>
+                    <input type="hidden" name="type" value={definition.type} />
+                    <input
+                      type="hidden"
+                      name="redirectTo"
+                      value={`/client/connections/${definition.key}`}
+                    />
+                    <button className={secondaryButtonClassName()} type="submit">
+                      Disconnect Instagram
+                    </button>
+                  </form>
+                ) : null}
               </div>
             ) : connection ? (
               <div className="mt-6 space-y-4">

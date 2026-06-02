@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { ChannelType, IntegrationType } from "@prisma/client";
 import { z } from "zod";
 
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
+import { getInstagramCredentialsValidationError } from "@/lib/channels/instagram";
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 
@@ -10,13 +12,22 @@ type ConnectionsRouteContext = {
   params: Promise<{ tenantId: string }>;
 };
 
-const createConnectionSchema = z.object({
-  scope: z.enum(["channel", "integration"]),
-  type: z.string().min(1),
+const connectionBaseSchema = z.object({
   status: z.enum(["PENDING", "CONNECTED", "ERROR", "REVOKED"]),
   credentials: z.string().min(2),
   metadata: z.unknown().optional(),
 });
+
+const createConnectionSchema = z.discriminatedUnion("scope", [
+  connectionBaseSchema.extend({
+    scope: z.literal("channel"),
+    type: z.nativeEnum(ChannelType),
+  }),
+  connectionBaseSchema.extend({
+    scope: z.literal("integration"),
+    type: z.nativeEnum(IntegrationType),
+  }),
+]);
 
 export async function GET(_: Request, context: ConnectionsRouteContext) {
   const session = await requireAdminApiSession();
@@ -71,11 +82,22 @@ export async function POST(request: Request, context: ConnectionsRouteContext) {
     | undefined;
 
   if (parsed.data.scope === "channel") {
+    if (parsed.data.type === ChannelType.INSTAGRAM && parsed.data.status === "CONNECTED") {
+      const credentialsError = getInstagramCredentialsValidationError(parsed.data.credentials);
+
+      if (credentialsError) {
+        return NextResponse.json(
+          { error: credentialsError },
+          { status: 400 },
+        );
+      }
+    }
+
     const item = await db.channelConnection.upsert({
       where: {
         tenantId_type: {
           tenantId,
-          type: parsed.data.type as never,
+          type: parsed.data.type,
         },
       },
       update: {
@@ -85,7 +107,7 @@ export async function POST(request: Request, context: ConnectionsRouteContext) {
       },
       create: {
         tenantId,
-        type: parsed.data.type as never,
+        type: parsed.data.type,
         status: parsed.data.status,
         credentialsEnc: encrypt(parsed.data.credentials),
         metadata,
@@ -99,7 +121,7 @@ export async function POST(request: Request, context: ConnectionsRouteContext) {
     where: {
       tenantId_type: {
         tenantId,
-        type: parsed.data.type as never,
+        type: parsed.data.type,
       },
     },
     update: {
@@ -109,7 +131,7 @@ export async function POST(request: Request, context: ConnectionsRouteContext) {
     },
     create: {
       tenantId,
-      type: parsed.data.type as never,
+      type: parsed.data.type,
       status: parsed.data.status,
       credentialsEnc: encrypt(parsed.data.credentials),
       metadata,

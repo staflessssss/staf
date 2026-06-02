@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { NextRequest } from "next/server";
 
 import { GET, POST } from "@/app/api/webhooks/instagram/route";
@@ -57,4 +58,14 @@ test("instagram POST rejects unsigned production requests", async () => {
   } finally {
     restore();
   }
+});
+
+test("instagram webhook signature can use the shared Meta app secret", () => {
+  const source = readFileSync(
+    "src/app/api/webhooks/instagram/route.ts",
+    "utf8",
+  );
+
+  assert.match(source, /INSTAGRAM_APP_SECRET/);
+  assert.match(source, /META_APP_SECRET/);
 });

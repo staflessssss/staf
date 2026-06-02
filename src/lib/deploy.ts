@@ -106,7 +106,11 @@ function buildChannelDeployConfig(
         webhookSecret,
         channelConfig: {
           webhookPath: `/api/webhooks/instagram?agentId=${agent.id}`,
-          outboundMode: "meta_graph_pending",
+          webhookUrl: isPublicHttpsUrl
+            ? `${publicBaseUrl}/api/webhooks/instagram?agentId=${agent.id}`
+            : null,
+          webhookRegistration: isPublicHttpsUrl ? "ready_to_register" : "pending_public_url",
+          outboundMode: "meta_graph_api",
           channelType: agent.channel.type,
         },
       };

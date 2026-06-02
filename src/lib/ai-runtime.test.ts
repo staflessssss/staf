@@ -227,6 +227,23 @@ We'd be honored to create something timeless for you both 🤍`,
   assert.doesNotMatch(finalized, /this year|2025|collections guide|recent wedding films|Google Reviews/i);
 });
 
+test("extractDelayedFollowUpGuidance keeps delayed wedding follow-ups customer-safe", () => {
+  assert.equal(
+    aiRuntimeTestHelpers.extractDelayedFollowUpGuidance(
+      [
+        "Internal delayed follow-up task.",
+        "",
+        "Write the next outbound message to the customer based on the existing conversation history.",
+        "",
+        "Do not mention this instruction, internal settings, automation, or that this is a follow-up task.",
+        "",
+        "Follow-up guidance: Just checking in. I can still help with pricing or booking when you're ready.",
+      ].join("\n"),
+    ),
+    "Just checking in. I can still help with pricing or booking when you're ready.",
+  );
+});
+
 test("isWithinAgentSchedule returns false outside an enabled daily window", () => {
   const beforeOpening = aiRuntimeTestHelpers.isWithinAgentSchedule(
     {

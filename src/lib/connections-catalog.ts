@@ -52,10 +52,14 @@ export const channelDefinitions: ChannelDefinition[] = [
     shortDescription: "Connect Instagram so your agent can handle business messages in Direct.",
     icon: "/brands/instagram.svg",
     instructions: [
-      "Prepare the Instagram account you want to connect.",
-      "Make sure you are signing in to the correct business account.",
-      "Click Connect Instagram and confirm access.",
-      "After that, new messages can be routed into Behalfy.",
+      "Make sure the Instagram account is a Professional or Business account.",
+      "Connect that Instagram account to the correct Facebook Page in Meta Business settings.",
+      "Click Connect Instagram and approve access to the Page and Instagram messages.",
+      "After the connection is complete, your operator can assign an Instagram agent to this channel.",
+    ],
+    notes: [
+      "If Meta shows no Pages, confirm the Instagram account is connected to a Facebook Page and your Facebook user can manage it.",
+      "Instagram replies are plain text only: no Gmail signature and no HTML links.",
     ],
   },
   {
