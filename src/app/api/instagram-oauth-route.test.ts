@@ -28,18 +28,21 @@ test("Instagram OAuth routes mirror authenticated client connection flow", () =>
   assert.match(callbackSource, /error: "instagram-subscription"/);
 });
 
-test("Instagram OAuth library requests messaging and page scopes", () => {
+test("Instagram OAuth library requests Meta-supported Instagram messaging scopes", () => {
   const source = readFileSync(oauthLibPath, "utf8");
 
   for (const scope of [
     "pages_show_list",
-    "pages_manage_metadata",
-    "pages_messaging",
+    "pages_read_engagement",
+    "business_management",
     "instagram_basic",
     "instagram_manage_messages",
   ]) {
     assert.match(source, new RegExp(scope));
   }
+
+  assert.doesNotMatch(source, /pages_manage_metadata/);
+  assert.doesNotMatch(source, /pages_messaging/);
 });
 
 test("Instagram OAuth redirects stay internal to the client app", () => {

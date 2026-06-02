@@ -5,8 +5,7 @@ const DEFAULT_GRAPH_API_VERSION = "v21.0";
 const INSTAGRAM_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
-  "pages_manage_metadata",
-  "pages_messaging",
+  "business_management",
   "instagram_basic",
   "instagram_manage_messages",
 ];
