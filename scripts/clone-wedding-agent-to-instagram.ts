@@ -1,4 +1,4 @@
-import { AgentStatus, ChannelType } from "@prisma/client";
+import { AgentStatus, ChannelType, Prisma } from "@prisma/client";
 
 import { getDefaultChannelBehaviorConfig } from "@/lib/agent-config";
 import { db } from "@/lib/db";
@@ -16,11 +16,16 @@ function asObject(value: unknown) {
     : {};
 }
 
-function buildInstagramChannelConfig(sourceConfig: unknown) {
+function asInputJsonObject(value: unknown): Prisma.InputJsonObject {
+  return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonObject;
+}
+
+function buildInstagramChannelConfig(sourceConfig: unknown): Prisma.InputJsonObject {
   const source = asObject(sourceConfig);
+  const sourceBehavior = asObject(source.channelBehavior);
   const instagramBehavior = getDefaultChannelBehaviorConfig(ChannelType.INSTAGRAM);
 
-  return {
+  return asInputJsonObject({
     ...source,
     runtimeType: "langgraph_wedding_sales",
     channelBehavior: {
@@ -29,21 +34,21 @@ function buildInstagramChannelConfig(sourceConfig: unknown) {
         "Instagram launch: same wedding sales runtime as Gmail, with plain links, no email signature, no attachments, and short split DM replies.",
       messageFormat: "split_into_2_3_messages",
       splitMessageDelaySeconds:
-        typeof asObject(source.channelBehavior).splitMessageDelaySeconds === "number"
-          ? asObject(source.channelBehavior).splitMessageDelaySeconds
+        typeof sourceBehavior.splitMessageDelaySeconds === "number"
+          ? sourceBehavior.splitMessageDelaySeconds
           : instagramBehavior.splitMessageDelaySeconds,
       followUpEnabled:
-        typeof asObject(source.channelBehavior).followUpEnabled === "boolean"
-          ? asObject(source.channelBehavior).followUpEnabled
+        typeof sourceBehavior.followUpEnabled === "boolean"
+          ? sourceBehavior.followUpEnabled
           : instagramBehavior.followUpEnabled,
-      followUpRules: Array.isArray(asObject(source.channelBehavior).followUpRules)
-        ? asObject(source.channelBehavior).followUpRules
+      followUpRules: Array.isArray(sourceBehavior.followUpRules)
+        ? sourceBehavior.followUpRules
         : instagramBehavior.followUpRules,
       useRichFormatting: false,
       allowAttachments: false,
       useSignature: false,
     },
-  };
+  });
 }
 
 async function main() {
