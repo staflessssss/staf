@@ -72,13 +72,12 @@ export async function GET(request: Request) {
 
     const page = pages[0];
     const graphApiVersion = getMetaOAuthConfig().graphApiVersion;
-    const subscriptionResult = await subscribeInstagramPageToWebhooks(page).catch(() => null);
-
-    if (!subscriptionResult) {
-      return NextResponse.redirect(
-        buildRedirect(baseUrl, statePayload.redirectTo, { error: "instagram-subscription" }),
-      );
-    }
+    const subscriptionResult = await subscribeInstagramPageToWebhooks(page)
+      .then(() => ({ ok: true as const, error: null }))
+      .catch((error) => ({
+        ok: false as const,
+        error: error instanceof Error ? error.message : "instagram_subscription_failed",
+      }));
 
     const credentials = JSON.stringify({
       pageAccessToken: page.access_token,
@@ -95,7 +94,9 @@ export async function GET(request: Request) {
       instagramUsername: page.instagram_business_account?.username ?? null,
       graphApiVersion,
       scopes: userToken.token_type ? [] : [],
-      webhookSubscribedAt: new Date().toISOString(),
+      webhookSubscriptionStatus: subscriptionResult.ok ? "subscribed" : "manual_or_dashboard_required",
+      webhookSubscriptionError: subscriptionResult.error,
+      webhookSubscribedAt: subscriptionResult.ok ? new Date().toISOString() : null,
       connectedAt: new Date().toISOString(),
     };
 

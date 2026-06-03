@@ -24,8 +24,10 @@ test("Instagram OAuth routes mirror authenticated client connection flow", () =>
   assert.match(callbackSource, /fetchInstagramPages/);
   assert.match(callbackSource, /upsertChannelConnection/);
   assert.match(callbackSource, /type: ChannelType\.INSTAGRAM/);
-  assert.match(callbackSource, /subscribeInstagramPageToWebhooks\(page\)\.catch\(\(\) => null\)/);
-  assert.match(callbackSource, /error: "instagram-subscription"/);
+  assert.match(callbackSource, /subscribeInstagramPageToWebhooks\(page\)/);
+  assert.match(callbackSource, /webhookSubscriptionStatus/);
+  assert.match(callbackSource, /manual_or_dashboard_required/);
+  assert.doesNotMatch(callbackSource, /error: "instagram-subscription"/);
 });
 
 test("Instagram OAuth library requests Meta-supported Instagram messaging scopes", () => {
