@@ -135,9 +135,12 @@ async function sendInstagramMessage(args: {
   contactId: string;
   text: string;
 }) {
-  const senderId = args.credentials.pageId ?? "me";
+  const senderId = args.credentials.igBusinessAccountId ?? args.credentials.pageId ?? "me";
+  const graphHost = args.credentials.igBusinessAccountId
+    ? "https://graph.instagram.com"
+    : "https://graph.facebook.com";
   const response = await fetch(
-    `https://graph.facebook.com/${args.credentials.graphApiVersion}/${senderId}/messages`,
+    `${graphHost}/${args.credentials.graphApiVersion}/${senderId}/messages`,
     {
       method: "POST",
       headers: {

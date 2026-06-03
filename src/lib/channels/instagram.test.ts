@@ -50,13 +50,14 @@ test("instagram adapter sends plain text through Meta Graph API", async () => {
     credentials: JSON.stringify({
       pageAccessToken: "page-token",
       pageId: "page-1",
+      igBusinessAccountId: "ig-1",
       graphApiVersion: "v22.0",
     }),
     contactId: "ig-user-1",
     message: { text: "Here is the pricing link: https://example.com/pricing", html: "<a>ignored</a>" },
   });
 
-  assert.equal(requestUrl, "https://graph.facebook.com/v22.0/page-1/messages");
+  assert.equal(requestUrl, "https://graph.instagram.com/v22.0/ig-1/messages");
   assert.equal(authorization, "Bearer page-token");
   assert.deepEqual(requestBody, {
     recipient: {
@@ -68,6 +69,31 @@ test("instagram adapter sends plain text through Meta Graph API", async () => {
     },
   });
   assert.deepEqual(result, { recipient_id: "ig-user-1", message_id: "mid-1" });
+});
+
+test("instagram adapter falls back to Facebook Graph Page messages without an IG account id", async () => {
+  let requestUrl = "";
+
+  global.fetch = (async (input: RequestInfo | URL) => {
+    requestUrl = String(input);
+
+    return {
+      ok: true,
+      json: async () => ({ recipient_id: "ig-user-1", message_id: "mid-1" }),
+    } as Response;
+  }) as typeof fetch;
+
+  await instagramAdapter.sendReply({
+    credentials: JSON.stringify({
+      pageAccessToken: "page-token",
+      pageId: "page-1",
+      graphApiVersion: "v22.0",
+    }),
+    contactId: "ig-user-1",
+    message: "Hello",
+  });
+
+  assert.equal(requestUrl, "https://graph.facebook.com/v22.0/page-1/messages");
 });
 
 test("instagram adapter returns partial-delivery metadata if a later split chunk fails", async () => {
