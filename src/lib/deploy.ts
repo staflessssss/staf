@@ -86,6 +86,10 @@ function buildChannelDeployConfig(
   const isPublicHttpsUrl =
     publicBaseUrl.startsWith("https://") && !publicBaseUrl.includes("localhost");
   const gmailPubSubSecret = process.env.GMAIL_PUBSUB_WEBHOOK_SECRET?.trim() || "";
+  const instagramWebhookVerifyToken =
+    process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN?.trim() ||
+    process.env.META_WEBHOOK_VERIFY_TOKEN?.trim() ||
+    "";
 
   switch (agent.channel.type) {
     case ChannelType.TELEGRAM:
@@ -101,19 +105,26 @@ function buildChannelDeployConfig(
           channelType: agent.channel.type,
         },
       };
-    case ChannelType.INSTAGRAM:
+    case ChannelType.INSTAGRAM: {
+      const instagramWebhookRegistration = !isPublicHttpsUrl
+        ? "pending_public_url"
+        : instagramWebhookVerifyToken
+          ? "ready_to_register"
+          : "pending_verify_token";
+
       return {
         webhookSecret,
         channelConfig: {
-          webhookPath: `/api/webhooks/instagram?agentId=${agent.id}`,
+          webhookPath: "/api/webhooks/instagram",
           webhookUrl: isPublicHttpsUrl
-            ? `${publicBaseUrl}/api/webhooks/instagram?agentId=${agent.id}`
+            ? `${publicBaseUrl}/api/webhooks/instagram`
             : null,
-          webhookRegistration: isPublicHttpsUrl ? "ready_to_register" : "pending_public_url",
+          webhookRegistration: instagramWebhookRegistration,
           outboundMode: "meta_graph_api",
           channelType: agent.channel.type,
         },
       };
+    }
     case ChannelType.GMAIL:
       return {
         webhookSecret,

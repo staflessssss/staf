@@ -5,9 +5,8 @@ import { auth } from "@/lib/auth";
 import { upsertChannelConnection } from "@/lib/connection-store";
 import {
   exchangeInstagramCode,
-  fetchInstagramPages,
+  fetchInstagramProfile,
   getMetaOAuthConfig,
-  subscribeInstagramPageToWebhooks,
   normalizeInstagramRedirectTo,
   verifyInstagramState,
 } from "@/lib/instagram-oauth";
@@ -55,48 +54,40 @@ export async function GET(request: Request) {
       );
     }
 
-    const userToken = await exchangeInstagramCode(code);
-    const pages = await fetchInstagramPages(userToken.access_token);
-
-    if (pages.length === 0) {
-      return NextResponse.redirect(
-        buildRedirect(baseUrl, statePayload.redirectTo, { error: "instagram-no-page" }),
-      );
-    }
-
-    if (pages.length > 1) {
-      return NextResponse.redirect(
-        buildRedirect(baseUrl, statePayload.redirectTo, { error: "instagram-multiple-pages" }),
-      );
-    }
-
-    const page = pages[0];
+    const token = await exchangeInstagramCode(code);
+    const profile = await fetchInstagramProfile(token.access_token);
     const graphApiVersion = getMetaOAuthConfig().graphApiVersion;
-    const subscriptionResult = await subscribeInstagramPageToWebhooks(page)
-      .then(() => ({ ok: true as const, error: null }))
-      .catch((error) => ({
-        ok: false as const,
-        error: error instanceof Error ? error.message : "instagram_subscription_failed",
-      }));
+    const igUserId = profile.user_id ?? token.user_id ?? profile.id;
+    const igScopedUserId = profile.id !== igUserId ? profile.id : null;
+
+    if (!igUserId) {
+      return NextResponse.redirect(
+        buildRedirect(baseUrl, statePayload.redirectTo, { error: "instagram-no-account" }),
+      );
+    }
 
     const credentials = JSON.stringify({
-      pageAccessToken: page.access_token,
-      pageId: page.id,
-      igBusinessAccountId: page.instagram_business_account?.id,
+      accessToken: token.access_token,
+      instagramUserAccessToken: token.access_token,
+      igUserId,
+      igScopedUserId,
       graphApiVersion,
     });
     const metadata = {
       provider: "meta",
-      source: "instagram_oauth",
-      pageId: page.id,
-      pageName: page.name ?? null,
-      igBusinessAccountId: page.instagram_business_account?.id ?? null,
-      instagramUsername: page.instagram_business_account?.username ?? null,
+      source: "instagram_login",
+      igUserId,
+      igScopedUserId,
+      igBusinessAccountId: null,
+      instagramUsername: profile.username ?? null,
+      instagramName: profile.name ?? null,
+      instagramAccountType: profile.account_type ?? null,
       graphApiVersion,
-      scopes: userToken.token_type ? [] : [],
-      webhookSubscriptionStatus: subscriptionResult.ok ? "subscribed" : "manual_or_dashboard_required",
-      webhookSubscriptionError: subscriptionResult.error,
-      webhookSubscribedAt: subscriptionResult.ok ? new Date().toISOString() : null,
+      scopes: ["instagram_business_basic", "instagram_business_manage_messages"],
+      tokenExpiresIn: token.expires_in ?? null,
+      webhookSubscriptionStatus: "dashboard_required",
+      webhookSubscriptionError: null,
+      webhookSubscribedAt: null,
       connectedAt: new Date().toISOString(),
     };
 

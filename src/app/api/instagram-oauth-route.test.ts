@@ -19,30 +19,34 @@ test("Instagram OAuth routes mirror authenticated client connection flow", () =>
   assert.match(connectSource, /buildInstagramConnectUrl/);
   assert.match(connectSource, /role !== "CLIENT"/);
   assert.match(oauthSource, /\/client\/connections\/instagram/);
+  assert.match(oauthSource, /www\.instagram\.com\/oauth\/authorize/);
   assert.match(callbackSource, /verifyInstagramState/);
   assert.match(callbackSource, /exchangeInstagramCode/);
-  assert.match(callbackSource, /fetchInstagramPages/);
+  assert.match(callbackSource, /fetchInstagramProfile/);
   assert.match(callbackSource, /upsertChannelConnection/);
   assert.match(callbackSource, /type: ChannelType\.INSTAGRAM/);
-  assert.match(callbackSource, /subscribeInstagramPageToWebhooks\(page\)/);
-  assert.match(callbackSource, /webhookSubscriptionStatus/);
-  assert.match(callbackSource, /manual_or_dashboard_required/);
+  assert.match(callbackSource, /source: "instagram_login"/);
+  assert.match(callbackSource, /igUserId/);
+  assert.match(callbackSource, /igScopedUserId/);
+  assert.match(callbackSource, /webhookSubscriptionStatus: "dashboard_required"/);
   assert.doesNotMatch(callbackSource, /error: "instagram-subscription"/);
 });
 
-test("Instagram OAuth library requests Meta-supported Instagram messaging scopes", () => {
+test("Instagram OAuth library requests Instagram Login messaging scopes", () => {
   const source = readFileSync(oauthLibPath, "utf8");
 
   for (const scope of [
-    "pages_show_list",
-    "pages_read_engagement",
-    "business_management",
-    "instagram_basic",
-    "instagram_manage_messages",
+    "instagram_business_basic",
+    "instagram_business_manage_messages",
   ]) {
     assert.match(source, new RegExp(scope));
   }
 
+  assert.doesNotMatch(source, /pages_show_list/);
+  assert.doesNotMatch(source, /pages_read_engagement/);
+  assert.doesNotMatch(source, /business_management/);
+  assert.doesNotMatch(source, /instagram_basic/);
+  assert.doesNotMatch(source, /instagram_manage_messages/);
   assert.doesNotMatch(source, /pages_manage_metadata/);
   assert.doesNotMatch(source, /pages_messaging/);
 });
@@ -74,15 +78,17 @@ test("Instagram OAuth redirect normalization blocks external backslash variants"
   );
 });
 
-test("Instagram webhook supports global OAuth app routing by Page ID", () => {
+test("Instagram webhook supports global OAuth app routing by Instagram recipient ID", () => {
   const source = readFileSync(webhookRoutePath, "utf8");
 
   assert.match(source, /getInstagramWebhookVerifyToken/);
-  assert.match(source, /extractInstagramRecipientPageId/);
-  assert.match(source, /findInstagramAgentByPageId/);
+  assert.match(source, /extractInstagramRecipientId/);
+  assert.match(source, /findInstagramAgentByRecipientId/);
   assert.match(source, /parseInstagramCredentials/);
-  assert.match(source, /credentials\.pageId === pageId/);
-  assert.match(source, /credentials\.igBusinessAccountId === pageId/);
+  assert.match(source, /credentials\.igUserId === recipientId/);
+  assert.match(source, /credentials\.igScopedUserId === recipientId/);
+  assert.match(source, /credentials\.igBusinessAccountId === recipientId/);
+  assert.match(source, /credentials\.pageId === recipientId/);
 });
 
 test("Instagram launch check accepts the shared Meta app secret", () => {

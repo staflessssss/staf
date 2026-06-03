@@ -3,11 +3,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 const DEFAULT_GRAPH_API_VERSION = "v21.0";
 
 const INSTAGRAM_SCOPES = [
-  "pages_show_list",
-  "pages_read_engagement",
-  "business_management",
-  "instagram_basic",
-  "instagram_manage_messages",
+  "instagram_business_basic",
+  "instagram_business_manage_messages",
 ];
 
 type InstagramStatePayload = {
@@ -20,16 +17,15 @@ type MetaTokenResponse = {
   access_token: string;
   token_type?: string;
   expires_in?: number;
+  user_id?: string;
 };
 
-export type MetaPageWithInstagram = {
+export type InstagramProfile = {
   id: string;
+  user_id?: string;
+  username?: string;
   name?: string;
-  access_token: string;
-  instagram_business_account?: {
-    id: string;
-    username?: string;
-  };
+  account_type?: string;
 };
 
 function getStateSecret() {
@@ -81,22 +77,23 @@ export function normalizeInstagramRedirectTo(value: string | null | undefined) {
 }
 
 export function getMetaOAuthConfig() {
-  const clientId =
-    process.env.META_APP_ID?.trim() || process.env.INSTAGRAM_APP_ID?.trim() || "";
+  const clientId = process.env.INSTAGRAM_APP_ID?.trim() || "";
   const clientSecret =
-    process.env.META_APP_SECRET?.trim() || process.env.INSTAGRAM_APP_SECRET?.trim() || "";
+    process.env.INSTAGRAM_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim() || "";
   const publicBaseUrl =
     process.env.APP_BASE_URL?.trim() || process.env.NEXTAUTH_URL?.trim() || "";
   const graphApiVersion =
     process.env.META_GRAPH_API_VERSION?.trim() || DEFAULT_GRAPH_API_VERSION;
+  const configId = process.env.INSTAGRAM_LOGIN_CONFIG_ID?.trim() || "";
 
   if (!clientId || !clientSecret || !publicBaseUrl) {
-    throw new Error("Meta OAuth credentials or app base URL are missing.");
+    throw new Error("Instagram OAuth credentials or app base URL are missing. Set INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, and APP_BASE_URL.");
   }
 
   return {
     clientId,
     clientSecret,
+    configId,
     redirectUri: `${publicBaseUrl}/api/instagram/callback`,
     graphApiVersion,
     scopes: INSTAGRAM_SCOPES,
@@ -115,13 +112,19 @@ export function buildInstagramConnectUrl(args: {
   };
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const state = `${encodedPayload}.${signState(encodedPayload)}`;
-  const url = new URL(`https://www.facebook.com/${config.graphApiVersion}/dialog/oauth`);
+  const url = new URL("https://www.instagram.com/oauth/authorize");
 
   url.searchParams.set("client_id", config.clientId);
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", config.scopes.join(","));
   url.searchParams.set("state", state);
+  url.searchParams.set("enable_fb_login", "0");
+  url.searchParams.set("force_authentication", "1");
+
+  if (config.configId) {
+    url.searchParams.set("config_id", config.configId);
+  }
 
   return url.toString();
 }
@@ -167,63 +170,56 @@ async function getGraphJson<T>(url: URL): Promise<T> {
 
 export async function exchangeInstagramCode(code: string) {
   const config = getMetaOAuthConfig();
-  const url = new URL(`https://graph.facebook.com/${config.graphApiVersion}/oauth/access_token`);
+  const response = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      grant_type: "authorization_code",
+      redirect_uri: config.redirectUri,
+      code,
+    }),
+  });
+  const shortLived = (await response.json().catch(() => null)) as MetaTokenResponse | null;
 
-  url.searchParams.set("client_id", config.clientId);
-  url.searchParams.set("client_secret", config.clientSecret);
-  url.searchParams.set("redirect_uri", config.redirectUri);
-  url.searchParams.set("code", code);
-
-  const shortLived = await getGraphJson<MetaTokenResponse>(url);
-
-  if (!shortLived.access_token) {
-    throw new Error("Meta token exchange failed.");
+  if (!response.ok || !shortLived?.access_token) {
+    throw new Error("Instagram token exchange failed.");
   }
 
-  const longLivedUrl = new URL(`https://graph.facebook.com/${config.graphApiVersion}/oauth/access_token`);
+  const longLivedUrl = new URL("https://graph.instagram.com/access_token");
 
-  longLivedUrl.searchParams.set("grant_type", "fb_exchange_token");
-  longLivedUrl.searchParams.set("client_id", config.clientId);
+  longLivedUrl.searchParams.set("grant_type", "ig_exchange_token");
   longLivedUrl.searchParams.set("client_secret", config.clientSecret);
-  longLivedUrl.searchParams.set("fb_exchange_token", shortLived.access_token);
+  longLivedUrl.searchParams.set("access_token", shortLived.access_token);
 
   const longLived = await getGraphJson<MetaTokenResponse>(longLivedUrl);
 
-  return longLived.access_token ? longLived : shortLived;
+  return {
+    ...shortLived,
+    ...longLived,
+    access_token: longLived.access_token || shortLived.access_token,
+    user_id: shortLived.user_id,
+  };
 }
 
-export async function fetchInstagramPages(userAccessToken: string) {
+export async function fetchInstagramProfile(accessToken: string) {
   const config = getMetaOAuthConfig();
-  const url = new URL(`https://graph.facebook.com/${config.graphApiVersion}/me/accounts`);
+  const url = new URL(`https://graph.instagram.com/${config.graphApiVersion}/me`);
 
   url.searchParams.set(
     "fields",
-    "id,name,access_token,instagram_business_account{id,username}",
+    "id,user_id,username,name,account_type",
   );
-  url.searchParams.set("access_token", userAccessToken);
+  url.searchParams.set("access_token", accessToken);
 
-  const payload = await getGraphJson<{ data?: MetaPageWithInstagram[] }>(url);
-
-  return (payload.data ?? []).filter(
-    (page) => page.access_token && page.instagram_business_account?.id,
-  );
+  return getGraphJson<InstagramProfile>(url);
 }
 
-export async function subscribeInstagramPageToWebhooks(page: MetaPageWithInstagram) {
-  const config = getMetaOAuthConfig();
-  const url = new URL(`https://graph.facebook.com/${config.graphApiVersion}/${page.id}/subscribed_apps`);
-  const response = await fetch(url, {
-    method: "POST",
-    body: new URLSearchParams({
-      subscribed_fields: "messages,messaging_postbacks,messaging_seen",
-      access_token: page.access_token,
-    }),
-  });
-  const payload = await response.json().catch(() => null);
+export async function refreshInstagramLongLivedToken(accessToken: string) {
+  const url = new URL("https://graph.instagram.com/refresh_access_token");
 
-  if (!response.ok) {
-    throw new Error("Meta webhook page subscription failed.");
-  }
+  url.searchParams.set("grant_type", "ig_refresh_token");
+  url.searchParams.set("access_token", accessToken);
 
-  return payload;
+  return getGraphJson<MetaTokenResponse>(url);
 }

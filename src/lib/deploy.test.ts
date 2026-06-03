@@ -13,6 +13,8 @@ import { assessAgentReadiness } from "@/lib/deploy";
 
 const originalAppBaseUrl = process.env.APP_BASE_URL;
 const originalNextAuthUrl = process.env.NEXTAUTH_URL;
+const originalInstagramWebhookVerifyToken = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
+const originalMetaWebhookVerifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN;
 
 afterEach(() => {
   if (originalAppBaseUrl === undefined) {
@@ -25,6 +27,18 @@ afterEach(() => {
     delete process.env.NEXTAUTH_URL;
   } else {
     process.env.NEXTAUTH_URL = originalNextAuthUrl;
+  }
+
+  if (originalInstagramWebhookVerifyToken === undefined) {
+    delete process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
+  } else {
+    process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN = originalInstagramWebhookVerifyToken;
+  }
+
+  if (originalMetaWebhookVerifyToken === undefined) {
+    delete process.env.META_WEBHOOK_VERIFY_TOKEN;
+  } else {
+    process.env.META_WEBHOOK_VERIFY_TOKEN = originalMetaWebhookVerifyToken;
   }
 });
 
@@ -167,6 +181,7 @@ test("assessAgentReadiness allows deploys without tools for reply-only agents", 
 test("getDeployStatus keeps Instagram webhook paths free of embedded secrets", async () => {
   const { getDeployStatus } = await import("@/lib/deploy");
   process.env.APP_BASE_URL = "https://app.stafless.test";
+  process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN = "verify-token";
   const fixture = createAgentFixture();
   fixture.channel.type = ChannelType.INSTAGRAM;
   fixture.webhookSecret = "preview-secret";
@@ -177,13 +192,31 @@ test("getDeployStatus keeps Instagram webhook paths free of embedded secrets", a
       ? (report.channelConfig as Record<string, unknown>)
       : {};
 
-  assert.equal(channelConfig.webhookPath, "/api/webhooks/instagram?agentId=agent-1");
+  assert.equal(channelConfig.webhookPath, "/api/webhooks/instagram");
   assert.equal(
     channelConfig.webhookUrl,
-    "https://app.stafless.test/api/webhooks/instagram?agentId=agent-1",
+    "https://app.stafless.test/api/webhooks/instagram",
   );
   assert.equal(channelConfig.webhookRegistration, "ready_to_register");
   assert.equal(channelConfig.outboundMode, "meta_graph_api");
+});
+
+test("getDeployStatus marks Instagram webhook registration pending without a global verify token", async () => {
+  const { getDeployStatus } = await import("@/lib/deploy");
+  process.env.APP_BASE_URL = "https://app.stafless.test";
+  delete process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
+  delete process.env.META_WEBHOOK_VERIFY_TOKEN;
+  const fixture = createAgentFixture();
+  fixture.channel.type = ChannelType.INSTAGRAM;
+  fixture.webhookSecret = "preview-secret";
+
+  const report = await getDeployStatus(fixture, createDbStub());
+  const channelConfig =
+    report.channelConfig && typeof report.channelConfig === "object" && !Array.isArray(report.channelConfig)
+      ? (report.channelConfig as Record<string, unknown>)
+      : {};
+
+  assert.equal(channelConfig.webhookRegistration, "pending_verify_token");
 });
 
 test("getDeployStatus keeps Gmail webhook paths authenticated for the relay boundary", async () => {

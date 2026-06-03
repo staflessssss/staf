@@ -10,6 +10,7 @@ import {
   ensureBufferedDeliveryExecution,
   scheduleDelayedDeliverySweepBackground,
 } from "@/lib/delayed-delivery-background";
+import { splitInstagramMessagingPayloads } from "@/lib/instagram-webhook";
 
 function hasValidInstagramSignature(rawBody: string, signatureHeader: string | null) {
   const appSecret =
@@ -41,7 +42,7 @@ function getInstagramWebhookVerifyToken() {
   );
 }
 
-function extractInstagramRecipientPageId(payload: unknown) {
+function extractInstagramRecipientId(payload: unknown) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return "";
   }
@@ -71,8 +72,8 @@ function extractInstagramRecipientPageId(payload: unknown) {
   return "";
 }
 
-async function findInstagramAgentByPageId(pageId: string) {
-  if (!pageId) {
+async function findInstagramAgentByRecipientId(recipientId: string) {
+  if (!recipientId) {
     return null;
   }
 
@@ -98,7 +99,10 @@ async function findInstagramAgentByPageId(pageId: string) {
     const credentials = parseInstagramCredentials(decrypt(channel.credentialsEnc));
 
     if (
-      (credentials.pageId === pageId || credentials.igBusinessAccountId === pageId) &&
+      (credentials.igUserId === recipientId ||
+        credentials.igScopedUserId === recipientId ||
+        credentials.igBusinessAccountId === recipientId ||
+        credentials.pageId === recipientId) &&
       channel.agents[0]?.id
     ) {
       return channel.agents[0];
@@ -145,7 +149,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const agentId = req.nextUrl.searchParams.get("agentId");
   const isLocalDev = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
 
   const rawBody = await req.text().catch(() => "");
@@ -175,36 +178,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid Instagram payload." }, { status: 400 });
   }
 
-  const agent = agentId
-    ? await db.agent.findFirst({
-        where: {
-          id: agentId,
-          status: "ACTIVE",
-          channel: {
-            type: "INSTAGRAM",
-          },
-        },
-        select: {
-          id: true,
-          webhookSecret: true,
-        },
-      })
-    : await findInstagramAgentByPageId(extractInstagramRecipientPageId(payload));
-
-  if (!agent) {
-    return NextResponse.json({ error: "Agent not found." }, { status: 404 });
-  }
-
   try {
-    const result = await handleIncomingEvent({
-      agentId: agent.id,
-      channel: "INSTAGRAM",
-      payload,
-    });
-    await ensureBufferedDeliveryExecution(result);
+    const results = [];
+
+    for (const eventPayload of splitInstagramMessagingPayloads(payload)) {
+      const agent = await findInstagramAgentByRecipientId(extractInstagramRecipientId(eventPayload));
+
+      if (!agent) {
+        return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+      }
+
+      const result = await handleIncomingEvent({
+        agentId: agent.id,
+        channel: "INSTAGRAM",
+        payload: eventPayload,
+      });
+
+      await ensureBufferedDeliveryExecution(result);
+      results.push(result);
+    }
+
     scheduleDelayedDeliverySweepBackground();
 
-    return NextResponse.json(result);
+    return NextResponse.json(results.length === 1 ? results[0] : { results });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Instagram webhook failed." },

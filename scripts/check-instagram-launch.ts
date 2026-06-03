@@ -25,6 +25,9 @@ async function main() {
   const agentId = process.env.AGENT_ID?.trim();
   const metaAppSecret =
     process.env.INSTAGRAM_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
+  const instagramWebhookVerifyToken =
+    process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN?.trim() ||
+    process.env.META_WEBHOOK_VERIFY_TOKEN?.trim();
   const checks: Check[] = [];
 
   if (!tenantId) {
@@ -70,6 +73,15 @@ async function main() {
 
   addCheck(
     checks,
+    "Instagram webhook verify token",
+    Boolean(instagramWebhookVerifyToken),
+    instagramWebhookVerifyToken
+      ? "Meta can verify the global Instagram webhook callback."
+      : "Set INSTAGRAM_WEBHOOK_VERIFY_TOKEN or META_WEBHOOK_VERIFY_TOKEN before registering the Instagram webhook.",
+  );
+
+  addCheck(
+    checks,
     "Instagram channel exists",
     Boolean(instagramChannel),
     instagramChannel
@@ -91,7 +103,7 @@ async function main() {
       checks,
       "Instagram credentials shape",
       !credentialsError,
-      credentialsError ?? "pageAccessToken, pageId, and igBusinessAccountId are present.",
+      credentialsError ?? "accessToken and igUserId/pageId are present.",
     );
   }
 
@@ -143,16 +155,24 @@ async function main() {
     addCheck(
       checks,
       "Deploy webhook URL",
-      typeof deployConfig.webhookUrl === "string" && deployConfig.webhookUrl.startsWith("https://"),
+      typeof deployConfig.webhookUrl === "string" &&
+        deployConfig.webhookUrl.startsWith("https://") &&
+        !deployConfig.webhookUrl.includes("agentId="),
       typeof deployConfig.webhookUrl === "string"
         ? `webhookUrl=${deployConfig.webhookUrl}`
-        : "Set APP_BASE_URL or NEXTAUTH_URL to public HTTPS before deploy.",
+        : "Set APP_BASE_URL or NEXTAUTH_URL to public HTTPS before deploy. Instagram webhooks must use the global callback without agentId.",
     );
     addCheck(
       checks,
       "Deploy outbound mode",
       deployConfig.outboundMode === "meta_graph_api",
       `outboundMode=${String(deployConfig.outboundMode ?? "missing")}.`,
+    );
+    addCheck(
+      checks,
+      "Deploy webhook registration readiness",
+      deployConfig.webhookRegistration === "ready_to_register",
+      `webhookRegistration=${String(deployConfig.webhookRegistration ?? "missing")}.`,
     );
   }
 

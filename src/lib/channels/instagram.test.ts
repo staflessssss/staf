@@ -15,15 +15,20 @@ test("parseInstagramCredentials accepts JSON credentials", () => {
   assert.deepEqual(
     parseInstagramCredentials(
       JSON.stringify({
-        pageAccessToken: "page-token",
+        accessToken: "ig-token",
+        instagramUserAccessToken: "ig-token",
+        igUserId: "ig-user",
+        igScopedUserId: "ig-scoped-user",
         pageId: "page-1",
         igBusinessAccountId: "ig-1",
         graphApiVersion: "v22.0",
       }),
     ),
     {
-      pageAccessToken: "page-token",
+      pageAccessToken: "ig-token",
       pageId: "page-1",
+      igUserId: "ig-user",
+      igScopedUserId: "ig-scoped-user",
       igBusinessAccountId: "ig-1",
       graphApiVersion: "v22.0",
     },
@@ -48,8 +53,9 @@ test("instagram adapter sends plain text through Meta Graph API", async () => {
 
   const result = await instagramAdapter.sendReply({
     credentials: JSON.stringify({
-      pageAccessToken: "page-token",
+      instagramUserAccessToken: "ig-token",
       pageId: "page-1",
+      igUserId: "ig-user",
       igBusinessAccountId: "ig-1",
       graphApiVersion: "v22.0",
     }),
@@ -57,8 +63,8 @@ test("instagram adapter sends plain text through Meta Graph API", async () => {
     message: { text: "Here is the pricing link: https://example.com/pricing", html: "<a>ignored</a>" },
   });
 
-  assert.equal(requestUrl, "https://graph.instagram.com/v22.0/ig-1/messages");
-  assert.equal(authorization, "Bearer page-token");
+  assert.equal(requestUrl, "https://graph.instagram.com/v22.0/ig-user/messages");
+  assert.equal(authorization, "Bearer ig-token");
   assert.deepEqual(requestBody, {
     recipient: {
       id: "ig-user-1",
@@ -69,6 +75,35 @@ test("instagram adapter sends plain text through Meta Graph API", async () => {
     },
   });
   assert.deepEqual(result, { recipient_id: "ig-user-1", message_id: "mid-1" });
+});
+
+test("instagram adapter uses Instagram Login igUserId as the sender account", async () => {
+  let requestUrl = "";
+
+  global.fetch = (async (input: RequestInfo | URL) => {
+    requestUrl = String(input);
+
+    return {
+      ok: true,
+      json: async () => ({ recipient_id: "ig-scoped-customer", message_id: "mid-1" }),
+    } as Response;
+  }) as typeof fetch;
+
+  await instagramAdapter.sendReply({
+    credentials: JSON.stringify({
+      instagramUserAccessToken: "ig-token",
+      igUserId: "ig-professional-account",
+      igScopedUserId: "ig-scoped-app-user",
+      graphApiVersion: "v25.0",
+    }),
+    contactId: "ig-scoped-customer",
+    message: "Hello",
+  });
+
+  assert.equal(
+    requestUrl,
+    "https://graph.instagram.com/v25.0/ig-professional-account/messages",
+  );
 });
 
 test("instagram adapter falls back to Facebook Graph Page messages without an IG account id", async () => {

@@ -6,6 +6,8 @@ import {
 type InstagramCredentials = {
   pageAccessToken: string;
   pageId?: string;
+  igUserId?: string;
+  igScopedUserId?: string;
   igBusinessAccountId?: string;
   graphApiVersion: string;
 };
@@ -60,11 +62,25 @@ export function parseInstagramCredentials(credentials: string): InstagramCredent
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
     const graphApiVersion = String(parsed.graphApiVersion ?? parsed.version ?? "v21.0").trim();
+    const accessToken = String(
+      parsed.instagramUserAccessToken ??
+        parsed.pageAccessToken ??
+        parsed.accessToken ??
+        parsed.token ??
+        "",
+    ).trim();
+    const igUserId = String(parsed.igUserId ?? "").trim() || undefined;
+    const igScopedUserId =
+      String(parsed.igScopedUserId ?? parsed.instagramScopedUserId ?? "").trim() || undefined;
 
     return {
-      pageAccessToken: String(parsed.pageAccessToken ?? parsed.accessToken ?? parsed.token ?? "").trim(),
+      pageAccessToken: accessToken,
       pageId: String(parsed.pageId ?? "").trim() || undefined,
-      igBusinessAccountId: String(parsed.igBusinessAccountId ?? parsed.instagramBusinessAccountId ?? "").trim() || undefined,
+      igUserId,
+      igScopedUserId,
+      igBusinessAccountId:
+        String(parsed.igBusinessAccountId ?? parsed.instagramBusinessAccountId ?? "").trim() ||
+        undefined,
       graphApiVersion: graphApiVersion || "v21.0",
     };
   } catch {
@@ -79,15 +95,11 @@ export function getInstagramCredentialsValidationError(credentials: string) {
   const parsed = parseInstagramCredentials(credentials);
 
   if (!parsed.pageAccessToken) {
-    return "Instagram credentials must include pageAccessToken.";
+    return "Instagram credentials must include accessToken.";
   }
 
-  if (!parsed.pageId) {
-    return "Instagram credentials must include pageId.";
-  }
-
-  if (!parsed.igBusinessAccountId) {
-    return "Instagram credentials must include igBusinessAccountId.";
+  if (!parsed.igUserId && !parsed.igBusinessAccountId && !parsed.pageId) {
+    return "Instagram credentials must include igUserId or pageId.";
   }
 
   return null;
@@ -135,8 +147,8 @@ async function sendInstagramMessage(args: {
   contactId: string;
   text: string;
 }) {
-  const senderId = args.credentials.igBusinessAccountId ?? args.credentials.pageId ?? "me";
-  const graphHost = args.credentials.igBusinessAccountId
+  const senderId = args.credentials.igUserId ?? args.credentials.igBusinessAccountId ?? args.credentials.pageId ?? "me";
+  const graphHost = args.credentials.igUserId || args.credentials.igBusinessAccountId
     ? "https://graph.instagram.com"
     : "https://graph.facebook.com";
   const response = await fetch(
@@ -197,7 +209,7 @@ export const instagramAdapter = {
     const credentials = parseInstagramCredentials(params.credentials);
 
     if (!credentials.pageAccessToken) {
-      throw new Error("Instagram connection is missing a Page access token.");
+      throw new Error("Instagram connection is missing an access token.");
     }
 
     const messageParts = getTextPayload(params.message).filter((part) => part.trim());
