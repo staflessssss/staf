@@ -12,6 +12,7 @@
     "dry-run:wedding-sales": "node --env-file=.env --import tsx scripts/dry-run-wedding-sales.ts",
     "smoke:wedding-sales-checkpoint": "node --env-file=.env --import tsx scripts/smoke-wedding-sales-checkpoint.ts",
     "setup:instagram-channel": "node --env-file=.env --import tsx scripts/setup-instagram-channel.ts",
+    "clone:wedding-agent-to-instagram": "node --env-file=.env --import tsx scripts/clone-wedding-agent-to-instagram.ts",
     "check:instagram-launch": "node --env-file=.env --import tsx scripts/check-instagram-launch.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
