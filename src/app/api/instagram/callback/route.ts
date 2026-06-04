@@ -21,6 +21,28 @@ function buildRedirect(baseUrl: URL, redirectTo: string, params: Record<string, 
   return target;
 }
 
+function getInstagramOAuthErrorCode(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message.startsWith("Instagram token exchange failed")) {
+    return "instagram-token-exchange";
+  }
+
+  if (message.startsWith("Instagram long-lived token exchange failed")) {
+    return "instagram-token-refresh";
+  }
+
+  if (message.startsWith("Instagram profile fetch failed")) {
+    return "instagram-profile";
+  }
+
+  if (message.startsWith("Instagram OAuth credentials")) {
+    return "instagram-config";
+  }
+
+  return "instagram-oauth";
+}
+
 export async function GET(request: Request) {
   const baseUrl = new URL(request.url);
   const code = baseUrl.searchParams.get("code");
@@ -102,9 +124,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(
       buildRedirect(baseUrl, statePayload.redirectTo, { saved: "channel" }),
     );
-  } catch {
+  } catch (error) {
+    console.error("[instagram-oauth] callback failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+
     return NextResponse.redirect(
-      buildRedirect(baseUrl, "/client/connections/instagram", { error: "instagram-oauth" }),
+      buildRedirect(baseUrl, "/client/connections/instagram", {
+        error: getInstagramOAuthErrorCode(error),
+      }),
     );
   }
 }

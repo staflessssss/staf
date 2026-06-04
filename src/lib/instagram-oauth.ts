@@ -20,6 +20,18 @@ type MetaTokenResponse = {
   user_id?: string;
 };
 
+type MetaErrorPayload = {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: number;
+    error_subcode?: number;
+  };
+  error_message?: string;
+  error_type?: string;
+  code?: number;
+};
+
 export type InstagramProfile = {
   id: string;
   user_id?: string;
@@ -157,12 +169,28 @@ export function verifyInstagramState(state: string) {
   return payload;
 }
 
-async function getGraphJson<T>(url: URL): Promise<T> {
+function formatMetaError(payload: MetaErrorPayload | null | undefined, fallback: string) {
+  const error = payload?.error;
+  const message = error?.message ?? payload?.error_message;
+  const type = error?.type ?? payload?.error_type;
+  const code = error?.code ?? payload?.code;
+  const subcode = error?.error_subcode;
+  const details = [
+    message ? `message=${message}` : null,
+    type ? `type=${type}` : null,
+    code ? `code=${code}` : null,
+    subcode ? `subcode=${subcode}` : null,
+  ].filter(Boolean);
+
+  return details.length > 0 ? `${fallback}: ${details.join("; ")}` : fallback;
+}
+
+async function getGraphJson<T>(url: URL, errorLabel = "Meta Graph API request failed"): Promise<T> {
   const response = await fetch(url);
-  const payload = await response.json().catch(() => null);
+  const payload = (await response.json().catch(() => null)) as MetaErrorPayload | null;
 
   if (!response.ok || !payload) {
-    throw new Error("Meta Graph API request failed.");
+    throw new Error(formatMetaError(payload, errorLabel));
   }
 
   return payload as T;
@@ -180,10 +208,12 @@ export async function exchangeInstagramCode(code: string) {
       code,
     }),
   });
-  const shortLived = (await response.json().catch(() => null)) as MetaTokenResponse | null;
+  const shortLived = (await response.json().catch(() => null)) as
+    | (MetaTokenResponse & MetaErrorPayload)
+    | null;
 
   if (!response.ok || !shortLived?.access_token) {
-    throw new Error("Instagram token exchange failed.");
+    throw new Error(formatMetaError(shortLived, "Instagram token exchange failed"));
   }
 
   const longLivedUrl = new URL("https://graph.instagram.com/access_token");
@@ -192,7 +222,10 @@ export async function exchangeInstagramCode(code: string) {
   longLivedUrl.searchParams.set("client_secret", config.clientSecret);
   longLivedUrl.searchParams.set("access_token", shortLived.access_token);
 
-  const longLived = await getGraphJson<MetaTokenResponse>(longLivedUrl);
+  const longLived = await getGraphJson<MetaTokenResponse>(
+    longLivedUrl,
+    "Instagram long-lived token exchange failed",
+  );
 
   return {
     ...shortLived,
@@ -212,7 +245,7 @@ export async function fetchInstagramProfile(accessToken: string) {
   );
   url.searchParams.set("access_token", accessToken);
 
-  return getGraphJson<InstagramProfile>(url);
+  return getGraphJson<InstagramProfile>(url, "Instagram profile fetch failed");
 }
 
 export async function refreshInstagramLongLivedToken(accessToken: string) {
@@ -221,5 +254,5 @@ export async function refreshInstagramLongLivedToken(accessToken: string) {
   url.searchParams.set("grant_type", "ig_refresh_token");
   url.searchParams.set("access_token", accessToken);
 
-  return getGraphJson<MetaTokenResponse>(url);
+  return getGraphJson<MetaTokenResponse>(url, "Instagram token refresh failed");
 }
