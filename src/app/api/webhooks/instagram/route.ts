@@ -162,7 +162,19 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-hub-signature-256"),
   );
 
+  console.log("[instagram-webhook] received", {
+    isLocalDev,
+    hasSignatureHeader: Boolean(req.headers.get("x-hub-signature-256")),
+    hasValidSignature,
+    bodyBytes: rawBody.length,
+  });
+
   if (!isLocalDev && !hasValidSignature) {
+    console.error("[instagram-webhook] rejected invalid signature", {
+      hasSignatureHeader: Boolean(req.headers.get("x-hub-signature-256")),
+      bodyBytes: rawBody.length,
+    });
+
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -182,9 +194,20 @@ export async function POST(req: NextRequest) {
     const results = [];
 
     for (const eventPayload of splitInstagramMessagingPayloads(payload)) {
-      const agent = await findInstagramAgentByRecipientId(extractInstagramRecipientId(eventPayload));
+      const recipientId = extractInstagramRecipientId(eventPayload);
+      const agent = await findInstagramAgentByRecipientId(recipientId);
+
+      console.log("[instagram-webhook] routing event", {
+        hasRecipientId: Boolean(recipientId),
+        recipientId,
+        agentId: agent?.id ?? null,
+      });
 
       if (!agent) {
+        console.error("[instagram-webhook] agent not found for recipient", {
+          recipientId,
+        });
+
         return NextResponse.json({ error: "Agent not found." }, { status: 404 });
       }
 
