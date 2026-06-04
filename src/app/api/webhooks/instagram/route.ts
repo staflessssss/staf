@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { handleIncomingEvent } from "@/lib/ai-runtime";
@@ -72,6 +73,123 @@ function extractInstagramRecipientId(payload: unknown) {
   return "";
 }
 
+function extractInstagramSenderId(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "";
+  }
+
+  const entry = "entry" in payload && Array.isArray(payload.entry) ? payload.entry : [];
+
+  for (const item of entry) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+
+    const messaging = "messaging" in item && Array.isArray(item.messaging) ? item.messaging : [];
+
+    for (const event of messaging) {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        continue;
+      }
+
+      const sender = "sender" in event ? event.sender : null;
+
+      if (sender && typeof sender === "object" && !Array.isArray(sender) && "id" in sender) {
+        return String(sender.id ?? "");
+      }
+    }
+  }
+
+  return "";
+}
+
+function extractInstagramMessageId(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "";
+  }
+
+  const entry = "entry" in payload && Array.isArray(payload.entry) ? payload.entry : [];
+
+  for (const item of entry) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+
+    const messaging = "messaging" in item && Array.isArray(item.messaging) ? item.messaging : [];
+
+    for (const event of messaging) {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        continue;
+      }
+
+      const message = "message" in event ? event.message : null;
+
+      if (message && typeof message === "object" && !Array.isArray(message) && "mid" in message) {
+        return String(message.mid ?? "");
+      }
+    }
+  }
+
+  return "";
+}
+
+function readMetadataRecord(metadata: Prisma.JsonValue | null) {
+  return metadata && typeof metadata === "object" && !Array.isArray(metadata)
+    ? (metadata as Record<string, Prisma.JsonValue>)
+    : {};
+}
+
+async function recordInstagramWebhookStatus(args: {
+  channelId: string;
+  metadata: Prisma.JsonValue | null;
+  status: string;
+  recipientId: string;
+  senderId: string;
+  messageId: string;
+  agentId?: string;
+  error?: string;
+}) {
+  await db.channelConnection.update({
+    where: {
+      id: args.channelId,
+    },
+    data: {
+      metadata: {
+        ...readMetadataRecord(args.metadata),
+        webhookLastEventAt: new Date().toISOString(),
+        webhookLastStatus: args.status,
+        webhookLastRecipientId: args.recipientId || null,
+        webhookLastSenderId: args.senderId || null,
+        webhookLastMessageId: args.messageId || null,
+        webhookLastAgentId: args.agentId ?? null,
+        webhookLastError: args.error ?? null,
+      },
+    },
+  });
+}
+
+async function safeRecordInstagramWebhookStatus(
+  args: Parameters<typeof recordInstagramWebhookStatus>[0],
+) {
+  await recordInstagramWebhookStatus(args).catch((error) => {
+    console.error("[instagram-webhook] failed to record webhook status", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  });
+}
+
+function readRuntimeResultStatus(result: unknown) {
+  if (result && typeof result === "object" && !Array.isArray(result) && "status" in result) {
+    const status = result.status;
+
+    if (typeof status === "string" && status.trim()) {
+      return status;
+    }
+  }
+
+  return "processed";
+}
+
 async function findInstagramAgentByRecipientId(recipientId: string) {
   if (!recipientId) {
     return null;
@@ -111,7 +229,11 @@ async function findInstagramAgentByRecipientId(recipientId: string) {
         credentials.pageId === recipientId) &&
       agent?.id
     ) {
-      return agent;
+      return {
+        agent,
+        channelId: channel.id,
+        metadata: channel.metadata,
+      };
     }
   }
 
@@ -121,7 +243,17 @@ async function findInstagramAgentByRecipientId(recipientId: string) {
       agentId: activeCandidates[0].id,
     });
 
-    return activeCandidates[0];
+    const fallbackChannel = channels.find(
+      (channel) => channel.agents[0]?.id === activeCandidates[0].id,
+    );
+
+    return fallbackChannel
+      ? {
+          agent: activeCandidates[0],
+          channelId: fallbackChannel.id,
+          metadata: fallbackChannel.metadata,
+        }
+      : null;
   }
 
   return null;
@@ -210,7 +342,10 @@ export async function POST(req: NextRequest) {
 
     for (const eventPayload of splitInstagramMessagingPayloads(payload)) {
       const recipientId = extractInstagramRecipientId(eventPayload);
-      const agent = await findInstagramAgentByRecipientId(recipientId);
+      const senderId = extractInstagramSenderId(eventPayload);
+      const messageId = extractInstagramMessageId(eventPayload);
+      const route = await findInstagramAgentByRecipientId(recipientId);
+      const agent = route?.agent ?? null;
 
       console.log("[instagram-webhook] routing event", {
         hasRecipientId: Boolean(recipientId),
@@ -218,7 +353,7 @@ export async function POST(req: NextRequest) {
         agentId: agent?.id ?? null,
       });
 
-      if (!agent) {
+      if (!route || !agent) {
         console.error("[instagram-webhook] agent not found for recipient", {
           recipientId,
         });
@@ -230,9 +365,31 @@ export async function POST(req: NextRequest) {
         agentId: agent.id,
         channel: "INSTAGRAM",
         payload: eventPayload,
+      }).catch(async (error) => {
+        await safeRecordInstagramWebhookStatus({
+          channelId: route.channelId,
+          metadata: route.metadata,
+          status: "error",
+          recipientId,
+          senderId,
+          messageId,
+          agentId: agent.id,
+          error: error instanceof Error ? error.message : "Instagram webhook failed.",
+        });
+
+        throw error;
       });
 
       await ensureBufferedDeliveryExecution(result);
+      await safeRecordInstagramWebhookStatus({
+        channelId: route.channelId,
+        metadata: route.metadata,
+        status: readRuntimeResultStatus(result),
+        recipientId,
+        senderId,
+        messageId,
+        agentId: agent.id,
+      });
       results.push(result);
     }
 

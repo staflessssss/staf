@@ -12,6 +12,8 @@ type InstagramCredentials = {
   graphApiVersion: string;
 };
 
+const DEFAULT_GRAPH_API_VERSION = "v25.0";
+
 type InstagramMessagingEvent = {
   sender?: { id?: string };
   recipient?: { id?: string };
@@ -48,20 +50,22 @@ export function parseInstagramCredentials(credentials: string): InstagramCredent
   if (!trimmed) {
     return {
       pageAccessToken: "",
-      graphApiVersion: "v21.0",
+      graphApiVersion: DEFAULT_GRAPH_API_VERSION,
     };
   }
 
   if (!trimmed.startsWith("{")) {
     return {
       pageAccessToken: trimmed,
-      graphApiVersion: "v21.0",
+      graphApiVersion: DEFAULT_GRAPH_API_VERSION,
     };
   }
 
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    const graphApiVersion = String(parsed.graphApiVersion ?? parsed.version ?? "v21.0").trim();
+    const graphApiVersion = String(
+      parsed.graphApiVersion ?? parsed.version ?? DEFAULT_GRAPH_API_VERSION,
+    ).trim();
     const accessToken = String(
       parsed.instagramUserAccessToken ??
         parsed.pageAccessToken ??
@@ -81,12 +85,12 @@ export function parseInstagramCredentials(credentials: string): InstagramCredent
       igBusinessAccountId:
         String(parsed.igBusinessAccountId ?? parsed.instagramBusinessAccountId ?? "").trim() ||
         undefined,
-      graphApiVersion: graphApiVersion || "v21.0",
+      graphApiVersion: graphApiVersion || DEFAULT_GRAPH_API_VERSION,
     };
   } catch {
     return {
       pageAccessToken: "",
-      graphApiVersion: "v21.0",
+      graphApiVersion: DEFAULT_GRAPH_API_VERSION,
     };
   }
 }

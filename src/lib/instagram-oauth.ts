@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const DEFAULT_GRAPH_API_VERSION = "v21.0";
+const DEFAULT_GRAPH_API_VERSION = "v25.0";
 
 const INSTAGRAM_SCOPES = [
   "instagram_business_basic",
