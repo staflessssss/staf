@@ -94,19 +94,34 @@ async function findInstagramAgentByRecipientId(recipientId: string) {
       },
     },
   });
+  const activeCandidates: Array<{ id: string }> = [];
 
   for (const channel of channels) {
     const credentials = parseInstagramCredentials(decrypt(channel.credentialsEnc));
+    const agent = channel.agents[0];
+
+    if (agent?.id) {
+      activeCandidates.push(agent);
+    }
 
     if (
       (credentials.igUserId === recipientId ||
         credentials.igScopedUserId === recipientId ||
         credentials.igBusinessAccountId === recipientId ||
         credentials.pageId === recipientId) &&
-      channel.agents[0]?.id
+      agent?.id
     ) {
-      return channel.agents[0];
+      return agent;
     }
+  }
+
+  if (activeCandidates.length === 1) {
+    console.warn("[instagram-webhook] using single active Instagram agent fallback", {
+      recipientId,
+      agentId: activeCandidates[0].id,
+    });
+
+    return activeCandidates[0];
   }
 
   return null;
