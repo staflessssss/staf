@@ -78,6 +78,12 @@ function hasWeddingDate(text: string) {
 }
 
 function hasNames(text: string) {
+  if (
+    /\b(?:our names?(?: are)?)\b/i.test(text) ||
+    /\b[A-Z][A-Za-z'-]+\s+(?:and|&)\s+[A-Z][A-Za-z'-]+\b/.test(text)
+  ) {
+    return true;
+  }
   return /\b(?:we are|we're|this is|my name is|i am|i'm|his name is|her name is|fianc[eé]'?s name is|fiance'?s name is)\b/i.test(text);
 }
 
@@ -244,6 +250,22 @@ function hasCoupleNames(value?: string) {
 }
 
 function extractNames(text: string, currentNames?: string) {
+  const directCoupleMatch = text.match(
+    /\b([A-Z][A-Za-z'-]+)\s+(?:and|&)\s+([A-Z][A-Za-z'-]+)\b(?:\s+(?:and\s+)?(?:date|wedding|venue|location|in|at)\b|[.,]|$)/,
+  );
+
+  if (directCoupleMatch?.[1] && directCoupleMatch[2]) {
+    return `${directCoupleMatch[1]} and ${directCoupleMatch[2]}`;
+  }
+
+  const namedCoupleMatch = text.match(
+    /\b(?:our names?(?: are)?)\s+([A-Z][A-Za-z .'-]+?)(?:\.|,|\s+and\s+(?:date|our|wedding|venue|location)\b|\s+our\b|\s+wedding\b|\s+from\b|\s+in\b|$)/i,
+  );
+
+  if (namedCoupleMatch?.[1]) {
+    return namedCoupleMatch[1].trim();
+  }
+
   const coupleMatch = text.match(/\b(?:we are|we're|this is)\s+([A-Z][A-Za-z .'-]+?)(?:\.|,|\s+and\s+our|\s+our|\s+wedding|\s+from|\s+in\b|$)/i);
 
   if (coupleMatch?.[1]) {
@@ -252,14 +274,20 @@ function extractNames(text: string, currentNames?: string) {
 
   const selfMatch = text.match(/\b(?:my name is|i am|i'm)\s+([A-Z][A-Za-z'-]+)/i);
   const partnerMatch = text.match(/\b(?:his name is|her name is|fianc[eé]'?s name is|fiance'?s name is)\s+([A-Z][A-Za-z'-]+)/i);
+  const reversePartnerMatch = text.match(/\b([A-Z][A-Za-z'-]+)\s+is\s+(?:my\s+)?(?:fianc\S*|fiance\S*)\s+name\b/i);
   const withSelf = mergeNames(currentNames, selfMatch?.[1]);
 
-  return mergeNames(withSelf, partnerMatch?.[1]);
+  return mergeNames(withSelf, partnerMatch?.[1] ?? reversePartnerMatch?.[1]);
 }
 
 function extractLocation(text: string) {
   const match = text.match(/\b(?:in|near|at)\s+([A-Z][A-Za-z .'-]+?)(?:\.|,|\s+(?:on|for|and|with)\b|$)/);
-  return match?.[1]?.trim();
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+
+  const knownCity = text.match(/^\s*(Charlotte|Atlanta|Savannah)\s*(?:[,.\s]|$)/i)?.[1];
+  return knownCity ? knownCity.charAt(0).toUpperCase() + knownCity.slice(1).toLowerCase() : undefined;
 }
 
 function extractEmail(text: string) {

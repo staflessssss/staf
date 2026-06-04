@@ -81,6 +81,10 @@ function getContactName(contactId: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function isEmail(value: string | null | undefined) {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
+}
+
 function getLastMessagePreview(messages: Array<{ content: string; role: MessageRole }>) {
   const message = messages.find(
     (item) => item.role === MessageRole.USER || item.role === MessageRole.ASSISTANT,
@@ -397,18 +401,22 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   const selectedLeadDetails = selectedLatestOutcome
     ? getLeadDetails(selectedLatestOutcome, selectedLatestOutcome.conversation.contactId)
     : null;
+  const fallbackLeadDetails = selectedConversation ? null : latestLeadDetails;
+  const selectedEmail = isEmail(selectedLeadDetails?.email)
+    ? selectedLeadDetails?.email
+    : isEmail(selectedConversation?.contactId)
+      ? selectedConversation?.contactId
+      : null;
   const latestWork = latestOutcome ? buildAgentWorkOutcome(latestOutcome) : null;
   const leadScore = Math.min(
     96,
     58 + targetActions.length * 14 + Math.min(agents.length, 3) * 4,
   );
   const leadRows = [
-    ["Name", selectedLeadDetails?.coupleName ?? latestLeadDetails?.coupleName ?? selectedContactName],
+    ["Name", selectedLeadDetails?.coupleName ?? fallbackLeadDetails?.coupleName ?? selectedContactName],
     [
       "Email",
-      selectedConversation?.contactId.includes("@")
-        ? selectedConversation.contactId
-        : "Not captured yet",
+      selectedEmail ?? (isEmail(fallbackLeadDetails?.email) ? fallbackLeadDetails?.email : "Not captured yet"),
     ],
     ["Channel", selectedChannel],
     ["Agent", selectedConversation?.agent.name ?? agents[0]?.name ?? "No active agent"],
@@ -416,11 +424,11 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
       "Date",
       selectedLeadDetails?.weddingDate ??
         selectedLeadDetails?.callDate ??
-        latestLeadDetails?.weddingDate ??
-        latestLeadDetails?.callDate ??
+        fallbackLeadDetails?.weddingDate ??
+        fallbackLeadDetails?.callDate ??
         "Not captured yet",
     ],
-    ["Location", selectedLeadDetails?.location ?? latestLeadDetails?.location ?? "Not captured yet"],
+    ["Location", selectedLeadDetails?.location ?? fallbackLeadDetails?.location ?? "Not captured yet"],
   ];
 
   const header = (

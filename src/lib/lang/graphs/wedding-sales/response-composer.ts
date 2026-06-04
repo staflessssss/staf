@@ -738,6 +738,10 @@ async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
   const fallback = composeWeddingSalesResponse(args);
 
+  if (isInstagram(args.state)) {
+    return fallback;
+  }
+
   if (!shouldUseLlmComposer()) {
     return fallback;
   }

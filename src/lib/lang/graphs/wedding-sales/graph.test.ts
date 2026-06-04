@@ -140,6 +140,21 @@ test("wedding sales analyze node extracts normalized wedding details", () => {
   );
 });
 
+test("wedding sales analyzer extracts Instagram-style couple names", () => {
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Mark and Julie and date is October 11"),
+    "Mark and Julie",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Our names Mark and Julie"),
+    "Mark and Julie",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Julie is fiancés name", "Mark"),
+    "Mark and Julie",
+  );
+});
+
 test("wedding sales graph records availability tool observations", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "gmail",
@@ -291,6 +306,76 @@ test("instagram wedding sales first reply asks for fiance name and wedding date 
   assert.match(result.responseDraft ?? "", /fianc/i);
   assert.match(result.responseDraft ?? "", /date of your wedding/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Founder|MYNDFUL FILMS/);
+});
+
+test("instagram wedding sales keeps real DM state and reaches availability tool", async () => {
+  let state = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Hello there!",
+  });
+
+  state = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Mark and Julie and date is October 11",
+    previousState: state,
+  });
+
+  assert.equal(state.names, "Mark and Julie");
+  assert.equal(state.weddingDateText, "October 11");
+  assert.equal(state.leadStage, "waiting_wedding_year");
+
+  state = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "2026",
+    previousState: state,
+  });
+
+  assert.equal(state.names, "Mark and Julie");
+  assert.equal(state.weddingDate, "2026-10-11");
+  assert.equal(state.leadStage, "missing_location_or_venue");
+  assert.doesNotMatch(state.responseDraft ?? "", /fianc/i);
+
+  state = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Charlotte",
+    previousState: state,
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {
+          operation: "capacity_availability",
+          spreadsheetId: "sheet-1",
+          sheetName: "Bookings",
+          headerRow: 1,
+          dateColumn: "Wedding Date",
+          statusColumn: "Status",
+          regionColumn: "Region",
+          bookedStatusValue: "Booked",
+          capacityRules: [{ region: "NC", aliases: ["NC", "Charlotte"], capacity: 2 }],
+          suggestionSearchDays: 14,
+        },
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+        credentialsEnc: encrypt(JSON.stringify({ access_token: "test-token" })),
+      },
+    },
+  });
+
+  assert.equal(state.names, "Mark and Julie");
+  assert.equal(state.location, "Charlotte");
+  assert.equal(state.availability, "available");
+  assert.equal(state.toolObservations.at(-1)?.toolName, "check_wedding_availability");
+  assert.match(state.responseDraft ?? "", /collections start/i);
+  assert.match(state.responseDraft ?? "", /venue/i);
+  assert.doesNotMatch(state.responseDraft ?? "", /fianc/i);
 });
 
 test("wedding sales graph asks only for location after names and date are known", async () => {

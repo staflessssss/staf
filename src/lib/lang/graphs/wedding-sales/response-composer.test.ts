@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { defaultWeddingSalesConfig } from "./config";
 import {
+  composeHumanWeddingSalesResponse,
   composeWeddingSalesResponse,
   finalizeLlmWeddingSalesResponse,
   parseWeddingSalesReflectionJson,
@@ -99,6 +100,36 @@ test("wedding sales composer uses plain links for instagram", () => {
   assert.match(response, /venue/i);
   assert.doesNotMatch(response, /Taras Mynd/);
   assert.doesNotMatch(response, /MYNDFUL FILMS/);
+});
+
+test("instagram human composer stays deterministic instead of using the LLM composer", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "true";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "ask_missing_info",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        leadStage: "missing_names_or_date",
+        names: "Mark and Julie",
+        weddingDate: undefined,
+        weddingDateText: undefined,
+        assistantReplyCount: 1,
+        hasGreeted: true,
+      },
+    });
+
+    assert.equal(response, "Would you mind sharing the date of your wedding? That way I can check our availability for Charlotte and get you all set up ✨");
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
 });
 
 test("wedding sales composer confirms consultation booking warmly without wedding-booking language", () => {
