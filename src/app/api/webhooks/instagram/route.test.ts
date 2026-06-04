@@ -168,12 +168,13 @@ test("instagram webhook signature can use the shared Meta app secret", () => {
   assert.match(source, /META_APP_SECRET/);
 });
 
-test("instagram webhook can fall back to one active Instagram agent during launch", () => {
+test("instagram webhook ignores business message echoes instead of routing them as inbound", () => {
   const source = readFileSync(
     "src/app/api/webhooks/instagram/route.ts",
     "utf8",
   );
 
-  assert.match(source, /activeCandidates\.length === 1/);
-  assert.match(source, /single active Instagram agent fallback/);
+  assert.match(source, /findInstagramChannelByAccountId/);
+  assert.match(source, /ignored_business_echo/);
+  assert.doesNotMatch(source, /single active Instagram agent fallback/);
 });

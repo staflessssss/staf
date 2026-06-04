@@ -212,15 +212,10 @@ async function findInstagramAgentByRecipientId(recipientId: string) {
       },
     },
   });
-  const activeCandidates: Array<{ id: string }> = [];
 
   for (const channel of channels) {
     const credentials = parseInstagramCredentials(decrypt(channel.credentialsEnc));
     const agent = channel.agents[0];
-
-    if (agent?.id) {
-      activeCandidates.push(agent);
-    }
 
     if (
       (credentials.igUserId === recipientId ||
@@ -237,23 +232,40 @@ async function findInstagramAgentByRecipientId(recipientId: string) {
     }
   }
 
-  if (activeCandidates.length === 1) {
-    console.warn("[instagram-webhook] using single active Instagram agent fallback", {
-      recipientId,
-      agentId: activeCandidates[0].id,
-    });
+  return null;
+}
 
-    const fallbackChannel = channels.find(
-      (channel) => channel.agents[0]?.id === activeCandidates[0].id,
-    );
+async function findInstagramChannelByAccountId(accountId: string) {
+  if (!accountId) {
+    return null;
+  }
 
-    return fallbackChannel
-      ? {
-          agent: activeCandidates[0],
-          channelId: fallbackChannel.id,
-          metadata: fallbackChannel.metadata,
-        }
-      : null;
+  const channels = await db.channelConnection.findMany({
+    where: {
+      type: "INSTAGRAM",
+      status: "CONNECTED",
+    },
+    select: {
+      id: true,
+      credentialsEnc: true,
+      metadata: true,
+    },
+  });
+
+  for (const channel of channels) {
+    const credentials = parseInstagramCredentials(decrypt(channel.credentialsEnc));
+
+    if (
+      credentials.igUserId === accountId ||
+      credentials.igScopedUserId === accountId ||
+      credentials.igBusinessAccountId === accountId ||
+      credentials.pageId === accountId
+    ) {
+      return {
+        channelId: channel.id,
+        metadata: channel.metadata,
+      };
+    }
   }
 
   return null;
@@ -354,6 +366,31 @@ export async function POST(req: NextRequest) {
       });
 
       if (!route || !agent) {
+        const echoChannel = await findInstagramChannelByAccountId(senderId);
+
+        if (echoChannel) {
+          console.log("[instagram-webhook] ignored business message echo", {
+            senderId,
+            recipientId,
+            messageId,
+          });
+
+          await safeRecordInstagramWebhookStatus({
+            channelId: echoChannel.channelId,
+            metadata: echoChannel.metadata,
+            status: "ignored_business_echo",
+            recipientId,
+            senderId,
+            messageId,
+          });
+
+          results.push({
+            ok: true,
+            status: "ignored_business_echo",
+          });
+          continue;
+        }
+
         console.error("[instagram-webhook] agent not found for recipient", {
           recipientId,
         });
