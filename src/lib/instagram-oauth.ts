@@ -38,7 +38,6 @@ export type InstagramProfile = {
   id: string;
   user_id?: string;
   username?: string;
-  name?: string;
   account_type?: string;
 };
 
@@ -254,17 +253,38 @@ export async function exchangeInstagramCode(code: string) {
   };
 }
 
-export async function fetchInstagramProfile(accessToken: string) {
+export async function fetchInstagramProfile(accessToken: string, userId?: string) {
   const config = getMetaOAuthConfig();
   const url = new URL(`https://graph.instagram.com/${config.graphApiVersion}/me`);
 
   url.searchParams.set(
     "fields",
-    "id,user_id,username,name,account_type",
+    "id,user_id,username,account_type",
   );
   url.searchParams.set("access_token", accessToken);
 
-  return getGraphJson<InstagramProfile>(url, "Instagram profile fetch failed");
+  const profile = await getGraphJson<InstagramProfile>(url, "Instagram profile fetch failed").catch(
+    async (error) => {
+      if (!userId) {
+        throw error;
+      }
+
+      console.error("[instagram-oauth] /me profile fetch failed; retrying by user_id", {
+        error: error instanceof Error ? error.message : "unknown",
+      });
+
+      const fallbackUrl = new URL(`https://graph.instagram.com/${config.graphApiVersion}/${userId}`);
+      fallbackUrl.searchParams.set("fields", "id,username,account_type");
+      fallbackUrl.searchParams.set("access_token", accessToken);
+
+      return getGraphJson<InstagramProfile>(fallbackUrl, "Instagram profile fetch failed");
+    },
+  );
+
+  return {
+    ...profile,
+    user_id: profile.user_id ?? userId,
+  };
 }
 
 export async function refreshInstagramLongLivedToken(accessToken: string) {

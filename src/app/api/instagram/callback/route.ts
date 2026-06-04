@@ -77,7 +77,22 @@ export async function GET(request: Request) {
     }
 
     const token = await exchangeInstagramCode(code);
-    const profile = await fetchInstagramProfile(token.access_token);
+    const profile = await fetchInstagramProfile(token.access_token, token.user_id).catch((error) => {
+      if (!token.user_id) {
+        throw error;
+      }
+
+      console.error("[instagram-oauth] profile fetch failed; saving token user_id only", {
+        error: error instanceof Error ? error.message : "unknown",
+      });
+
+      return {
+        id: token.user_id,
+        user_id: token.user_id,
+        username: undefined,
+        account_type: undefined,
+      };
+    });
     const graphApiVersion = getMetaOAuthConfig().graphApiVersion;
     const igUserId = profile.user_id ?? token.user_id ?? profile.id;
     const igScopedUserId = profile.id !== igUserId ? profile.id : null;
@@ -102,7 +117,6 @@ export async function GET(request: Request) {
       igScopedUserId,
       igBusinessAccountId: null,
       instagramUsername: profile.username ?? null,
-      instagramName: profile.name ?? null,
       instagramAccountType: profile.account_type ?? null,
       graphApiVersion,
       scopes: ["instagram_business_basic", "instagram_business_manage_messages"],

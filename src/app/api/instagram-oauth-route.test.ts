@@ -20,9 +20,11 @@ test("Instagram OAuth routes mirror authenticated client connection flow", () =>
   assert.match(connectSource, /role !== "CLIENT"/);
   assert.match(oauthSource, /\/client\/connections\/instagram/);
   assert.match(oauthSource, /www\.instagram\.com\/oauth\/authorize/);
+  assert.doesNotMatch(oauthSource, /id,user_id,username,name,account_type/);
   assert.match(callbackSource, /verifyInstagramState/);
   assert.match(callbackSource, /exchangeInstagramCode/);
   assert.match(callbackSource, /fetchInstagramProfile/);
+  assert.match(callbackSource, /saving token user_id only/);
   assert.match(callbackSource, /upsertChannelConnection/);
   assert.match(callbackSource, /type: ChannelType\.INSTAGRAM/);
   assert.match(callbackSource, /source: "instagram_login"/);
