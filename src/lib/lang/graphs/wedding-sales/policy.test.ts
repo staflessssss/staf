@@ -28,7 +28,9 @@ const baseState: WeddingSalesState = {
   guideOffered: true,
   askedForNames: false,
   askedForWeddingYear: false,
+  askedForVenue: false,
   askedForCallTime: true,
+  askedForEmail: false,
   responseDraft: "Would you be open to a 30-minute consultation Monday through Friday between 9 AM and 2 PM Eastern?",
 };
 

@@ -1,7 +1,9 @@
 import type { WeddingSalesState } from "../state";
 
-const monthNamePattern =
-  "\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\s+\\d{1,2}(?:st|nd|rd|th)?\\b";
+const monthPattern =
+  "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+const monthNamePattern = `\\b${monthPattern}\\s+\\d{1,2}(?:st|nd|rd|th)?\\b`;
+const dayMonthPattern = `\\b\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?${monthPattern}\\b`;
 const monthIndexByName: Record<string, number> = {
   january: 1,
   jan: 1,
@@ -68,11 +70,15 @@ function stripQuotedEmailText(text: string) {
 }
 
 function hasWeddingDate(text: string) {
-  return new RegExp(monthNamePattern, "i").test(text) || /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(text);
+  return (
+    new RegExp(monthNamePattern, "i").test(text) ||
+    new RegExp(dayMonthPattern, "i").test(text) ||
+    /\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/.test(text)
+  );
 }
 
 function hasNames(text: string) {
-  return /\b(?:we are|we're|this is|my name is|i am|i'm)\b/i.test(text);
+  return /\b(?:we are|we're|this is|my name is|i am|i'm|his name is|her name is|fianc[eé]'?s name is|fiance'?s name is)\b/i.test(text);
 }
 
 function hasLocation(text: string) {
@@ -164,6 +170,22 @@ function extractWeddingDate(text: string) {
     };
   }
 
+  const dayMonthDate = text.match(
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:,?\s+((?:19|20)\d{2}))?\b/i,
+  );
+
+  if (dayMonthDate) {
+    const day = Number(dayMonthDate[1]);
+    const month = monthIndexByName[dayMonthDate[2].toLowerCase()];
+    const year = dayMonthDate[3];
+
+    return {
+      display: dayMonthDate[0],
+      iso: year && month && day >= 1 && day <= 31 ? `${year}-${pad2(month)}-${pad2(day)}` : undefined,
+      yearKnown: Boolean(year),
+    };
+  }
+
   const numericDate = text.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-]((?:19|20)?\d{2}))?\b/);
   if (!numericDate) {
     return null;
@@ -189,9 +211,50 @@ function combineWeddingDateTextWithYear(dateText: string | undefined, year: stri
   return extractWeddingDate(`${dateText}, ${year}`)?.iso;
 }
 
-function extractNames(text: string) {
-  const match = text.match(/\b(?:we are|we're|this is)\s+([A-Z][A-Za-z .'-]+?)(?:\.|,|\s+and\s+our|\s+our|\s+wedding|\s+from|\s+in\b|$)/i);
-  return match?.[1]?.trim();
+function extractFirstName(value?: string) {
+  return value?.trim().split(/\s+/)[0]?.replace(/[^A-Za-z'-]/g, "");
+}
+
+function mergeNames(currentNames: string | undefined, newName: string | undefined) {
+  const normalizedName = extractFirstName(newName);
+
+  if (!normalizedName) {
+    return currentNames;
+  }
+
+  if (!currentNames) {
+    return normalizedName;
+  }
+
+  const existingNames = currentNames
+    .split(/\s+(?:and|&)\s+/i)
+    .map(extractFirstName)
+    .filter(Boolean)
+    .map((name) => name?.toLowerCase());
+
+  if (existingNames.includes(normalizedName.toLowerCase())) {
+    return currentNames;
+  }
+
+  return `${currentNames} and ${normalizedName}`;
+}
+
+function hasCoupleNames(value?: string) {
+  return Boolean(value && /\s+(?:and|&)\s+/i.test(value));
+}
+
+function extractNames(text: string, currentNames?: string) {
+  const coupleMatch = text.match(/\b(?:we are|we're|this is)\s+([A-Z][A-Za-z .'-]+?)(?:\.|,|\s+and\s+our|\s+our|\s+wedding|\s+from|\s+in\b|$)/i);
+
+  if (coupleMatch?.[1]) {
+    return coupleMatch[1].trim();
+  }
+
+  const selfMatch = text.match(/\b(?:my name is|i am|i'm)\s+([A-Z][A-Za-z'-]+)/i);
+  const partnerMatch = text.match(/\b(?:his name is|her name is|fianc[eé]'?s name is|fiance'?s name is)\s+([A-Z][A-Za-z'-]+)/i);
+  const withSelf = mergeNames(currentNames, selfMatch?.[1]);
+
+  return mergeNames(withSelf, partnerMatch?.[1]);
 }
 
 function extractLocation(text: string) {
@@ -199,12 +262,47 @@ function extractLocation(text: string) {
   return match?.[1]?.trim();
 }
 
+function extractEmail(text: string) {
+  return text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)?.[0]?.toLowerCase();
+}
+
+function isLikelyVenueAnswer(text: string, state: WeddingSalesState) {
+  const trimmed = text.trim();
+
+  if (!trimmed || trimmed.length > 80 || /[?@]/.test(trimmed)) {
+    return false;
+  }
+
+  if (/^(?:yes|yeah|yep|sure|ok|okay|perfect|great|sounds good|that works|works for me|cool|awesome|thanks|thank you)$/i.test(trimmed)) {
+    return false;
+  }
+
+  if (!state.askedForVenue && state.lastAssistantIntent !== "availability_available") {
+    return false;
+  }
+
+  return /\b(?:park|estate|farm|barn|venue|club|hotel|garden|hall|chapel|church|resort|manor|house|vineyard|winery|center|centre)\b/i.test(trimmed) ||
+    /^[A-Z][A-Za-z0-9 .'-]+\s+[A-Z]?[A-Za-z0-9 .'-]+$/.test(trimmed);
+}
+
+function extractVenue(text: string, state: WeddingSalesState) {
+  const explicitVenue = text.match(/\b(?:venue is|at|it'?s at|its at)\s+([A-Z][A-Za-z0-9 .'-]+?)(?:\.|,|\s+(?:on|for|and|with)\b|$)/i)?.[1];
+
+  if (explicitVenue) {
+    return explicitVenue.trim();
+  }
+
+  return isLikelyVenueAnswer(text, state) ? text.trim() : undefined;
+}
+
 export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Promise<Partial<WeddingSalesState>> {
   const message = stripQuotedEmailText(state.latestCustomerMessage ?? "");
   const extractedDate = extractWeddingDate(message);
   const extractedYear = extractYear(message);
-  const extractedNames = extractNames(message);
+  const extractedNames = extractNames(message, state.names);
   const extractedLocation = extractLocation(message);
+  const extractedVenue = extractVenue(message, state);
+  const extractedEmail = extractEmail(message);
   const combinedWeddingDate =
     extractedDate?.iso ??
     combineWeddingDateTextWithYear(extractedDate?.display, state.weddingYear) ??
@@ -215,14 +313,23 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     ...(extractedDate?.display && !combinedWeddingDate ? { weddingDateText: extractedDate.display } : {}),
     ...(extractedYear ? { weddingYear: extractedYear } : {}),
     ...(extractedLocation ? { location: extractedLocation } : {}),
+    ...(extractedVenue ? { venue: extractedVenue } : {}),
+    ...(extractedEmail ? { customerEmail: extractedEmail } : {}),
   };
 
   if (isCoordinatorOrCoi(message)) {
     return { ...baseUpdate, leadStage: "ignored" };
   }
 
+  const customerEmailKnown = Boolean(state.customerEmail || extractedEmail);
+  const proposedCallTimeKnown = Boolean(state.proposedCallTime);
+
+  if (state.calendarStatus === "available" && customerEmailKnown && (confirmsBooking(message) || extractedEmail)) {
+    return { ...baseUpdate, leadStage: "ready_to_book", bookingConfirmed: false };
+  }
+
   if (state.calendarStatus === "available" && confirmsBooking(message)) {
-    return { ...baseUpdate, leadStage: "ready_to_book", bookingConfirmed: true };
+    return { ...baseUpdate, leadStage: "waiting_customer_email" };
   }
 
   if (state.calendarStatus === "busy" && confirmsBooking(message)) {
@@ -241,6 +348,14 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: message };
   }
 
+  if (state.availability === "available" && !state.callProposed && (extractedVenue || state.venue)) {
+    return {
+      ...baseUpdate,
+      leadStage: "asking_call_time",
+      callProposed: true,
+    };
+  }
+
   if (
     state.availability === "available" &&
     asksGeneralQuestion(message) &&
@@ -250,9 +365,21 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     return { ...baseUpdate, leadStage: "answering_question" };
   }
 
+  if (state.availability === "available" && state.askedForVenue && !state.venue && !extractedVenue) {
+    return { ...baseUpdate, leadStage: "missing_location_or_venue" };
+  }
+
+  if (state.calendarStatus === "available" && proposedCallTimeKnown && !customerEmailKnown) {
+    return { ...baseUpdate, leadStage: "waiting_customer_email" };
+  }
+
   const dateKnown = Boolean(state.weddingDate) || Boolean(combinedWeddingDate) || Boolean(state.weddingDateText) || hasWeddingDate(message);
   const yearKnown = state.weddingYearKnown || hasYear(message) || Boolean(extractedDate?.yearKnown) || Boolean(state.weddingYear);
-  const namesKnown = Boolean(state.names) || hasNames(message);
+  const nextNames = extractedNames ?? state.names;
+  const namesKnown =
+    state.channel === "instagram"
+      ? hasCoupleNames(nextNames)
+      : Boolean(nextNames) || hasNames(message);
   const locationKnown = Boolean(state.location) || hasLocation(message);
 
   if (dateKnown && !yearKnown) {
@@ -267,6 +394,14 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     return {
       ...baseUpdate,
       leadStage: "missing_names_or_date",
+      weddingYearKnown: yearKnown,
+    };
+  }
+
+  if (!locationKnown) {
+    return {
+      ...baseUpdate,
+      leadStage: "missing_location_or_venue",
       weddingYearKnown: yearKnown,
     };
   }

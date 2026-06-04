@@ -9,11 +9,14 @@ import type { WeddingSalesState } from "./state";
 
 export type WeddingSalesResponseIntent =
   | "ask_missing_info"
+  | "ask_location_or_venue"
   | "ask_wedding_year"
   | "availability_tool_missing"
   | "availability_available"
   | "availability_unavailable"
   | "answer_question"
+  | "ask_call_time"
+  | "ask_email"
   | "calendar_time_missing"
   | "calendar_available"
   | "calendar_busy"
@@ -150,6 +153,69 @@ function formatLocationSuffix(location?: string) {
   return location ? ` in ${location}` : "";
 }
 
+function isInstagram(state: WeddingSalesState) {
+  return state.channel === "instagram";
+}
+
+function getPrimaryCustomerName(names?: string) {
+  return names
+    ?.split(/\s+(?:and|&)\s+/i)[0]
+    ?.split(/\s+/)[0]
+    ?.replace(/[^A-Za-z'-]/g, "")
+    .trim();
+}
+
+function getPartnerName(names?: string) {
+  return names
+    ?.split(/\s+(?:and|&)\s+/i)[1]
+    ?.split(/\s+/)[0]
+    ?.replace(/[^A-Za-z'-]/g, "")
+    .trim();
+}
+
+function hasCoupleNames(names?: string) {
+  return Boolean(names && /\s+(?:and|&)\s+/i.test(names));
+}
+
+function formatInstagramCustomerAddress(state: WeddingSalesState) {
+  const customerName = getPrimaryCustomerName(state.names);
+
+  return customerName ? ` ${customerName}` : "";
+}
+
+function formatInstagramAvailabilityLine(state: WeddingSalesState) {
+  const customerName = getPrimaryCustomerName(state.names);
+  const partnerName = getPartnerName(state.names);
+  const weddingDate = formatWeddingDateForReply(state.weddingDate);
+  const location = state.location ? ` for your ${state.location} wedding` : " for your wedding";
+
+  if (customerName && partnerName) {
+    return `Awesome ${customerName}! You and ${partnerName} have ${weddingDate} available${location} 🎥`;
+  }
+
+  if (customerName) {
+    return `Awesome ${customerName}! ${weddingDate} is available${location} 🎥`;
+  }
+
+  return `Awesome, ${weddingDate} is available${location} 🎥`;
+}
+
+function formatCallTimeForReply(timeText?: string) {
+  const normalized = (timeText || "that time")
+    .trim()
+    .replace(/\?+$/, "")
+    .replace(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi, (_match, hour: string, minutes: string | undefined, meridiem: string) => {
+      const minuteText = minutes ? `:${minutes}` : "";
+      return `${hour}${minuteText} ${meridiem.toUpperCase()}`;
+    })
+    .replace(/\s+/g, " ");
+  const withTimezone = /\b(?:Eastern|ET|EST|EDT)\b/i.test(normalized)
+    ? normalized
+    : `${normalized} Eastern`;
+
+  return withTimezone.replace(/^Tomorrow\b/, "tomorrow").replace(/^Today\b/, "today");
+}
+
 function asksAboutKnownWeddingAvailability(message?: string) {
   if (!message) {
     return false;
@@ -167,10 +233,39 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
   const response = (() => {
     switch (intent) {
       case "ask_missing_info":
+        if (isInstagram(state)) {
+          const customerName = formatInstagramCustomerAddress(state);
+          const missingDate = !state.weddingDate && !state.weddingDateText;
+          const missingNames = !hasCoupleNames(state.names);
+          const askParts = [
+            missingNames ? "your fiancé’s name" : "",
+            missingDate ? "the date of your wedding" : "",
+          ].filter(Boolean);
+
+          return [
+            policy.allowGreeting ? `Hey${customerName}, I’m Taras from Myndful Films 🤍` : "",
+            askParts.length
+              ? `Would you mind sharing ${askParts.join(" and ")}? That way I can check our availability${state.location ? ` for ${state.location}` : ""} and get you all set up ✨`
+              : `Could you send the exact wedding date so I can check availability${state.location ? ` for ${state.location}` : ""}? ✨`,
+          ]
+            .filter(Boolean)
+            .join("\n\n");
+        }
+
         return [
           "Thank you so much for reaching out. I would love to hear more.",
           "Could you share both of your names and the date you are planning to get married? Once I have that, I can check availability and send the most helpful details.",
         ].join("\n\n");
+      case "ask_location_or_venue":
+        if (isInstagram(state)) {
+          return state.location
+            ? `Where in ${state.location} is your venue? I want to double-check the travel details included for the collections.`
+            : "Could you share the city or venue for the wedding? That way I can check availability and travel details correctly ✨";
+        }
+
+        return state.location
+          ? `Could you share the venue in ${state.location}? I want to double-check the travel details before we move forward.`
+          : "Could you share the city, venue, or location for the wedding? I can check availability once I have that.";
       case "ask_wedding_year":
         return "Thank you so much. Just so I check the right date, could you share the wedding year?";
       case "availability_tool_missing":
@@ -181,6 +276,26 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           summary || "If you have flexibility, I can help look at alternative dates.",
         ].join("\n\n");
       case "availability_available": {
+        if (isInstagram(state)) {
+          const lines = [
+            formatInstagramAvailabilityLine(state),
+            `Our collections start at ${config.pricing.startPrice} — let me send you the guide so you can see everything ✨`,
+          ];
+
+          if (!state.venue) {
+            lines.push(
+              state.location
+                ? `Where in ${state.location} is your venue? I want to double-check travel details included for the collections.`
+                : "Where is your venue? I want to double-check travel details included for the collections.",
+            );
+          } else {
+            lines.push(
+              "When would be a good time for a quick call to go over everything? I’m free Mon-Fri, 9 AM to 2 PM Eastern ✨",
+            );
+          }
+
+          return lines.join("\n\n");
+        }
         const intro = `Amazing, thank you so much${state.names ? `, ${state.names}` : ""}. ${weddingDate}${location} is available for Myndful, so you reached out at a great time 🤍`;
 
         if (state.guideSent) {
@@ -212,6 +327,13 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           .join("\n\n");
       }
       case "answer_question": {
+        if (isInstagram(state) && state.leadStage === "answering_question" && state.calendarStatus === "available" && !state.customerEmail) {
+          return [
+            `Our collections start at ${config.pricing.startPrice}. Yes, travel details are checked against the exact venue, and I’ll make sure everything is clear before our call.`,
+            "Send me the best email for the calendar invite when you’re ready ✨",
+          ].join("\n\n");
+        }
+
         if (state.availability === "available" && asksAboutKnownWeddingAvailability(state.latestCustomerMessage)) {
           return [
             `${weddingDate}${location} is still showing available on my end.`,
@@ -224,6 +346,37 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         return [
           `Our collections start at ${config.pricing.startPrice}. Yes, we do travel for weddings.`,
           "Each collection includes travel miles, and if the venue is beyond the included mileage, I can check the exact travel details for your location before the call.",
+        ].join("\n\n");
+      }
+      case "ask_call_time":
+        if (isInstagram(state)) {
+          return [
+            state.venue
+              ? `${state.venue} sounds lovely 🤍 I’ll check the exact travel details for your date and venue so we’re all set.`
+              : "That sounds lovely 🤍 I’ll check the exact travel details for your date and venue so we’re all set.",
+            "When would be a good time for a quick call to go over everything? I’m free Mon-Fri, 9 AM to 2 PM Eastern ✨",
+          ].join("\n\n");
+        }
+
+        return [
+          state.venue
+            ? `${state.venue} sounds great. I can double-check the exact travel details for your date and venue.`
+            : "That sounds great. I can double-check the exact travel details for your date and venue.",
+          "Would you be open to a 30-minute consultation Monday through Friday between 9 AM and 2 PM Eastern?",
+        ].join("\n\n");
+      case "ask_email": {
+        const callTime = formatCallTimeForReply(state.proposedCallTime);
+
+        if (isInstagram(state)) {
+          return [
+            `Perfect, ${callTime} works great!`,
+            "What’s the best email to send you the calendar invite for our call? ✨",
+          ].join("\n\n");
+        }
+
+        return [
+          `That time works great: ${callTime}.`,
+          "What is the best email address for the calendar invite?",
         ].join("\n\n");
       }
       case "calendar_time_missing":
@@ -239,6 +392,16 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       case "booking_tool_missing":
         return "I can book the consultation once I have the confirmed time and booking tool configured.";
       case "booking_confirmed":
+        if (isInstagram(state)) {
+          const callTime = formatCallTimeForReply(state.proposedCallTime);
+          const email = state.customerEmail ? ` to ${state.customerEmail}` : "";
+
+          return [
+            `You’re all set! I’ve sent a calendar invite${email} — really looking forward to meeting you both ${callTime} 🤍`,
+            "Anything else you’d like to know before we chat?",
+          ].join("\n\n");
+        }
+
         return [
           "Perfect, you are all set. I just created the calendar invite for our consultation.",
           "I am really looking forward to hearing more about your day and answering any questions you both have 🤍",
@@ -285,6 +448,8 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
       weddingYear: state.weddingYear,
       weddingYearKnown: state.weddingYearKnown,
       location: state.location,
+      venue: state.venue,
+      customerEmail: state.customerEmail,
       availability: state.availability,
       guideSent: state.guideSent,
       callProposed: state.callProposed,
@@ -301,7 +466,9 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
       guideOffered: state.guideOffered,
       askedForNames: state.askedForNames,
       askedForWeddingYear: state.askedForWeddingYear,
+      askedForVenue: state.askedForVenue,
       askedForCallTime: state.askedForCallTime,
+      askedForEmail: state.askedForEmail,
       lastAssistantIntent: state.lastAssistantIntent,
     },
     toolSummary: summary,
@@ -360,7 +527,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
   return [
     "You write final customer-facing replies for Myndful Films wedding leads.",
     "Sound like Taras, the warm founder of a premium wedding videography company. Be human, specific, and natural.",
-    "This is a real ongoing email thread. Write only the next reply, not a generic bot status update.",
+    args.state.channel === "instagram"
+      ? "This is a real ongoing Instagram DM thread. Write only the next short DM reply, not a generic bot status update."
+      : "This is a real ongoing email thread. Write only the next reply, not a generic bot status update.",
     "Never repeat the previous assistant response. Never restate the same availability intro, same guide pitch, or same call proposal unless the current customer message asks for it.",
     "Move the conversation forward from the customer's latest message. Answer their current question before adding the next step.",
     greetingInstruction,
@@ -373,10 +542,18 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
     "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
     "Gmail can use HTML links. Instagram and Telegram must use plain URLs.",
+    args.state.channel === "instagram"
+      ? "Instagram style: 1-3 short message bubbles separated by blank lines. No signature. No HTML. Warm, direct, founder-like, and concise. Ask only the next missing question."
+      : "",
+    args.state.channel === "instagram"
+      ? "Instagram sales sequence: ask fiance name/date, confirm availability and starting price, ask exact venue, ask call time, ask email, then confirm the calendar invite only after booking succeeds."
+      : "",
     "Brand voice: warm, reassuring, lightly excited, and founder-like. Use natural contractions when they fit.",
     "Allowed emojis only: 🤍 ✨ 🎥. Use exactly one brand emoji in warm first replies, availability replies, and booking confirmations. For routine scheduling/error replies, usually use no emoji. Never use more than one emoji unless the customer is very enthusiastic.",
     "Avoid filler openings like 'Thanks for sharing' on every turn. Vary phrasing naturally.",
-    "Write concise email paragraphs, usually 2-4 short paragraphs. Scheduling replies should usually be 1 paragraph.",
+    args.state.channel === "instagram"
+      ? "Write compact DM bubbles, usually 1-3 short paragraphs. Scheduling replies should not ask for permission to book if email is still missing; ask for email instead."
+      : "Write concise email paragraphs, usually 2-4 short paragraphs. Scheduling replies should usually be 1 paragraph.",
     signatureInstruction,
   ].filter(Boolean).join("\n");
 }
@@ -391,6 +568,9 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     '{"status":"pass"|"rewrite","issues":["short issue"],"revisedText":"final reply if rewrite, otherwise empty string"}',
     "Rewrite only when needed. If rewriting, preserve all required facts and do not invent any new facts.",
     "Fail and rewrite if the draft repeats the previous assistant response, greets mid-thread, includes a forbidden signature, sounds like a bot status message, ignores the customer's latest question, or exceeds the paragraph limit.",
+    args.state.channel === "instagram"
+      ? "For Instagram, fail and rewrite if the draft sounds like an email, repeats the intro, repeats the call-time question, asks for permission to book before asking for email, or says an invite was sent before booking is confirmed."
+      : "",
     "Keep the voice friendly and premium. Allowed emojis only: 🤍 ✨ 🎥. Warm first replies, availability replies, and booking confirmations should contain one brand emoji; routine scheduling replies usually should not.",
     policy.mustInclude.length ? `The final reply must include:\n- ${policy.mustInclude.join("\n- ")}` : "",
     policy.mustNotRepeat.length ? `The final reply must not repeat:\n- ${policy.mustNotRepeat.join("\n- ")}` : "",

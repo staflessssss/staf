@@ -678,6 +678,25 @@ function getWeddingSalesGraphChannel(channel: ChannelType) {
   return channel === ChannelType.INSTAGRAM ? "instagram" : "gmail";
 }
 
+function isValidRuntimeEmail(value?: string) {
+  return Boolean(value && /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value));
+}
+
+function resolveWeddingSalesDefaultEmail(args: {
+  channel: ChannelType;
+  incoming: Pick<ParsedIncomingMessage, "contactEmail" | "contactId">;
+}) {
+  if (isValidRuntimeEmail(args.incoming.contactEmail)) {
+    return args.incoming.contactEmail;
+  }
+
+  if (args.channel === ChannelType.GMAIL && isValidRuntimeEmail(args.incoming.contactId)) {
+    return args.incoming.contactId;
+  }
+
+  return undefined;
+}
+
 function classifyGmailClientMessage(args: {
   from?: string;
   subject?: string;
@@ -1103,10 +1122,14 @@ async function runWeddingSalesRuntime(args: {
     },
     args.database,
   );
+  const defaultEmail = resolveWeddingSalesDefaultEmail({
+    channel: args.channel,
+    incoming: args.incoming,
+  });
   const toolContext = createWeddingSalesToolContextFromFeatures({
     tenantId: args.agent.tenantId,
     toolFeatures,
-    defaultEmail: args.incoming.contactEmail ?? args.incoming.contactId,
+    defaultEmail,
   });
 
   const graphResult = await invokeWeddingSalesGraph({
@@ -1115,6 +1138,7 @@ async function runWeddingSalesRuntime(args: {
     contactId: args.incoming.contactId,
     channel: getWeddingSalesGraphChannel(args.channel),
     message: args.incoming.message,
+    customerEmail: defaultEmail,
     config: buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig),
     toolContext,
     checkpoint: args.database === db,

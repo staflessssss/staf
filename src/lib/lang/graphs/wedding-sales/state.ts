@@ -9,8 +9,11 @@ export type WeddingSalesLeadStage =
   | "ready_for_availability"
   | "availability_checked"
   | "answering_question"
+  | "missing_location_or_venue"
+  | "asking_call_time"
   | "call_proposed"
   | "checking_calendar"
+  | "waiting_customer_email"
   | "ready_to_book"
   | "booked"
   | "ignored";
@@ -24,6 +27,8 @@ export type WeddingSalesState = {
   weddingYear?: string;
   weddingYearKnown: boolean;
   location?: string;
+  venue?: string;
+  customerEmail?: string;
   availability?: "available" | "unavailable";
   guideSent: boolean;
   callProposed: boolean;
@@ -50,7 +55,9 @@ export type WeddingSalesState = {
   guideOffered: boolean;
   askedForNames: boolean;
   askedForWeddingYear: boolean;
+  askedForVenue: boolean;
   askedForCallTime: boolean;
+  askedForEmail: boolean;
   lastAssistantIntent?: string;
 };
 
@@ -63,6 +70,8 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   weddingYear: Annotation<string | undefined>(),
   weddingYearKnown: Annotation<boolean>(),
   location: Annotation<string | undefined>(),
+  venue: Annotation<string | undefined>(),
+  customerEmail: Annotation<string | undefined>(),
   availability: Annotation<"available" | "unavailable" | undefined>(),
   guideSent: Annotation<boolean>(),
   callProposed: Annotation<boolean>(),
@@ -89,13 +98,16 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   guideOffered: Annotation<boolean>(),
   askedForNames: Annotation<boolean>(),
   askedForWeddingYear: Annotation<boolean>(),
+  askedForVenue: Annotation<boolean>(),
   askedForCallTime: Annotation<boolean>(),
+  askedForEmail: Annotation<boolean>(),
   lastAssistantIntent: Annotation<string | undefined>(),
 });
 
 export function createInitialWeddingSalesState(args: {
   channel: WeddingSalesChannel;
   message: string;
+  customerEmail?: string;
   previousState?: Partial<WeddingSalesState>;
 }): WeddingSalesState {
   return {
@@ -107,6 +119,8 @@ export function createInitialWeddingSalesState(args: {
     weddingYear: args.previousState?.weddingYear,
     weddingYearKnown: args.previousState?.weddingYearKnown ?? false,
     location: args.previousState?.location,
+    venue: args.previousState?.venue,
+    customerEmail: args.previousState?.customerEmail ?? args.customerEmail,
     availability: args.previousState?.availability,
     guideSent: args.previousState?.guideSent ?? false,
     callProposed: args.previousState?.callProposed ?? false,
@@ -127,7 +141,9 @@ export function createInitialWeddingSalesState(args: {
     guideOffered: args.previousState?.guideOffered ?? false,
     askedForNames: args.previousState?.askedForNames ?? false,
     askedForWeddingYear: args.previousState?.askedForWeddingYear ?? false,
+    askedForVenue: args.previousState?.askedForVenue ?? false,
     askedForCallTime: args.previousState?.askedForCallTime ?? false,
+    askedForEmail: args.previousState?.askedForEmail ?? false,
     lastAssistantIntent: args.previousState?.lastAssistantIntent,
   };
 }

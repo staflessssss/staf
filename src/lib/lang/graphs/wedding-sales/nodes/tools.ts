@@ -188,10 +188,12 @@ export function createWeddingSalesToolNodes(args: {
         };
       }
 
+      const askVenueBeforeCall = state.channel === "instagram" && !state.venue;
+
       return {
         availability: "available",
         guideSent: true,
-        callProposed: true,
+        callProposed: !askVenueBeforeCall,
         leadStage: "availability_checked",
         ...(await composeReplyUpdate({
           intent: "availability_available",
@@ -204,7 +206,7 @@ export function createWeddingSalesToolNodes(args: {
           summaryStatePatch: {
             availability: "available",
             guideSent: true,
-            callProposed: true,
+            callProposed: !askVenueBeforeCall,
             leadStage: "availability_checked",
           },
         })),
@@ -228,6 +230,7 @@ export function createWeddingSalesToolNodes(args: {
         coupleName: state.names,
         weddingDate: state.weddingDate,
         location: state.location,
+        email: state.customerEmail,
         channel: state.channel,
       });
       const parsedResult = parseToolJson(result);
@@ -238,17 +241,20 @@ export function createWeddingSalesToolNodes(args: {
       );
       const summary = getSummary(parsedResult) || steps.map(getSummary).find(Boolean);
 
+      const nextIntent: WeddingSalesResponseIntent = available && !state.customerEmail ? "ask_email" : available ? "calendar_available" : outsideWindow ? "calendar_outside_window" : "calendar_busy";
+      const nextLeadStage = available && !state.customerEmail ? "waiting_customer_email" : available ? "call_proposed" : "checking_calendar";
+
       return {
         calendarStatus: available ? "available" : "busy",
-        leadStage: available ? "call_proposed" : "checking_calendar",
+        leadStage: nextLeadStage,
         ...(await composeReplyUpdate({
-          intent: available ? "calendar_available" : outsideWindow ? "calendar_outside_window" : "calendar_busy",
+          intent: nextIntent,
           config,
           state,
           summary,
           statePatch: {
             calendarStatus: available ? "available" : "busy",
-            leadStage: available ? "call_proposed" : "checking_calendar",
+            leadStage: nextLeadStage,
           },
         })),
         ...buildToolObservationUpdate({ toolName: "check_consultation_calendar", result }),
@@ -257,10 +263,30 @@ export function createWeddingSalesToolNodes(args: {
     bookCall: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
       if (!toolContext || !state.proposedCallTime) {
         return {
+          bookingConfirmed: false,
           ...(await composeReplyUpdate({
             intent: "booking_tool_missing",
             config,
             state,
+            statePatch: {
+              bookingConfirmed: false,
+            },
+          })),
+        };
+      }
+
+      if (!state.customerEmail) {
+        return {
+          leadStage: "waiting_customer_email",
+          bookingConfirmed: false,
+          ...(await composeReplyUpdate({
+            intent: "ask_email",
+            config,
+            state,
+            statePatch: {
+              leadStage: "waiting_customer_email",
+              bookingConfirmed: false,
+            },
           })),
         };
       }
@@ -271,6 +297,7 @@ export function createWeddingSalesToolNodes(args: {
         coupleName: state.names,
         weddingDate: state.weddingDate,
         location: state.location,
+        email: state.customerEmail,
         channel: state.channel,
       });
       const parsedResult = parseToolJson(result);

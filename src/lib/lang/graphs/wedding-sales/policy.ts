@@ -23,6 +23,7 @@ type BuildWeddingSalesDialogPolicyArgs = {
 };
 
 const schedulingIntents = new Set<WeddingSalesResponseIntent>([
+  "ask_email",
   "calendar_available",
   "calendar_busy",
   "calendar_outside_window",
@@ -39,16 +40,26 @@ function isFirstAssistantReply(state: WeddingSalesState) {
   return (state.assistantReplyCount ?? 0) === 0 && !state.responseDraft;
 }
 
+function hasCoupleNames(names?: string) {
+  return Boolean(names && /\s+(?:and|&)\s+/i.test(names));
+}
+
 function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
   const { intent, config, state, summary } = args;
 
   switch (intent) {
     case "ask_missing_info":
       return [
-        state.names ? "" : "ask for both names",
+        state.channel === "instagram"
+          ? hasCoupleNames(state.names) ? "" : "ask for the fiance name"
+          : state.names ? "" : "ask for both names",
         state.weddingDate ? "" : "ask for exact wedding date",
-        state.location ? "" : "ask for venue, city, or location if natural",
       ].filter(Boolean);
+    case "ask_location_or_venue":
+      return [
+        state.location ? "ask for the exact venue" : "ask for wedding city, venue, or location",
+        "do not ask again for names or date",
+      ];
     case "ask_wedding_year":
       return ["ask for the wedding year only", state.weddingDate ? `reference ${state.weddingDate}` : ""].filter(Boolean);
     case "availability_available":
@@ -56,7 +67,8 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
         state.weddingDate ? `confirm ${state.weddingDate} is available` : "confirm the date is available",
         `starting price ${config.pricing.startPrice}`,
         state.guideSent || state.guideOffered ? "" : "mention the collections guide",
-        state.callProposed ? "" : "propose a consultation call",
+        state.channel === "instagram" && !state.venue ? "ask for the exact venue before proposing a call" : "",
+        state.channel === "instagram" && !state.venue ? "" : state.callProposed ? "" : "propose a consultation call",
       ].filter(Boolean);
     case "availability_unavailable":
       return [summary || "say the wedding date is unavailable", "offer alternative dates if they have flexibility"];
@@ -68,6 +80,10 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
         "if travel is asked, say Myndful travels and travel miles are included by collection, with exact travel details handled after venue/location is known",
         "end with one natural next step toward consultation",
       ];
+    case "ask_call_time":
+      return ["acknowledge the venue if known", "ask for a quick consultation time", "mention Monday through Friday, 9 AM to 2 PM Eastern"];
+    case "ask_email":
+      return ["confirm the consultation time works", "ask for the best email for the calendar invite"];
     case "calendar_available":
       return ["say the proposed consultation time is available", "ask for permission to book it"];
     case "calendar_busy":
@@ -95,7 +111,9 @@ function buildMustNotRepeat(state: WeddingSalesState) {
     state.callProposed ? "full wedding availability intro" : "",
     state.askedForNames ? "asking for names" : "",
     state.askedForWeddingYear ? "asking for wedding year" : "",
+    state.askedForVenue ? "asking for the venue or location" : "",
     state.askedForCallTime ? "generic request for any call time" : "",
+    state.askedForEmail ? "asking for email" : "",
     state.responseDraft ? `previous assistant wording: ${state.responseDraft.slice(0, 320)}` : "",
   ].filter(Boolean);
 }
@@ -145,7 +163,14 @@ export function getWeddingSalesBehavioralStateUpdate(args: {
     guideOffered: Boolean(state.guideOffered || intent === "availability_available"),
     askedForNames: Boolean(state.askedForNames || intent === "ask_missing_info"),
     askedForWeddingYear: Boolean(state.askedForWeddingYear || intent === "ask_wedding_year"),
-    askedForCallTime: Boolean(state.askedForCallTime || intent === "availability_available" || intent === "calendar_time_missing"),
+    askedForVenue: Boolean(state.askedForVenue || intent === "ask_location_or_venue" || (intent === "availability_available" && state.channel === "instagram" && !state.venue)),
+    askedForCallTime: Boolean(
+      state.askedForCallTime ||
+        (intent === "availability_available" && (state.channel !== "instagram" || Boolean(state.venue))) ||
+        intent === "ask_call_time" ||
+        intent === "calendar_time_missing",
+    ),
+    askedForEmail: Boolean(state.askedForEmail || intent === "ask_email"),
     lastAssistantIntent: intent,
   };
 }

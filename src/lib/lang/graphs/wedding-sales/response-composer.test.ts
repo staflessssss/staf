@@ -32,7 +32,9 @@ const baseState: WeddingSalesState = {
   guideOffered: false,
   askedForNames: false,
   askedForWeddingYear: false,
+  askedForVenue: false,
   askedForCallTime: false,
+  askedForEmail: false,
 };
 
 const config = {
@@ -93,7 +95,8 @@ test("wedding sales composer uses plain links for instagram", () => {
   });
 
   assert.doesNotMatch(response, /<a href=/);
-  assert.match(response, /Callista and Kevin: https:\/\/example.com\/film/);
+  assert.match(response, /\$2,750/);
+  assert.match(response, /venue/i);
   assert.doesNotMatch(response, /Taras Mynd/);
   assert.doesNotMatch(response, /MYNDFUL FILMS/);
 });

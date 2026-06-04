@@ -37,6 +37,12 @@ export function createWeddingSalesReplyNodes(config: WeddingSalesConfig) {
         config,
         state,
       }),
+    askLocationOrVenue: async (state: WeddingSalesState) =>
+      composeReplyUpdate({
+        intent: "ask_location_or_venue",
+        config,
+        state,
+      }),
     askWeddingYear: async (state: WeddingSalesState) =>
       composeReplyUpdate({
         intent: "ask_wedding_year",
@@ -46,6 +52,18 @@ export function createWeddingSalesReplyNodes(config: WeddingSalesConfig) {
     answerQuestion: async (state: WeddingSalesState) =>
       composeReplyUpdate({
         intent: "answer_question",
+        config,
+        state,
+      }),
+    askCallTime: async (state: WeddingSalesState) =>
+      composeReplyUpdate({
+        intent: "ask_call_time",
+        config,
+        state,
+      }),
+    askEmail: async (state: WeddingSalesState) =>
+      composeReplyUpdate({
+        intent: "ask_email",
         config,
         state,
       }),

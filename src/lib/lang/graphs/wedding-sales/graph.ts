@@ -16,8 +16,11 @@ import {
 
 type WeddingSalesRoute =
   | "ask_missing_info"
+  | "ask_location_or_venue"
   | "ask_wedding_year"
   | "answer_question"
+  | "ask_call_time"
+  | "ask_email"
   | "check_availability"
   | "check_calendar"
   | "book_call"
@@ -29,6 +32,7 @@ export type InvokeWeddingSalesGraphInput = {
   tenantId?: string;
   agentId?: string;
   contactId?: string;
+  customerEmail?: string;
   previousState?: Partial<WeddingSalesState>;
   config?: Partial<WeddingSalesConfig>;
   toolContext?: WeddingSalesToolContext | null;
@@ -41,8 +45,14 @@ export function routeWeddingSalesState(state: WeddingSalesState): WeddingSalesRo
       return "ignored";
     case "waiting_wedding_year":
       return "ask_wedding_year";
+    case "missing_location_or_venue":
+      return "ask_location_or_venue";
     case "answering_question":
       return "answer_question";
+    case "asking_call_time":
+      return "ask_call_time";
+    case "waiting_customer_email":
+      return "ask_email";
     case "ready_for_availability":
       return "check_availability";
     case "checking_calendar":
@@ -102,8 +112,11 @@ export function buildWeddingSalesGraph(args: {
   const workflow = new StateGraph(WeddingSalesStateAnnotation)
     .addNode("analyze", analyzeWeddingSalesMessage)
     .addNode("ask_missing_info", replyNodes.askMissingInfo)
+    .addNode("ask_location_or_venue", replyNodes.askLocationOrVenue)
     .addNode("ask_wedding_year", replyNodes.askWeddingYear)
     .addNode("answer_question", replyNodes.answerQuestion)
+    .addNode("ask_call_time", replyNodes.askCallTime)
+    .addNode("ask_email", replyNodes.askEmail)
     .addNode("check_availability", toolNodes.checkAvailability)
     .addNode("check_calendar", toolNodes.checkCalendar)
     .addNode("book_call", toolNodes.bookCall)
@@ -111,16 +124,22 @@ export function buildWeddingSalesGraph(args: {
     .addEdge(START, "analyze")
     .addConditionalEdges("analyze", routeWeddingSalesState, {
       ask_missing_info: "ask_missing_info",
+      ask_location_or_venue: "ask_location_or_venue",
       ask_wedding_year: "ask_wedding_year",
       answer_question: "answer_question",
+      ask_call_time: "ask_call_time",
+      ask_email: "ask_email",
       check_availability: "check_availability",
       check_calendar: "check_calendar",
       book_call: "book_call",
       ignored: "ignored",
     })
     .addEdge("ask_missing_info", END)
+    .addEdge("ask_location_or_venue", END)
     .addEdge("ask_wedding_year", END)
     .addEdge("answer_question", END)
+    .addEdge("ask_call_time", END)
+    .addEdge("ask_email", END)
     .addEdge("check_availability", END)
     .addEdge("check_calendar", END)
     .addEdge("book_call", END)
@@ -139,6 +158,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
   const initialState = createInitialWeddingSalesState({
     channel: input.channel,
     message: input.message,
+    customerEmail: input.customerEmail,
     previousState: input.previousState,
   });
 
@@ -157,6 +177,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
     configurable && !input.previousState
       ? {
           channel: input.channel,
+          customerEmail: input.customerEmail,
           latestCustomerMessage: input.message,
           toolObservations: [],
           turnToolObservations: [],
