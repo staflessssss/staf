@@ -18,6 +18,8 @@ type MetaTokenResponse = {
   token_type?: string;
   expires_in?: number;
   user_id?: string;
+  tokenExchangeWarning?: string;
+  tokenLifetime?: "short_lived" | "long_lived";
 };
 
 type MetaErrorPayload = {
@@ -225,13 +227,30 @@ export async function exchangeInstagramCode(code: string) {
   const longLived = await getGraphJson<MetaTokenResponse>(
     longLivedUrl,
     "Instagram long-lived token exchange failed",
-  );
+  ).catch((error) => {
+    console.error("[instagram-oauth] long-lived token exchange failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+
+    return null;
+  });
+
+  if (!longLived?.access_token) {
+    return {
+      ...shortLived,
+      access_token: shortLived.access_token,
+      user_id: shortLived.user_id,
+      tokenExchangeWarning: "instagram-token-refresh",
+      tokenLifetime: "short_lived" as const,
+    };
+  }
 
   return {
     ...shortLived,
     ...longLived,
-    access_token: longLived.access_token || shortLived.access_token,
+    access_token: longLived.access_token,
     user_id: shortLived.user_id,
+    tokenLifetime: "long_lived" as const,
   };
 }
 

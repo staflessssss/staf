@@ -29,6 +29,7 @@ test("Instagram OAuth routes mirror authenticated client connection flow", () =>
   assert.match(callbackSource, /igUserId/);
   assert.match(callbackSource, /igScopedUserId/);
   assert.match(callbackSource, /webhookSubscriptionStatus: "dashboard_required"/);
+  assert.match(callbackSource, /tokenExchangeWarning/);
   assert.match(callbackSource, /getInstagramOAuthErrorCode/);
   assert.doesNotMatch(callbackSource, /error: "instagram-subscription"/);
 });

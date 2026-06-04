@@ -107,6 +107,8 @@ export async function GET(request: Request) {
       graphApiVersion,
       scopes: ["instagram_business_basic", "instagram_business_manage_messages"],
       tokenExpiresIn: token.expires_in ?? null,
+      tokenLifetime: token.tokenLifetime ?? null,
+      tokenExchangeWarning: token.tokenExchangeWarning ?? null,
       webhookSubscriptionStatus: "dashboard_required",
       webhookSubscriptionError: null,
       webhookSubscribedAt: null,
