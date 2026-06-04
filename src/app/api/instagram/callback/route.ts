@@ -8,6 +8,7 @@ import {
   fetchInstagramProfile,
   getMetaOAuthConfig,
   normalizeInstagramRedirectTo,
+  subscribeInstagramWebhooks,
   verifyInstagramState,
 } from "@/lib/instagram-oauth";
 
@@ -103,6 +104,23 @@ export async function GET(request: Request) {
       );
     }
 
+    const webhookSubscription = await subscribeInstagramWebhooks({
+      accessToken: token.access_token,
+      igUserId,
+    }).catch((error) => {
+      const message = error instanceof Error ? error.message : "Instagram webhook subscription failed.";
+
+      console.error("[instagram-oauth] webhook subscription failed", {
+        error: message,
+      });
+
+      return {
+        status: "subscription_failed",
+        fields: [],
+        error: message,
+      };
+    });
+
     const credentials = JSON.stringify({
       accessToken: token.access_token,
       instagramUserAccessToken: token.access_token,
@@ -123,9 +141,10 @@ export async function GET(request: Request) {
       tokenExpiresIn: token.expires_in ?? null,
       tokenLifetime: token.tokenLifetime ?? null,
       tokenExchangeWarning: token.tokenExchangeWarning ?? null,
-      webhookSubscriptionStatus: "dashboard_required",
-      webhookSubscriptionError: null,
-      webhookSubscribedAt: null,
+      webhookSubscriptionStatus: webhookSubscription.status,
+      webhookSubscriptionError: "error" in webhookSubscription ? webhookSubscription.error : null,
+      webhookSubscribedAt: webhookSubscription.status === "subscribed" ? new Date().toISOString() : null,
+      webhookSubscribedFields: webhookSubscription.fields,
       connectedAt: new Date().toISOString(),
     };
 

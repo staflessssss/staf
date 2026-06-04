@@ -24,13 +24,14 @@ test("Instagram OAuth routes mirror authenticated client connection flow", () =>
   assert.match(callbackSource, /verifyInstagramState/);
   assert.match(callbackSource, /exchangeInstagramCode/);
   assert.match(callbackSource, /fetchInstagramProfile/);
+  assert.match(callbackSource, /subscribeInstagramWebhooks/);
   assert.match(callbackSource, /saving token user_id only/);
   assert.match(callbackSource, /upsertChannelConnection/);
   assert.match(callbackSource, /type: ChannelType\.INSTAGRAM/);
   assert.match(callbackSource, /source: "instagram_login"/);
   assert.match(callbackSource, /igUserId/);
   assert.match(callbackSource, /igScopedUserId/);
-  assert.match(callbackSource, /webhookSubscriptionStatus: "dashboard_required"/);
+  assert.match(callbackSource, /webhookSubscriptionStatus: webhookSubscription\.status/);
   assert.match(callbackSource, /tokenExchangeWarning/);
   assert.match(callbackSource, /getInstagramOAuthErrorCode/);
   assert.doesNotMatch(callbackSource, /error: "instagram-subscription"/);
@@ -53,6 +54,17 @@ test("Instagram OAuth library requests Instagram Login messaging scopes", () => 
   assert.doesNotMatch(source, /instagram_manage_messages/);
   assert.doesNotMatch(source, /pages_manage_metadata/);
   assert.doesNotMatch(source, /pages_messaging/);
+});
+
+test("Instagram OAuth subscribes the connected professional account to messaging webhooks", () => {
+  const source = readFileSync(oauthLibPath, "utf8");
+
+  assert.match(source, /subscribeInstagramWebhooks/);
+  assert.match(source, /subscribed_apps/);
+  assert.match(source, /messages/);
+  assert.match(source, /messaging_seen/);
+  assert.match(source, /message_reactions/);
+  assert.match(source, /messaging_postbacks/);
 });
 
 test("Instagram OAuth redirects stay internal to the client app", () => {

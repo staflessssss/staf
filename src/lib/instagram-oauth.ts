@@ -7,6 +7,13 @@ const INSTAGRAM_SCOPES = [
   "instagram_business_manage_messages",
 ];
 
+const INSTAGRAM_WEBHOOK_SUBSCRIBED_FIELDS = [
+  "messages",
+  "messaging_seen",
+  "message_reactions",
+  "messaging_postbacks",
+];
+
 type InstagramStatePayload = {
   tenantId: string;
   redirectTo: string;
@@ -197,6 +204,19 @@ async function getGraphJson<T>(url: URL, errorLabel = "Meta Graph API request fa
   return payload as T;
 }
 
+async function postGraphJson<T>(url: URL, errorLabel = "Meta Graph API request failed"): Promise<T> {
+  const response = await fetch(url, {
+    method: "POST",
+  });
+  const payload = (await response.json().catch(() => null)) as MetaErrorPayload | null;
+
+  if (!response.ok || !payload) {
+    throw new Error(formatMetaError(payload, errorLabel));
+  }
+
+  return payload as T;
+}
+
 export async function exchangeInstagramCode(code: string) {
   const config = getMetaOAuthConfig();
   const response = await fetch("https://api.instagram.com/oauth/access_token", {
@@ -294,4 +314,31 @@ export async function refreshInstagramLongLivedToken(accessToken: string) {
   url.searchParams.set("access_token", accessToken);
 
   return getGraphJson<MetaTokenResponse>(url, "Instagram token refresh failed");
+}
+
+export async function subscribeInstagramWebhooks(args: {
+  accessToken: string;
+  igUserId: string;
+}) {
+  const config = getMetaOAuthConfig();
+  const url = new URL(
+    `https://graph.instagram.com/${config.graphApiVersion}/${args.igUserId}/subscribed_apps`,
+  );
+
+  url.searchParams.set("subscribed_fields", INSTAGRAM_WEBHOOK_SUBSCRIBED_FIELDS.join(","));
+  url.searchParams.set("access_token", args.accessToken);
+
+  const result = await postGraphJson<{ success?: boolean }>(
+    url,
+    "Instagram webhook subscription failed",
+  );
+
+  if (result.success !== true) {
+    throw new Error("Instagram webhook subscription failed.");
+  }
+
+  return {
+    status: "subscribed",
+    fields: INSTAGRAM_WEBHOOK_SUBSCRIBED_FIELDS,
+  };
 }
