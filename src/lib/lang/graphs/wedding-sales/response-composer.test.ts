@@ -102,9 +102,9 @@ test("wedding sales composer uses plain links for instagram", () => {
   assert.doesNotMatch(response, /MYNDFUL FILMS/);
 });
 
-test("instagram human composer stays deterministic instead of using the LLM composer", async () => {
+test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
-  process.env.WEDDING_SALES_LLM_COMPOSER = "true";
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
 
   try {
     const response = await composeHumanWeddingSalesResponse({
@@ -130,6 +130,31 @@ test("instagram human composer stays deterministic instead of using the LLM comp
       process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
     }
   }
+});
+
+test("instagram wedding-year fallback acknowledges newly captured names instead of repeating verbatim", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "ask_wedding_year",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "waiting_wedding_year",
+      names: "Olivia and Daniel",
+      weddingDate: undefined,
+      weddingDateText: "June 14",
+      weddingYear: undefined,
+      weddingYearKnown: false,
+      askedForWeddingYear: true,
+      latestCustomerMessage: "My fiance is Daniel",
+      assistantReplyCount: 2,
+      hasGreeted: true,
+    },
+  });
+
+  assert.match(response, /Olivia and Daniel/);
+  assert.match(response, /What year is June 14/i);
+  assert.doesNotMatch(response, /Thank you so much\. Just so I check the right date/i);
 });
 
 test("instagram missing-name follow-up avoids repeating the same full prompt", () => {

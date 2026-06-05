@@ -132,7 +132,7 @@ export function createInitialWeddingSalesState(args: {
     turnToolObservations: [],
     conversationSummary: args.previousState?.conversationSummary,
     latestCustomerMessage: args.message,
-    responseDraft: undefined,
+    responseDraft: args.previousState?.responseDraft,
     assistantReplyCount: args.previousState?.assistantReplyCount ?? 0,
     hasGreeted: args.previousState?.hasGreeted ?? false,
     signatureSent: args.previousState?.signatureSent ?? false,

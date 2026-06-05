@@ -272,6 +272,10 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           ? `Could you share the venue in ${state.location}? I want to double-check the travel details before we move forward.`
           : "Could you share the city, venue, or location for the wedding? I can check availability once I have that.";
       case "ask_wedding_year":
+        if (isInstagram(state) && state.askedForWeddingYear && state.names) {
+          return `Got it — ${state.names}. What year is ${state.weddingDateText || "the wedding date"}? I want to check the right date for you.`;
+        }
+
         return "Thank you so much. Just so I check the right date, could you share the wedding year?";
       case "availability_tool_missing":
         return "I have enough details to check the wedding date, but the availability tool is not configured yet.";
@@ -468,6 +472,7 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
 
   return {
     intent,
+    testMode: Boolean(args.testMode),
     customerMessage: state.latestCustomerMessage,
     previousAssistantResponse: state.responseDraft,
     conversationSummary: state.conversationSummary,
@@ -563,6 +568,8 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       : "This is a real ongoing email thread. Write only the next reply, not a generic bot status update.",
     "Never repeat the previous assistant response. Never restate the same availability intro, same guide pitch, or same call proposal unless the current customer message asks for it.",
     "Move the conversation forward from the customer's latest message. Answer their current question before adding the next step.",
+    "If the customer just supplied one useful missing fact but another fact is still missing, acknowledge the supplied fact briefly, then ask only for the remaining fact.",
+    "Never ask again for a detail that is already present in leadState.",
     greetingInstruction,
     `Reply mode: ${policy.replyMode}. Maximum paragraphs: ${policy.maxParagraphs}. Link style: ${policy.linkStyle}.`,
     modeInstruction,
@@ -571,6 +578,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     policy.forbiddenPhrases.length ? `Forbidden phrases or concepts. Do not use these even if they seem natural:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
     "Use the provided facts only. Do not invent availability, calendar status, prices, links, event IDs, or bookings.",
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
+    args.testMode
+      ? "TEST MODE IS ACTIVE: do not claim a real invite was sent or created. Say this is test mode and that the system would send/create the calendar invite."
+      : "",
     "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
     "Gmail can use HTML links. Instagram and Telegram must use plain URLs.",
     args.state.channel === "instagram"
@@ -578,6 +588,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       : "",
     args.state.channel === "instagram"
       ? "Instagram sales sequence: ask fiance name/date, confirm availability and starting price, ask exact venue, ask call time, ask email, then confirm the calendar invite only after booking succeeds."
+      : "",
+    args.state.channel === "instagram"
+      ? "If you need the wedding year after the customer gave a fiance name, do not repeat the prior year question verbatim. Acknowledge the fiance name naturally and ask for the year in a fresh short line."
       : "",
     "Brand voice: warm, reassuring, lightly excited, and founder-like. Use natural contractions when they fit.",
     "Allowed emojis only: 🤍 ✨ 🎥. Use exactly one brand emoji in warm first replies, availability replies, and booking confirmations. For routine scheduling/error replies, usually use no emoji. Never use more than one emoji unless the customer is very enthusiastic.",
@@ -599,8 +612,14 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     '{"status":"pass"|"rewrite","issues":["short issue"],"revisedText":"final reply if rewrite, otherwise empty string"}',
     "Rewrite only when needed. If rewriting, preserve all required facts and do not invent any new facts.",
     "Fail and rewrite if the draft repeats the previous assistant response, greets mid-thread, includes a forbidden signature, sounds like a bot status message, ignores the customer's latest question, or exceeds the paragraph limit.",
+    args.testMode
+      ? "Fail and rewrite if the draft says a real calendar invite was sent, created, booked, or confirmed. In test mode it must say the invite would be sent/created."
+      : "",
     args.state.channel === "instagram"
       ? "For Instagram, fail and rewrite if the draft sounds like an email, repeats the intro, repeats the call-time question, asks for permission to book before asking for email, or says an invite was sent before booking is confirmed."
+      : "",
+    args.state.channel === "instagram"
+      ? "For Instagram, fail and rewrite if a customer supplied a useful fact and the draft does not acknowledge it before asking for the next missing fact."
       : "",
     "Keep the voice friendly and premium. Allowed emojis only: 🤍 ✨ 🎥. Warm first replies, availability replies, and booking confirmations should contain one brand emoji; routine scheduling replies usually should not.",
     policy.mustInclude.length ? `The final reply must include:\n- ${policy.mustInclude.join("\n- ")}` : "",
@@ -704,8 +723,6 @@ async function generateWeddingSalesComposerDraft(args: ComposeWeddingSalesRespon
           safeJson(buildComposerFacts(args)),
         ].join("\n\n"),
         temperature: 0.7,
-        frequencyPenalty: 0.4,
-        presencePenalty: 0.2,
       });
 
       return {
@@ -769,7 +786,7 @@ async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
   const fallback = composeWeddingSalesResponse(args);
 
-  if (isInstagram(args.state)) {
+  if (args.testMode && args.intent === "booking_confirmed") {
     return fallback;
   }
 

@@ -5,6 +5,7 @@ import { encrypt } from "@/lib/crypto";
 
 import { invokeWeddingSalesGraph } from "./graph";
 import { weddingSalesAnalyzeTestHelpers } from "./nodes/analyze";
+import { createInitialWeddingSalesState } from "./state";
 
 test("wedding sales graph asks for year before checking availability", async () => {
   const result = await invokeWeddingSalesGraph({
@@ -15,6 +16,22 @@ test("wedding sales graph asks for year before checking availability", async () 
   assert.equal(result.leadStage, "waiting_wedding_year");
   assert.equal(result.weddingDateText, "June 14");
   assert.match(result.responseDraft ?? "", /year/i);
+});
+
+test("wedding sales initial state preserves previous assistant response for anti-repeat policy", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "My fiance is Daniel",
+    previousState: {
+      responseDraft: "Thank you so much. Just so I check the right date, could you share the wedding year?",
+      assistantReplyCount: 1,
+    },
+  });
+
+  assert.equal(
+    state.responseDraft,
+    "Thank you so much. Just so I check the right date, could you share the wedding year?",
+  );
 });
 
 test("wedding sales graph combines a previously mentioned month-day with a later year", async () => {
