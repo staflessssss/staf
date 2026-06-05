@@ -238,13 +238,16 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           const customerName = formatInstagramCustomerAddress(state);
           const missingDate = !state.weddingDate && !state.weddingDateText;
           const missingNames = !hasCoupleNames(state.names);
+          const hasAnyName = Boolean(state.names?.trim());
           const askParts = [
-            missingNames ? "your fiancé’s name" : "",
+            missingNames ? (hasAnyName ? "your fiancé’s name" : "both of your names") : "",
             missingDate ? "the date of your wedding" : "",
           ].filter(Boolean);
 
           if (missingNames && state.askedForNames && !missingDate) {
-            return "I may be missing it — could you send just your fiancé’s first name? ✨";
+            return hasAnyName
+              ? "I may be missing it — could you send just your fiancé’s first name? ✨"
+              : "I may be missing it — could you send both of your first names? ✨";
           }
 
           return [

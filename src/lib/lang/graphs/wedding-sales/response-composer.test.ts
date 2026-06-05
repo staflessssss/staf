@@ -179,6 +179,50 @@ test("instagram missing-name follow-up avoids repeating the same full prompt", (
   assert.doesNotMatch(response, /That way I can check our availability/i);
 });
 
+test("instagram first missing-info reply asks for both names when no name is known", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "missing_names_or_date",
+      names: undefined,
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      askedForNames: false,
+      assistantReplyCount: 0,
+      hasGreeted: false,
+    },
+  });
+
+  assert.match(response, /both of your names/i);
+  assert.match(response, /date of your wedding/i);
+  assert.doesNotMatch(response, /sharing your fiancé’s name and the date/i);
+});
+
+test("instagram first missing-info reply asks only for fiance name when customer name is known", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "missing_names_or_date",
+      names: "Rachel",
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      askedForNames: false,
+      assistantReplyCount: 0,
+      hasGreeted: false,
+    },
+  });
+
+  assert.match(response, /fiancé’s name/i);
+  assert.match(response, /date of your wedding/i);
+  assert.doesNotMatch(response, /both of your names/i);
+});
+
 test("unavailable-date follow-up answers pricing without repeating availability check copy", () => {
   const response = composeWeddingSalesResponse({
     intent: "answer_question",

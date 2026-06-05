@@ -51,7 +51,11 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
     case "ask_missing_info":
       return [
         state.channel === "instagram"
-          ? hasCoupleNames(state.names) ? "" : "ask for the fiance name"
+          ? hasCoupleNames(state.names)
+            ? ""
+            : state.names
+              ? "ask for the fiance name"
+              : "ask for both names"
           : state.names ? "" : "ask for both names",
         state.weddingDate ? "" : "ask for exact wedding date",
       ].filter(Boolean);
