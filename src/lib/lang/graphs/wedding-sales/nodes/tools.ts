@@ -75,6 +75,7 @@ async function composeReplyUpdate(args: {
   config: WeddingSalesConfig;
   state: WeddingSalesState;
   summary?: string;
+  testMode?: boolean;
   statePatch?: Partial<WeddingSalesState>;
   summaryStatePatch?: Partial<WeddingSalesState>;
 }) {
@@ -302,6 +303,8 @@ export function createWeddingSalesToolNodes(args: {
       });
       const parsedResult = parseToolJson(result);
       const { bookingConfirmed, eventId } = getBookingOutcome(parsedResult);
+      const summary = getSummary(parsedResult);
+      const testMode = parsedResult.mode === "test";
 
       return {
         bookingConfirmed,
@@ -311,6 +314,8 @@ export function createWeddingSalesToolNodes(args: {
           intent: bookingConfirmed ? "booking_confirmed" : "booking_failed",
           config,
           state,
+          summary,
+          testMode,
           statePatch: {
             bookingConfirmed,
             bookedEventId: eventId,

@@ -31,6 +31,7 @@ import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { buildWeddingSalesConfigFromChannelConfig } from "@/lib/lang/graphs/wedding-sales/config-from-agent";
 import { invokeWeddingSalesGraph } from "@/lib/lang/graphs/wedding-sales/graph";
+import type { WeddingSalesState } from "@/lib/lang/graphs/wedding-sales/state";
 import { createWeddingSalesToolContextFromFeatures } from "@/lib/lang/graphs/wedding-sales/tools";
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
@@ -145,6 +146,8 @@ type LangGraphToolObservation = {
   toolName: string;
   result: string;
 };
+
+const WEDDING_SALES_TEST_STATE_TOOL_NAME = "__wedding_sales_state";
 
 export type InvokeAgentResult = {
   message: string;
@@ -917,6 +920,109 @@ function buildHistoryAppend(args: {
   ];
 }
 
+function parseToolObservationResult(result: string) {
+  try {
+    return JSON.parse(result) as unknown;
+  } catch {
+    return result;
+  }
+}
+
+function extractWeddingSalesTestState(historyMessages?: RuntimeHistoryMessage[]) {
+  const stateMessage = [...(historyMessages ?? [])]
+    .reverse()
+    .find((message) => message.role === MessageRole.TOOL && message.toolName === WEDDING_SALES_TEST_STATE_TOOL_NAME);
+
+  const rawState =
+    stateMessage?.toolResult &&
+    typeof stateMessage.toolResult === "object" &&
+    !Array.isArray(stateMessage.toolResult) &&
+    "state" in stateMessage.toolResult
+      ? stateMessage.toolResult.state
+      : stateMessage?.toolResult;
+
+  return rawState && typeof rawState === "object" && !Array.isArray(rawState)
+    ? (rawState as Partial<WeddingSalesState>)
+    : undefined;
+}
+
+function buildWeddingSalesTestHistoryAppend(args: {
+  state: WeddingSalesState;
+  assistantText: string;
+}) {
+  const toolMessages = args.state.turnToolObservations.map((observation): RuntimeHistoryMessage => {
+    const parsedResult = parseToolObservationResult(observation.result);
+
+    return {
+      role: MessageRole.TOOL,
+      content: typeof parsedResult === "string" ? parsedResult : JSON.stringify(parsedResult),
+      toolName: observation.toolName,
+      toolResult: parsedResult,
+    };
+  });
+
+  return [
+    ...toolMessages,
+    {
+      role: MessageRole.TOOL,
+      content: JSON.stringify({ state: args.state }),
+      toolName: WEDDING_SALES_TEST_STATE_TOOL_NAME,
+      toolResult: { state: args.state },
+      model: "langgraph_wedding_sales_state",
+    },
+    {
+      role: MessageRole.ASSISTANT,
+      content: args.assistantText,
+      model: "langgraph_wedding_sales",
+    },
+  ] satisfies RuntimeHistoryMessage[];
+}
+
+async function runWeddingSalesTestRuntime(args: {
+  agent: IncomingEventAgent;
+  input: InvokeAgentInput;
+  toolFeatures: RuntimeBlocks["toolFeatures"];
+}) {
+  const defaultEmail = resolveWeddingSalesDefaultEmail({
+    channel: args.agent.channel.type,
+    incoming: {
+      contactId: args.input.contactId,
+      contactEmail: args.input.contactEmail,
+    },
+  });
+  const toolContext = createWeddingSalesToolContextFromFeatures({
+    tenantId: args.agent.tenantId,
+    toolFeatures: args.toolFeatures,
+    testMode: true,
+    defaultEmail,
+  });
+  const graphResult = await invokeWeddingSalesGraph({
+    tenantId: args.agent.tenantId,
+    agentId: args.agent.id,
+    contactId: args.input.contactId,
+    channel: getWeddingSalesGraphChannel(args.agent.channel.type),
+    message: args.input.message,
+    customerEmail: defaultEmail,
+    previousState: extractWeddingSalesTestState(args.input.historyMessages),
+    config: buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig),
+    toolContext,
+    checkpoint: false,
+  });
+  const message = graphResult.responseDraft ?? "";
+
+  return {
+    message,
+    promptPreview: "langgraph_wedding_sales",
+    usedTooling: graphResult.turnToolObservations.map((observation) => observation.toolName),
+    model: "langgraph_wedding_sales",
+    historyAppend: buildWeddingSalesTestHistoryAppend({
+      state: graphResult,
+      assistantText: message,
+    }),
+    suppressReply: !message,
+  } satisfies InvokeAgentResult;
+}
+
 function isPartialDeliveryResult(
   delivery: unknown,
 ): delivery is {
@@ -1496,6 +1602,17 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
           },
         ],
       };
+    }
+
+    if (shouldUseWeddingSalesRuntime({ channel: agent.channel.type, runtimeType })) {
+      return runWeddingSalesTestRuntime({
+        agent,
+        input: {
+          ...input,
+          historyMessages,
+        },
+        toolFeatures: runtimeBlocks.toolFeatures,
+      });
     }
 
     const modelResult = await runModelInvocation({

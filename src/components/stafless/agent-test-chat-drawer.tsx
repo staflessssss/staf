@@ -18,8 +18,11 @@ type TestChatDrawerProps = {
 
 type VisibleChatMessage = {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   text: string;
+  toolName?: string;
+  toolResult?: unknown;
+  durationMs?: number;
   usedTooling?: string[];
 };
 
@@ -41,6 +44,69 @@ type InvokeResponse = {
   };
   error?: string;
 };
+
+const HIDDEN_WEDDING_SALES_STATE_TOOL_NAME = "__wedding_sales_state";
+
+function stringifyTraceValue(value: unknown) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function buildVisibleTraceMessages(args: {
+  historyAppend: HiddenHistoryMessage[];
+  fallbackAssistantText: string;
+  fallbackUsedTooling: string[];
+  suppressReply?: boolean;
+}) {
+  const visible = args.historyAppend
+    .filter((entry) => entry.toolName !== HIDDEN_WEDDING_SALES_STATE_TOOL_NAME)
+    .filter((entry) => entry.role === "TOOL" || entry.role === "ASSISTANT")
+    .map((entry, index): VisibleChatMessage => {
+      if (entry.role === "TOOL") {
+        return {
+          id: `tool-${Date.now()}-${index}`,
+          role: "tool",
+          text: entry.content || stringifyTraceValue(entry.toolResult),
+          toolName: entry.toolName ?? "tool",
+          toolResult: entry.toolResult,
+          durationMs: entry.durationMs,
+        };
+      }
+
+      return {
+        id: `assistant-${Date.now()}-${index}`,
+        role: "assistant",
+        text: entry.content,
+        usedTooling: args.fallbackUsedTooling,
+      };
+    });
+
+  if (visible.length > 0) {
+    return visible;
+  }
+
+  return args.suppressReply
+    ? []
+    : [
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant" as const,
+          text: args.fallbackAssistantText,
+          usedTooling: args.fallbackUsedTooling,
+        },
+      ];
+}
 
 export function AgentTestChatDrawer({
   tenantId,
@@ -127,17 +193,15 @@ export function AgentTestChatDrawer({
         return;
       }
 
-      if (!result.item.suppressReply) {
-        setVisibleMessages((current) => [
-          ...current,
-          {
-            id: `assistant-${Date.now()}`,
-            role: "assistant",
-            text: result.item?.message ?? "",
-            usedTooling: result.item?.usedTooling ?? [],
-          },
-        ]);
-      }
+      const appendedHistory = result.item.historyAppend ?? [];
+      const visibleTraceMessages = buildVisibleTraceMessages({
+        historyAppend: appendedHistory,
+        fallbackAssistantText: result.item.message,
+        fallbackUsedTooling: result.item.usedTooling ?? [],
+        suppressReply: result.item.suppressReply,
+      });
+
+      setVisibleMessages((current) => [...current, ...visibleTraceMessages]);
       setHistoryMessages((current) => [
         ...current,
         {
@@ -145,7 +209,7 @@ export function AgentTestChatDrawer({
           content: trimmed,
           createdAt: new Date().toISOString(),
         },
-        ...((result.item?.historyAppend ?? []).map((historyEntry) => ({
+        ...(appendedHistory.map((historyEntry) => ({
           role: historyEntry.role,
           content: historyEntry.content,
           toolName: historyEntry.toolName,
@@ -221,11 +285,32 @@ export function AgentTestChatDrawer({
                     className={
                       chatMessage.role === "user"
                         ? "ml-10 rounded-[18px] bg-[#221b2d] px-4 py-3 text-sm leading-6 text-white"
-                        : "mr-10 rounded-[18px] border border-[#e5d8c8] bg-white px-4 py-3 text-sm leading-6 text-[#433a49]"
+                        : chatMessage.role === "tool"
+                          ? "rounded-[16px] border border-[#d7a96d]/35 bg-[#fff8ee] px-4 py-3 text-xs leading-5 text-[#5d4b38]"
+                          : "mr-10 rounded-[18px] border border-[#e5d8c8] bg-white px-4 py-3 text-sm leading-6 text-[#433a49]"
                     }
                   >
-                    <p>{chatMessage.text}</p>
-                    {audience === "admin" && chatMessage.usedTooling?.length ? (
+                    {chatMessage.role === "tool" ? (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#9c6b35]">
+                            Function call
+                          </span>
+                          {chatMessage.durationMs ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9c6b35]/70">
+                              {chatMessage.durationMs}ms
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="font-semibold text-[#2f2418]">{chatMessage.toolName}</p>
+                        <pre className="max-h-64 overflow-auto rounded-xl border border-[#e5d8c8] bg-white/70 p-3 text-[11px] leading-5 text-[#433a49]">
+                          {stringifyTraceValue(chatMessage.toolResult) || chatMessage.text}
+                        </pre>
+                      </div>
+                    ) : (
+                      <p>{chatMessage.text}</p>
+                    )}
+                    {chatMessage.role === "assistant" && chatMessage.usedTooling?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {chatMessage.usedTooling.map((toolName) => (
                           <span

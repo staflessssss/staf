@@ -32,6 +32,16 @@ function toGoogleStepConfig(step: RuntimeToolStep) {
   };
 }
 
+function getStepOperation(step: RuntimeToolStep) {
+  return step.params &&
+    typeof step.params === "object" &&
+    !Array.isArray(step.params) &&
+    "operation" in step.params &&
+    typeof step.params.operation === "string"
+    ? step.params.operation
+    : null;
+}
+
 export function createWeddingSalesToolContextFromFeatures(args: {
   tenantId: string;
   toolFeatures: RuntimeToolFeature[];
@@ -42,6 +52,7 @@ export function createWeddingSalesToolContextFromFeatures(args: {
     args.toolFeatures,
     (feature, step) =>
       step.integration.type === IntegrationType.GOOGLE_SHEETS &&
+      getStepOperation(step) === "capacity_availability" &&
       (includesAny(feature.name, ["wedding availability", "availability"]) ||
         includesAny(step.action, ["capacity availability"])),
   );

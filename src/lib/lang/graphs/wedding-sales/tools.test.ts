@@ -47,7 +47,7 @@ test("wedding sales tool context maps booking to booking function, not calendar 
       name: "Check wedding availability",
       step: {
         action: "check capacity availability in sheet",
-        params: {},
+        params: { operation: "capacity_availability" },
         integration: {
           ...baseIntegration,
           id: "sheets-1",
@@ -91,4 +91,55 @@ test("wedding sales tool context maps booking to booking function, not calendar 
   assert.ok(context);
   assert.equal(context.consultationCalendar.action, "check consultation calendar availability");
   assert.equal(context.bookConsultation.action, "book call and send invite");
+});
+
+test("wedding sales tool context does not select write-style Sheets steps as availability", () => {
+  const toolFeatures = [
+    feature({
+      id: "availability",
+      name: "Check wedding availability",
+      step: {
+        action: "append row to sheet",
+        params: { operation: "append_row" },
+        integration: {
+          ...baseIntegration,
+          id: "sheets-1",
+          type: IntegrationType.GOOGLE_SHEETS,
+        },
+      },
+    }),
+    feature({
+      id: "calendar-check",
+      name: "Check consultation calendar",
+      step: {
+        action: "check consultation calendar availability",
+        params: { calendarId: "calendar-check" },
+        integration: {
+          ...baseIntegration,
+          id: "calendar-1",
+          type: IntegrationType.GOOGLE_CALENDAR,
+        },
+      },
+    }),
+    feature({
+      id: "calendar-book",
+      name: "Book consultation call",
+      step: {
+        action: "book call and send invite",
+        params: { calendarId: "calendar-book" },
+        integration: {
+          ...baseIntegration,
+          id: "calendar-1",
+          type: IntegrationType.GOOGLE_CALENDAR,
+        },
+      },
+    }),
+  ];
+
+  const context = createWeddingSalesToolContextFromFeatures({
+    tenantId: "tenant-1",
+    toolFeatures,
+  });
+
+  assert.equal(context, null);
 });

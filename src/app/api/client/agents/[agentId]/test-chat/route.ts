@@ -5,6 +5,8 @@ import { invokeAgent } from "@/lib/ai-runtime";
 import { requireClientApiSession } from "@/lib/client-api-auth";
 import { db } from "@/lib/db";
 
+import { sanitizeClientTestChatResponse } from "./redaction";
+
 const clientTestChatSchema = z.object({
   contactId: z.string().trim().min(1).max(120).optional(),
   message: z.string().trim().min(1).max(4_000),
@@ -80,5 +82,5 @@ export async function POST(
     })),
   });
 
-  return NextResponse.json({ item: response });
+  return NextResponse.json({ item: sanitizeClientTestChatResponse(response) });
 }

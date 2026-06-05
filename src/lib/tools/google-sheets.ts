@@ -12,6 +12,7 @@ type SheetsExecutionArgs = {
   request: string;
   metadata?: Prisma.JsonValue | null;
   credentialsEnc?: string;
+  testMode?: boolean;
   date?: string;
   timeText?: string;
   coupleName?: string;
@@ -1056,18 +1057,6 @@ async function runSheetsCapacityAvailability(args: SheetsExecutionArgs) {
 async function runSheetsAppend(args: SheetsExecutionArgs) {
   const config = parseSheetsAppendConfig(args.params, args.metadata);
 
-  if (!args.credentialsEnc) {
-    return {
-      integration: "GOOGLE_SHEETS",
-      mode: "live_unavailable",
-      status: "missing_credentials",
-      action: args.action,
-      summary: "This Google Sheets integration does not have usable OAuth credentials.",
-      params: args.params,
-      request: args.request,
-    };
-  }
-
   if (!config.spreadsheetId || !config.sheetName) {
     return {
       integration: "GOOGLE_SHEETS",
@@ -1087,6 +1076,34 @@ async function runSheetsAppend(args: SheetsExecutionArgs) {
       status: "missing_mappings",
       action: args.action,
       summary: "This Google Sheets action needs at least one column mapping before it can append a row.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (args.testMode) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "test",
+      status: "skipped",
+      action: args.action,
+      operation: config.operation,
+      spreadsheetId: config.spreadsheetId,
+      spreadsheetTitle: config.spreadsheetTitle ?? null,
+      sheetName: config.sheetName,
+      summary: "Test mode skips appending a Google Sheets row.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (!args.credentialsEnc) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_credentials",
+      action: args.action,
+      summary: "This Google Sheets integration does not have usable OAuth credentials.",
       params: args.params,
       request: args.request,
     };
@@ -1164,18 +1181,6 @@ async function runSheetsAppend(args: SheetsExecutionArgs) {
 async function runSheetsUpdate(args: SheetsExecutionArgs) {
   const config = parseSheetsUpdateConfig(args.params, args.metadata);
 
-  if (!args.credentialsEnc) {
-    return {
-      integration: "GOOGLE_SHEETS",
-      mode: "live_unavailable",
-      status: "missing_credentials",
-      action: args.action,
-      summary: "This Google Sheets integration does not have usable OAuth credentials.",
-      params: args.params,
-      request: args.request,
-    };
-  }
-
   if (!config.spreadsheetId || !config.sheetName) {
     return {
       integration: "GOOGLE_SHEETS",
@@ -1207,6 +1212,34 @@ async function runSheetsUpdate(args: SheetsExecutionArgs) {
       status: "missing_mappings",
       action: args.action,
       summary: "This Google Sheets update action needs at least one column mapping before it can run.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (args.testMode) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "test",
+      status: "skipped",
+      action: args.action,
+      operation: config.operation,
+      spreadsheetId: config.spreadsheetId,
+      spreadsheetTitle: config.spreadsheetTitle ?? null,
+      sheetName: config.sheetName,
+      summary: "Test mode skips updating Google Sheets rows.",
+      params: args.params,
+      request: args.request,
+    };
+  }
+
+  if (!args.credentialsEnc) {
+    return {
+      integration: "GOOGLE_SHEETS",
+      mode: "live_unavailable",
+      status: "missing_credentials",
+      action: args.action,
+      summary: "This Google Sheets integration does not have usable OAuth credentials.",
       params: args.params,
       request: args.request,
     };

@@ -151,6 +151,28 @@ test("wedding sales composer confirms consultation booking warmly without weddin
   assert.equal(response.match(/Taras Mynd/g)?.length ?? 0, 0);
 });
 
+test("wedding sales composer labels test-mode booking without claiming a live invite was sent", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "booking_confirmed",
+    summary: "This consultation slot could be booked without triggering live calendar or lead side effects.",
+    testMode: true,
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "booked",
+      bookingConfirmed: true,
+      proposedCallTime: "Monday at 11am",
+      customerEmail: "rachel@example.com",
+    },
+  });
+
+  assert.match(response, /test mode/i);
+  assert.match(response, /would send a calendar invite/i);
+  assert.doesNotMatch(response, /I've sent/i);
+  assert.doesNotMatch(response, /sent a calendar invite/i);
+});
+
 test("LLM wedding sales finalizer removes model-added duplicate signatures", () => {
   const response = finalizeLlmWeddingSalesResponse({
     intent: "availability_available",

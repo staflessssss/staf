@@ -617,5 +617,7 @@ test("instagram wedding sales confirms booking only after the booking tool succe
   assert.equal(result.leadStage, "booked");
   assert.equal(result.bookingConfirmed, true);
   assert.equal(result.turnToolObservations.at(-1)?.toolName, "book_consultation");
-  assert.match(result.responseDraft ?? "", /sent a calendar invite to rachel@example.com/i);
+  assert.match(result.responseDraft ?? "", /test mode/i);
+  assert.match(result.responseDraft ?? "", /would send a calendar invite to rachel@example.com/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /I've sent/i);
 });

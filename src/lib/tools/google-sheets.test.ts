@@ -64,3 +64,47 @@ test("capacity availability runtime does not silently default explicit empty rul
   assert.equal(Array.isArray(result), false);
   assert.equal((result as { status?: string }).status, "missing_capacity_rules");
 });
+
+test("Google Sheets append skips writes in test mode before requiring credentials", async () => {
+  const result = await executeGoogleSheetsStep({
+    action: "append row to sheet",
+    request: "Log a lead",
+    testMode: true,
+    params: {
+      operation: "append_row",
+      spreadsheetId: "sheet-id",
+      sheetName: "Leads",
+      headerRow: 1,
+      columnMappings: [{ column: "email", valueSource: "email" }],
+    },
+    email: "rachel@example.com",
+  });
+
+  assert.equal(typeof result, "object");
+  assert.equal(Array.isArray(result), false);
+  assert.equal((result as { mode?: string }).mode, "test");
+  assert.equal((result as { status?: string }).status, "skipped");
+});
+
+test("Google Sheets update skips writes in test mode before requiring credentials", async () => {
+  const result = await executeGoogleSheetsStep({
+    action: "update rows in sheet",
+    request: "Mark lead booked",
+    testMode: true,
+    params: {
+      operation: "update_rows",
+      spreadsheetId: "sheet-id",
+      sheetName: "Leads",
+      headerRow: 1,
+      combineFilters: "AND",
+      filters: [{ column: "email", operator: "equals", valueSource: "email" }],
+      columnMappings: [{ column: "status", valueSource: "literal", value: "Booked" }],
+    },
+    email: "rachel@example.com",
+  });
+
+  assert.equal(typeof result, "object");
+  assert.equal(Array.isArray(result), false);
+  assert.equal((result as { mode?: string }).mode, "test");
+  assert.equal((result as { status?: string }).status, "skipped");
+});

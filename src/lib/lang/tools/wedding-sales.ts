@@ -49,6 +49,7 @@ export function checkWeddingAvailabilityTool(context: WeddingSalesToolContext) {
         location,
         email,
         channel,
+        testMode: context.testMode,
       });
 
       return stringifyToolResult(result);

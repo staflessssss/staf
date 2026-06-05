@@ -30,6 +30,7 @@ type ComposeWeddingSalesResponseArgs = {
   config: WeddingSalesConfig;
   state: WeddingSalesState;
   summary?: string;
+  testMode?: boolean;
   policy?: WeddingSalesDialogPolicy;
 };
 
@@ -392,6 +393,21 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       case "booking_tool_missing":
         return "I can book the consultation once I have the confirmed time and booking tool configured.";
       case "booking_confirmed":
+        if (args.testMode || (summary && /\btest mode\b/i.test(summary))) {
+          const callTime = formatCallTimeForReply(state.proposedCallTime);
+          const email = state.customerEmail ? ` to ${state.customerEmail}` : "";
+
+          return isInstagram(state)
+            ? [
+                `Test mode: this would send a calendar invite${email} for ${callTime}.`,
+                "Anything else you’d like to test before we chat?",
+              ].join("\n\n")
+            : [
+                `Test mode: this would create the calendar invite${email} for ${callTime}.`,
+                "No live invite or lead log was sent.",
+              ].join("\n\n");
+        }
+
         if (isInstagram(state)) {
           const callTime = formatCallTimeForReply(state.proposedCallTime);
           const email = state.customerEmail ? ` to ${state.customerEmail}` : "";
