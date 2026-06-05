@@ -15,7 +15,7 @@ type InstagramCredentials = {
 const DEFAULT_GRAPH_API_VERSION = "v25.0";
 
 type InstagramMessagingEvent = {
-  sender?: { id?: string };
+  sender?: { id?: string; username?: string; name?: string };
   recipient?: { id?: string };
   timestamp?: number;
   message?: {
@@ -26,6 +26,8 @@ type InstagramMessagingEvent = {
 
 type InstagramPayload = {
   contactId?: string;
+  contactUsername?: string;
+  contactDisplayName?: string;
   text?: string;
   body?: string;
   direction?: string;
@@ -195,6 +197,8 @@ export const instagramAdapter = {
 
     return {
       contactId: String(payload.contactId ?? event?.sender?.id ?? ""),
+      contactUsername: String(payload.contactUsername ?? event?.sender?.username ?? ""),
+      contactDisplayName: String(payload.contactDisplayName ?? event?.sender?.name ?? ""),
       message: String(payload.text ?? payload.body ?? event?.message?.text ?? ""),
       messageId: String(event?.message?.mid ?? ""),
       eventTimestamp: parseInstagramTimestamp(event?.timestamp),

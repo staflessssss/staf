@@ -81,6 +81,31 @@ function getContactName(contactId: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+type ConversationContact = {
+  channel: ChannelType;
+  contactId: string;
+  contactUsername?: string | null;
+  contactDisplayName?: string | null;
+};
+
+function formatInstagramUsername(username: string) {
+  const normalized = username.trim().replace(/^@+/, "");
+  return normalized ? `@${normalized}` : "";
+}
+
+function getConversationContactName(conversation: ConversationContact) {
+  if (conversation.channel === ChannelType.INSTAGRAM) {
+    const username = conversation.contactUsername
+      ? formatInstagramUsername(conversation.contactUsername)
+      : "";
+
+    if (username) return username;
+    if (conversation.contactDisplayName?.trim()) return conversation.contactDisplayName.trim();
+  }
+
+  return getContactName(conversation.contactId);
+}
+
 function isEmail(value: string | null | undefined) {
   return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
 }
@@ -366,7 +391,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
     (message) => message.role === MessageRole.TOOL,
   );
   const selectedContactName = selectedConversation
-    ? getContactName(selectedConversation.contactId)
+    ? getConversationContactName(selectedConversation)
     : "No conversation yet";
   const selectedChannel = selectedConversation
     ? formatChannel(selectedConversation.channel)
@@ -414,6 +439,9 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   );
   const leadRows = [
     ["Name", selectedLeadDetails?.coupleName ?? fallbackLeadDetails?.coupleName ?? selectedContactName],
+    ...(selectedConversation?.channel === ChannelType.INSTAGRAM
+      ? [["Instagram", selectedContactName]]
+      : []),
     [
       "Email",
       selectedEmail ?? (isEmail(fallbackLeadDetails?.email) ? fallbackLeadDetails?.email : "Not captured yet"),
@@ -529,7 +557,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               </div>
             ) : (
               conversations.map((item) => {
-                const name = getContactName(item.contactId);
+                const name = getConversationContactName(item);
                 const channel = formatChannel(item.channel);
                 const preview = getLastMessagePreview(item.messages);
                 const isSelected = selectedConversation?.id === item.id;

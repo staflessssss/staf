@@ -13,6 +13,13 @@ import {
 } from "@/lib/delayed-delivery-background";
 import { splitInstagramMessagingPayloads } from "@/lib/instagram-webhook";
 
+type InstagramCredentials = ReturnType<typeof parseInstagramCredentials>;
+
+type InstagramContactProfile = {
+  username?: string;
+  name?: string;
+};
+
 function hasValidInstagramSignature(rawBody: string, signatureHeader: string | null) {
   const appSecret =
     process.env.INSTAGRAM_APP_SECRET?.trim() || process.env.META_APP_SECRET?.trim();
@@ -228,11 +235,74 @@ async function findInstagramAgentByRecipientId(recipientId: string) {
         agent,
         channelId: channel.id,
         metadata: channel.metadata,
+        credentials,
       };
     }
   }
 
   return null;
+}
+
+async function resolveInstagramContactProfile(
+  senderId: string,
+  credentials: InstagramCredentials,
+): Promise<InstagramContactProfile | null> {
+  if (!senderId || !credentials.pageAccessToken) {
+    return null;
+  }
+
+  const hosts =
+    credentials.igUserId || credentials.igBusinessAccountId
+      ? ["https://graph.instagram.com", "https://graph.facebook.com"]
+      : ["https://graph.facebook.com", "https://graph.instagram.com"];
+
+  for (const host of hosts) {
+    try {
+      const response = await fetch(
+        `${host}/${credentials.graphApiVersion}/${senderId}?fields=username,name,profile_pic`,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.pageAccessToken}`,
+          },
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as unknown;
+
+      if (!response.ok || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+        continue;
+      }
+
+      const record = payload as Record<string, unknown>;
+      const username = typeof record.username === "string" ? record.username.trim() : "";
+      const name = typeof record.name === "string" ? record.name.trim() : "";
+
+      if (username || name) {
+        return {
+          ...(username ? { username } : {}),
+          ...(name ? { name } : {}),
+        };
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function withInstagramContactProfile(
+  payload: unknown,
+  profile: InstagramContactProfile | null,
+) {
+  if (!profile || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    ...(profile.username ? { contactUsername: profile.username } : {}),
+    ...(profile.name ? { contactDisplayName: profile.name } : {}),
+  };
 }
 
 async function findInstagramChannelByAccountId(accountId: string) {
@@ -398,10 +468,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Agent not found." }, { status: 404 });
       }
 
+      const contactProfile = await resolveInstagramContactProfile(senderId, route.credentials);
       const result = await handleIncomingEvent({
         agentId: agent.id,
         channel: "INSTAGRAM",
-        payload: eventPayload,
+        payload: withInstagramContactProfile(eventPayload, contactProfile),
       }).catch(async (error) => {
         await safeRecordInstagramWebhookStatus({
           channelId: route.channelId,

@@ -35,6 +35,52 @@ test("parseInstagramCredentials accepts JSON credentials", () => {
   );
 });
 
+test("instagram adapter preserves contact profile fields from webhook payload", () => {
+  const parsed = instagramAdapter.parseIncoming({
+    contactUsername: "smok1ngcrypto",
+    contactDisplayName: "Smoking Crypto",
+    entry: [
+      {
+        messaging: [
+          {
+            sender: { id: "2635163460242818" },
+            message: { text: "Hello", mid: "mid-1" },
+            timestamp: 1717600000000,
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(parsed.contactId, "2635163460242818");
+  assert.equal(parsed.contactUsername, "smok1ngcrypto");
+  assert.equal(parsed.contactDisplayName, "Smoking Crypto");
+  assert.equal(parsed.message, "Hello");
+});
+
+test("instagram adapter can read contact profile fields from sender metadata", () => {
+  const parsed = instagramAdapter.parseIncoming({
+    entry: [
+      {
+        messaging: [
+          {
+            sender: {
+              id: "2635163460242818",
+              username: "smok1ngcrypto",
+              name: "Smoking Crypto",
+            },
+            message: { text: "Hello", mid: "mid-1" },
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(parsed.contactId, "2635163460242818");
+  assert.equal(parsed.contactUsername, "smok1ngcrypto");
+  assert.equal(parsed.contactDisplayName, "Smoking Crypto");
+});
+
 test("instagram adapter sends plain text through Meta Graph API", async () => {
   let requestUrl = "";
   let requestBody: unknown = null;

@@ -97,6 +97,8 @@ type RuntimeAttachment = {
 
 type ParsedIncomingMessage = {
   contactId: string;
+  contactUsername?: string;
+  contactDisplayName?: string;
   contactEmail?: string;
   message: string;
   messageId?: string;
@@ -121,6 +123,24 @@ type RuntimeChannelAdapter = {
     channelConfig?: unknown;
   }) => Promise<unknown>;
 };
+
+function normalizeOptionalText(value?: string) {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function buildContactProfileUpdate(args: {
+  contactUsername?: string;
+  contactDisplayName?: string;
+}) {
+  const contactUsername = normalizeOptionalText(args.contactUsername);
+  const contactDisplayName = normalizeOptionalText(args.contactDisplayName);
+
+  return {
+    ...(contactUsername ? { contactUsername } : {}),
+    ...(contactDisplayName ? { contactDisplayName } : {}),
+  };
+}
 
 type GmailClientClassification =
   | {
@@ -1051,6 +1071,8 @@ async function recordInboundMessageWithDb(
   args: {
   agentId: string;
   contactId: string;
+  contactUsername?: string;
+  contactDisplayName?: string;
   channel: ChannelType;
   message: string;
   messageId?: string;
@@ -1060,6 +1082,7 @@ async function recordInboundMessageWithDb(
   conversationStatus?: ConversationStatus;
 }) {
   return database.$transaction(async (tx) => {
+    const contactProfileUpdate = buildContactProfileUpdate(args);
     const existingConversation = await tx.conversation.findUnique({
       where: {
         agentId_contactId: {
@@ -1075,6 +1098,7 @@ async function recordInboundMessageWithDb(
         data: {
           agentId: args.agentId,
           contactId: args.contactId,
+          ...contactProfileUpdate,
           channel: args.channel,
           status: args.conversationStatus ?? ConversationStatus.ACTIVE,
         },
@@ -1087,7 +1111,12 @@ async function recordInboundMessageWithDb(
     ) {
       await tx.conversation.update({
         where: { id: existingConversation.id },
-        data: { status: args.conversationStatus },
+        data: { status: args.conversationStatus, ...contactProfileUpdate },
+      });
+    } else if (existingConversation && Object.keys(contactProfileUpdate).length > 0) {
+      await tx.conversation.update({
+        where: { id: existingConversation.id },
+        data: contactProfileUpdate,
       });
     }
 
@@ -1117,6 +1146,8 @@ async function recordBusinessManualMessageWithDb(
   args: {
   agentId: string;
   contactId: string;
+  contactUsername?: string;
+  contactDisplayName?: string;
   channel: ChannelType;
   message: string;
   messageId?: string;
@@ -1125,6 +1156,7 @@ async function recordBusinessManualMessageWithDb(
   subject?: string;
 }) {
   return database.$transaction(async (tx) => {
+    const contactProfileUpdate = buildContactProfileUpdate(args);
     const existingConversation = await tx.conversation.findUnique({
       where: {
         agentId_contactId: {
@@ -1139,9 +1171,17 @@ async function recordBusinessManualMessageWithDb(
         data: {
           agentId: args.agentId,
           contactId: args.contactId,
+          ...contactProfileUpdate,
           channel: args.channel,
         },
       }));
+
+    if (existingConversation && Object.keys(contactProfileUpdate).length > 0) {
+      await tx.conversation.update({
+        where: { id: existingConversation.id },
+        data: contactProfileUpdate,
+      });
+    }
 
     await tx.message.create({
       data: {
@@ -1180,6 +1220,8 @@ async function runWeddingSalesRuntime(args: {
       : await recordInboundMessageWithDb(args.database, {
           agentId: args.agent.id,
           contactId: args.incoming.contactId,
+          contactUsername: args.incoming.contactUsername,
+          contactDisplayName: args.incoming.contactDisplayName,
           channel: args.agent.channel.type,
           message: args.incoming.message,
           messageId: args.incoming.messageId,
@@ -1289,6 +1331,8 @@ async function runWeddingSalesRuntime(args: {
 async function recordInboundMessage(args: {
   agentId: string;
   contactId: string;
+  contactUsername?: string;
+  contactDisplayName?: string;
   channel: ChannelType;
   message: string;
   messageId?: string;
@@ -1920,6 +1964,8 @@ async function handleIncomingEventWithDeps(
     const conversation = await recordBusinessManualMessageWithDb(deps.db, {
       agentId: agent.id,
       contactId: incoming.contactId,
+      contactUsername: incoming.contactUsername,
+      contactDisplayName: incoming.contactDisplayName,
       channel: agent.channel.type,
       message: incoming.message,
       messageId: incoming.messageId,
@@ -1961,6 +2007,8 @@ async function handleIncomingEventWithDeps(
     const conversation = await recordInboundMessageWithDb(deps.db, {
       agentId: agent.id,
       contactId: incoming.contactId,
+      contactUsername: incoming.contactUsername,
+      contactDisplayName: incoming.contactDisplayName,
       channel: agent.channel.type,
       message: incoming.message,
       messageId: incoming.messageId,
@@ -1988,6 +2036,8 @@ async function handleIncomingEventWithDeps(
     const conversation = await recordInboundMessageWithDb(deps.db, {
       agentId: agent.id,
       contactId: incoming.contactId,
+      contactUsername: incoming.contactUsername,
+      contactDisplayName: incoming.contactDisplayName,
       channel: agent.channel.type,
       message: incoming.message,
       messageId: incoming.messageId,
@@ -2041,6 +2091,8 @@ async function handleIncomingEventWithDeps(
     const conversation = await recordInboundMessageWithDb(deps.db, {
       agentId: agent.id,
       contactId: incoming.contactId,
+      contactUsername: incoming.contactUsername,
+      contactDisplayName: incoming.contactDisplayName,
       channel: agent.channel.type,
       message: incoming.message,
       messageId: incoming.messageId,
@@ -2070,6 +2122,8 @@ async function handleIncomingEventWithDeps(
     const conversation = await recordInboundMessageWithDb(deps.db, {
       agentId: agent.id,
       contactId: incoming.contactId,
+      contactUsername: incoming.contactUsername,
+      contactDisplayName: incoming.contactDisplayName,
       channel: agent.channel.type,
       message: incoming.message,
       messageId: incoming.messageId,
