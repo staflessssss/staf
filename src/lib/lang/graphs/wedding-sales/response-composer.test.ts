@@ -132,6 +132,53 @@ test("instagram human composer stays deterministic instead of using the LLM comp
   }
 });
 
+test("instagram missing-name follow-up avoids repeating the same full prompt", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "missing_names_or_date",
+      names: "Olivia",
+      weddingDate: "2027-06-14",
+      weddingDateText: "June 14",
+      askedForNames: true,
+      assistantReplyCount: 2,
+      hasGreeted: true,
+    },
+  });
+
+  assert.match(response, /missing it/i);
+  assert.match(response, /just your fiancé’s first name/i);
+  assert.doesNotMatch(response, /That way I can check our availability/i);
+});
+
+test("unavailable-date follow-up answers pricing without repeating availability check copy", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "answering_question",
+      names: "Priya and Arjun",
+      weddingDate: "2026-09-19",
+      weddingDateText: "September 19",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Atlanta",
+      availability: "unavailable",
+      latestCustomerMessage: "What do your packages start at and do you travel?",
+    },
+  });
+
+  assert.match(response, /unavailable/i);
+  assert.match(response, /\$2,750/);
+  assert.match(response, /travel/i);
+  assert.doesNotMatch(response, /I checked/i);
+});
+
 test("wedding sales composer confirms consultation booking warmly without wedding-booking language", () => {
   const response = composeWeddingSalesResponse({
     intent: "booking_confirmed",

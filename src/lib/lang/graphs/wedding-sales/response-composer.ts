@@ -243,6 +243,10 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
             missingDate ? "the date of your wedding" : "",
           ].filter(Boolean);
 
+          if (missingNames && state.askedForNames && !missingDate) {
+            return "I may be missing it — could you send just your fiancé’s first name? ✨";
+          }
+
           return [
             policy.allowGreeting ? `Hey${customerName}, I’m Taras from Myndful Films 🤍` : "",
             askParts.length
@@ -328,6 +332,17 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           .join("\n\n");
       }
       case "answer_question": {
+        if (state.availability === "unavailable") {
+          const asksPricingOrTravel = /\b(?:pricing|price|cost|package|collection|travel)\b/i.test(
+            state.latestCustomerMessage ?? "",
+          );
+          const followUp = asksPricingOrTravel
+            ? `If you are flexible, send me another date and I can check it right away. Our collections start at ${config.pricing.startPrice}, and yes, we do travel for weddings.`
+            : "If you are flexible, send me another date and I can check it right away.";
+
+          return [`${weddingDate}${location} is still showing unavailable on my end.`, followUp].join("\n\n");
+        }
+
         if (isInstagram(state) && state.leadStage === "answering_question" && state.calendarStatus === "available" && !state.customerEmail) {
           return [
             `Our collections start at ${config.pricing.startPrice}. Yes, travel details are checked against the exact venue, and I’ll make sure everything is clear before our call.`,

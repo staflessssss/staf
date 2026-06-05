@@ -95,6 +95,32 @@ test("wedding sales graph answers pricing and travel questions without recheckin
   assert.match(result.conversationSummary ?? "", /Last assistant intent: answer_question/);
 });
 
+test("wedding sales graph answers after an unavailable date without rechecking the same date", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "What do your packages start at and do you travel?",
+    previousState: {
+      names: "Priya and Arjun",
+      weddingDate: "2026-09-19",
+      weddingDateText: "September 19",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Atlanta",
+      availability: "unavailable",
+      bookingConfirmed: false,
+      leadStage: "availability_checked",
+      lastAssistantIntent: "availability_unavailable",
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.equal(result.weddingDate, "2026-09-19");
+  assert.equal(result.toolObservations.length, 0);
+  assert.match(result.responseDraft ?? "", /\$2,750/);
+  assert.match(result.responseDraft ?? "", /unavailable/i);
+  assert.match(result.responseDraft ?? "", /travel/i);
+});
+
 test("wedding sales graph routes complete wedding info to availability check", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "gmail",
@@ -152,6 +178,22 @@ test("wedding sales analyzer extracts Instagram-style couple names", () => {
   assert.equal(
     weddingSalesAnalyzeTestHelpers.extractNames("Julie is fiancés name", "Mark"),
     "Mark and Julie",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("My fiance is Daniel", "Olivia"),
+    "Olivia and Daniel",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Groom is Arjun and the date is September 19 2026", "Priya"),
+    "Priya and Arjun",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Mark, Dec 5 2026", "Anna"),
+    "Anna and Mark",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("hey im Anna, wedding in Charlotte"),
+    "Anna",
   );
 });
 

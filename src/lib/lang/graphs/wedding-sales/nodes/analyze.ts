@@ -221,10 +221,20 @@ function extractFirstName(value?: string) {
   return value?.trim().split(/\s+/)[0]?.replace(/[^A-Za-z'-]/g, "");
 }
 
+function isLikelyPersonName(value?: string) {
+  const name = extractFirstName(value);
+
+  if (!name) {
+    return false;
+  }
+
+  return !Object.hasOwn(monthIndexByName, name.toLowerCase());
+}
+
 function mergeNames(currentNames: string | undefined, newName: string | undefined) {
   const normalizedName = extractFirstName(newName);
 
-  if (!normalizedName) {
+  if (!normalizedName || !isLikelyPersonName(normalizedName)) {
     return currentNames;
   }
 
@@ -272,12 +282,26 @@ function extractNames(text: string, currentNames?: string) {
     return coupleMatch[1].trim();
   }
 
-  const selfMatch = text.match(/\b(?:my name is|i am|i'm)\s+([A-Z][A-Za-z'-]+)/i);
-  const partnerMatch = text.match(/\b(?:his name is|her name is|fianc[eé]'?s name is|fiance'?s name is)\s+([A-Z][A-Za-z'-]+)/i);
+  const selfMatch = text.match(/\b(?:my name is|i am|i'm|im)\s+([A-Z][A-Za-z'-]+)/i);
+  const partnerMatch = text.match(/\b(?:(?:his|her|their)\s+name|(?:my\s+)?(?:fianc[eé]|fiance|groom|bride|partner)(?:'?s)?(?:\s+name)?|groom|bride)\s*(?:is|:)\s+([A-Z][A-Za-z'-]+)/i);
   const reversePartnerMatch = text.match(/\b([A-Z][A-Za-z'-]+)\s+is\s+(?:my\s+)?(?:fianc\S*|fiance\S*)\s+name\b/i);
   const withSelf = mergeNames(currentNames, selfMatch?.[1]);
 
-  return mergeNames(withSelf, partnerMatch?.[1] ?? reversePartnerMatch?.[1]);
+  const withExplicitPartner = mergeNames(withSelf, partnerMatch?.[1] ?? reversePartnerMatch?.[1]);
+
+  if (withExplicitPartner && hasCoupleNames(withExplicitPartner)) {
+    return withExplicitPartner;
+  }
+
+  if (currentNames && !hasCoupleNames(currentNames)) {
+    const shortPartnerReply = text.match(/^\s*([A-Z][A-Za-z'-]+)\s*(?:,|\.|\s+(?:and\s+)?(?:date|wedding|our|venue|location)\b|$)/);
+
+    if (shortPartnerReply?.[1] && isLikelyPersonName(shortPartnerReply[1])) {
+      return mergeNames(withExplicitPartner, shortPartnerReply[1]);
+    }
+  }
+
+  return withExplicitPartner;
 }
 
 function extractLocation(text: string) {
@@ -390,6 +414,10 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     !hasWeddingDate(message) &&
     !hasYear(message)
   ) {
+    return { ...baseUpdate, leadStage: "answering_question" };
+  }
+
+  if (state.availability === "unavailable" && !hasWeddingDate(message) && !hasYear(message)) {
     return { ...baseUpdate, leadStage: "answering_question" };
   }
 
