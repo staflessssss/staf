@@ -1,7 +1,7 @@
 import test, { afterEach } from "node:test";
 import assert from "node:assert/strict";
 
-import { telegramAdapter } from "@/lib/channels/telegram";
+import { registerTelegramWebhook, telegramAdapter } from "@/lib/channels/telegram";
 
 const originalFetch = global.fetch;
 const originalSetTimeout = global.setTimeout;
@@ -95,4 +95,55 @@ test("telegram adapter waits between split message parts when configured", async
   });
 
   assert.deepEqual(delays, [2000, 2000]);
+});
+
+test("telegram adapter sends inline keyboard markup on the last message part", async () => {
+  const requestBodies: Array<Record<string, unknown>> = [];
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+
+    return {
+      ok: true,
+      json: async () => ({ ok: true, result: { message_id: requestBodies.length } }),
+    } as Response;
+  }) as typeof fetch;
+
+  await telegramAdapter.sendReply({
+    credentials: "bot-token",
+    contactId: "12345",
+    message: ["First part", "Second part"],
+    replyMarkup: {
+      inline_keyboard: [[{ text: "Resume agent", callback_data: "oh:resume:conversation-1" }]],
+    },
+  });
+
+  assert.equal(requestBodies[0]?.reply_markup, undefined);
+  assert.deepEqual(requestBodies[1]?.reply_markup, {
+    inline_keyboard: [[{ text: "Resume agent", callback_data: "oh:resume:conversation-1" }]],
+  });
+});
+
+test("telegram webhook registration subscribes to button callbacks", async () => {
+  const requestBodies: Array<Record<string, unknown>> = [];
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+
+    return {
+      ok: true,
+      json: async () => ({ ok: true, result: true }),
+    } as Response;
+  }) as typeof fetch;
+
+  await registerTelegramWebhook({
+    credentials: "bot-token",
+    webhookUrl: "https://behalfy.io/api/webhooks/telegram/handoff?tenantId=tenant-1",
+    secretToken: "secret",
+  });
+
+  const requestBody = requestBodies[0];
+
+  assert.ok(requestBody);
+  assert.deepEqual(requestBody.allowed_updates, ["message", "edited_message", "callback_query"]);
 });

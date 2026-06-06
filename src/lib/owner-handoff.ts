@@ -9,13 +9,14 @@ import {
 } from "@prisma/client";
 
 import { getChannelAdapter } from "@/lib/channels";
-import { telegramAdapter } from "@/lib/channels/telegram";
+import { type TelegramReplyMarkup, telegramAdapter } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
 
 export const OWNER_HANDOFF_REQUEST_TOOL_NAME = "owner_handoff_request";
 export const OWNER_HANDOFF_RESPONSE_TOOL_NAME = "owner_handoff_response";
+const OWNER_HANDOFF_CALLBACK_PREFIX = "oh";
 
 type HandoffAgent = {
   id: string;
@@ -45,6 +46,11 @@ type HandoffChannelAdapter = {
     subject?: string;
     channelConfig?: unknown;
   }) => Promise<unknown>;
+};
+
+type OwnerTelegramResponse = {
+  message: string;
+  replyMarkup?: TelegramReplyMarkup;
 };
 
 const OPERATIONAL_HANDOFF_PATTERNS = [
@@ -192,6 +198,54 @@ function formatOwnerHandoffMessage(args: {
     .join("\n");
 }
 
+function buildOwnerHandoffReplyMarkup(conversationId: string): TelegramReplyMarkup {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "Reply",
+          callback_data: `${OWNER_HANDOFF_CALLBACK_PREFIX}:reply:${conversationId}`,
+        },
+        {
+          text: "Take over",
+          callback_data: `${OWNER_HANDOFF_CALLBACK_PREFIX}:takeover:${conversationId}`,
+        },
+      ],
+    ],
+  };
+}
+
+function buildOwnerResumeReplyMarkup(conversationId: string): TelegramReplyMarkup {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "Resume agent",
+          callback_data: `${OWNER_HANDOFF_CALLBACK_PREFIX}:resume:${conversationId}`,
+        },
+      ],
+    ],
+  };
+}
+
+function parseOwnerHandoffCallback(data: string) {
+  const [prefix, action, ...conversationParts] = data.split(":");
+  const conversationId = conversationParts.join(":").trim();
+
+  if (
+    prefix !== OWNER_HANDOFF_CALLBACK_PREFIX ||
+    !["reply", "takeover", "resume"].includes(action ?? "") ||
+    !conversationId
+  ) {
+    return null;
+  }
+
+  return {
+    action: action as "reply" | "takeover" | "resume",
+    conversationId,
+  };
+}
+
 function extractTelegramDeliveryMessageId(delivery: unknown) {
   if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
     return "";
@@ -319,6 +373,7 @@ export async function requestOwnerHandoffWithDb(args: {
     credentials: decrypt(ownerTelegram.credentialsEnc),
     contactId: ownerConfig.ownerChatId,
     message,
+    replyMarkup: buildOwnerHandoffReplyMarkup(conversation.id),
   });
   const telegramMessageId = extractTelegramDeliveryMessageId(delivery);
 
@@ -414,7 +469,7 @@ export async function handleOwnerTelegramReply(args: {
   ownerChatId: string;
   replyToMessageId: string;
   text: string;
-}) {
+}): Promise<OwnerTelegramResponse | null> {
   const text = args.text.trim();
 
   if (!text || text.startsWith("/")) {
@@ -462,13 +517,16 @@ export async function handleOwnerTelegramReply(args: {
     text,
   });
 
-  return `Sent to customer. Conversation ${conversation.id} remains paused. Reply with /resume ${conversation.id} when the agent can continue.`;
+  return {
+    message: `Sent to customer. Conversation ${conversation.id} remains paused.`,
+    replyMarkup: buildOwnerResumeReplyMarkup(conversation.id),
+  };
 }
 
 export async function handleOwnerTelegramCommand(args: {
   tenantId: string;
   text: string;
-}) {
+}): Promise<OwnerTelegramResponse> {
   const text = args.text.trim();
   const sendMatch = text.match(/^\/send\s+(\S+)\s+([\s\S]+)$/i);
   const takeoverMatch = text.match(/^\/takeover\s+(\S+)$/i);
@@ -481,7 +539,10 @@ export async function handleOwnerTelegramCommand(args: {
       text: sendMatch[2].trim(),
     });
 
-    return `Sent to customer. Conversation ${conversation.id} remains paused until you run /resume ${conversation.id}.`;
+    return {
+      message: `Sent to customer. Conversation ${conversation.id} remains paused.`,
+      replyMarkup: buildOwnerResumeReplyMarkup(conversation.id),
+    };
   }
 
   if (takeoverMatch?.[1]) {
@@ -503,7 +564,10 @@ export async function handleOwnerTelegramCommand(args: {
       data: { status: ConversationStatus.ESCALATED },
     });
 
-    return `Manual takeover is active for conversation ${conversation.id}.`;
+    return {
+      message: `Manual takeover is active for conversation ${conversation.id}.`,
+      replyMarkup: buildOwnerResumeReplyMarkup(conversation.id),
+    };
   }
 
   if (resumeMatch?.[1]) {
@@ -525,17 +589,74 @@ export async function handleOwnerTelegramCommand(args: {
       data: { status: ConversationStatus.ACTIVE },
     });
 
-    return `Agent resumed for conversation ${conversation.id}.`;
+    return {
+      message: `Agent resumed for conversation ${conversation.id}.`,
+    };
   }
 
-  return [
-    "I did not recognize that handoff command.",
-    "",
-    "Use:",
-    "/send <conversationId> <exact message>",
-    "/takeover <conversationId>",
-    "/resume <conversationId>",
-  ].join("\n");
+  return {
+    message: [
+      "I did not recognize that handoff command.",
+      "",
+      "Use:",
+      "/send <conversationId> <exact message>",
+      "/takeover <conversationId>",
+      "/resume <conversationId>",
+    ].join("\n"),
+  };
+}
+
+export async function handleOwnerTelegramCallback(args: {
+  tenantId: string;
+  ownerChatId: string;
+  data: string;
+}): Promise<OwnerTelegramResponse | null> {
+  const callback = parseOwnerHandoffCallback(args.data);
+
+  if (!callback) {
+    return null;
+  }
+
+  const conversation = await db.conversation.findUnique({
+    where: { id: callback.conversationId },
+    include: { agent: true },
+  });
+
+  if (!conversation) {
+    throw new Error("Conversation not found.");
+  }
+
+  if (conversation.agent.tenantId !== args.tenantId) {
+    throw new Error("Conversation does not belong to this tenant.");
+  }
+
+  if (callback.action === "reply") {
+    return {
+      message:
+        "To send an answer, tap Reply on the Behalfy handoff message above and type the exact text for the customer.",
+    };
+  }
+
+  if (callback.action === "takeover") {
+    await db.conversation.update({
+      where: { id: conversation.id },
+      data: { status: ConversationStatus.ESCALATED },
+    });
+
+    return {
+      message: `Manual takeover is active for conversation ${conversation.id}.`,
+      replyMarkup: buildOwnerResumeReplyMarkup(conversation.id),
+    };
+  }
+
+  await db.conversation.update({
+    where: { id: conversation.id },
+    data: { status: ConversationStatus.ACTIVE },
+  });
+
+  return {
+    message: `Agent resumed for conversation ${conversation.id}.`,
+  };
 }
 
 export function mergeOwnerHandoffMetadata(args: {

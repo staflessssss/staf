@@ -34,6 +34,10 @@ type TelegramMessagePayload = {
   };
 };
 
+export type TelegramReplyMarkup = {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+};
+
 function isBusinessManualPayload(payload: TelegramMessagePayload) {
   const marker = String(
     payload.direction ?? payload.source ?? payload.senderType ?? "",
@@ -84,6 +88,7 @@ async function sendTelegramMessage(args: {
   botToken: string;
   contactId: string;
   text: string;
+  replyMarkup?: TelegramReplyMarkup;
 }) {
   const response = await fetch(`https://api.telegram.org/bot${args.botToken}/sendMessage`, {
     method: "POST",
@@ -93,6 +98,7 @@ async function sendTelegramMessage(args: {
     body: JSON.stringify({
       chat_id: args.contactId,
       text: args.text,
+      ...(args.replyMarkup ? { reply_markup: args.replyMarkup } : {}),
     }),
   });
 
@@ -100,6 +106,37 @@ async function sendTelegramMessage(args: {
 
   if (!response.ok) {
     throw new Error(`Telegram send failed with ${response.status}.`);
+  }
+
+  return payload;
+}
+
+export async function answerTelegramCallbackQuery(args: {
+  credentials: string;
+  callbackQueryId: string;
+  text?: string;
+}) {
+  const botToken = parseTelegramBotToken(args.credentials);
+
+  if (!botToken) {
+    throw new Error("Telegram connection is missing a bot token.");
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      callback_query_id: args.callbackQueryId,
+      ...(args.text ? { text: args.text } : {}),
+    }),
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok || !payload?.ok) {
+    throw new Error(`Telegram callback answer failed with ${response.status}.`);
   }
 
   return payload;
@@ -124,7 +161,7 @@ export async function registerTelegramWebhook(args: {
     body: JSON.stringify({
       url: args.webhookUrl,
       secret_token: args.secretToken,
-      allowed_updates: ["message", "edited_message"],
+      allowed_updates: ["message", "edited_message", "callback_query"],
     }),
   });
 
@@ -159,6 +196,7 @@ export const telegramAdapter = {
     contactId: string;
     message: string | string[];
     channelConfig?: unknown;
+    replyMarkup?: TelegramReplyMarkup;
   }) => {
     const botToken = parseTelegramBotToken(params.credentials);
 
@@ -182,6 +220,10 @@ export const telegramAdapter = {
           botToken,
           contactId: params.contactId,
           text: part,
+          replyMarkup:
+            params.replyMarkup && index === messageParts.length - 1
+              ? params.replyMarkup
+              : undefined,
         });
         deliveries.push(payload);
       } catch (error) {

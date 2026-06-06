@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ChannelType, ConnectionStatus } from "@prisma/client";
 
-import { telegramAdapter } from "@/lib/channels/telegram";
+import { answerTelegramCallbackQuery, telegramAdapter } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import {
+  handleOwnerTelegramCallback,
   handleOwnerTelegramCommand,
   handleOwnerTelegramReply,
   readOwnerHandoffStartToken,
   readOwnerHandoffWebhookSecret,
   updateOwnerHandoffChatMetadata,
 } from "@/lib/owner-handoff";
+
+type OwnerTelegramWebhookResponse = Awaited<ReturnType<typeof handleOwnerTelegramCommand>>;
 
 function extractTelegramMessage(payload: unknown) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -49,6 +52,52 @@ function extractTelegramMessage(payload: unknown) {
   };
 }
 
+function extractTelegramCallback(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const callback = record.callback_query;
+
+  if (!callback || typeof callback !== "object" || Array.isArray(callback)) {
+    return null;
+  }
+
+  const callbackRecord = callback as Record<string, unknown>;
+  const message =
+    callbackRecord.message && typeof callbackRecord.message === "object" && !Array.isArray(callbackRecord.message)
+      ? (callbackRecord.message as Record<string, unknown>)
+      : {};
+  const chat =
+    message.chat && typeof message.chat === "object" && !Array.isArray(message.chat)
+      ? (message.chat as Record<string, unknown>)
+      : {};
+
+  return {
+    callbackQueryId: String(callbackRecord.id ?? ""),
+    chatId: String(chat.id ?? ""),
+    data: typeof callbackRecord.data === "string" ? callbackRecord.data : "",
+  };
+}
+
+async function sendOwnerTelegramResponse(args: {
+  credentials: string;
+  chatId: string;
+  response: OwnerTelegramWebhookResponse | null;
+}) {
+  if (!args.response) {
+    return;
+  }
+
+  await telegramAdapter.sendReply({
+    credentials: args.credentials,
+    contactId: args.chatId,
+    message: args.response.message,
+    replyMarkup: args.response.replyMarkup,
+  });
+}
+
 export async function POST(req: NextRequest) {
   const tenantId = req.nextUrl.searchParams.get("tenantId")?.trim() ?? "";
 
@@ -78,6 +127,34 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = await req.json().catch(() => null);
+  const credentials = decrypt(channel.credentialsEnc);
+  const callback = extractTelegramCallback(payload);
+
+  if (callback?.callbackQueryId) {
+    await answerTelegramCallbackQuery({
+      credentials,
+      callbackQueryId: callback.callbackQueryId,
+    });
+
+    if (!callback.chatId || !callback.data) {
+      return NextResponse.json({ ok: true, status: "ignored_incomplete_callback" });
+    }
+
+    const callbackResponse = await handleOwnerTelegramCallback({
+      tenantId,
+      ownerChatId: callback.chatId,
+      data: callback.data,
+    });
+
+    await sendOwnerTelegramResponse({
+      credentials,
+      chatId: callback.chatId,
+      response: callbackResponse,
+    });
+
+    return NextResponse.json({ ok: true, status: "owner_callback_processed" });
+  }
+
   const message = extractTelegramMessage(payload);
 
   if (!message?.chatId) {
@@ -90,7 +167,7 @@ export async function POST(req: NextRequest) {
 
     if (expectedStartToken && receivedStartToken !== expectedStartToken) {
       await telegramAdapter.sendReply({
-        credentials: decrypt(channel.credentialsEnc),
+        credentials,
         contactId: message.chatId,
         message: "Use the exact /start command shown in Behalfy to link this handoff chat.",
       });
@@ -109,7 +186,7 @@ export async function POST(req: NextRequest) {
     });
 
     await telegramAdapter.sendReply({
-      credentials: decrypt(channel.credentialsEnc),
+      credentials,
       contactId: message.chatId,
       message: "Behalfy handoff is connected. I will send you agent questions here.",
     });
@@ -126,17 +203,17 @@ export async function POST(req: NextRequest) {
     });
 
     if (replyResponseText) {
-      await telegramAdapter.sendReply({
-        credentials: decrypt(channel.credentialsEnc),
-        contactId: message.chatId,
-        message: replyResponseText,
+      await sendOwnerTelegramResponse({
+        credentials,
+        chatId: message.chatId,
+        response: replyResponseText,
       });
 
       return NextResponse.json({ ok: true, status: "owner_reply_processed" });
     }
 
     await telegramAdapter.sendReply({
-      credentials: decrypt(channel.credentialsEnc),
+      credentials,
       contactId: message.chatId,
       message:
         "I could not match this Telegram reply to a Behalfy handoff. Tap Reply on the latest Behalfy handoff message, or use /send <conversationId> <message>.",
@@ -150,10 +227,10 @@ export async function POST(req: NextRequest) {
     text: message.text,
   });
 
-  await telegramAdapter.sendReply({
-    credentials: decrypt(channel.credentialsEnc),
-    contactId: message.chatId,
-    message: responseText,
+  await sendOwnerTelegramResponse({
+    credentials,
+    chatId: message.chatId,
+    response: responseText,
   });
 
   return NextResponse.json({ ok: true, status: "owner_command_processed" });
