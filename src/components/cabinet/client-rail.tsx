@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
@@ -73,12 +74,13 @@ export function ClientRail({
         ].join(" ")}
       >
         <Link href="/client/overview" title="Behalfy" className="flex items-center gap-2 md:gap-3">
-          <span
-            className="block size-8 shrink-0 bg-[#d7a96d] md:size-9"
-            style={{
-              WebkitMask: "url('/assets/landing/behalfy-mark.svg') center / contain no-repeat",
-              mask: "url('/assets/landing/behalfy-mark.svg') center / contain no-repeat",
-            }}
+          <Image
+            src="/favicon.ico"
+            alt=""
+            width={36}
+            height={36}
+            unoptimized
+            className="block size-8 shrink-0 object-contain md:size-9"
           />
           <span
             className={[
