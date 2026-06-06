@@ -185,7 +185,7 @@ function extractWeddingDate(text: string) {
   }
 
   const dayMonthDate = text.match(
-    /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:,?\s+((?:19|20)\d{2}))?\b/i,
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:,?\s+(?:of\s+)?((?:19|20)\d{2}))?\b/i,
   );
 
   if (dayMonthDate) {
@@ -366,7 +366,8 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
   const combinedWeddingDate =
     extractedDate?.iso ??
     combineWeddingDateTextWithYear(extractedDate?.display, state.weddingYear) ??
-    combineWeddingDateTextWithYear(state.weddingDateText, extractedYear);
+    combineWeddingDateTextWithYear(state.weddingDateText, extractedYear) ??
+    combineWeddingDateTextWithYear(state.weddingDateText, state.weddingYear);
   const baseUpdate: Partial<WeddingSalesState> = {
     ...(extractedNames ? { names: extractedNames } : {}),
     ...(combinedWeddingDate ? { weddingDate: combinedWeddingDate } : {}),

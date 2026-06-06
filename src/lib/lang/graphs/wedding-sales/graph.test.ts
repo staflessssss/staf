@@ -54,6 +54,45 @@ test("wedding sales graph combines a previously mentioned month-day with a later
   assert.doesNotMatch(result.responseDraft ?? "", /exact date/i);
 });
 
+test("wedding sales graph combines stored month-day and year before availability check", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "gmail",
+    message: "Charlotte NC in Evergreen Park",
+    customerEmail: "v.bedritsky.dodo@gmail.com",
+    previousState: {
+      names: "Jason and Kristina",
+      weddingDateText: "29 may",
+      weddingYear: "2027",
+      weddingYearKnown: true,
+      bookingConfirmed: false,
+      askedForNames: true,
+      askedForVenue: true,
+      leadStage: "missing_location_or_venue",
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.weddingDate, "2027-05-29");
+  assert.equal(result.leadStage, "availability_checked");
+  assert.equal(result.turnToolObservations[0]?.toolName, "check_wedding_availability");
+  assert.doesNotMatch(result.responseDraft ?? "", /tool is not configured/i);
+});
+
 test("wedding sales graph ignores Gmail quote dates when analyzing replies", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "gmail",
@@ -215,6 +254,11 @@ test("wedding sales analyze node extracts normalized wedding details", () => {
       yearKnown: true,
     },
   );
+  assert.deepEqual(weddingSalesAnalyzeTestHelpers.extractWeddingDate("wedding date is 29 may of 2027"), {
+    display: "29 may of 2027",
+    iso: "2027-05-29",
+    yearKnown: true,
+  });
   assert.equal(
     weddingSalesAnalyzeTestHelpers.extractNames(
       "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
