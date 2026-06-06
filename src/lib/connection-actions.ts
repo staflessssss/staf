@@ -1,5 +1,7 @@
 "use server";
 
+import { randomBytes } from "crypto";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -11,9 +13,11 @@ import { z } from "zod";
 
 import { requireClientSession } from "@/lib/client-auth";
 import { getInstagramCredentialsValidationError } from "@/lib/channels/instagram";
+import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
 import { upsertChannelConnection, upsertIntegrationConnection } from "@/lib/connection-store";
 import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { mergeOwnerHandoffMetadata } from "@/lib/owner-handoff";
 
 const channelSchema = z.object({
   type: z.nativeEnum(ChannelType),
@@ -53,6 +57,15 @@ function parseMetadata(metadata?: string) {
   }
 }
 
+function getPublicBaseUrl() {
+  const publicBaseUrl =
+    process.env.APP_BASE_URL?.trim() || process.env.NEXTAUTH_URL?.trim() || "";
+
+  return publicBaseUrl.startsWith("https://") && !publicBaseUrl.includes("localhost")
+    ? publicBaseUrl
+    : "";
+}
+
 export async function saveChannelConnectionAction(formData: FormData) {
   const session = await requireClientSession();
   const tenantId = session.user.tenantId;
@@ -81,18 +94,66 @@ export async function saveChannelConnectionAction(formData: FormData) {
     }
   }
 
+  let channelMetadata = metadata;
+
+  if (parsed.data.type === ChannelType.TELEGRAM && parsed.data.status === ConnectionStatus.CONNECTED) {
+    const botToken = parseTelegramBotToken(parsed.data.credentials);
+    const publicBaseUrl = getPublicBaseUrl();
+
+    if (!botToken || !publicBaseUrl) {
+      redirect("/client/connections/telegram?error=telegram-config");
+    }
+
+    const existingConnection = await db.channelConnection.findUnique({
+      where: {
+        tenantId_type: {
+          tenantId,
+          type: ChannelType.TELEGRAM,
+        },
+      },
+      select: {
+        metadata: true,
+      },
+    });
+    const webhookSecret = randomBytes(24).toString("hex");
+    const startToken = randomBytes(6).toString("hex");
+    const webhookUrl = `${publicBaseUrl}/api/webhooks/telegram/handoff?tenantId=${tenantId}`;
+
+    await registerTelegramWebhook({
+      credentials: parsed.data.credentials,
+      webhookUrl,
+      secretToken: webhookSecret,
+    }).catch(() => {
+      redirect("/client/connections/telegram?error=telegram-webhook");
+    });
+
+    channelMetadata = mergeOwnerHandoffMetadata({
+      metadata: existingConnection?.metadata ?? metadata,
+      webhookSecret,
+      webhookUrl,
+      startToken,
+    });
+  }
+
   await upsertChannelConnection({
     tenantId,
     type: parsed.data.type,
     status: parsed.data.status,
     credentials: parsed.data.credentials,
-    metadata,
+    metadata: channelMetadata,
   });
 
   revalidatePath("/client");
   revalidatePath("/client/connections");
+  if (parsed.data.type === ChannelType.TELEGRAM) {
+    revalidatePath("/client/connections/telegram");
+  }
   revalidatePath("/admin");
-  redirect("/client/connections?saved=channel");
+  redirect(
+    parsed.data.type === ChannelType.TELEGRAM
+      ? "/client/connections/telegram?saved=channel"
+      : "/client/connections?saved=channel",
+  );
 }
 
 export async function saveIntegrationConnectionAction(formData: FormData) {

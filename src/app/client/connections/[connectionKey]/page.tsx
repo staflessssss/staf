@@ -37,6 +37,12 @@ function secondaryButtonClassName() {
   return "inline-flex w-full items-center justify-center rounded-lg border border-[#d7a96d]/34 bg-[#3a3028] px-5 py-3 text-sm font-semibold text-[#e9be86] transition hover:bg-[#473a2f]";
 }
 
+function readMetadataRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 export default async function ConnectionDetailPage({
   params,
   searchParams,
@@ -114,6 +120,14 @@ export default async function ConnectionDetailPage({
   const isInstagram = definition.kind === "channel" && definition.type === ChannelType.INSTAGRAM;
   const isGoogleWorkspace =
     definition.kind === "integration" && definition.key === "google-workspace";
+  const connectionMetadata = readMetadataRecord(connection?.metadata);
+  const ownerHandoffMetadata = readMetadataRecord(connectionMetadata.ownerHandoff);
+  const isTelegramOwnerChatLinked =
+    isTelegram && typeof ownerHandoffMetadata.ownerChatId === "string";
+  const telegramStartCommand =
+    isTelegram && typeof ownerHandoffMetadata.startToken === "string"
+      ? `/start ${ownerHandoffMetadata.startToken}`
+      : "/start";
 
   return (
     <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
@@ -210,7 +224,7 @@ export default async function ConnectionDetailPage({
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-white/56">
                   {isTelegram
-                    ? "Paste the Telegram bot token from BotFather. It will be stored for this workspace only."
+                    ? "Paste the Telegram bot token from BotFather. This bot will message the owner when the agent needs human help."
                     : isInstagram
                       ? "Sign in with Facebook/Meta and approve access to the Page connected to this Instagram account."
                     : isGoogleWorkspace
@@ -225,6 +239,25 @@ export default async function ConnectionDetailPage({
 
             {isTelegram ? (
               <div className="mt-6 space-y-4">
+                {isConnected ? (
+                  <div
+                    className={[
+                      "rounded-xl border p-4 text-sm leading-6",
+                      isTelegramOwnerChatLinked
+                        ? "border-[#47c978]/28 bg-[#47c978]/[0.08] text-[#62d990]"
+                        : "border-[#d7a96d]/28 bg-[#3a2c1e] text-[#e9be86]",
+                    ].join(" ")}
+                  >
+                    {isTelegramOwnerChatLinked
+                      ? "Owner chat is linked. The agent can now send handoff questions to Telegram."
+                      : "Bot token is saved. Open this bot in Telegram and send the command below to finish linking the owner chat."}
+                    {!isTelegramOwnerChatLinked ? (
+                      <code className="mt-3 block rounded-lg border border-white/[0.08] bg-black/20 px-3 py-2 font-mono text-xs text-white">
+                        {telegramStartCommand}
+                      </code>
+                    ) : null}
+                  </div>
+                ) : null}
                 <form action={saveChannelConnectionAction} className="space-y-4">
                   <input type="hidden" name="type" value={definition.type} />
                   <input type="hidden" name="status" value="CONNECTED" />
@@ -244,7 +277,7 @@ export default async function ConnectionDetailPage({
                     />
                   </label>
                   <button className={primaryButtonClassName()} type="submit">
-                    Connect Telegram
+                    Save Telegram bot
                   </button>
                 </form>
                 {connection ? (

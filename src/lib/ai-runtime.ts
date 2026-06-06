@@ -50,6 +50,11 @@ import {
   pauseConversationForBusinessHandoffWithDb,
   shouldPauseAfterBusinessManualMessage,
 } from "@/lib/business-handoff";
+import {
+  hasConnectedOwnerTelegram,
+  requestOwnerHandoffWithDb,
+  shouldRequestOwnerHandoff,
+} from "@/lib/owner-handoff";
 
 type LightweightKnowledgeBlock = {
   name: string;
@@ -2113,6 +2118,44 @@ async function handleIncomingEventWithDeps(
       conversationId: conversation.id,
       status: "closed_conversation_requires_review",
     };
+  }
+
+  const ownerHandoff = shouldRequestOwnerHandoff(incoming.message);
+
+  if (
+    ownerHandoff &&
+    (args.channel === ChannelType.GMAIL || args.channel === ChannelType.INSTAGRAM) &&
+    (await hasConnectedOwnerTelegram(agent.tenantId, deps.db))
+  ) {
+    const conversation = await recordInboundMessageWithDb(deps.db, {
+      agentId: agent.id,
+      contactId: incoming.contactId,
+      contactUsername: incoming.contactUsername,
+      contactDisplayName: incoming.contactDisplayName,
+      channel: agent.channel.type,
+      message: incoming.message,
+      messageId: incoming.messageId,
+      gmailMessageId: incoming.gmailMessageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
+      conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
+    });
+    const handoff = await requestOwnerHandoffWithDb({
+      database: deps.db,
+      agent,
+      conversationId: conversation.id,
+      customerMessage: incoming.message,
+      reason: ownerHandoff.reason,
+    });
+
+    if (handoff.status === "owner_handoff_requested") {
+      return {
+        ok: true,
+        agentId: agent.id,
+        conversationId: conversation.id,
+        status: handoff.status,
+      };
+    }
   }
 
   if (

@@ -67,16 +67,18 @@ export const channelDefinitions: ChannelDefinition[] = [
     key: "telegram",
     type: ChannelType.TELEGRAM,
     title: "Telegram",
-    shortDescription: "Connect Telegram so your agent can receive new dialogs from your bot.",
+    shortDescription: "Connect Telegram so the agent can ask the business owner for help.",
     icon: "/brands/telegram.svg",
     instructions: [
       "Open Telegram and search for BotFather.",
-      "Create a new bot or open the existing bot for this business.",
+      "Create a private owner-notification bot or open the existing bot for this business.",
       "Copy the bot token that BotFather gives you.",
       "Paste the token into the field below and save the connection.",
+      "Open the bot in Telegram and send the exact /start command shown after saving.",
     ],
     notes: [
-      "Your token is stored securely. If you change the bot later, just save a new token here.",
+      "This bot is for operator handoff: when the agent is unsure, it sends the owner the dialog and waits for a command.",
+      "Your token is stored securely. If you change the bot later, just save a new token here and send /start again.",
     ],
   },
 ];
