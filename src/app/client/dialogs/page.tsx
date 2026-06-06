@@ -333,7 +333,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               ],
             },
             orderBy: { createdAt: "desc" },
-            take: 24,
+            take: 100,
           },
           _count: {
             select: { messages: true },

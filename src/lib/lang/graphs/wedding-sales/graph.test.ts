@@ -485,6 +485,34 @@ test("instagram wedding sales asks for call time after venue answer", async () =
   assert.match(result.responseDraft ?? "", /Mon-Fri, 9 AM to 2 PM Eastern/i);
 });
 
+test("instagram wedding sales asks for a time when customer only says tomorrow", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Ye we can call tomorrow",
+    previousState: {
+      names: "Rick and Julie",
+      weddingDate: "2026-10-11",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      venue: "Evergreen Park",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      bookingConfirmed: false,
+      leadStage: "availability_checked",
+      lastAssistantIntent: "availability_available",
+    },
+  });
+
+  assert.equal(result.leadStage, "asking_call_time");
+  assert.equal(result.proposedCallTime, "Ye we can call tomorrow");
+  assert.equal(result.turnToolObservations.length, 0);
+  assert.doesNotMatch(result.responseDraft ?? "", /Tomorrow works perfectly/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /October 11, 2026.*available/i);
+  assert.match(result.responseDraft ?? "", /9 AM to 2 PM Eastern/i);
+});
+
 test("instagram wedding sales does not treat filler replies as a venue", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",
@@ -594,6 +622,57 @@ test("instagram wedding sales routes a collected email to booking after an avail
   assert.equal(result.leadStage, "ready_to_book");
   assert.equal(result.bookingConfirmed, false);
   assert.match(result.responseDraft ?? "", /booking tool/i);
+});
+
+test("instagram wedding sales keeps known email after checking a replacement call time", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "10:30 works for us",
+    previousState: {
+      names: "Rick and Julie",
+      weddingDate: "2026-10-11",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      venue: "Evergreen Park",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "Monday at 10 AM",
+      calendarStatus: "busy",
+      customerEmail: "bonkopoly@gmail.com",
+      bookingConfirmed: false,
+      leadStage: "checking_calendar",
+      lastAssistantIntent: "calendar_busy",
+      askedForCallTime: true,
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {
+          businessDays: [1, 2, 3, 4, 5],
+          businessWindowStartHour: 9,
+          businessWindowEndHour: 14,
+          slotDurationMinutes: 30,
+          checkConflictsBeforeBooking: false,
+        },
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.customerEmail, "bonkopoly@gmail.com");
+  assert.equal(result.proposedCallTime, "Monday at 10:30 AM");
+  assert.doesNotMatch(result.responseDraft ?? "", /best email/i);
 });
 
 test("wedding sales graph uses known Gmail customer email instead of asking again", async () => {

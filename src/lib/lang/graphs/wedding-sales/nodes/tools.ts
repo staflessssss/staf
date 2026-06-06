@@ -247,6 +247,7 @@ export function createWeddingSalesToolNodes(args: {
 
       return {
         calendarStatus: available ? "available" : "busy",
+        customerEmail: state.customerEmail,
         leadStage: nextLeadStage,
         ...(await composeReplyUpdate({
           intent: nextIntent,
@@ -255,6 +256,7 @@ export function createWeddingSalesToolNodes(args: {
           summary,
           statePatch: {
             calendarStatus: available ? "available" : "busy",
+            customerEmail: state.customerEmail,
             leadStage: nextLeadStage,
           },
         })),

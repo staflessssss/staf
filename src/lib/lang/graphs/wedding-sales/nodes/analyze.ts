@@ -107,6 +107,14 @@ function proposesCallTime(text: string) {
   return hasDayOrRelativeDate && hasTime;
 }
 
+function proposesCallDayWithoutTime(text: string) {
+  const hasDayOrRelativeDate =
+    /\b(?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text);
+  const hasCallIntent = /\b(?:call|chat|talk|meet|consultation)\b/i.test(text);
+
+  return hasDayOrRelativeDate && hasCallIntent && !hasBareTimeSelection(text);
+}
+
 function hasBareTimeSelection(text: string) {
   return /\b\d{1,2}:\d{2}\b/.test(text) || /\b\d{1,2}\s*(?:am|pm)\b/i.test(text);
 }
@@ -396,6 +404,14 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     };
   }
 
+  if ((state.callProposed || state.availability === "available") && proposesCallDayWithoutTime(message)) {
+    return {
+      ...baseUpdate,
+      leadStage: "asking_call_time",
+      proposedCallTime: message,
+    };
+  }
+
   if (asksForCall(message) || ((state.callProposed || state.availability === "available") && proposesCallTime(message))) {
     return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: message };
   }
@@ -482,5 +498,6 @@ export const weddingSalesAnalyzeTestHelpers = {
   extractNames,
   extractWeddingDate,
   normalizeBareTimeSelection,
+  proposesCallDayWithoutTime,
   proposesCallTime,
 };
