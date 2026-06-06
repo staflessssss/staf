@@ -75,7 +75,11 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
         state.channel === "instagram" && !state.venue ? "" : state.callProposed ? "" : "propose a consultation call",
       ].filter(Boolean);
     case "availability_unavailable":
-      return [summary || "say the wedding date is unavailable", "offer alternative dates if they have flexibility"];
+      return [
+        "say the requested wedding date looks already booked or unavailable",
+        summary?.match(/\b\d{4}-\d{2}-\d{2}\b/) ? "offer the nearby replacement dates from the tool result" : "ask for another date if they have flexibility",
+        "be warm and gentle, not final or bureaucratic",
+      ];
     case "answer_question":
       return [
         "answer only the customer's current question",
@@ -147,6 +151,12 @@ export function buildWeddingSalesDialogPolicy(args: BuildWeddingSalesDialogPolic
       "wedding is booked",
       "date is reserved",
       "retainer is confirmed",
+      "still some time away",
+      "aren't able to confirm availability just yet",
+      "are not able to confirm availability just yet",
+      "when the time is closer",
+      "we'll be able to provide a clear update",
+      "we will be able to provide a clear update",
     ],
   };
 }

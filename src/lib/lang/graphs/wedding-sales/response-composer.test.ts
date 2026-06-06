@@ -248,6 +248,35 @@ test("unavailable-date follow-up answers pricing without repeating availability 
   assert.doesNotMatch(response, /I checked/i);
 });
 
+test("unavailable wedding date reply softly offers nearby dates without deferring confirmation", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "availability_unavailable",
+    config,
+    summary:
+      "Wedding date check: 2026-10-11 is unavailable for NC (1/1 booked). Offer these nearby dates right away: 2026-10-10, 2026-10-12.",
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "availability_checked",
+      names: "Rick and Julie",
+      weddingDate: "2026-10-11",
+      weddingDateText: "October 11",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte, NC",
+      availability: "unavailable",
+      latestCustomerMessage: "Charlotte, NC in Evergreen Park",
+    },
+  });
+
+  assert.match(response, /already booked|unavailable/i);
+  assert.match(response, /October 10, 2026/);
+  assert.match(response, /October 12, 2026/);
+  assert.doesNotMatch(response, /still some time away/i);
+  assert.doesNotMatch(response, /closer/i);
+  assert.doesNotMatch(response, /can't confirm|cannot confirm|able to confirm/i);
+});
+
 test("wedding sales composer confirms consultation booking warmly without wedding-booking language", () => {
   const response = composeWeddingSalesResponse({
     intent: "booking_confirmed",

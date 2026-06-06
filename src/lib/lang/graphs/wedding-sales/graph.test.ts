@@ -138,6 +138,52 @@ test("wedding sales graph answers after an unavailable date without rechecking t
   assert.match(result.responseDraft ?? "", /travel/i);
 });
 
+test("wedding sales graph softly declines a booked wedding date without deferring confirmation", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Charlotte, NC in Evergreen Park",
+    previousState: {
+      names: "Rick and Julie",
+      weddingDate: "2026-10-11",
+      weddingDateText: "October 11",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      bookingConfirmed: false,
+      leadStage: "missing_location_or_venue",
+    },
+    config: {
+      coverage: {
+        regions: ["NC"],
+        capacityPerDate: 1,
+        unavailableDates: ["2026-10-11"],
+      },
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.leadStage, "availability_checked");
+  assert.equal(result.availability, "unavailable");
+  assert.match(result.responseDraft ?? "", /already booked|unavailable/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /still some time away/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /closer/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /can't confirm|cannot confirm|able to confirm/i);
+});
+
 test("wedding sales graph routes complete wedding info to availability check", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "gmail",

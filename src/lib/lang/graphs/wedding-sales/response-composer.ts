@@ -225,6 +225,34 @@ function asksAboutKnownWeddingAvailability(message?: string) {
   return /\b(?:available|availability|still open|still available|our date|the date|wedding date)\b/i.test(message);
 }
 
+function formatUnavailableWeddingReply(args: {
+  state: WeddingSalesState;
+  summary?: string;
+  weddingDate: string;
+  location: string;
+}) {
+  const suggestedDates =
+    args.summary
+      ?.match(/\b\d{4}-\d{2}-\d{2}\b/g)
+      ?.filter((date) => date !== args.state.weddingDate)
+      .slice(0, 3) ?? [];
+  const formattedSuggestions = suggestedDates.map((date) => formatWeddingDateForReply(date));
+  const requestedDate = `${args.weddingDate}${args.location}`;
+  const softDecline = `I checked ${requestedDate}, and it looks like that date is already booked on our end.`;
+
+  if (formattedSuggestions.length > 0) {
+    return [
+      softDecline,
+      `The closest dates I can suggest around then are ${formattedSuggestions.join(" or ")}. If one of those could work for you, send it over and I can check the details from there ✨`,
+    ].join("\n\n");
+  }
+
+  return [
+    softDecline,
+    "If you have any flexibility around the date, send me another option and I can check it right away ✨",
+  ].join("\n\n");
+}
+
 export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
   const { intent, config, state, summary } = args;
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
@@ -283,10 +311,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       case "availability_tool_missing":
         return "I have enough details to check the wedding date, but the availability tool is not configured yet.";
       case "availability_unavailable":
-        return [
-          `Thank you for sharing those details. I checked ${weddingDate}${location}, and it looks unavailable on my end.`,
-          summary || "If you have flexibility, I can help look at alternative dates.",
-        ].join("\n\n");
+        return formatUnavailableWeddingReply({ state, summary, weddingDate, location });
       case "availability_available": {
         if (isInstagram(state)) {
           const lines = [
@@ -592,6 +617,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     args.state.channel === "instagram"
       ? "Instagram sales sequence: ask fiance name/date, confirm availability and starting price, ask exact venue, ask call time, ask email, then confirm the calendar invite only after booking succeeds."
       : "",
+    args.intent === "availability_unavailable"
+      ? "Unavailable wedding date rule: do not soften this into 'too early to confirm' or 'check later'. Say the requested date looks booked/unavailable now, then offer nearby replacement dates if provided."
+      : "",
     args.state.channel === "instagram"
       ? "If you need the wedding year after the customer gave a fiance name, do not repeat the prior year question verbatim. Acknowledge the fiance name naturally and ask for the year in a fresh short line."
       : "",
@@ -623,6 +651,9 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       : "",
     args.state.channel === "instagram"
       ? "For Instagram, fail and rewrite if a customer supplied a useful fact and the draft does not acknowledge it before asking for the next missing fact."
+      : "",
+    args.intent === "availability_unavailable"
+      ? "For unavailable wedding dates, fail and rewrite if the draft says the date is too far away, cannot be confirmed yet, or should be checked closer to the date."
       : "",
     "Keep the voice friendly and premium. Allowed emojis only: 🤍 ✨ 🎥. Warm first replies, availability replies, and booking confirmations should contain one brand emoji; routine scheduling replies usually should not.",
     policy.mustInclude.length ? `The final reply must include:\n- ${policy.mustInclude.join("\n- ")}` : "",
