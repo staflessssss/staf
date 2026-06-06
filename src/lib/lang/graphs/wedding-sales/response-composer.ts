@@ -225,6 +225,127 @@ function asksAboutKnownWeddingAvailability(message?: string) {
   return /\b(?:available|availability|still open|still available|our date|the date|wedding date)\b/i.test(message);
 }
 
+function nextStepAfterFaq(state: WeddingSalesState) {
+  if (state.calendarStatus === "available" && !state.customerEmail) {
+    return "Send me the best email for the calendar invite when you are ready.";
+  }
+
+  if (state.callProposed || state.availability === "available") {
+    return "The next step is the quick consultation, so I can walk you through everything live.";
+  }
+
+  return "Once I have your date and location, I can check availability and point you in the right direction.";
+}
+
+function formatFaqAnswer(args: {
+  config: WeddingSalesConfig;
+  state: WeddingSalesState;
+}) {
+  const message = args.state.latestCustomerMessage ?? "";
+  const nextStep = nextStepAfterFaq(args.state);
+  const asksPricing = /\b(?:pricing|price|cost|package|packages|collection|collections)\b/i.test(message);
+  const asksTravel = /\b(?:travel|travel fee|distance|mileage|venue fee)\b/i.test(message);
+
+  if (asksPricing || asksTravel) {
+    return [
+      asksPricing ? `Our collections start at ${args.config.pricing.startPrice}.` : "",
+      asksTravel
+        ? "Each collection includes travel miles. If the venue is beyond the included mileage, I will check the exact distance and have clear travel details ready for our call."
+        : "",
+      nextStep,
+    ].filter(Boolean).join("\n\n");
+  }
+
+  if (/\b(?:style|approach|cinematic|documentary|pose|posed)\b/i.test(message)) {
+    return [
+      "Our style is cinematic documentary: natural backstage moments, real emotion, and no cheesy posing.",
+      `We work alongside the photographer without getting in the way. ${nextStep}`,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:include|included|what comes with|what's included|whats included)\b/i.test(message)) {
+    return [
+      "All collections include the full ceremony and speeches, a cinematic clip, a wedding film, drone footage, raw footage, and digital delivery.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:timeline|delivery time|deliver|edit|editing|sneak peek)\b/i.test(message)) {
+    return [
+      "The Sneak Peek is usually delivered about 2 weeks after the wedding. The Wedding Film and Cinematic Clip are usually around 4 months.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:music|song|songs)\b/i.test(message)) {
+    return [
+      "Yes, couples can choose music for their films.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:hidden fee|hidden fees|tax|taxes)\b/i.test(message)) {
+    return [
+      "There are no taxes or hidden fees. The only possible extra cost is travel if the venue is beyond the included mileage.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:insurance|certificate of insurance|coi)\b/i.test(message)) {
+    return [
+      "Yes, we carry insurance and can provide a COI to the venue or planner when needed.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:review|reviews|testimonial|testimonials)\b/i.test(message)) {
+    const reviews = args.config.reviews.url && args.state.channel !== "instagram"
+      ? formatLink({
+          label: args.config.reviews.label || "Google Reviews",
+          url: args.config.reviews.url,
+          config: args.config,
+          state: args.state,
+        })
+      : "I can point you to recent reviews from our couples.";
+
+    return [reviews, nextStep].join("\n\n");
+  }
+
+  if (/\b(?:film|films|portfolio|gallery|galleries|example|examples|work)\b/i.test(message)) {
+    const portfolio = args.state.channel !== "instagram"
+      ? formatPortfolioLinks(args.config, args.state)
+      : "";
+
+    return [
+      portfolio ? `Here are a few recent wedding films:\n${portfolio}` : "I can share a few recent wedding films so you can get a feel for the work.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:photographer|photographers)\b/i.test(message)) {
+    return [
+      "Yes, we always work collaboratively with photographers and never interfere with their flow.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:florida|tampa)\b/i.test(message) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
+    return [
+      "For Florida, our lead filmmaker is Jay in Tampa.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  if (/\b(?:nc|north carolina|south carolina|sc|georgia|ga|charlotte)\b/i.test(message) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
+    return [
+      "For NC, SC, and GA, our lead filmmakers are Dima and Marie, a husband-wife team based in Charlotte.",
+      nextStep,
+    ].join("\n\n");
+  }
+
+  return null;
+}
+
 function formatUnavailableWeddingReply(args: {
   state: WeddingSalesState;
   summary?: string;
@@ -373,6 +494,12 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
             : "If you are flexible, send me another date and I can check it right away.";
 
           return [`${weddingDate}${location} is still showing unavailable on my end.`, followUp].join("\n\n");
+        }
+
+        const faqAnswer = formatFaqAnswer({ config, state });
+
+        if (faqAnswer) {
+          return faqAnswer;
         }
 
         if (isInstagram(state) && state.leadStage === "answering_question" && state.calendarStatus === "available" && !state.customerEmail) {
@@ -551,6 +678,24 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
       channel: state.channel,
       richLinks: getChannelFormatting(config, state).richLinks,
       allowAttachments: getChannelFormatting(config, state).allowAttachments,
+      faq: {
+        style: "Cinematic documentary, natural backstage filming, real moments, no cheesy poses.",
+        included:
+          "All collections include full ceremony and speeches, cinematic clip, wedding film, drone footage, raw footage, and digital delivery.",
+        editingTimeline:
+          "Sneak Peek is usually delivered about 2 weeks after the wedding. Wedding Film and Cinematic Clip are usually around 4 months.",
+        music: "Couples can choose music for their films.",
+        hiddenFees:
+          "No taxes and no hidden fees. Only possible additional cost is travel if venue is beyond included mileage.",
+        travel:
+          "Classic includes 100 miles, Premium 125 miles, Exclusive 175 miles. If beyond included mileage, do not calculate in chat; say the exact travel details will be checked for the venue.",
+        insurance:
+          "Myndful carries insurance and can provide a Certificate of Insurance to the venue or planner when needed.",
+        photographers:
+          "Myndful works collaboratively with photographers and does not interfere with their workflow.",
+        teams:
+          "NC/SC/GA lead filmmakers are Dima and Marie in Charlotte. Florida lead filmmaker is Jay in Tampa.",
+      },
     },
     dialogPolicy: policy,
   };
@@ -606,6 +751,8 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     policy.forbiddenPhrases.length ? `Forbidden phrases or concepts. Do not use these even if they seem natural:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
     "Use the provided facts only. Do not invent availability, calendar status, prices, links, event IDs, or bookings.",
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
+    "For FAQ questions, answer from businessConfig.faq and then move to one clear next step. Do not over-answer with collection details unless the customer specifically asks.",
+    "For travel fees, never calculate distance or claim there is no travel fee. Say travel miles are included and exact travel details are checked from the venue.",
     args.testMode
       ? "TEST MODE IS ACTIVE: do not claim a real invite was sent or created. Say this is test mode and that the system would send/create the calendar invite."
       : "",
@@ -613,6 +760,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Gmail can use HTML links. Instagram and Telegram must use plain URLs.",
     args.state.channel === "instagram"
       ? "Instagram style: 1-3 short message bubbles separated by blank lines. No signature. No HTML. Warm, direct, founder-like, and concise. Ask only the next missing question."
+      : "",
+    args.state.channel === "instagram"
+      ? "For Instagram, do not paste URLs or long collection details. Mention that you can send examples or the guide naturally instead."
       : "",
     args.state.channel === "instagram"
       ? "Instagram sales sequence: ask fiance name/date, confirm availability and starting price, ask exact venue, ask call time, ask email, then confirm the calendar invite only after booking succeeds."

@@ -49,10 +49,12 @@ type HandoffChannelAdapter = {
 
 const OPERATIONAL_HANDOFF_PATTERNS = [
   /\b(contract|signed|deposit|payment|paid|invoice|refund|balance|extra hour|additional hour)\b/i,
-  /\b(parent|parents|planner|coordinator|venue coordinator|vendor|operator|videographer|photographer)\b/i,
-  /\b(insurance|certificate|coi|dietary|meal|timeline|deliverable|gallery|film|teaser|raw footage)\b/i,
   /\b(already booked|existing client|wedding already happened|after the wedding|day of the wedding)\b/i,
   /\b(did they|were they able|can you confirm|do you know if|has it been)\b/i,
+  /\b(?:send|email|share|upload|provide)\b[\s\S]{0,80}\b(?:coi|certificate|insurance)\b/i,
+  /\b(?:coi|certificate|insurance)\b[\s\S]{0,80}\b(?:to|for)\b[\s\S]{0,60}\b(?:venue|planner|coordinator)\b/i,
+  /\b(?:planner|coordinator|venue|vendor|parent|parents|operator|videographer|photographer)\b[\s\S]{0,100}\b(?:asked|needs?|requested|paid|confirmed|question|dietary|meal|timeline)\b/i,
+  /\b(?:gallery|film|teaser|raw footage|deliverable)\b[\s\S]{0,80}\b(?:missing|late|ready|sent|delivered|download|access)\b/i,
 ];
 
 function readRecord(value: Prisma.JsonValue | null | undefined) {

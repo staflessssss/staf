@@ -18,6 +18,14 @@ test("wedding sales graph asks for year before checking availability", async () 
   assert.match(result.responseDraft ?? "", /year/i);
 });
 
+test("wedding sales analyzer recognizes Florida locations", () => {
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractLocation("We are getting married in Tampa, Florida."),
+    "Tampa",
+  );
+  assert.equal(weddingSalesAnalyzeTestHelpers.extractLocation("Miami"), "Miami");
+});
+
 test("wedding sales initial state preserves previous assistant response for anti-repeat policy", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

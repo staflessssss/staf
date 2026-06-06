@@ -88,7 +88,7 @@ function hasNames(text: string) {
 }
 
 function hasLocation(text: string) {
-  return /\b(?:in|at|near)\s+[A-Z][A-Za-z .'-]{2,}/.test(text) || /\b(?:NC|SC|GA|Charlotte|Atlanta|Savannah)\b/i.test(text);
+  return /\b(?:in|at|near)\s+[A-Z][A-Za-z .'-]{2,}/.test(text) || /\b(?:NC|SC|GA|FL|Florida|Charlotte|Atlanta|Savannah|Tampa|Miami|Orlando)\b/i.test(text);
 }
 
 function isCoordinatorOrCoi(text: string) {
@@ -318,7 +318,7 @@ function extractLocation(text: string) {
     return match[1].trim();
   }
 
-  const knownCity = text.match(/^\s*(Charlotte|Atlanta|Savannah)\s*(?:[,.\s]|$)/i)?.[1];
+  const knownCity = text.match(/^\s*(Charlotte|Atlanta|Savannah|Tampa|Miami|Orlando)\s*(?:[,.\s]|$)/i)?.[1];
   return knownCity ? knownCity.charAt(0).toUpperCase() + knownCity.slice(1).toLowerCase() : undefined;
 }
 

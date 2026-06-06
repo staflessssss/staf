@@ -25,6 +25,9 @@ describe("owner handoff trigger", () => {
       "Hi, I am Olivia. We are getting married June 14 in Charlotte.",
       "My fiance is Daniel and the venue is Evergreen Park.",
       "Tomorrow at 11am works for a call.",
+      "What is your editing timeline?",
+      "Do you carry insurance?",
+      "What films are included?",
     ];
 
     for (const message of examples) {

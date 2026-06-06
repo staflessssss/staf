@@ -85,6 +85,40 @@ test("wedding sales composer avoids resending guide assets after guide was sent"
   assert.match(response, /quick consultation/i);
 });
 
+test("wedding sales composer answers FAQ from Myndful business facts", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      latestCustomerMessage: "What is your style and how long does editing take?",
+      callProposed: true,
+    },
+  });
+
+  assert.match(response, /cinematic documentary/i);
+  assert.match(response, /photographer/i);
+  assert.match(response, /quick consultation/i);
+  assert.doesNotMatch(response, /we do travel/i);
+});
+
+test("wedding sales composer gives travel answer without guessing fees", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      latestCustomerMessage: "Do you charge a travel fee for our venue?",
+      callProposed: true,
+    },
+  });
+
+  assert.match(response, /travel miles/i);
+  assert.match(response, /exact distance|exact travel details/i);
+  assert.doesNotMatch(response, /no travel fee/i);
+  assert.doesNotMatch(response, /\$0\.65/i);
+});
+
 test("wedding sales composer uses plain links for instagram", () => {
   const response = composeWeddingSalesResponse({
     intent: "availability_available",
