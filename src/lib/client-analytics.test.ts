@@ -18,6 +18,7 @@ test("client analytics extracts lead details from booking tool results", () => {
         weddingDate: "2027-06-14",
         location: "Charlotte, NC",
         eventId: "event-1",
+        meetLink: "https://meet.google.com/abc-defg-hij",
       },
     },
     "anna@example.com",
@@ -30,6 +31,7 @@ test("client analytics extracts lead details from booking tool results", () => {
   assert.equal(details.callDate, "2026-05-25");
   assert.equal(details.callTime, "11:00");
   assert.equal(details.eventId, "event-1");
+  assert.equal(details.meetLink, "https://meet.google.com/abc-defg-hij");
 });
 
 test("client analytics extracts capacity details from availability tool results", () => {

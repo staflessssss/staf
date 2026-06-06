@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MessageRole } from "@prisma/client";
-import { ArrowUpRight, CheckCircle2, Clock3, UsersRound } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Clock3, Link2, UsersRound, Video } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
 import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
@@ -237,6 +237,12 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                       <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/62">
                         {buildLeadPreview(thread.capturedFields)}
                       </p>
+                      {details.meetLink ? (
+                        <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#62d990]">
+                          <Video className="size-3.5" />
+                          Meet link ready
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex items-start gap-2 md:flex-col md:text-right">
                       <span
@@ -294,6 +300,41 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                   </div>
                 ))}
               </div>
+
+              {selectedLead.details.meetLink ? (
+                <div className="rounded-xl border border-[#47c978]/24 bg-[#47c978]/[0.06] p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#62d990]">
+                        <Video className="size-3.5" />
+                        Google Meet
+                      </p>
+                      <p className="mt-2 break-all text-sm font-semibold text-white">
+                        {selectedLead.details.meetLink}
+                      </p>
+                    </div>
+                    <Link
+                      href={selectedLead.details.meetLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex w-fit shrink-0 items-center gap-2 rounded-lg border border-[#47c978]/36 bg-[#17321f] px-4 py-2.5 text-sm font-semibold text-[#62d990] transition hover:bg-[#1d4028]"
+                    >
+                      Open Meet
+                      <ArrowUpRight className="size-4" />
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-white/[0.08] bg-black/16 p-4">
+                  <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/38">
+                    <Link2 className="size-3.5" />
+                    Google Meet
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-white/52">
+                    No Meet link has been recorded for this lead yet.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <h3 className="font-serif text-xl font-normal tracking-[-0.04em] text-white">
