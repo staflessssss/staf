@@ -40,6 +40,12 @@ type InstagramPayload = {
   }>;
 };
 
+type InstagramAttachment = {
+  publicUrl?: string;
+  fileName?: string;
+  mimeType?: string;
+};
+
 function wait(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -151,7 +157,15 @@ function getTextPayload(message: string | string[] | { text: string; html?: stri
 async function sendInstagramMessage(args: {
   credentials: InstagramCredentials;
   contactId: string;
-  text: string;
+  message: {
+    text?: string;
+    attachment?: {
+      type: "image";
+      payload: {
+        url: string;
+      };
+    };
+  };
 }) {
   const senderId = args.credentials.igUserId ?? args.credentials.igBusinessAccountId ?? args.credentials.pageId ?? "me";
   const graphHost = args.credentials.igUserId || args.credentials.igBusinessAccountId
@@ -170,9 +184,7 @@ async function sendInstagramMessage(args: {
           id: args.contactId,
         },
         messaging_type: "RESPONSE",
-        message: {
-          text: args.text,
-        },
+        message: args.message,
       }),
     },
   );
@@ -188,6 +200,14 @@ async function sendInstagramMessage(args: {
   }
 
   return payload;
+}
+
+function getImageAttachments(attachments?: InstagramAttachment[]) {
+  return (attachments ?? []).filter((attachment) => {
+    const mimeType = attachment.mimeType?.toLowerCase() ?? "";
+
+    return Boolean(attachment.publicUrl?.trim()) && (!mimeType || mimeType.startsWith("image/"));
+  });
 }
 
 export const instagramAdapter = {
@@ -212,6 +232,7 @@ export const instagramAdapter = {
     credentials: string;
     contactId: string;
     message: string | string[] | { text: string; html?: string };
+    attachments?: InstagramAttachment[];
     channelConfig?: unknown;
   }) => {
     const credentials = parseInstagramCredentials(params.credentials);
@@ -221,8 +242,10 @@ export const instagramAdapter = {
     }
 
     const messageParts = getTextPayload(params.message).filter((part) => part.trim());
+    const imageAttachments = getImageAttachments(params.attachments);
     const splitDelayMs = readMessageBehaviorConfig(params.channelConfig).splitMessageDelaySeconds * 1000;
     const deliveries = [];
+    const totalParts = messageParts.length + imageAttachments.length;
 
     for (let index = 0; index < messageParts.length; index += 1) {
       const part = messageParts[index];
@@ -235,7 +258,9 @@ export const instagramAdapter = {
         const payload = await sendInstagramMessage({
           credentials,
           contactId: params.contactId,
-          text: part,
+          message: {
+            text: part,
+          },
         });
         deliveries.push(payload);
       } catch (error) {
@@ -247,7 +272,42 @@ export const instagramAdapter = {
           ok: false,
           mode: "meta_partial_delivery",
           deliveredCount: deliveries.length,
-          totalParts: messageParts.length,
+          totalParts,
+          deliveries,
+          error: error instanceof Error ? error.message : "meta_partial_delivery_failed",
+        };
+      }
+    }
+
+    for (const attachment of imageAttachments) {
+      try {
+        if (deliveries.length > 0 && splitDelayMs > 0) {
+          await wait(splitDelayMs);
+        }
+
+        const payload = await sendInstagramMessage({
+          credentials,
+          contactId: params.contactId,
+          message: {
+            attachment: {
+              type: "image",
+              payload: {
+                url: attachment.publicUrl?.trim() ?? "",
+              },
+            },
+          },
+        });
+        deliveries.push(payload);
+      } catch (error) {
+        if (deliveries.length === 0) {
+          throw error;
+        }
+
+        return {
+          ok: false,
+          mode: "meta_partial_delivery",
+          deliveredCount: deliveries.length,
+          totalParts,
           deliveries,
           error: error instanceof Error ? error.message : "meta_partial_delivery_failed",
         };

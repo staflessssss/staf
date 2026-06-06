@@ -9,6 +9,7 @@ export type WeddingSalesConfig = {
     fileId?: string;
     fileName?: string;
     link?: string;
+    imageUrl?: string;
   };
   portfolio: Array<{
     label: string;

@@ -8,6 +8,7 @@ test("buildWeddingSalesConfigFromChannelConfig maps Myndful channel config into 
     signatureText: "Taras Mynd\nMYNDFUL",
     priceAttachmentFileId: "file-1",
     priceAttachmentFileName: "price.png",
+    priceAttachmentPublicUrl: "https://drive.google.com/uc?export=download&id=file-1",
     channelBehavior: {
       useRichFormatting: true,
       allowAttachments: true,
@@ -51,6 +52,7 @@ test("buildWeddingSalesConfigFromChannelConfig maps Myndful channel config into 
   assert.equal(config.signature, "Taras Mynd\nMYNDFUL");
   assert.equal(config.guide.fileId, "file-1");
   assert.equal(config.guide.fileName, "price.png");
+  assert.equal(config.guide.imageUrl, "https://drive.google.com/uc?export=download&id=file-1");
   assert.deepEqual(config.portfolio, [
     {
       label: "Film One",

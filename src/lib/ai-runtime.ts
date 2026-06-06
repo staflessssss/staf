@@ -98,7 +98,44 @@ type RuntimeAttachment = {
   fileId: string;
   fileName?: string;
   mimeType?: string;
+  publicUrl?: string;
 };
+
+function buildPublicGoogleDriveDownloadUrl(fileId?: string) {
+  const trimmed = fileId?.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(trimmed)}`;
+}
+
+function getWeddingSalesGuideAttachment(args: {
+  channel: ChannelType | string;
+  message: string;
+  config: ReturnType<typeof buildWeddingSalesConfigFromChannelConfig>;
+}) {
+  if (args.channel !== ChannelType.INSTAGRAM || !/\bguide\b/i.test(args.message)) {
+    return [];
+  }
+
+  const publicUrl = args.config.guide.imageUrl ?? buildPublicGoogleDriveDownloadUrl(args.config.guide.fileId);
+
+  if (!args.config.guide.fileId && !publicUrl) {
+    return [];
+  }
+
+  return [
+    {
+      source: "google_drive",
+      fileId: args.config.guide.fileId ?? publicUrl ?? "collections-guide",
+      fileName: args.config.guide.fileName,
+      mimeType: "image/png",
+      publicUrl,
+    },
+  ] satisfies RuntimeAttachment[];
+}
 
 type ParsedIncomingMessage = {
   contactId: string;
@@ -1021,6 +1058,7 @@ async function runWeddingSalesTestRuntime(args: {
     testMode: true,
     defaultEmail,
   });
+  const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
   const graphResult = await invokeWeddingSalesGraph({
     tenantId: args.agent.tenantId,
     agentId: args.agent.id,
@@ -1029,7 +1067,7 @@ async function runWeddingSalesTestRuntime(args: {
     message: args.input.message,
     customerEmail: defaultEmail,
     previousState: extractWeddingSalesTestState(args.input.historyMessages),
-    config: buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig),
+    config,
     toolContext,
     checkpoint: false,
   });
@@ -1040,6 +1078,11 @@ async function runWeddingSalesTestRuntime(args: {
     promptPreview: "langgraph_wedding_sales",
     usedTooling: graphResult.turnToolObservations.map((observation) => observation.toolName),
     model: "langgraph_wedding_sales",
+    attachments: getWeddingSalesGuideAttachment({
+      channel: args.agent.channel.type,
+      message,
+      config,
+    }),
     historyAppend: buildWeddingSalesTestHistoryAppend({
       state: graphResult,
       assistantText: message,
@@ -1284,6 +1327,7 @@ async function runWeddingSalesRuntime(args: {
     toolFeatures,
     defaultEmail,
   });
+  const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
 
   const graphResult = await invokeWeddingSalesGraph({
     tenantId: args.agent.tenantId,
@@ -1292,7 +1336,7 @@ async function runWeddingSalesRuntime(args: {
     channel: getWeddingSalesGraphChannel(args.channel),
     message: args.incoming.message,
     customerEmail: defaultEmail,
-    config: buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig),
+    config,
     toolContext,
     checkpoint: args.database === db,
   });
@@ -1330,6 +1374,11 @@ async function runWeddingSalesRuntime(args: {
     usedTooling: graphResult.toolObservations.map((observation) => observation.toolName),
     conversationId: conversation.id,
     model: "langgraph_wedding_sales",
+    attachments: getWeddingSalesGuideAttachment({
+      channel: args.channel,
+      message,
+      config,
+    }),
   };
 }
 
@@ -2267,7 +2316,10 @@ async function handleIncomingEventWithDeps(
     messageId: incoming.messageId,
     threadId: incoming.threadId,
     subject: incoming.subject,
-    attachments: messageBehavior.allowAttachments ? result.attachments : undefined,
+    attachments:
+      messageBehavior.allowAttachments || args.channel === ChannelType.INSTAGRAM
+        ? result.attachments
+        : undefined,
     channelConfig: agent.channelConfig,
   });
 

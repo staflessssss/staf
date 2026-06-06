@@ -123,6 +123,63 @@ test("instagram adapter sends plain text through Meta Graph API", async () => {
   assert.deepEqual(result, { recipient_id: "ig-user-1", message_id: "mid-1" });
 });
 
+test("instagram adapter sends image attachments as separate Meta messages", async () => {
+  const requestBodies: unknown[] = [];
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")));
+
+    return {
+      ok: true,
+      json: async () => ({ recipient_id: "ig-user-1", message_id: `mid-${requestBodies.length}` }),
+    } as Response;
+  }) as typeof fetch;
+
+  const result = await instagramAdapter.sendReply({
+    credentials: JSON.stringify({
+      instagramUserAccessToken: "ig-token",
+      igUserId: "ig-professional-account",
+      graphApiVersion: "v25.0",
+    }),
+    contactId: "ig-user-1",
+    message: "Here is the guide.",
+    attachments: [
+      {
+        publicUrl: "https://drive.google.com/uc?export=download&id=file-1",
+        fileName: "price.png",
+        mimeType: "image/png",
+      },
+    ],
+  });
+
+  assert.deepEqual(requestBodies, [
+    {
+      recipient: {
+        id: "ig-user-1",
+      },
+      messaging_type: "RESPONSE",
+      message: {
+        text: "Here is the guide.",
+      },
+    },
+    {
+      recipient: {
+        id: "ig-user-1",
+      },
+      messaging_type: "RESPONSE",
+      message: {
+        attachment: {
+          type: "image",
+          payload: {
+            url: "https://drive.google.com/uc?export=download&id=file-1",
+          },
+        },
+      },
+    },
+  ]);
+  assert.deepEqual(result, { recipient_id: "ig-user-1", message_id: "mid-1" });
+});
+
 test("instagram adapter uses Instagram Login igUserId as the sender account", async () => {
   let requestUrl = "";
 

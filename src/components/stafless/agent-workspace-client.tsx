@@ -134,6 +134,7 @@ type ChannelConfigDraft = {
   priceAttachmentFileId: string;
   priceAttachmentFileName: string;
   priceAttachmentMimeType: string;
+  priceAttachmentPublicUrl: string;
   agentSettings: AgentSettingsConfig;
   channelBehavior: ChannelBehaviorConfig;
   conversationPlaybook: ConversationPlaybookConfig;
@@ -513,6 +514,10 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
       priceAttachmentMimeType:
         typeof rawChannelConfig.priceAttachmentMimeType === "string"
           ? rawChannelConfig.priceAttachmentMimeType
+          : "",
+      priceAttachmentPublicUrl:
+        typeof rawChannelConfig.priceAttachmentPublicUrl === "string"
+          ? rawChannelConfig.priceAttachmentPublicUrl
           : "",
       agentSettings: normalizeAgentSettings(
         rawChannelConfig.agentSettings &&
@@ -1605,6 +1610,7 @@ export function AgentWorkspaceClient({
           priceAttachmentFileId: draft.channelConfig.priceAttachmentFileId || undefined,
           priceAttachmentFileName: draft.channelConfig.priceAttachmentFileName || undefined,
           priceAttachmentMimeType: draft.channelConfig.priceAttachmentMimeType || undefined,
+          priceAttachmentPublicUrl: draft.channelConfig.priceAttachmentPublicUrl || undefined,
           agentSettings: draft.channelConfig.agentSettings,
           channelBehavior: draft.channelConfig.channelBehavior,
           conversationPlaybook: draft.channelConfig.conversationPlaybook,

@@ -126,6 +126,11 @@ export function buildWeddingSalesConfigFromChannelConfig(
     guide: {
       fileId: asString(channelConfig.priceAttachmentFileId) || undefined,
       fileName: asString(channelConfig.priceAttachmentFileName) || undefined,
+      imageUrl:
+        asString(channelConfig.priceAttachmentPublicUrl) ||
+        asString(channelConfig.priceAttachmentImageUrl) ||
+        asString(channelConfig.collectionsGuideImageUrl) ||
+        undefined,
       link: undefined,
     },
     portfolio,

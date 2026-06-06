@@ -943,6 +943,13 @@ export const channelConfigSchema = z
       .max(120)
       .optional()
       .transform((value) => (value ? value : undefined)),
+    priceAttachmentPublicUrl: z
+      .string()
+      .trim()
+      .url()
+      .max(1000)
+      .optional()
+      .transform((value) => (value ? value : undefined)),
     channelBehavior: z
       .object({
         preset: z.enum(channelBehaviorPresetOptions).default("recommended_for_channel"),
@@ -1150,6 +1157,7 @@ export const channelConfigSchema = z
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,
+    priceAttachmentPublicUrl: undefined,
     channelBehavior: undefined,
     conversationPlaybook: undefined,
     prompting: undefined,
@@ -1164,6 +1172,7 @@ const agentManagedChannelConfigKeys = [
   "priceAttachmentFileId",
   "priceAttachmentFileName",
   "priceAttachmentMimeType",
+  "priceAttachmentPublicUrl",
   "channelBehavior",
   "conversationPlaybook",
   "prompting",
@@ -1191,6 +1200,7 @@ export const agentDraftSchema = z.object({
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,
+    priceAttachmentPublicUrl: undefined,
   }),
   knowledgeBlocks: z.array(knowledgeBlockSchema).default([]),
 });

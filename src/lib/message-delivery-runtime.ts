@@ -419,7 +419,10 @@ async function deliverThroughChannel(args: {
     messageId: args.replyContext.messageId,
     threadId: args.replyContext.threadId,
     subject: args.replyContext.subject,
-    attachments: behavior.allowAttachments ? args.attachments : undefined,
+    attachments:
+      behavior.allowAttachments || args.agent.channel.type === ChannelType.INSTAGRAM
+        ? args.attachments
+        : undefined,
     channelConfig: args.agent.channelConfig,
   });
 
