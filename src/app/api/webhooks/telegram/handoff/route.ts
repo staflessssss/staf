@@ -6,6 +6,7 @@ import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import {
   handleOwnerTelegramCommand,
+  handleOwnerTelegramReply,
   readOwnerHandoffStartToken,
   readOwnerHandoffWebhookSecret,
   updateOwnerHandoffChatMetadata,
@@ -25,9 +26,14 @@ function extractTelegramMessage(payload: unknown) {
 
   const messageRecord = message as Record<string, unknown>;
   const chat = messageRecord.chat;
+  const replyToMessage = messageRecord.reply_to_message;
   const chatId =
     chat && typeof chat === "object" && !Array.isArray(chat)
       ? String((chat as Record<string, unknown>).id ?? "")
+      : "";
+  const replyToMessageId =
+    replyToMessage && typeof replyToMessage === "object" && !Array.isArray(replyToMessage)
+      ? String((replyToMessage as Record<string, unknown>).message_id ?? "")
       : "";
   const text =
     typeof messageRecord.text === "string"
@@ -38,6 +44,7 @@ function extractTelegramMessage(payload: unknown) {
 
   return {
     chatId,
+    replyToMessageId,
     text: text.trim(),
   };
 }
@@ -108,6 +115,34 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, status: "owner_chat_linked" });
+  }
+
+  if (message.replyToMessageId && message.text && !message.text.startsWith("/")) {
+    const replyResponseText = await handleOwnerTelegramReply({
+      tenantId,
+      ownerChatId: message.chatId,
+      replyToMessageId: message.replyToMessageId,
+      text: message.text,
+    });
+
+    if (replyResponseText) {
+      await telegramAdapter.sendReply({
+        credentials: decrypt(channel.credentialsEnc),
+        contactId: message.chatId,
+        message: replyResponseText,
+      });
+
+      return NextResponse.json({ ok: true, status: "owner_reply_processed" });
+    }
+
+    await telegramAdapter.sendReply({
+      credentials: decrypt(channel.credentialsEnc),
+      contactId: message.chatId,
+      message:
+        "I could not match this Telegram reply to a Behalfy handoff. Tap Reply on the latest Behalfy handoff message, or use /send <conversationId> <message>.",
+    });
+
+    return NextResponse.json({ ok: true, status: "owner_reply_not_matched" });
   }
 
   const responseText = await handleOwnerTelegramCommand({

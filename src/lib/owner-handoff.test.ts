@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { mergeOwnerHandoffMetadata, shouldRequestOwnerHandoff } from "@/lib/owner-handoff";
+import {
+  mergeOwnerHandoffMetadata,
+  ownerHandoffTestHelpers,
+  shouldRequestOwnerHandoff,
+} from "@/lib/owner-handoff";
 
 describe("owner handoff trigger", () => {
   it("requests owner help for operational questions the agent should not answer", () => {
@@ -62,6 +66,20 @@ describe("owner handoff metadata", () => {
     assert.deepEqual(
       (metadata.ownerHandoff as Record<string, unknown>).webhookSecret,
       "new-secret",
+    );
+  });
+});
+
+describe("owner handoff Telegram delivery", () => {
+  it("reads the Telegram message id from sendMessage responses", () => {
+    assert.equal(
+      ownerHandoffTestHelpers.extractTelegramDeliveryMessageId({
+        ok: true,
+        result: {
+          message_id: 12345,
+        },
+      }),
+      "12345",
     );
   });
 });

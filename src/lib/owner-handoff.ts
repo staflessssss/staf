@@ -180,7 +180,10 @@ function formatOwnerHandoffMessage(args: {
     "Customer wrote:",
     args.customerMessage,
     "",
-    "Reply with one of these commands:",
+    "Fast reply:",
+    "Tap Reply on this Telegram message and type the exact answer to send to the customer.",
+    "",
+    "Commands:",
     `/send ${args.conversationId} <exact message to customer>`,
     `/takeover ${args.conversationId}`,
     `/resume ${args.conversationId}`,
@@ -188,6 +191,26 @@ function formatOwnerHandoffMessage(args: {
     .filter((line): line is string => line !== null)
     .join("\n");
 }
+
+function extractTelegramDeliveryMessageId(delivery: unknown) {
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return "";
+  }
+
+  const result = (delivery as Record<string, unknown>).result;
+  const messageId =
+    result && typeof result === "object" && !Array.isArray(result)
+      ? (result as Record<string, unknown>).message_id
+      : (delivery as Record<string, unknown>).message_id;
+
+  return typeof messageId === "number" || typeof messageId === "string"
+    ? String(messageId)
+    : "";
+}
+
+export const ownerHandoffTestHelpers = {
+  extractTelegramDeliveryMessageId,
+};
 
 export async function requestOwnerHandoffWithDb(args: {
   database: typeof db;
@@ -249,6 +272,7 @@ export async function requestOwnerHandoffWithDb(args: {
     customerMessage: args.customerMessage,
     reason: args.reason,
   });
+  let requestMessageId = "";
 
   await args.database.$transaction(async (tx) => {
     await tx.conversation.update({
@@ -271,7 +295,7 @@ export async function requestOwnerHandoffWithDb(args: {
         error: "owner_handoff_requested",
       },
     });
-    await tx.message.create({
+    const requestMessage = await tx.message.create({
       data: {
         conversationId: conversation.id,
         role: MessageRole.TOOL,
@@ -288,13 +312,28 @@ export async function requestOwnerHandoffWithDb(args: {
         },
       },
     });
+    requestMessageId = requestMessage.id;
   });
 
-  await telegramAdapter.sendReply({
+  const delivery = await telegramAdapter.sendReply({
     credentials: decrypt(ownerTelegram.credentialsEnc),
     contactId: ownerConfig.ownerChatId,
     message,
   });
+  const telegramMessageId = extractTelegramDeliveryMessageId(delivery);
+
+  if (requestMessageId && telegramMessageId) {
+    await args.database.message.update({
+      where: { id: requestMessageId },
+      data: {
+        toolResult: {
+          status: "sent_to_owner",
+          ownerChatId: ownerConfig.ownerChatId,
+          telegramMessageId,
+        },
+      },
+    });
+  }
 
   return {
     status: "owner_handoff_requested" as const,
@@ -368,6 +407,62 @@ async function sendReplyThroughConversationChannel(args: {
   });
 
   return conversation;
+}
+
+export async function handleOwnerTelegramReply(args: {
+  tenantId: string;
+  ownerChatId: string;
+  replyToMessageId: string;
+  text: string;
+}) {
+  const text = args.text.trim();
+
+  if (!text || text.startsWith("/")) {
+    return null;
+  }
+
+  const requestMessage = await db.message.findFirst({
+    where: {
+      role: MessageRole.TOOL,
+      toolName: OWNER_HANDOFF_REQUEST_TOOL_NAME,
+      toolResult: {
+        path: ["telegramMessageId"],
+        equals: args.replyToMessageId,
+      },
+      conversation: {
+        agent: {
+          tenantId: args.tenantId,
+        },
+      },
+    },
+    select: {
+      conversationId: true,
+      toolResult: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!requestMessage) {
+    return null;
+  }
+
+  const toolResult = readRecord(requestMessage.toolResult);
+  const ownerChatId =
+    typeof toolResult.ownerChatId === "string" && toolResult.ownerChatId.trim()
+      ? toolResult.ownerChatId.trim()
+      : "";
+
+  if (ownerChatId && ownerChatId !== args.ownerChatId) {
+    throw new Error("Telegram reply does not belong to the linked owner chat.");
+  }
+
+  const conversation = await sendReplyThroughConversationChannel({
+    tenantId: args.tenantId,
+    conversationId: requestMessage.conversationId,
+    text,
+  });
+
+  return `Sent to customer. Conversation ${conversation.id} remains paused. Reply with /resume ${conversation.id} when the agent can continue.`;
 }
 
 export async function handleOwnerTelegramCommand(args: {
