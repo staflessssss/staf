@@ -10,10 +10,14 @@ type GmailWatchMetadata = {
   historyId?: string;
   expiration?: string;
   registeredAt?: string;
+  lastRenewalAttemptAt?: string;
   lastNotificationAt?: string;
   lastProcessedAt?: string;
   lastError?: string | null;
 };
+
+const GMAIL_WATCH_RENEWAL_WINDOW_MS = 24 * 60 * 60 * 1000;
+const GMAIL_WATCH_RENEWAL_RETRY_MS = 60 * 60 * 1000;
 
 type PubSubPushEnvelope = {
   message?: {
@@ -80,10 +84,47 @@ function getWatchMetadata(metadata: Prisma.JsonValue | null | undefined): GmailW
           ? String(value.expiration)
           : undefined,
     registeredAt: typeof value.registeredAt === "string" ? value.registeredAt : undefined,
+    lastRenewalAttemptAt:
+      typeof value.lastRenewalAttemptAt === "string" ? value.lastRenewalAttemptAt : undefined,
     lastNotificationAt: typeof value.lastNotificationAt === "string" ? value.lastNotificationAt : undefined,
     lastProcessedAt: typeof value.lastProcessedAt === "string" ? value.lastProcessedAt : undefined,
     lastError: typeof value.lastError === "string" ? value.lastError : value.lastError === null ? null : undefined,
   };
+}
+
+function parseEpochMs(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseIsoMs(value?: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function shouldRenewGmailWatch(metadata: Prisma.JsonValue | null | undefined, now: Date) {
+  const watch = getWatchMetadata(metadata);
+  const lastAttemptAt = parseIsoMs(watch.lastRenewalAttemptAt);
+
+  if (lastAttemptAt && now.getTime() - lastAttemptAt < GMAIL_WATCH_RENEWAL_RETRY_MS) {
+    return false;
+  }
+
+  const expiration = parseEpochMs(watch.expiration);
+
+  if (!expiration) {
+    return true;
+  }
+
+  return expiration - now.getTime() <= GMAIL_WATCH_RENEWAL_WINDOW_MS;
 }
 
 function mergeWatchMetadata(
@@ -440,6 +481,78 @@ export async function registerGmailWatchForChannel(args: {
   }
 }
 
+export async function renewDueGmailWatches(args: {
+  now?: Date;
+  limit?: number;
+} = {}) {
+  const topicName = getGmailPubSubTopic();
+
+  if (!topicName) {
+    return {
+      ok: false,
+      reason: "gmail_pubsub_topic_missing",
+      checked: 0,
+      due: 0,
+      renewed: 0,
+      results: [],
+    };
+  }
+
+  const now = args.now ?? new Date();
+  const limit = args.limit && args.limit > 0 ? Math.floor(args.limit) : 10;
+  const channels = await db.channelConnection.findMany({
+    where: {
+      type: ChannelType.GMAIL,
+      status: ConnectionStatus.CONNECTED,
+    },
+    select: {
+      id: true,
+      credentialsEnc: true,
+      metadata: true,
+    },
+    orderBy: {
+      updatedAt: "asc",
+    },
+  });
+  const dueChannels = channels
+    .filter((channel) => shouldRenewGmailWatch(channel.metadata, now))
+    .slice(0, limit);
+  const results: Array<{
+    channelId: string;
+    ok: boolean;
+    mode: string;
+    reason?: string;
+    expiration?: string;
+  }> = [];
+
+  for (const channel of dueChannels) {
+    await updateChannelWatchMetadata(channel.id, {
+      lastRenewalAttemptAt: now.toISOString(),
+    });
+
+    const result = await registerGmailWatchForChannel({
+      channelId: channel.id,
+      credentialsEnc: channel.credentialsEnc,
+    });
+
+    results.push({
+      channelId: channel.id,
+      ok: Boolean(result.ok),
+      mode: result.mode,
+      reason: "reason" in result ? result.reason : undefined,
+      expiration: "expiration" in result ? result.expiration : undefined,
+    });
+  }
+
+  return {
+    ok: results.every((result) => result.ok),
+    checked: channels.length,
+    due: dueChannels.length,
+    renewed: results.filter((result) => result.ok).length,
+    results,
+  };
+}
+
 export async function processGmailPubSubNotification(args: {
   envelope: PubSubPushEnvelope;
 }) {
@@ -654,3 +767,7 @@ export function assertPubSubWebhookSecret(token?: string | null) {
 
   return token === expected;
 }
+
+export const gmailWatchTestHelpers = {
+  shouldRenewGmailWatch,
+};

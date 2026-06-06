@@ -6,6 +6,7 @@ import { decrypt } from "@/lib/crypto";
 import { getChannelAdapter } from "@/lib/channels";
 import { invokeAgent } from "@/lib/ai-runtime";
 import { saveMessages } from "@/lib/agent-memory";
+import { renewDueGmailWatches } from "@/lib/gmail-watch";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +41,12 @@ export async function GET(request: NextRequest) {
     new Date(),
     limit,
   );
+  const gmailWatchRenewal = await renewDueGmailWatches();
 
   return NextResponse.json({
     ok: true,
     processed: results.length,
+    gmailWatchRenewal,
     results,
   });
 }
