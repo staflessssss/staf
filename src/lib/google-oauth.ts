@@ -18,6 +18,32 @@ type GoogleStatePayload = {
   issuedAt: number;
 };
 
+export function normalizeGoogleRedirectTo(value: string | null | undefined) {
+  const fallback = "/client/connections/gmail";
+  const redirectTo = value?.trim() || fallback;
+
+  if (
+    !redirectTo.startsWith("/") ||
+    redirectTo.startsWith("//") ||
+    redirectTo.includes("\\")
+  ) {
+    return fallback;
+  }
+
+  try {
+    const base = "https://stafless.local";
+    const target = new URL(redirectTo, base);
+
+    if (target.origin !== base) {
+      return fallback;
+    }
+
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 function getStateSecret() {
   const secret = process.env.NEXTAUTH_SECRET?.trim();
 
@@ -65,7 +91,7 @@ export function buildGoogleConnectUrl(args: {
   const config = getGoogleOAuthConfig();
   const payload: GoogleStatePayload = {
     tenantId: args.tenantId,
-    redirectTo: args.redirectTo,
+    redirectTo: normalizeGoogleRedirectTo(args.redirectTo),
     issuedAt: Date.now(),
   };
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));

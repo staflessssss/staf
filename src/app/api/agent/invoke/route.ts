@@ -12,6 +12,7 @@ import { invokeAgent } from "@/lib/ai-runtime";
 import { db } from "@/lib/db";
 import { getOrderedResultTargets } from "@/lib/functions/destination-mapping";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const session = await requireAdminApiSession();
@@ -21,6 +22,17 @@ export async function POST(req: NextRequest) {
   }
 
   void session;
+
+  const invokeLimit = await checkRateLimit({
+    scope: "admin-agent-invoke",
+    identifier: session.user.id,
+    limit: 30,
+    windowSeconds: 60,
+  });
+
+  if (!invokeLimit.allowed) {
+    return rateLimitResponse(invokeLimit);
+  }
 
   const json = await req.json().catch(() => null);
   const parsed = sandboxInvokeSchema.safeParse(json);

@@ -19,9 +19,17 @@ export default async function AgentDetailPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const tenant = await db.tenant.findUnique({
     where: { id: tenantId },
-    include: {
-      channelConnections: true,
-      integrationConnections: true,
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      timezone: true,
+      channelConnections: {
+        omit: { credentialsEnc: true },
+      },
+      integrationConnections: {
+        omit: { credentialsEnc: true },
+      },
       agents: {
         select: {
           id: true,
@@ -33,8 +41,19 @@ export default async function AgentDetailPage({
   });
   const agent = await db.agent.findFirst({
     where: { id: agentId, tenantId },
-    include: {
-      channel: true,
+    select: {
+      id: true,
+      name: true,
+      persona: true,
+      tone: true,
+      languagePreference: true,
+      status: true,
+      deployedAt: true,
+      channelId: true,
+      channelConfig: true,
+      channel: {
+        omit: { credentialsEnc: true },
+      },
       features: {
         orderBy: { sortOrder: "asc" },
       },

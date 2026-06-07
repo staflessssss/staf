@@ -63,3 +63,23 @@ test("gmail POST accepts the relay auth header and continues to payload validati
     restore();
   }
 });
+
+test("gmail POST does not reveal whether an agent exists", async () => {
+  const restore = withMockedAgentFindFirst(async () => null as never);
+
+  try {
+    const request = new NextRequest("https://example.com/api/webhooks/gmail?agentId=unknown", {
+      method: "POST",
+      body: JSON.stringify({ message: "hello" }),
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+    const response = await POST(request);
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: "Forbidden" });
+  } finally {
+    restore();
+  }
+});

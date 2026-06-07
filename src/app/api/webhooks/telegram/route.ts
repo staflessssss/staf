@@ -6,6 +6,7 @@ import {
   ensureBufferedDeliveryExecution,
   scheduleDelayedDeliverySweepBackground,
 } from "@/lib/delayed-delivery-background";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const agentId = req.nextUrl.searchParams.get("agentId");
@@ -28,15 +29,24 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (!agent) {
-    return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  const secretHeader = req.headers.get("x-telegram-bot-api-secret-token");
+  const isLocalDev =
+    process.env.NODE_ENV !== "production" &&
+    (req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1");
+
+  if (!agent || (!isLocalDev && (!agent.webhookSecret || secretHeader !== agent.webhookSecret))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const secretHeader = req.headers.get("x-telegram-bot-api-secret-token");
-  const isLocalDev = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
+  const webhookLimit = await checkRateLimit({
+    scope: "telegram-webhook",
+    identifier: agent.id,
+    limit: 300,
+    windowSeconds: 60,
+  });
 
-  if (!isLocalDev && (!agent.webhookSecret || secretHeader !== agent.webhookSecret)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!webhookLimit.allowed) {
+    return rateLimitResponse(webhookLimit);
   }
 
   const payload = await req.json().catch(() => null);
@@ -56,8 +66,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
+    console.error("[telegram-webhook] processing failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Telegram webhook failed." },
+      { error: "Webhook processing failed." },
       { status: 500 },
     );
   }

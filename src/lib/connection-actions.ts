@@ -12,6 +12,7 @@ import {
 import { z } from "zod";
 
 import { requireClientSession } from "@/lib/client-auth";
+import { normalizeInternalRedirect } from "@/lib/auth-redirect";
 import { getInstagramCredentialsValidationError } from "@/lib/channels/instagram";
 import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
 import { upsertChannelConnection, upsertIntegrationConnection } from "@/lib/connection-store";
@@ -196,7 +197,10 @@ export async function connectPresetChannelAction(formData: FormData) {
   const parsed = presetChannelSchema.safeParse({
     type: formData.get("type"),
   });
-  const redirectTo = String(formData.get("redirectTo") || "/client/connections");
+  const redirectTo = normalizeInternalRedirect(
+    String(formData.get("redirectTo") || ""),
+    "/client/connections",
+  );
 
   if (!parsed.success) {
     redirect("/client/connections?error=channel");
@@ -247,7 +251,10 @@ export async function connectPresetIntegrationAction(formData: FormData) {
   const parsed = presetIntegrationSchema.safeParse({
     type: formData.get("type"),
   });
-  const redirectTo = String(formData.get("redirectTo") || "/client/connections");
+  const redirectTo = normalizeInternalRedirect(
+    String(formData.get("redirectTo") || ""),
+    "/client/connections",
+  );
 
   if (!parsed.success) {
     redirect("/client/connections?error=integration");
@@ -273,7 +280,10 @@ export async function revokeChannelConnectionAction(formData: FormData) {
   const parsed = revokeChannelSchema.safeParse({
     type: formData.get("type"),
   });
-  const redirectTo = String(formData.get("redirectTo") || "/client/connections");
+  const redirectTo = normalizeInternalRedirect(
+    String(formData.get("redirectTo") || ""),
+    "/client/connections",
+  );
 
   if (!parsed.success) {
     redirect(`${redirectTo}?error=channel`);

@@ -1,5 +1,4 @@
-import { ChannelConnection } from "@prisma/client";
-
+import type { SafeChannelConnection } from "@/components/stafless/agent-editor-shared";
 import { SurfaceCard } from "@/components/stafless/foundation";
 import { humanizeWorkspaceToken } from "@/components/stafless/workspace-sections/utils";
 
@@ -12,7 +11,7 @@ export function WorkspaceOverviewSection({
   softInfoPanelClassName,
 }: {
   agentName: string;
-  selectedChannel: ChannelConnection | null;
+  selectedChannel: SafeChannelConnection | null;
   isDirty: boolean;
   knowledgeCount: number;
   functionCount: number;

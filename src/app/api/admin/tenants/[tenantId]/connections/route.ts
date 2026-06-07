@@ -29,6 +29,16 @@ const createConnectionSchema = z.discriminatedUnion("scope", [
   }),
 ]);
 
+const safeConnectionSelect = {
+  id: true,
+  tenantId: true,
+  type: true,
+  status: true,
+  metadata: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 export async function GET(_: Request, context: ConnectionsRouteContext) {
   const session = await requireAdminApiSession();
 
@@ -43,10 +53,12 @@ export async function GET(_: Request, context: ConnectionsRouteContext) {
     db.channelConnection.findMany({
       where: { tenantId },
       orderBy: { type: "asc" },
+      select: safeConnectionSelect,
     }),
     db.integrationConnection.findMany({
       where: { tenantId },
       orderBy: { type: "asc" },
+      select: safeConnectionSelect,
     }),
   ]);
 
@@ -112,6 +124,7 @@ export async function POST(request: Request, context: ConnectionsRouteContext) {
         credentialsEnc: encrypt(parsed.data.credentials),
         metadata,
       },
+      select: safeConnectionSelect,
     });
 
     return NextResponse.json({ item }, { status: 201 });
@@ -136,6 +149,7 @@ export async function POST(request: Request, context: ConnectionsRouteContext) {
       credentialsEnc: encrypt(parsed.data.credentials),
       metadata,
     },
+    select: safeConnectionSelect,
   });
 
   return NextResponse.json({ item }, { status: 201 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
 
 type TenantRouteContext = {
@@ -14,6 +15,12 @@ const updateTenantSchema = z.object({
 });
 
 export async function GET(_: Request, context: TenantRouteContext) {
+  const session = await requireAdminApiSession();
+
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
   const { tenantId } = await context.params;
 
   const tenant = await db.tenant.findUnique({
@@ -28,6 +35,12 @@ export async function GET(_: Request, context: TenantRouteContext) {
 }
 
 export async function PATCH(request: Request, context: TenantRouteContext) {
+  const session = await requireAdminApiSession();
+
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
   const { tenantId } = await context.params;
   const json = await request.json().catch(() => null);
   const parsed = updateTenantSchema.safeParse(json);

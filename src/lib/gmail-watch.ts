@@ -762,7 +762,7 @@ export function assertPubSubWebhookSecret(token?: string | null) {
   const expected = getPubSubWebhookSecret();
 
   if (!expected) {
-    return true;
+    return false;
   }
 
   return token === expected;

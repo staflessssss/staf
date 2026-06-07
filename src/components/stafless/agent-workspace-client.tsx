@@ -4,11 +4,9 @@ import { useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AgentStatus,
-  ChannelConnection,
   Feature,
   FeatureType,
   IntegrationType,
-  IntegrationConnection,
 } from "@prisma/client";
 import {
   BookOpen,
@@ -78,14 +76,18 @@ import {
   getGoogleSheetsActionForOperation,
   getGoogleSheetsParams,
 } from "@/lib/function-execution";
+import type {
+  SafeChannelConnection,
+  SafeIntegrationConnection,
+} from "@/components/stafless/agent-editor-shared";
 
 type SerializableTenant = {
   id: string;
   name: string;
   slug: string;
   timezone?: string | null;
-  channelConnections: ChannelConnection[];
-  integrationConnections: IntegrationConnection[];
+  channelConnections: SafeChannelConnection[];
+  integrationConnections: SafeIntegrationConnection[];
   agents: Array<{
     id: string;
     name: string;
@@ -103,7 +105,7 @@ type SerializableAgent = {
   deployedAt: string | null;
   channelId: string;
   channelConfig?: Record<string, unknown> | null;
-  channel: ChannelConnection;
+  channel: SafeChannelConnection;
   features: Feature[];
 };
 
@@ -559,7 +561,7 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
 
 function parseFunctionBlocks(
   functionBlocks: FunctionDraft[],
-  integrationById: Map<string, IntegrationConnection>,
+  integrationById: Map<string, SafeIntegrationConnection>,
 ) {
   const errors: string[] = [];
   stripFunctionUiIds(functionBlocks).forEach((fn) => {

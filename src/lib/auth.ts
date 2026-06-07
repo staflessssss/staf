@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { checkRateLimit, getRequestIp } from "@/lib/rate-limit";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -24,10 +25,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const parsed = credentialsSchema.safeParse(credentials);
 
         if (!parsed.success) {
+          return null;
+        }
+
+        const requestIp = getRequestIp(request);
+        const ipLimit = await checkRateLimit({
+          scope: "login-ip",
+          identifier: requestIp,
+          limit: 50,
+          windowSeconds: 15 * 60,
+        });
+        const loginLimit = await checkRateLimit({
+          scope: "login",
+          identifier: `${requestIp}:${parsed.data.email.toLowerCase()}`,
+          limit: 10,
+          windowSeconds: 15 * 60,
+        });
+
+        if (!ipLimit.allowed || !loginLimit.allowed) {
           return null;
         }
 

@@ -77,6 +77,21 @@ test("instagram POST rejects unsigned production requests", async () => {
   }
 });
 
+test("instagram POST rejects oversized payloads before signature processing", async () => {
+  const request = new NextRequest("https://example.com/api/webhooks/instagram", {
+    method: "POST",
+    body: "{}",
+    headers: {
+      "content-length": "1000001",
+      "content-type": "application/json",
+    },
+  });
+  const response = await POST(request);
+
+  assert.equal(response.status, 413);
+  assert.deepEqual(await response.json(), { error: "Payload too large." });
+});
+
 test("instagram POST does not let agentId override recipient routing", async () => {
   const originalSecret = process.env.INSTAGRAM_APP_SECRET;
   process.env.INSTAGRAM_APP_SECRET = "test-instagram-secret";

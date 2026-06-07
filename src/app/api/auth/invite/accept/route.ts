@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { checkRateLimit, getRequestIp, rateLimitResponse } from "@/lib/rate-limit";
 
 const acceptInviteSchema = z.object({
   token: z.string().min(1),
@@ -19,6 +20,24 @@ export async function POST(request: Request) {
       { error: "Invalid invite payload." },
       { status: 400 },
     );
+  }
+
+  const requestIp = getRequestIp(request);
+  const ipLimit = await checkRateLimit({
+    scope: "invite-accept-ip",
+    identifier: requestIp,
+    limit: 30,
+    windowSeconds: 15 * 60,
+  });
+  const inviteLimit = await checkRateLimit({
+    scope: "invite-accept",
+    identifier: `${requestIp}:${parsed.data.token}`,
+    limit: 10,
+    windowSeconds: 15 * 60,
+  });
+
+  if (!ipLimit.allowed || !inviteLimit.allowed) {
+    return rateLimitResponse(ipLimit.allowed ? inviteLimit : ipLimit);
   }
 
   const invite = await db.inviteToken.findUnique({

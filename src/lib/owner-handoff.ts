@@ -90,6 +90,31 @@ function readOwnerHandoffConfig(metadata: Prisma.JsonValue | null | undefined) {
   };
 }
 
+export function readOwnerHandoffChatId(metadata: Prisma.JsonValue | null | undefined) {
+  return readOwnerHandoffConfig(metadata).ownerChatId;
+}
+
+async function assertLinkedOwnerTelegramChat(args: {
+  tenantId: string;
+  ownerChatId: string;
+}) {
+  const channel = await db.channelConnection.findUnique({
+    where: {
+      tenantId_type: {
+        tenantId: args.tenantId,
+        type: ChannelType.TELEGRAM,
+      },
+    },
+    select: { metadata: true },
+  });
+
+  const linkedOwnerChatId = readOwnerHandoffChatId(channel?.metadata);
+
+  if (!linkedOwnerChatId || linkedOwnerChatId !== args.ownerChatId) {
+    throw new Error("Telegram command does not belong to the linked owner chat.");
+  }
+}
+
 function readStringField(value: unknown, field: string) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
@@ -525,8 +550,11 @@ export async function handleOwnerTelegramReply(args: {
 
 export async function handleOwnerTelegramCommand(args: {
   tenantId: string;
+  ownerChatId: string;
   text: string;
 }): Promise<OwnerTelegramResponse> {
+  await assertLinkedOwnerTelegramChat(args);
+
   const text = args.text.trim();
   const sendMatch = text.match(/^\/send\s+(\S+)\s+([\s\S]+)$/i);
   const takeoverMatch = text.match(/^\/takeover\s+(\S+)$/i);
@@ -611,6 +639,8 @@ export async function handleOwnerTelegramCallback(args: {
   ownerChatId: string;
   data: string;
 }): Promise<OwnerTelegramResponse | null> {
+  await assertLinkedOwnerTelegramChat(args);
+
   const callback = parseOwnerHandoffCallback(args.data);
 
   if (!callback) {
@@ -715,6 +745,7 @@ export function updateOwnerHandoffChatMetadata(args: {
       ...ownerHandoff,
       enabled: true,
       ownerChatId: args.ownerChatId,
+      startToken: null,
       chatLinkedAt: new Date().toISOString(),
     },
   };

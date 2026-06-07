@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { gmailWatchTestHelpers } from "@/lib/gmail-watch";
+import { assertPubSubWebhookSecret, gmailWatchTestHelpers } from "@/lib/gmail-watch";
 
 const now = new Date("2026-06-06T00:00:00.000Z");
 
@@ -46,4 +46,38 @@ test("Gmail watch renewal backs off after a recent attempt", () => {
     ),
     false,
   );
+});
+
+test("Gmail Pub/Sub webhook secret fails closed when not configured", () => {
+  const originalSecret = process.env.GMAIL_PUBSUB_WEBHOOK_SECRET;
+
+  try {
+    delete process.env.GMAIL_PUBSUB_WEBHOOK_SECRET;
+
+    assert.equal(assertPubSubWebhookSecret("attacker-token"), false);
+    assert.equal(assertPubSubWebhookSecret(null), false);
+  } finally {
+    if (originalSecret === undefined) {
+      delete process.env.GMAIL_PUBSUB_WEBHOOK_SECRET;
+    } else {
+      process.env.GMAIL_PUBSUB_WEBHOOK_SECRET = originalSecret;
+    }
+  }
+});
+
+test("Gmail Pub/Sub webhook secret accepts only the configured token", () => {
+  const originalSecret = process.env.GMAIL_PUBSUB_WEBHOOK_SECRET;
+
+  try {
+    process.env.GMAIL_PUBSUB_WEBHOOK_SECRET = "expected-secret";
+
+    assert.equal(assertPubSubWebhookSecret("expected-secret"), true);
+    assert.equal(assertPubSubWebhookSecret("wrong-secret"), false);
+  } finally {
+    if (originalSecret === undefined) {
+      delete process.env.GMAIL_PUBSUB_WEBHOOK_SECRET;
+    } else {
+      process.env.GMAIL_PUBSUB_WEBHOOK_SECRET = originalSecret;
+    }
+  }
 });

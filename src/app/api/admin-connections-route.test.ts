@@ -40,3 +40,10 @@ test("admin connections route validates connection type enums before Prisma writ
   assert.match(source, /z\.nativeEnum\(IntegrationType\)/);
   assert.doesNotMatch(source, /as never/);
 });
+
+test("admin connections route never returns encrypted credentials", () => {
+  const source = readFileSync(routePath, "utf8");
+
+  assert.match(source, /safeConnectionSelect/);
+  assert.doesNotMatch(source, /credentialsEnc: true/);
+});

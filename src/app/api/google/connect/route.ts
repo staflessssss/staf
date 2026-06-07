@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
-import { buildGoogleConnectUrl } from "@/lib/google-oauth";
+import { getCurrentSession } from "@/lib/current-session";
+import { buildGoogleConnectUrl, normalizeGoogleRedirectTo } from "@/lib/google-oauth";
 
 export async function GET(request: Request) {
-  const session = await auth();
+  const session = await getCurrentSession();
 
   if (!session?.user || session.user.role !== "CLIENT" || !session.user.tenantId) {
     return NextResponse.redirect(new URL("/login?callbackUrl=%2Fclient%2Fconnections%2Fgmail", request.url));
   }
 
   const url = new URL(request.url);
-  const redirectTo = url.searchParams.get("redirectTo") || "/client/connections/gmail";
+  const redirectTo = normalizeGoogleRedirectTo(url.searchParams.get("redirectTo"));
 
   try {
     const googleUrl = buildGoogleConnectUrl({

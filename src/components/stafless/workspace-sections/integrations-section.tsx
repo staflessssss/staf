@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { IntegrationConnection, IntegrationType } from "@prisma/client";
+import { IntegrationType } from "@prisma/client";
+import type { SafeIntegrationConnection } from "@/components/stafless/agent-editor-shared";
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -27,8 +28,8 @@ type IntegrationTab = "available" | "not_connected";
 type IntegrationCardModel = {
   id?: string;
   type: IntegrationType;
-  status: IntegrationConnection["status"] | "NOT_CONNECTED";
-  connection?: IntegrationConnection;
+  status: SafeIntegrationConnection["status"] | "NOT_CONNECTED";
+  connection?: SafeIntegrationConnection;
 };
 
 const integrationDescriptions: Partial<Record<IntegrationType, string>> = {
@@ -52,7 +53,7 @@ const integrationIconMap: Partial<Record<IntegrationType, typeof Database>> = {
   HUBSPOT: Database,
 };
 
-function readIntegrationIdentityHint(integration?: IntegrationConnection) {
+function readIntegrationIdentityHint(integration?: SafeIntegrationConnection) {
   if (!integration?.metadata || typeof integration.metadata !== "object" || Array.isArray(integration.metadata)) {
     return null;
   }
@@ -86,7 +87,7 @@ export function IntegrationsSection({
   onIntegrationEnabledChange,
   sectionCanvasClassName,
 }: {
-  integrations: IntegrationConnection[];
+  integrations: SafeIntegrationConnection[];
   dependencies: Map<string, IntegrationDependency>;
   enabledIntegrationIds: string[];
   onIntegrationEnabledChange: (integrationId: string, enabled: boolean) => void;

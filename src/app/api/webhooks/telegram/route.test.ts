@@ -63,3 +63,23 @@ test("telegram POST rejects a mismatched webhook secret", async () => {
     restore();
   }
 });
+
+test("telegram POST does not reveal whether an agent exists", async () => {
+  const restore = withMockedAgentFindFirst(async () => null as never);
+
+  try {
+    const request = new NextRequest("https://example.com/api/webhooks/telegram?agentId=unknown", {
+      method: "POST",
+      body: JSON.stringify({ message: { text: "hello" } }),
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+    const response = await POST(request);
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: "Forbidden" });
+  } finally {
+    restore();
+  }
+});

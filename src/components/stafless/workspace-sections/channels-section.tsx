@@ -1,4 +1,5 @@
-import { ChannelConnection, ChannelType } from "@prisma/client";
+import { ChannelType } from "@prisma/client";
+import type { SafeChannelConnection } from "@/components/stafless/agent-editor-shared";
 import { Camera, Mail, MessageCircle, Radio, Send } from "lucide-react";
 
 import { EmptyState, SurfaceCard } from "@/components/stafless/foundation";
@@ -37,7 +38,7 @@ const channelCatalog: ChannelCatalogItem[] = [
   },
 ];
 
-function readMetadataLabel(connection?: ChannelConnection | null) {
+function readMetadataLabel(connection?: SafeChannelConnection | null) {
   const metadata =
     connection?.metadata && typeof connection.metadata === "object" && !Array.isArray(connection.metadata)
       ? (connection.metadata as Record<string, unknown>)
@@ -50,7 +51,7 @@ function readMetadataLabel(connection?: ChannelConnection | null) {
 }
 
 function getChannelConnection(
-  connections: ChannelConnection[],
+  connections: SafeChannelConnection[],
   type: ChannelType,
 ) {
   return connections.find((connection) => connection.type === type) ?? null;
@@ -63,12 +64,12 @@ export function WorkspaceChannelsSection({
   isReadOnlyMode,
   onSelectChannel,
 }: {
-  channelConnections: ChannelConnection[];
+  channelConnections: SafeChannelConnection[];
   selectedChannelId: string;
   assignedChannels: Map<string, string>;
   isReadOnlyMode: boolean;
   tenantId: string;
-  onSelectChannel: (connection: ChannelConnection) => void;
+  onSelectChannel: (connection: SafeChannelConnection) => void;
   sectionCanvasClassName: string;
   softInfoPanelClassName: string;
 }) {

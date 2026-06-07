@@ -4,7 +4,10 @@ import { describe, it } from "node:test";
 import {
   mergeOwnerHandoffMetadata,
   ownerHandoffTestHelpers,
+  readOwnerHandoffChatId,
+  readOwnerHandoffStartToken,
   shouldRequestOwnerHandoff,
+  updateOwnerHandoffChatMetadata,
 } from "@/lib/owner-handoff";
 
 describe("owner handoff trigger", () => {
@@ -41,6 +44,38 @@ describe("owner handoff trigger", () => {
 });
 
 describe("owner handoff metadata", () => {
+  it("fails closed when owner chat or start token is missing", () => {
+    assert.equal(readOwnerHandoffChatId(null), "");
+    assert.equal(readOwnerHandoffStartToken(null), "");
+  });
+
+  it("reads the linked owner chat", () => {
+    assert.equal(
+      readOwnerHandoffChatId({
+        ownerHandoff: {
+          ownerChatId: "12345",
+        },
+      }),
+      "12345",
+    );
+  });
+
+  it("consumes the start token after linking an owner chat", () => {
+    const metadata = updateOwnerHandoffChatMetadata({
+      metadata: {
+        ownerHandoff: {
+          startToken: "single-use-token",
+        },
+      },
+      ownerChatId: "12345",
+    });
+
+    assert.equal(
+      (metadata.ownerHandoff as Record<string, unknown>).startToken,
+      null,
+    );
+  });
+
   it("preserves an already linked owner chat and start token when reconnecting the bot", () => {
     const metadata = mergeOwnerHandoffMetadata({
       metadata: {

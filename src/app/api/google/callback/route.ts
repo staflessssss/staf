@@ -1,14 +1,19 @@
 import { ChannelType, ConnectionStatus, IntegrationType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
 import { upsertChannelConnection, upsertIntegrationConnection } from "@/lib/connection-store";
+import { getCurrentSession } from "@/lib/current-session";
 import { db } from "@/lib/db";
 import { registerGmailWatchForChannel } from "@/lib/gmail-watch";
-import { fetchGoogleProfile, exchangeGoogleCode, verifyGoogleState } from "@/lib/google-oauth";
+import {
+  fetchGoogleProfile,
+  exchangeGoogleCode,
+  normalizeGoogleRedirectTo,
+  verifyGoogleState,
+} from "@/lib/google-oauth";
 
 function buildRedirect(baseUrl: URL, redirectTo: string, params: Record<string, string>) {
-  const target = new URL(redirectTo, baseUrl);
+  const target = new URL(normalizeGoogleRedirectTo(redirectTo), baseUrl);
 
   for (const [key, value] of Object.entries(params)) {
     target.searchParams.set(key, value);
@@ -37,7 +42,7 @@ export async function GET(request: Request) {
 
   try {
     const statePayload = verifyGoogleState(state);
-    const session = await auth();
+    const session = await getCurrentSession();
 
     if (
       !session?.user ||

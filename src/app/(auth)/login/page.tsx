@@ -3,15 +3,15 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { LoginForm } from "@/components/auth/login-form";
-import { auth } from "@/lib/auth";
 import { getDefaultRedirectForRole } from "@/lib/auth-redirect";
+import { getCurrentSession } from "@/lib/current-session";
 
 type LoginPageProps = {
   searchParams: Promise<{ callbackUrl?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const session = await auth();
+  const session = await getCurrentSession();
 
   if (session?.user) {
     redirect(getDefaultRedirectForRole(session.user.role));

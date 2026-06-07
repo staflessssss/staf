@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { ChannelConnection, ChannelType, ConnectionStatus } from "@prisma/client";
+import type { SafeChannelConnection } from "@/components/stafless/agent-editor-shared";
 
 const channelsSectionPath = path.join(
   process.cwd(),
@@ -90,7 +91,7 @@ test("channels section stays selection-only and does not expose setup or asset c
 
 test("channels section only selects connected and unassigned channels", async () => {
   const { WorkspaceChannelsSection } = await loadChannelsSection();
-  const selected: ChannelConnection[] = [];
+  const selected: SafeChannelConnection[] = [];
   const telegram = createChannel("telegram-1", ChannelType.TELEGRAM, ConnectionStatus.CONNECTED);
   const gmail = createChannel("gmail-1", ChannelType.GMAIL, ConnectionStatus.CONNECTED);
 
@@ -128,7 +129,7 @@ test("channels section only selects connected and unassigned channels", async ()
 
 test("channels section does not provide actions for disconnected or assigned channels", async () => {
   const { WorkspaceChannelsSection } = await loadChannelsSection();
-  const selected: ChannelConnection[] = [];
+  const selected: SafeChannelConnection[] = [];
   const telegram = createChannel("telegram-1", ChannelType.TELEGRAM, ConnectionStatus.REVOKED);
   const gmail = createChannel("gmail-1", ChannelType.GMAIL, ConnectionStatus.CONNECTED);
   const instagram = createChannel(

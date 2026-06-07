@@ -32,6 +32,15 @@ model InviteToken {
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
 }
 
+model RateLimitBucket {
+  key             String   @id
+  count           Int
+  windowStartedAt DateTime
+  updatedAt       DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
 enum UserRole {
   ADMIN
   CLIENT

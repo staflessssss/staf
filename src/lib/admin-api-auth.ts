@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
+import { getCurrentSession } from "@/lib/current-session";
 
 export async function requireAdminApiSession() {
-  const session = await auth();
+  const session = await getCurrentSession();
 
   if (!session?.user) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });

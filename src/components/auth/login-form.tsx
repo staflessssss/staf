@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 
-import { getDefaultRedirectForRole } from "@/lib/auth-redirect";
+import { getDefaultRedirectForRole, normalizeInternalRedirect } from "@/lib/auth-redirect";
 
 type LoginFormProps = {
   callbackUrl?: string;
@@ -35,8 +35,10 @@ export function LoginForm({ callbackUrl }: LoginFormProps) {
     }
 
     const session = await getSession();
-    const destination =
-      callbackUrl || getDefaultRedirectForRole(session?.user?.role);
+    const destination = normalizeInternalRedirect(
+      callbackUrl,
+      getDefaultRedirectForRole(session?.user?.role),
+    );
 
     router.push(destination);
     router.refresh();

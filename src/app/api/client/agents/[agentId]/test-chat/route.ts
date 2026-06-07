@@ -4,6 +4,7 @@ import { z } from "zod";
 import { invokeAgent } from "@/lib/ai-runtime";
 import { requireClientApiSession } from "@/lib/client-api-auth";
 import { db } from "@/lib/db";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 import { sanitizeClientTestChatResponse } from "./redaction";
 
@@ -39,6 +40,17 @@ export async function POST(
 
   if (!tenantId) {
     return NextResponse.json({ error: "Client tenant is missing." }, { status: 403 });
+  }
+
+  const testChatLimit = await checkRateLimit({
+    scope: "client-test-chat",
+    identifier: session.user.id,
+    limit: 20,
+    windowSeconds: 60,
+  });
+
+  if (!testChatLimit.allowed) {
+    return rateLimitResponse(testChatLimit);
   }
 
   const json = await req.json().catch(() => null);

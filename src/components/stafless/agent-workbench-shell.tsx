@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ChannelConnection, IntegrationConnection } from "@prisma/client";
 import type { ReactNode } from "react";
 
 import { AgentTestChatDrawer } from "@/components/stafless/agent-test-chat-drawer";
@@ -7,14 +6,18 @@ import {
   StatusBadge,
   secondaryButtonClassName,
 } from "@/components/stafless/foundation";
+import type {
+  SafeChannelConnection,
+  SafeIntegrationConnection,
+} from "@/components/stafless/agent-editor-shared";
 
 type ShellTenant = {
   id: string;
   name: string;
   slug: string;
   timezone?: string;
-  channelConnections: ChannelConnection[];
-  integrationConnections: IntegrationConnection[];
+  channelConnections: SafeChannelConnection[];
+  integrationConnections: SafeIntegrationConnection[];
   agents?: Array<{
     id: string;
     name: string;

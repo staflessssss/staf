@@ -12,13 +12,50 @@ import {
   scheduleDelayedDeliverySweepBackground,
 } from "@/lib/delayed-delivery-background";
 import { splitInstagramMessagingPayloads } from "@/lib/instagram-webhook";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 type InstagramCredentials = ReturnType<typeof parseInstagramCredentials>;
+const MAX_INSTAGRAM_WEBHOOK_BYTES = 1_000_000;
 
 type InstagramContactProfile = {
   username?: string;
   name?: string;
 };
+
+async function readRequestBodyWithLimit(request: NextRequest, maxBytes: number) {
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    return null;
+  }
+
+  if (!request.body) {
+    return "";
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    totalBytes += value.byteLength;
+
+    if (totalBytes > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+
+    chunks.push(value);
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 function hasValidInstagramSignature(rawBody: string, signatureHeader: string | null) {
   const appSecret =
@@ -378,9 +415,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const isLocalDev = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
+  const isLocalDev =
+    process.env.NODE_ENV !== "production" &&
+    (req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1");
 
-  const rawBody = await req.text().catch(() => "");
+  const rawBody = await readRequestBodyWithLimit(req, MAX_INSTAGRAM_WEBHOOK_BYTES).catch(() => "");
+
+  if (rawBody === null) {
+    return NextResponse.json({ error: "Payload too large." }, { status: 413 });
+  }
 
   if (!rawBody) {
     return NextResponse.json({ error: "Invalid Instagram payload." }, { status: 400 });
@@ -405,6 +448,17 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const webhookLimit = await checkRateLimit({
+    scope: "instagram-webhook",
+    identifier: "global",
+    limit: 600,
+    windowSeconds: 60,
+  });
+
+  if (!webhookLimit.allowed) {
+    return rateLimitResponse(webhookLimit);
   }
 
   const payload = (() => {
@@ -505,8 +559,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(results.length === 1 ? results[0] : { results });
   } catch (error) {
+    console.error("[instagram-webhook] processing failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Instagram webhook failed." },
+      { error: "Webhook processing failed." },
       { status: 500 },
     );
   }

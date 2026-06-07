@@ -3,11 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleIncomingEvent } from "@/lib/ai-runtime";
 import { db } from "@/lib/db";
 import { scheduleDelayedDeliverySweepBackground } from "@/lib/delayed-delivery-background";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const agentId = req.nextUrl.searchParams.get("agentId");
   const headerSecret = req.headers.get("x-stafless-webhook-secret");
-  const isLocalDev = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
+  const isLocalDev =
+    process.env.NODE_ENV !== "production" &&
+    (req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1");
 
   if (!agentId) {
     return NextResponse.json({ error: "Missing agentId." }, { status: 400 });
@@ -27,16 +30,23 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (!agent) {
-    return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  const hasValidSecret =
+    Boolean(agent?.webhookSecret) &&
+    headerSecret === agent?.webhookSecret;
+
+  if (!agent || (!isLocalDev && !hasValidSecret)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const hasValidSecret =
-    Boolean(agent.webhookSecret) &&
-    headerSecret === agent.webhookSecret;
+  const webhookLimit = await checkRateLimit({
+    scope: "gmail-webhook",
+    identifier: agent.id,
+    limit: 300,
+    windowSeconds: 60,
+  });
 
-  if (!isLocalDev && !hasValidSecret) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!webhookLimit.allowed) {
+    return rateLimitResponse(webhookLimit);
   }
 
   const payload = await req.json().catch(() => null);
@@ -55,8 +65,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
+    console.error("[gmail-webhook] processing failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Gmail webhook failed." },
+      { error: "Webhook processing failed." },
       { status: 500 },
     );
   }

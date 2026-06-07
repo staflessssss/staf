@@ -15,8 +15,8 @@ export type SerializableEditorTenant = {
   name: string;
   slug: string;
   timezone?: string | null;
-  channelConnections: ChannelConnection[];
-  integrationConnections: IntegrationConnection[];
+  channelConnections: SafeChannelConnection[];
+  integrationConnections: SafeIntegrationConnection[];
   agents?: Array<{
     id: string;
     name: string;
@@ -34,9 +34,12 @@ export type SerializableEditorAgent = {
   deployedAt: Date | null;
   channelId: string;
   channelConfig?: Prisma.JsonValue | null;
-  channel: ChannelConnection;
+  channel: SafeChannelConnection;
   features: Feature[];
 };
+
+export type SafeChannelConnection = Omit<ChannelConnection, "credentialsEnc">;
+export type SafeIntegrationConnection = Omit<IntegrationConnection, "credentialsEnc">;
 
 function getChannelConfigObject(channelConfig: Prisma.JsonValue | null | undefined) {
   return channelConfig && typeof channelConfig === "object" && !Array.isArray(channelConfig)
@@ -55,8 +58,12 @@ function deriveEditorFunctionBlocks(agent: SerializableEditorAgent): FunctionBlo
 }
 
 function serializeEditorChannelConfig(agent: SerializableEditorAgent) {
+  const safeChannelConfig = { ...getChannelConfigObject(agent.channelConfig) };
+  delete safeChannelConfig.pubsubWebhookPath;
+  delete safeChannelConfig.pubsubWebhookUrl;
+
   return {
-    ...getChannelConfigObject(agent.channelConfig),
+    ...safeChannelConfig,
     functionBlocks: deriveEditorFunctionBlocks(agent),
   };
 }

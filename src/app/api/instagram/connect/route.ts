@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
+import { getCurrentSession } from "@/lib/current-session";
 import { buildInstagramConnectUrl, normalizeInstagramRedirectTo } from "@/lib/instagram-oauth";
 
 export async function GET(request: Request) {
-  const session = await auth();
+  const session = await getCurrentSession();
 
   if (!session?.user || session.user.role !== "CLIENT" || !session.user.tenantId) {
     return NextResponse.redirect(

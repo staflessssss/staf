@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 
@@ -11,6 +12,12 @@ const createTenantSchema = z.object({
 });
 
 export async function GET() {
+  const session = await requireAdminApiSession();
+
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
   const items = await db.tenant.findMany({
     orderBy: { createdAt: "desc" },
   });
@@ -19,6 +26,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await requireAdminApiSession();
+
+  if (session instanceof NextResponse) {
+    return session;
+  }
+
   const json = await request.json().catch(() => null);
   const parsed = createTenantSchema.safeParse(json);
 

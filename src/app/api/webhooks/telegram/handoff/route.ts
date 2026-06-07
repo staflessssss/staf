@@ -8,10 +8,12 @@ import {
   handleOwnerTelegramCallback,
   handleOwnerTelegramCommand,
   handleOwnerTelegramReply,
+  readOwnerHandoffChatId,
   readOwnerHandoffStartToken,
   readOwnerHandoffWebhookSecret,
   updateOwnerHandoffChatMetadata,
 } from "@/lib/owner-handoff";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 type OwnerTelegramWebhookResponse = Awaited<ReturnType<typeof handleOwnerTelegramCommand>>;
 
@@ -114,20 +116,34 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (!channel || channel.status !== ConnectionStatus.CONNECTED) {
-    return NextResponse.json({ error: "Telegram handoff is not connected." }, { status: 404 });
+  const expectedSecret = readOwnerHandoffWebhookSecret(channel?.metadata);
+  const receivedSecret = req.headers.get("x-telegram-bot-api-secret-token")?.trim() ?? "";
+  const isLocalDev =
+    process.env.NODE_ENV !== "production" &&
+    (req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1");
+
+  if (
+    !channel ||
+    channel.status !== ConnectionStatus.CONNECTED ||
+    (!isLocalDev && (!expectedSecret || receivedSecret !== expectedSecret))
+  ) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const expectedSecret = readOwnerHandoffWebhookSecret(channel.metadata);
-  const receivedSecret = req.headers.get("x-telegram-bot-api-secret-token")?.trim() ?? "";
-  const isLocalDev = req.nextUrl.hostname === "localhost" || req.nextUrl.hostname === "127.0.0.1";
+  const webhookLimit = await checkRateLimit({
+    scope: "telegram-handoff-webhook",
+    identifier: tenantId,
+    limit: 300,
+    windowSeconds: 60,
+  });
 
-  if (!isLocalDev && (!expectedSecret || receivedSecret !== expectedSecret)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!webhookLimit.allowed) {
+    return rateLimitResponse(webhookLimit);
   }
 
   const payload = await req.json().catch(() => null);
   const credentials = decrypt(channel.credentialsEnc);
+  const linkedOwnerChatId = readOwnerHandoffChatId(channel.metadata);
   const callback = extractTelegramCallback(payload);
 
   if (callback?.callbackQueryId) {
@@ -138,6 +154,10 @@ export async function POST(req: NextRequest) {
 
     if (!callback.chatId || !callback.data) {
       return NextResponse.json({ ok: true, status: "ignored_incomplete_callback" });
+    }
+
+    if (!linkedOwnerChatId || callback.chatId !== linkedOwnerChatId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const callbackResponse = await handleOwnerTelegramCallback({
@@ -165,7 +185,11 @@ export async function POST(req: NextRequest) {
     const expectedStartToken = readOwnerHandoffStartToken(channel.metadata);
     const receivedStartToken = message.text.split(/\s+/)[1]?.trim() ?? "";
 
-    if (expectedStartToken && receivedStartToken !== expectedStartToken) {
+    if (
+      !expectedStartToken ||
+      receivedStartToken !== expectedStartToken ||
+      (linkedOwnerChatId && linkedOwnerChatId !== message.chatId)
+    ) {
       await telegramAdapter.sendReply({
         credentials,
         contactId: message.chatId,
@@ -192,6 +216,10 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, status: "owner_chat_linked" });
+  }
+
+  if (!linkedOwnerChatId || message.chatId !== linkedOwnerChatId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   if (message.replyToMessageId && message.text && !message.text.startsWith("/")) {
@@ -224,6 +252,7 @@ export async function POST(req: NextRequest) {
 
   const responseText = await handleOwnerTelegramCommand({
     tenantId,
+    ownerChatId: message.chatId,
     text: message.text,
   });
 

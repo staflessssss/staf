@@ -1,8 +1,8 @@
 import { ChannelType, ConnectionStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
 import { upsertChannelConnection } from "@/lib/connection-store";
+import { getCurrentSession } from "@/lib/current-session";
 import {
   exchangeInstagramCode,
   fetchInstagramProfile,
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
 
   try {
     const statePayload = verifyInstagramState(state);
-    const session = await auth();
+    const session = await getCurrentSession();
 
     if (
       !session?.user ||

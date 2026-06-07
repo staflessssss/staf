@@ -305,7 +305,6 @@ export async function deployAgent(
     select: {
       status: true,
       deployedAt: true,
-      webhookSecret: true,
       channelConfig: true,
     },
   });
@@ -315,7 +314,6 @@ export async function deployAgent(
     deployed: true,
     nextStatus: updated.status,
     deployedAt: updated.deployedAt,
-    webhookSecret: updated.webhookSecret,
     channelConfig: updated.channelConfig,
     message: "Agent deployed into the shared runtime and is ready to accept live channel events.",
   };

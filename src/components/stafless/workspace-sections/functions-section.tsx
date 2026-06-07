@@ -1,4 +1,5 @@
-import { IntegrationConnection, IntegrationType } from "@prisma/client";
+import { IntegrationType } from "@prisma/client";
+import type { SafeIntegrationConnection } from "@/components/stafless/agent-editor-shared";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
@@ -103,7 +104,7 @@ function asRecord(value: unknown) {
     : null;
 }
 
-function getIntegrationDisplayLabel(integration: IntegrationConnection) {
+function getIntegrationDisplayLabel(integration: SafeIntegrationConnection) {
   const metadata = asRecord(integration.metadata);
   const explicitLabel =
     (typeof metadata?.name === "string" && metadata.name.trim()) ||
@@ -279,7 +280,7 @@ function getFunctionBusinessMeta(fn: FunctionDraft) {
 
 function getFunctionBackendLabel(
   fn: FunctionDraft,
-  integrationById: Map<string, IntegrationConnection>,
+  integrationById: Map<string, SafeIntegrationConnection>,
 ) {
   const primaryTarget =
     fn.resultTargets.find((target) => target.type === "google_calendar") ??
@@ -309,7 +310,7 @@ function getFunctionBackendLabel(
 
 function getFunctionReadiness(
   fn: FunctionDraft,
-  integrationById: Map<string, IntegrationConnection>,
+  integrationById: Map<string, SafeIntegrationConnection>,
 ) {
   if (!fn.active) {
     return {
@@ -366,7 +367,7 @@ function getDestinationIntegrationType(destination: PrimaryDestinationType) {
 
 function isOperatorDestinationAvailable(
   destination: PrimaryDestinationType,
-  connectedIntegrations: IntegrationConnection[],
+  connectedIntegrations: SafeIntegrationConnection[],
 ) {
   const integrationType = getDestinationIntegrationType(destination);
 
@@ -423,8 +424,8 @@ export function FunctionsSection({
   functionBlocks: FunctionDraft[];
   isReadOnlyMode: boolean;
   isWorkspaceMode: boolean;
-  connectedIntegrations: IntegrationConnection[];
-  integrationById: Map<string, IntegrationConnection>;
+  connectedIntegrations: SafeIntegrationConnection[];
+  integrationById: Map<string, SafeIntegrationConnection>;
   sheetInspectors: Record<string, SheetInspectionState>;
   sectionCanvasClassName: string;
   onAddFunctionBlock: () => void;
