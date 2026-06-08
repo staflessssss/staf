@@ -247,10 +247,13 @@ async function findInstagramAgentByRecipientId(recipientId: string) {
     include: {
       agents: {
         where: {
-          status: "ACTIVE",
+          status: {
+            in: ["ACTIVE", "PAUSED"],
+          },
         },
         select: {
           id: true,
+          status: true,
         },
         take: 1,
       },
@@ -520,6 +523,24 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+      }
+
+      if (agent.status === "PAUSED") {
+        await safeRecordInstagramWebhookStatus({
+          channelId: route.channelId,
+          metadata: route.metadata,
+          status: "ignored_agent_paused",
+          recipientId,
+          senderId,
+          messageId,
+          agentId: agent.id,
+        });
+
+        results.push({
+          ok: true,
+          status: "ignored_agent_paused",
+        });
+        continue;
       }
 
       const contactProfile = await resolveInstagramContactProfile(senderId, route.credentials);

@@ -193,3 +193,14 @@ test("instagram webhook ignores business message echoes instead of routing them 
   assert.match(source, /ignored_business_echo/);
   assert.doesNotMatch(source, /single active Instagram agent fallback/);
 });
+
+test("instagram webhook acknowledges messages without replying while an agent is paused", () => {
+  const source = readFileSync(
+    "src/app/api/webhooks/instagram/route.ts",
+    "utf8",
+  );
+
+  assert.match(source, /in: \["ACTIVE", "PAUSED"\]/);
+  assert.match(source, /agent\.status === "PAUSED"/);
+  assert.match(source, /ignored_agent_paused/);
+});

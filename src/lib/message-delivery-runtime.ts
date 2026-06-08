@@ -263,6 +263,23 @@ async function markDeliveryStatus(args: {
   });
 }
 
+async function markDeliverySentIfProcessing(args: {
+  database: typeof db;
+  deliveryId: string;
+}) {
+  return args.database.delayedDelivery.updateMany({
+    where: {
+      id: args.deliveryId,
+      status: DelayedDeliveryStatus.PROCESSING,
+    },
+    data: {
+      status: DelayedDeliveryStatus.SENT,
+      error: null,
+      sentAt: new Date(),
+    },
+  });
+}
+
 function getDelayedDeliveryRetryDelayMs(attempts: number) {
   if (attempts <= 1) {
     return 15_000;
@@ -541,6 +558,31 @@ async function processBufferedReply(args: {
     };
   }
 
+  const activeAgent = await args.deps.db.agent.findFirst({
+    where: {
+      id: args.delivery.agentId,
+      status: AgentStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!activeAgent) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "buffered_reply_suppressed_agent_paused",
+    });
+
+    return {
+      ok: true,
+      status: "buffered_reply_suppressed_agent_paused" as const,
+      conversationId: result.conversationId,
+    };
+  }
+
   await deliverThroughChannel({
     agent: args.delivery.agent,
     decryptValue: args.deps.decrypt,
@@ -550,20 +592,31 @@ async function processBufferedReply(args: {
     attachments: result.attachments,
   });
 
-  await scheduleFollowUpsForReplyWithDb({
-    database: args.deps.db,
-    agentId: args.delivery.agentId,
-    conversationId: args.delivery.conversationId,
-    channelConfig: args.delivery.agent.channelConfig,
-    replyContext: payload.replyContext,
-    anchorCreatedAt: new Date(),
-    usedTooling: result.usedTooling,
+  const agentActiveAfterDelivery = await args.deps.db.agent.findFirst({
+    where: {
+      id: args.delivery.agentId,
+      status: AgentStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+    },
   });
 
-  await markDeliveryStatus({
+  if (agentActiveAfterDelivery) {
+    await scheduleFollowUpsForReplyWithDb({
+      database: args.deps.db,
+      agentId: args.delivery.agentId,
+      conversationId: args.delivery.conversationId,
+      channelConfig: args.delivery.agent.channelConfig,
+      replyContext: payload.replyContext,
+      anchorCreatedAt: new Date(),
+      usedTooling: result.usedTooling,
+    });
+  }
+
+  await markDeliverySentIfProcessing({
     database: args.deps.db,
     deliveryId: args.deliveryId,
-    status: DelayedDeliveryStatus.SENT,
   });
 
   return {
@@ -592,6 +645,29 @@ async function processFollowUp(args: {
   const autoResumePayload = getBusinessAutoResumePayload(args.delivery.payload);
   if (autoResumePayload) {
     let resumeMessageDeliveryFailed = false;
+
+    const activeAgent = await args.deps.db.agent.findFirst({
+      where: {
+        id: args.delivery.agentId,
+        status: AgentStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!activeAgent) {
+      await markDeliveryStatus({
+        database: args.deps.db,
+        deliveryId: args.deliveryId,
+        status: DelayedDeliveryStatus.CANCELED,
+        error: "business_auto_resume_suppressed_agent_paused",
+      });
+      return {
+        ok: true,
+        status: "business_auto_resume_suppressed_agent_paused" as const,
+      };
+    }
 
     if (args.delivery.conversation.status !== ConversationStatus.ESCALATED) {
       await markDeliveryStatus({
@@ -637,15 +713,37 @@ async function processFollowUp(args: {
       }
     }
 
+    const agentStillActive = await args.deps.db.agent.findFirst({
+      where: {
+        id: args.delivery.agentId,
+        status: AgentStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!agentStillActive) {
+      await markDeliveryStatus({
+        database: args.deps.db,
+        deliveryId: args.deliveryId,
+        status: DelayedDeliveryStatus.CANCELED,
+        error: "business_auto_resume_suppressed_agent_paused",
+      });
+      return {
+        ok: true,
+        status: "business_auto_resume_suppressed_agent_paused" as const,
+      };
+    }
+
     await args.deps.db.conversation.update({
       where: { id: args.delivery.conversationId },
       data: { status: ConversationStatus.ACTIVE },
     });
 
-    await markDeliveryStatus({
+    await markDeliverySentIfProcessing({
       database: args.deps.db,
       deliveryId: args.deliveryId,
-      status: DelayedDeliveryStatus.SENT,
     });
 
     return {
@@ -787,6 +885,31 @@ async function processFollowUp(args: {
     };
   }
 
+  const activeAgent = await args.deps.db.agent.findFirst({
+    where: {
+      id: args.delivery.agentId,
+      status: AgentStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!activeAgent) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "follow_up_suppressed_agent_paused",
+    });
+
+    return {
+      ok: true,
+      status: "follow_up_suppressed_agent_paused" as const,
+      conversationId: result.conversationId,
+    };
+  }
+
   await deliverThroughChannel({
     agent: args.delivery.agent,
     decryptValue: args.deps.decrypt,
@@ -796,10 +919,9 @@ async function processFollowUp(args: {
     attachments: result.attachments,
   });
 
-  await markDeliveryStatus({
+  await markDeliverySentIfProcessing({
     database: args.deps.db,
     deliveryId: args.deliveryId,
-    status: DelayedDeliveryStatus.SENT,
   });
 
   return {

@@ -2303,6 +2303,33 @@ async function handleIncomingEventWithDeps(
     };
   }
 
+  const agentStillActive = await deps.db.agent.findFirst({
+    where: {
+      id: agent.id,
+      status: AgentStatus.ACTIVE,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!agentStillActive) {
+    if (result.conversationId) {
+      await cancelPendingDelayedDeliveriesWithDb({
+        database: deps.db,
+        conversationId: result.conversationId,
+      });
+    }
+
+    return {
+      ok: true,
+      agentId: agent.id,
+      conversationId: result.conversationId,
+      status: "reply_suppressed_agent_paused",
+      usedTooling: result.usedTooling,
+    };
+  }
+
   const formattedReply = adapter.formatReply(result.message, agent.channelConfig);
   const outboundMessage = formattedReply as string | string[] | { text: string; html?: string };
 
@@ -2341,15 +2368,28 @@ async function handleIncomingEventWithDeps(
       conversationId: result.conversationId,
       kinds: [DelayedDeliveryKind.FOLLOW_UP],
     });
-    await scheduleFollowUpsForReplyWithDb({
-      database: deps.db,
-      agentId: agent.id,
-      conversationId: result.conversationId,
-      channelConfig: agent.channelConfig,
-      replyContext,
-      anchorCreatedAt: new Date(),
-      usedTooling: result.usedTooling,
+
+    const agentActiveAfterDelivery = await deps.db.agent.findFirst({
+      where: {
+        id: agent.id,
+        status: AgentStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+      },
     });
+
+    if (agentActiveAfterDelivery) {
+      await scheduleFollowUpsForReplyWithDb({
+        database: deps.db,
+        agentId: agent.id,
+        conversationId: result.conversationId,
+        channelConfig: agent.channelConfig,
+        replyContext,
+        anchorCreatedAt: new Date(),
+        usedTooling: result.usedTooling,
+      });
+    }
   }
 
   return {

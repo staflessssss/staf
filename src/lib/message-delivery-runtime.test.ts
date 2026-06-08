@@ -18,6 +18,9 @@ test("processDelayedDeliveryByIdWithDeps reschedules follow-up into the next sch
     "delivery-1",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
           updateMany: async () => ({ count: 1 }),
           findUnique: async () => ({
@@ -107,6 +110,9 @@ test("processDelayedDeliveryByIdWithDeps generates and sends a follow-up reminde
     "delivery-2",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
           updateMany: async () => ({ count: 1 }),
           findUnique: async () => ({
@@ -207,6 +213,9 @@ test("processDelayedDeliveryByIdWithDeps cancels follow-up when control suppress
     "delivery-suppressed",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
           updateMany: async () => ({ count: 1 }),
           findUnique: async () => ({
@@ -291,6 +300,9 @@ test("processDelayedDeliveryByIdWithDeps cancels buffered reply when control sup
     "delivery-buffered-suppressed",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
           updateMany: async () => ({ count: 1 }),
           findUnique: async () => ({
@@ -385,6 +397,9 @@ test("processDelayedDeliveryByIdWithDeps auto-resumes a business-paused dialog",
     "delivery-auto-resume",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
           updateMany: async () => ({ count: 1 }),
           findUnique: async () => ({
@@ -487,6 +502,76 @@ test("processDelayedDeliveryByIdWithDeps auto-resumes a business-paused dialog",
   assert.deepEqual(events, ["send", "save", "conversation:update"]);
 });
 
+test("processDelayedDeliveryByIdWithDeps does not auto-resume while the agent is paused", async () => {
+  let conversationUpdated = false;
+  let sendCalled = false;
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-auto-resume-paused-agent",
+    {
+      db: {
+        agent: {
+          findFirst: async () => null,
+        },
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-auto-resume-paused-agent",
+            agentId: "agent-1",
+            conversationId: "conv-auto-resume",
+            kind: DelayedDeliveryKind.FOLLOW_UP,
+            payload: {
+              kind: "business_auto_resume",
+              resumeMessage: "The agent is available again.",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.TELEGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-auto-resume",
+              contactId: "contact-1",
+              status: ConversationStatus.ESCALATED,
+            },
+          }),
+          update: async () => ({}),
+        },
+        conversation: {
+          update: async () => {
+            conversationUpdated = true;
+            return {};
+          },
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sendCalled = true;
+            return { ok: true };
+          },
+        }) as never,
+      invokeAgent: async () => {
+        throw new Error("invokeAgent should not run for business auto-resume");
+      },
+      saveMessages: async () => {},
+    },
+    new Date("2026-04-20T16:00:00Z"),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "business_auto_resume_suppressed_agent_paused");
+  assert.equal(conversationUpdated, false);
+  assert.equal(sendCalled, false);
+});
+
 test("processDelayedDeliveryByIdWithDeps does not resend an already-saved auto-resume message", async () => {
   let sendCalled = false;
   let saveCalled = false;
@@ -495,6 +580,9 @@ test("processDelayedDeliveryByIdWithDeps does not resend an already-saved auto-r
     "delivery-auto-resume-retry",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
           updateMany: async () => ({ count: 1 }),
           findUnique: async () => ({
@@ -564,8 +652,14 @@ test("processDelayedDeliveryByIdWithDeps resumes even when optional auto-resume 
     "delivery-auto-resume-send-fails",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
-          updateMany: async () => ({ count: 1 }),
+          updateMany: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return { count: 1 };
+          },
           findUnique: async () => ({
             id: "delivery-auto-resume-send-fails",
             agentId: "agent-1",
@@ -710,6 +804,9 @@ test("processDelayedDeliveryByIdWithDeps requeues transient failures with backof
     "delivery-4",
     {
       db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
         delayedDelivery: {
           updateMany: async () => ({ count: 1 }),
           findUnique: async () => ({

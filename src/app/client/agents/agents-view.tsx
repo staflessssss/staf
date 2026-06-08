@@ -4,6 +4,8 @@ import { ArrowUpRight, Bot } from "lucide-react";
 import { AgentTestChatDrawer } from "@/components/stafless/agent-test-chat-drawer";
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
 
+import { AgentStatusToggle } from "./agent-status-toggle";
+
 export type AgentsViewAgent = {
   id: string;
   name: string;
@@ -108,6 +110,7 @@ export function AgentsView({
               </div>
 
               <div className="flex flex-wrap items-center gap-3 md:justify-end">
+                <AgentStatusToggle agentId={agent.id} initialStatus={agent.status} />
                 <Link
                   href={`/client/dialogs?agent=${agent.id}`}
                   className="inline-flex items-center gap-2 rounded-lg border border-[#d7a96d]/38 bg-[#3a3028] px-4 py-2.5 text-sm font-medium text-[#e9be86] transition hover:border-[#d7a96d]/60"
