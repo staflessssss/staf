@@ -1064,6 +1064,11 @@ async function runWeddingSalesTestRuntime(args: {
     defaultEmail,
   });
   const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
+  const conversationContext = renderHistory(
+    (args.input.historyMessages ?? []).filter(
+      (message) => message.toolName !== WEDDING_SALES_TEST_STATE_TOOL_NAME,
+    ),
+  );
   const graphResult = await invokeWeddingSalesGraph({
     tenantId: args.agent.tenantId,
     agentId: args.agent.id,
@@ -1071,6 +1076,7 @@ async function runWeddingSalesTestRuntime(args: {
     channel: getWeddingSalesGraphChannel(args.agent.channel.type),
     message: args.input.message,
     customerEmail: defaultEmail,
+    conversationContext,
     previousState: extractWeddingSalesTestState(args.input.historyMessages),
     config,
     toolContext,

@@ -6,6 +6,7 @@ export type WeddingSalesLeadStage =
   | "new"
   | "missing_names_or_date"
   | "waiting_wedding_year"
+  | "confirming_change"
   | "ready_for_availability"
   | "availability_checked"
   | "answering_question"
@@ -60,6 +61,10 @@ export type WeddingSalesState = {
   askedForCallTime: boolean;
   askedForEmail: boolean;
   lastAssistantIntent?: string;
+  pendingChangeField?: "weddingDate" | "location";
+  pendingChangeValue?: string;
+  pendingChangeDisplay?: string;
+  changeConfirmationRejected?: boolean;
 };
 
 export const WeddingSalesStateAnnotation = Annotation.Root({
@@ -104,6 +109,10 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   askedForCallTime: Annotation<boolean>(),
   askedForEmail: Annotation<boolean>(),
   lastAssistantIntent: Annotation<string | undefined>(),
+  pendingChangeField: Annotation<"weddingDate" | "location" | undefined>(),
+  pendingChangeValue: Annotation<string | undefined>(),
+  pendingChangeDisplay: Annotation<string | undefined>(),
+  changeConfirmationRejected: Annotation<boolean | undefined>(),
 });
 
 export function createInitialWeddingSalesState(args: {
@@ -149,5 +158,9 @@ export function createInitialWeddingSalesState(args: {
     askedForCallTime: args.previousState?.askedForCallTime ?? false,
     askedForEmail: args.previousState?.askedForEmail ?? false,
     lastAssistantIntent: args.previousState?.lastAssistantIntent,
+    pendingChangeField: args.previousState?.pendingChangeField,
+    pendingChangeValue: args.previousState?.pendingChangeValue,
+    pendingChangeDisplay: args.previousState?.pendingChangeDisplay,
+    changeConfirmationRejected: args.previousState?.changeConfirmationRejected,
   };
 }

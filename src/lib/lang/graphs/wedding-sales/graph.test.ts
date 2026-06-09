@@ -5,7 +5,32 @@ import { encrypt } from "@/lib/crypto";
 
 import { invokeWeddingSalesGraph } from "./graph";
 import { weddingSalesAnalyzeTestHelpers } from "./nodes/analyze";
+import type { WeddingSalesSemanticAnalysis } from "./semantic-analyzer";
 import { createInitialWeddingSalesState } from "./state";
+
+function semanticAnalysis(
+  update: Partial<WeddingSalesSemanticAnalysis>,
+): WeddingSalesSemanticAnalysis {
+  return {
+    messageKind: "details",
+    answersRequestedField: "none",
+    names: null,
+    weddingDate: null,
+    weddingDateText: null,
+    weddingYear: null,
+    location: null,
+    venue: null,
+    email: null,
+    proposedCallTime: null,
+    weddingDateChange: "none",
+    locationChange: "none",
+    confirmsPendingChange: false,
+    rejectsPendingChange: false,
+    asksBusinessQuestion: false,
+    confidence: 0.95,
+    ...update,
+  };
+}
 
 test("wedding sales graph asks for year before checking availability", async () => {
   const result = await invokeWeddingSalesGraph({
@@ -323,6 +348,10 @@ test("wedding sales analyzer extracts Instagram-style couple names", () => {
   );
   assert.equal(
     weddingSalesAnalyzeTestHelpers.extractNames("Taras Kucherenko and Valerie Savchina"),
+    "Taras Kucherenko and Valerie Savchina",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Taras Kucherenko and Valerie Savchina\n08.02.2028\nCharlotte NC"),
     "Taras Kucherenko and Valerie Savchina",
   );
   assert.equal(
@@ -667,6 +696,194 @@ test("instagram wedding sales asks for call time after venue answer", async () =
   assert.match(result.responseDraft ?? "", /Mon-Fri, 9 AM to 2 PM Eastern/i);
 });
 
+test("instagram wedding sales rechecks availability when customer changes the wedding date", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Oh actually my date is October 17th 2026",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      availability: "available",
+      guideSent: true,
+      callProposed: false,
+      bookingConfirmed: false,
+      leadStage: "missing_location_or_venue",
+      askedForVenue: true,
+      lastAssistantIntent: "ask_location_or_venue",
+    },
+    config: {
+      coverage: {
+        regions: ["NC/SC/GA"],
+        capacityPerDate: 2,
+        unavailableDates: ["2026-10-17"],
+      },
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.weddingDate, "2026-10-17");
+  assert.equal(result.availability, "unavailable");
+  assert.equal(result.leadStage, "availability_checked");
+  assert.equal(result.turnToolObservations[0]?.toolName, "check_wedding_availability");
+  assert.doesNotMatch(result.responseDraft ?? "", /quick consultation call/i);
+  assert.match(result.responseDraft ?? "", /alternative|flexibility|nearby|available/i);
+});
+
+test("instagram wedding sales asks confirmation for ambiguous changed wedding date", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "October 17",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      availability: "available",
+      guideSent: true,
+      callProposed: false,
+      bookingConfirmed: false,
+      leadStage: "missing_location_or_venue",
+      askedForVenue: true,
+      lastAssistantIntent: "ask_location_or_venue",
+    },
+  });
+
+  assert.equal(result.weddingDate, "2026-10-18");
+  assert.equal(result.pendingChangeField, "weddingDate");
+  assert.equal(result.pendingChangeValue, "2026-10-17");
+  assert.equal(result.leadStage, "confirming_change");
+  assert.equal(result.turnToolObservations.length, 0);
+  assert.match(result.responseDraft ?? "", /confirm/i);
+  assert.match(result.responseDraft ?? "", /October 17/i);
+});
+
+test("instagram wedding sales applies confirmed changed wedding date", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Yes",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      availability: "available",
+      guideSent: true,
+      callProposed: false,
+      bookingConfirmed: false,
+      leadStage: "confirming_change",
+      askedForVenue: true,
+      pendingChangeField: "weddingDate",
+      pendingChangeValue: "2026-10-17",
+      pendingChangeDisplay: "October 17",
+      lastAssistantIntent: "confirm_change",
+    },
+    config: {
+      coverage: {
+        regions: ["NC/SC/GA"],
+        capacityPerDate: 2,
+        unavailableDates: ["2026-10-17"],
+      },
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.weddingDate, "2026-10-17");
+  assert.equal(result.pendingChangeField, undefined);
+  assert.equal(result.availability, "unavailable");
+  assert.equal(result.turnToolObservations[0]?.toolName, "check_wedding_availability");
+  assert.doesNotMatch(result.responseDraft ?? "", /quick consultation call/i);
+});
+
+test("instagram wedding sales asks confirmation for ambiguous changed location", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Raleigh",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideSent: true,
+      callProposed: false,
+      bookingConfirmed: false,
+      leadStage: "missing_location_or_venue",
+      askedForVenue: true,
+      lastAssistantIntent: "ask_location_or_venue",
+    },
+  });
+
+  assert.equal(result.location, "Charlotte");
+  assert.equal(result.pendingChangeField, "location");
+  assert.equal(result.pendingChangeValue, "Raleigh");
+  assert.equal(result.leadStage, "confirming_change");
+  assert.equal(result.turnToolObservations.length, 0);
+  assert.match(result.responseDraft ?? "", /updated wedding location/i);
+});
+
+test("instagram wedding sales accepts full street address as venue answer", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "8033 Hood Rd, Charlotte, NC 28215, United States",
+    previousState: {
+      names: "Ben and Marie",
+      weddingDate: "2026-08-08",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideSent: true,
+      callProposed: false,
+      bookingConfirmed: false,
+      leadStage: "availability_checked",
+      askedForVenue: true,
+      lastAssistantIntent: "availability_available",
+    },
+  });
+
+  assert.equal(result.leadStage, "asking_call_time");
+  assert.equal(result.venue, "8033 Hood Rd, Charlotte, NC 28215, United States");
+  assert.equal(result.callProposed, true);
+  assert.match(result.responseDraft ?? "", /9 AM to 2 PM Eastern/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /both of your full names/i);
+});
+
 test("instagram wedding sales asks for a time when customer only says tomorrow", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",
@@ -983,4 +1200,218 @@ test("instagram wedding sales confirms booking only after the booking tool succe
   assert.match(result.responseDraft ?? "", /test mode/i);
   assert.match(result.responseDraft ?? "", /would send a calendar invite to rachel@example.com/i);
   assert.doesNotMatch(result.responseDraft ?? "", /I've sent/i);
+});
+
+test("semantic analysis accepts a naturally phrased pair of names without asking again", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Those are our names, Taras and Valerie",
+    previousState: {
+      weddingDate: "2026-11-05",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Saint Augustine",
+      leadStage: "missing_names_or_date",
+      askedForNames: true,
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      names: "Taras and Valerie",
+      answersRequestedField: "names",
+    }),
+  );
+
+  assert.equal(result.names, "Taras and Valerie");
+  assert.equal(result.leadStage, "ready_for_availability");
+});
+
+test("semantic analysis uses context to recognize an unlabeled venue answer", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "The Foundry",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      availability: "available",
+      leadStage: "missing_location_or_venue",
+      askedForVenue: true,
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      venue: "The Foundry",
+      answersRequestedField: "venue",
+    }),
+  );
+
+  assert.equal(result.venue, "The Foundry");
+  assert.equal(result.leadStage, "asking_call_time");
+});
+
+test("semantic analysis accepts an unknown unlabeled city as the wedding location", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Saint Augustine",
+    previousState: {
+      names: "Taras and Valerie",
+      weddingDate: "2026-11-05",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      leadStage: "missing_location_or_venue",
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      location: "Saint Augustine",
+      answersRequestedField: "location",
+    }),
+  );
+
+  assert.equal(result.location, "Saint Augustine");
+  assert.equal(result.leadStage, "ready_for_availability");
+});
+
+test("semantic analysis confirms a pending date change from a conversational reply", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Yes, that's the new date",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      availability: "available",
+      leadStage: "confirming_change",
+      pendingChangeField: "weddingDate",
+      pendingChangeValue: "2026-10-17",
+      pendingChangeDisplay: "October 17, 2026",
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      messageKind: "confirmation",
+      confirmsPendingChange: true,
+    }),
+  );
+
+  assert.equal(result.weddingDate, "2026-10-17");
+  assert.equal(result.availability, undefined);
+  assert.equal(result.leadStage, "ready_for_availability");
+});
+
+test("semantic analysis asks before applying a conflicting unlabeled location", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Raleigh",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      leadStage: "availability_checked",
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      location: "Raleigh",
+      locationChange: "ambiguous",
+    }),
+  );
+
+  assert.equal(result.location, undefined);
+  assert.equal(result.pendingChangeField, "location");
+  assert.equal(result.pendingChangeValue, "Raleigh");
+  assert.equal(result.leadStage, "confirming_change");
+});
+
+test("semantic analysis asks before changing a known location prior to availability check", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Raleigh",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      leadStage: "ready_for_availability",
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      location: "Raleigh",
+      locationChange: "ambiguous",
+    }),
+  );
+
+  assert.equal(result.pendingChangeField, "location");
+  assert.equal(result.pendingChangeValue, "Raleigh");
+  assert.equal(result.leadStage, "confirming_change");
+});
+
+test("semantic analysis understands conversational call-time proposals", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Ten in the morning would be perfect",
+    previousState: {
+      names: "Peter and Marina",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      venue: "The Foundry",
+      availability: "available",
+      callProposed: true,
+      leadStage: "asking_call_time",
+      proposedCallTime: "tomorrow",
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      messageKind: "scheduling",
+      answersRequestedField: "call_time",
+      proposedCallTime: "tomorrow at 10 AM Eastern",
+    }),
+  );
+
+  assert.equal(result.proposedCallTime, "tomorrow at 10 AM Eastern");
+  assert.equal(result.leadStage, "checking_calendar");
+});
+
+test("semantic analysis answers an early business question before continuing qualification", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "What do your collections cost?",
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      messageKind: "question",
+      asksBusinessQuestion: true,
+    }),
+  );
+
+  assert.equal(result.leadStage, "answering_question");
 });

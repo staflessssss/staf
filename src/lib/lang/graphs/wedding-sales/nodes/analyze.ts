@@ -1,4 +1,8 @@
 import type { WeddingSalesState } from "../state";
+import {
+  analyzeWeddingSalesSemantics,
+  type WeddingSalesSemanticAnalysis,
+} from "../semantic-analyzer";
 
 const monthPattern =
   "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
@@ -88,7 +92,7 @@ function hasNames(text: string) {
 }
 
 function hasLocation(text: string) {
-  return /\b(?:in|at|near)\s+[A-Z][A-Za-z .'-]{2,}/.test(text) || /\b(?:NC|SC|GA|FL|Florida|Charlotte|Atlanta|Savannah|Tampa|Miami|Orlando)\b/i.test(text);
+  return /\b(?:in|at|near)\s+[A-Z][A-Za-z .'-]{2,}/.test(text) || /\b(?:NC|SC|GA|FL|Florida|Charlotte|Raleigh|Charleston|Atlanta|Savannah|Tampa|Miami|Orlando)\b/i.test(text);
 }
 
 function isCoordinatorOrCoi(text: string) {
@@ -160,8 +164,58 @@ function confirmsBooking(text: string) {
   return /\b(?:yes|yep|perfect|sounds good|please book|book it|confirm)\b/i.test(text);
 }
 
+function confirmsPendingChange(text: string) {
+  return /^(?:yes|yep|yeah|correct|right|exactly|that'?s right|yes please|please do|confirm)$/i.test(text.trim());
+}
+
+function rejectsPendingChange(text: string) {
+  return /^(?:no|nope|not|not really|wrong|that's not it|that is not it)$/i.test(text.trim());
+}
+
+function explicitlyChangesWeddingDate(text: string) {
+  return /\b(?:actually|correction|correcting|changed|change|updated|new|different|instead|sorry|i mean|i meant|moved|switched|rescheduled|my date is|wedding date is|date is)\b/i.test(text);
+}
+
+function explicitlyChangesLocation(text: string) {
+  return /\b(?:actually|correction|correcting|changed|change|updated|new|different|instead|sorry|i mean|i meant|moved|switched|relocated|location is|city is|wedding is in|it is in|it's in|its in)\b/i.test(text);
+}
+
+function clearPendingChange() {
+  return {
+    pendingChangeField: undefined,
+    pendingChangeValue: undefined,
+    pendingChangeDisplay: undefined,
+    changeConfirmationRejected: undefined,
+  } satisfies Partial<WeddingSalesState>;
+}
+
+function hasSemanticConfidence(semantic: WeddingSalesSemanticAnalysis | null) {
+  return Boolean(semantic && semantic.confidence >= 0.6);
+}
+
+function preferMoreCompleteNames(primary: string | undefined, fallback: string | undefined) {
+  if (!primary) {
+    return fallback;
+  }
+
+  if (!fallback) {
+    return primary;
+  }
+
+  if (hasCoupleNames(fallback) && !hasCoupleNames(primary)) {
+    return fallback;
+  }
+
+  return primary;
+}
+
 function asksGeneralQuestion(text: string) {
   return /\?/.test(text) || /\b(?:pricing|price|cost|travel|fee|venue|coi|insurance|style|included|include|timeline|delivery|music|photographer)\b/i.test(text);
+}
+
+function asksWeddingAvailabilityQuestion(text: string) {
+  return /\b(?:available|availability|open|free)\b/i.test(text) &&
+    /\b(?:date|day|wedding|you|team|videographer|filmmaker)\b/i.test(text);
 }
 
 function pad2(value: number) {
@@ -275,8 +329,9 @@ function hasCoupleNames(value?: string) {
 function extractNames(text: string, currentNames?: string) {
   const matchingText = text.replace(new RegExp(`\\b${monthPattern}\\b`, "gi"), (match) => match.toLowerCase());
   const nameTokenPattern = `(?!${monthPattern}\\b)[A-Z][A-Za-z'-]+`;
+  const namePhrasePattern = `${nameTokenPattern}(?:\\s+${nameTokenPattern})?`;
   const standaloneCoupleMatch = matchingText.match(
-    new RegExp(`^\\s*(${nameTokenPattern}(?:\\s+${nameTokenPattern})?)\\s+(?:and|And|AND|&)\\s+(${nameTokenPattern}(?:\\s+${nameTokenPattern})?)\\s*[.!]?\\s*$`),
+    new RegExp(`^\\s*(${namePhrasePattern})\\s+(?:and|And|AND|&)\\s+(${namePhrasePattern})\\s*[.!]?\\s*$`),
   );
 
   if (standaloneCoupleMatch?.[1] && standaloneCoupleMatch[2]) {
@@ -285,7 +340,7 @@ function extractNames(text: string, currentNames?: string) {
 
   const directCoupleMatch = matchingText.match(
     new RegExp(
-      `\\b(${nameTokenPattern})\\s+(?:and|And|AND|&)\\s+(${nameTokenPattern})\\b(?:[\\s\\n]+(?:and\\s+)?(?:date|wedding|venue|location|in|at|on)\\b|[\\s\\n]+${monthNamePattern}\\b|[\\s\\n]+\\d{1,2}\\b|[.,!]|$)`,
+      `\\b(${namePhrasePattern})\\s+(?:and|And|AND|&)\\s+(${namePhrasePattern})(?:[\\s\\n]+(?:and\\s+)?(?:date|wedding|venue|location|in|at|on)\\b|[\\s\\n]+${monthNamePattern}\\b|[\\s\\n]+\\d{1,2}\\b|[.,!]|$)`,
     ),
   );
 
@@ -342,7 +397,7 @@ function extractLocation(text: string) {
     return match[1].trim();
   }
 
-  const knownCity = text.match(/\b(Charlotte|Atlanta|Savannah|Tampa|Miami|Orlando)\b/i)?.[1];
+  const knownCity = text.match(/\b(Charlotte|Raleigh|Charleston|Atlanta|Savannah|Tampa|Miami|Orlando)\b/i)?.[1];
   return knownCity ? knownCity.charAt(0).toUpperCase() + knownCity.slice(1).toLowerCase() : undefined;
 }
 
@@ -365,12 +420,16 @@ function isLikelyVenueAnswer(text: string, state: WeddingSalesState) {
     return false;
   }
 
-  return /\b(?:park|estate|farm|barn|venue|club|hotel|garden|hall|chapel|church|resort|manor|house|vineyard|winery|center|centre)\b/i.test(trimmed) ||
-    /^[A-Z][A-Za-z0-9 .'-]+\s+[A-Z]?[A-Za-z0-9 .'-]+$/.test(trimmed);
+  const streetAddressPattern =
+    /\b\d{1,6}\s+[A-Za-z0-9 .'-]+?\s+(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|drive|dr\.?|boulevard|blvd\.?|way|court|ct\.?|place|pl\.?|highway|hwy\.?)\b/i;
+
+  return streetAddressPattern.test(trimmed) ||
+    /\b(?:park|estate|farm|barn|venue|club|hotel|garden|hall|chapel|church|resort|manor|house|vineyard|winery|center|centre|museum|mansion|lodge|inn|plaza|ballroom)\b/i.test(trimmed) ||
+    /^[A-Z][A-Za-z0-9 .'-]+\s+[A-Z]?[A-Za-z0-9 .'-]+[.!]?$/.test(trimmed);
 }
 
 function extractVenue(text: string, state: WeddingSalesState) {
-  const explicitVenue = text.match(/\b(?:venue is|at|it'?s at|its at)\s+([A-Z][A-Za-z0-9 .'-]+?)(?:\.|,|\s+(?:on|for|and|with)\b|$)/i)?.[1];
+  const explicitVenue = text.match(/\b(?:venue is|venue:|at|it(?:'|’)?s|its|it is|it(?:'|’)?s at|its at)\s+([A-Z][A-Za-z0-9 .'-]+?)(?:[.!]|,|\s+(?:on|for|and|with)\b|$)/i)?.[1];
 
   if (explicitVenue) {
     return explicitVenue.trim();
@@ -379,14 +438,36 @@ function extractVenue(text: string, state: WeddingSalesState) {
   return isLikelyVenueAnswer(text, state) ? text.trim() : undefined;
 }
 
-export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Promise<Partial<WeddingSalesState>> {
+export function analyzeWeddingSalesMessageWithSemantics(
+  state: WeddingSalesState,
+  semantic: WeddingSalesSemanticAnalysis | null,
+): Partial<WeddingSalesState> {
   const message = stripQuotedEmailText(state.latestCustomerMessage ?? "");
-  const extractedDate = extractWeddingDate(message);
-  const extractedYear = extractYear(message);
-  const extractedNames = extractNames(message, state.names);
-  const extractedLocation = extractLocation(message);
-  const extractedVenue = extractVenue(message, state);
-  const extractedEmail = extractEmail(message);
+  const useSemantic = hasSemanticConfidence(semantic);
+  const deterministicDate = extractWeddingDate(message);
+  const semanticCanSupplyIsoDate = hasYear(message) || Boolean(state.weddingYear);
+  const semanticDate = useSemantic && semantic?.weddingDate && semanticCanSupplyIsoDate
+    ? {
+        display: semantic.weddingDateText ?? semantic.weddingDate,
+        iso: semantic.weddingDate,
+        yearKnown: true,
+      }
+    : useSemantic && semantic?.weddingDateText
+      ? extractWeddingDate(semantic.weddingDateText)
+      : null;
+  const extractedDate = deterministicDate ?? semanticDate;
+  const extractedYear =
+    extractYear(message) ??
+    (useSemantic && semantic?.answersRequestedField === "wedding_year"
+      ? semantic.weddingYear ?? undefined
+      : undefined);
+  const extractedNames = preferMoreCompleteNames(
+    useSemantic ? semantic?.names ?? undefined : undefined,
+    extractNames(message, state.names),
+  );
+  const extractedLocation = extractLocation(message) ?? (useSemantic ? semantic?.location ?? undefined : undefined);
+  const extractedVenue = extractVenue(message, state) ?? (useSemantic ? semantic?.venue ?? undefined : undefined);
+  const extractedEmail = extractEmail(message) ?? (useSemantic ? semantic?.email ?? undefined : undefined);
   const combinedWeddingDate =
     extractedDate?.iso ??
     combineWeddingDateTextWithYear(extractedDate?.display, state.weddingYear) ??
@@ -401,6 +482,35 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     ...(extractedVenue ? { venue: extractedVenue } : {}),
     ...(extractedEmail ? { customerEmail: extractedEmail } : {}),
   };
+  const weddingDateChanged = Boolean(combinedWeddingDate && state.weddingDate && combinedWeddingDate !== state.weddingDate);
+  const locationChanged = Boolean(
+    extractedLocation &&
+      state.location &&
+      extractedLocation.toLowerCase() !== state.location.toLowerCase(),
+  );
+  const semanticConfirmsPendingChange = Boolean(useSemantic && semantic?.confirmsPendingChange);
+  const semanticRejectsPendingChange = Boolean(useSemantic && semantic?.rejectsPendingChange);
+  const semanticExplicitDateChange = Boolean(
+    useSemantic &&
+      semantic?.messageKind === "correction" &&
+      semantic.weddingDateChange === "explicit" &&
+      semantic.confidence >= 0.9,
+  );
+  const semanticAmbiguousDateChange = Boolean(useSemantic && semantic?.weddingDateChange === "ambiguous");
+  const semanticExplicitLocationChange = Boolean(
+    useSemantic &&
+      semantic?.messageKind === "correction" &&
+      semantic.locationChange === "explicit" &&
+      semantic.confidence >= 0.9,
+  );
+  const semanticAmbiguousLocationChange = Boolean(useSemantic && semantic?.locationChange === "ambiguous");
+  const semanticBusinessQuestion = Boolean(useSemantic && semantic?.asksBusinessQuestion);
+  const semanticProposedCallTime = useSemantic ? semantic?.proposedCallTime ?? undefined : undefined;
+  const semanticScheduling = Boolean(
+    useSemantic &&
+      semanticProposedCallTime &&
+      (semantic?.messageKind === "scheduling" || semantic?.answersRequestedField === "call_time"),
+  );
 
   if (isCoordinatorOrCoi(message)) {
     return { ...baseUpdate, leadStage: "ignored" };
@@ -408,6 +518,118 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
 
   const customerEmailKnown = Boolean(state.customerEmail || extractedEmail);
   const proposedCallTimeKnown = Boolean(state.proposedCallTime);
+  const dateKnown = Boolean(state.weddingDate) || Boolean(combinedWeddingDate) || Boolean(state.weddingDateText) || hasWeddingDate(message);
+  const yearKnown = state.weddingYearKnown || hasYear(message) || Boolean(extractedDate?.yearKnown) || Boolean(state.weddingYear);
+  const nextNames = extractedNames ?? state.names;
+  const namesKnown =
+    state.channel === "instagram"
+      ? hasCoupleNames(nextNames)
+      : Boolean(nextNames) || hasNames(message);
+  const locationKnown = Boolean(state.location || extractedLocation) || hasLocation(message);
+
+  if (state.pendingChangeField && state.pendingChangeValue) {
+    if (semanticConfirmsPendingChange || confirmsPendingChange(message)) {
+      if (state.pendingChangeField === "weddingDate") {
+        return {
+          ...clearPendingChange(),
+          weddingDate: state.pendingChangeValue,
+          weddingYear: state.pendingChangeValue.slice(0, 4),
+          weddingYearKnown: true,
+          availability: undefined,
+          calendarStatus: undefined,
+          proposedCallTime: undefined,
+          callProposed: false,
+          bookingConfirmed: false,
+          bookedEventId: undefined,
+          leadStage: state.location ? "ready_for_availability" : "missing_location_or_venue",
+        };
+      }
+
+      return {
+        ...clearPendingChange(),
+        location: state.pendingChangeValue,
+        venue: undefined,
+        availability: undefined,
+        calendarStatus: undefined,
+        proposedCallTime: undefined,
+        callProposed: false,
+        bookingConfirmed: false,
+        bookedEventId: undefined,
+        leadStage: state.weddingDate && state.weddingYearKnown ? "ready_for_availability" : "missing_names_or_date",
+      };
+    }
+
+    if (semanticRejectsPendingChange || rejectsPendingChange(message)) {
+      return {
+        ...clearPendingChange(),
+        changeConfirmationRejected: true,
+        leadStage: "confirming_change",
+      };
+    }
+
+    return {
+      leadStage: "confirming_change",
+    };
+  }
+
+  if (weddingDateChanged && yearKnown) {
+    if (semanticAmbiguousDateChange || (!semanticExplicitDateChange && !explicitlyChangesWeddingDate(message))) {
+      const safeBaseUpdate = { ...baseUpdate };
+      delete safeBaseUpdate.weddingDate;
+
+      return {
+        ...safeBaseUpdate,
+        pendingChangeField: "weddingDate",
+        pendingChangeValue: combinedWeddingDate,
+        pendingChangeDisplay: extractedDate?.display ?? combinedWeddingDate,
+        changeConfirmationRejected: undefined,
+        leadStage: "confirming_change",
+      };
+    }
+
+    return {
+      ...baseUpdate,
+      ...clearPendingChange(),
+      availability: undefined,
+      calendarStatus: undefined,
+      proposedCallTime: undefined,
+      callProposed: false,
+      bookingConfirmed: false,
+      bookedEventId: undefined,
+      leadStage: locationKnown ? "ready_for_availability" : "missing_location_or_venue",
+      weddingYearKnown: true,
+    };
+  }
+
+  if (locationChanged) {
+    if (semanticAmbiguousLocationChange || (!semanticExplicitLocationChange && !explicitlyChangesLocation(message))) {
+      const safeBaseUpdate = { ...baseUpdate };
+      delete safeBaseUpdate.location;
+
+      return {
+        ...safeBaseUpdate,
+        pendingChangeField: "location",
+        pendingChangeValue: extractedLocation,
+        pendingChangeDisplay: extractedLocation,
+        changeConfirmationRejected: undefined,
+        leadStage: "confirming_change",
+      };
+    }
+
+    return {
+      ...baseUpdate,
+      ...clearPendingChange(),
+      venue: undefined,
+      availability: undefined,
+      calendarStatus: undefined,
+      proposedCallTime: undefined,
+      callProposed: false,
+      bookingConfirmed: false,
+      bookedEventId: undefined,
+      leadStage: state.weddingDate && yearKnown ? "ready_for_availability" : "missing_names_or_date",
+      weddingYearKnown: yearKnown,
+    };
+  }
 
   if (state.calendarStatus === "available" && customerEmailKnown && (confirmsBooking(message) || extractedEmail)) {
     return { ...baseUpdate, leadStage: "ready_to_book", bookingConfirmed: false };
@@ -437,8 +659,20 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     };
   }
 
-  if (asksForCall(message) || ((state.callProposed || state.availability === "available") && proposesCallTime(message))) {
-    return { ...baseUpdate, leadStage: "checking_calendar", proposedCallTime: message };
+  if (
+    semanticScheduling ||
+    asksForCall(message) ||
+    ((state.callProposed || state.availability === "available") && proposesCallTime(message))
+  ) {
+    return {
+      ...baseUpdate,
+      leadStage: "checking_calendar",
+      proposedCallTime: proposesCallTime(message) || asksForCall(message)
+        ? message
+        : semanticProposedCallTime
+          ? normalizeBareTimeSelection(semanticProposedCallTime, state.proposedCallTime)
+          : message,
+    };
   }
 
   if (state.availability === "available" && !state.callProposed && (extractedVenue || state.venue)) {
@@ -451,7 +685,7 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
 
   if (
     state.availability === "available" &&
-    asksGeneralQuestion(message) &&
+    (semanticBusinessQuestion || asksGeneralQuestion(message)) &&
     !hasWeddingDate(message) &&
     !hasYear(message)
   ) {
@@ -462,6 +696,14 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
     return { ...baseUpdate, leadStage: "answering_question" };
   }
 
+  if (
+    semanticBusinessQuestion &&
+    !asksWeddingAvailabilityQuestion(message) &&
+    !semanticScheduling
+  ) {
+    return { ...baseUpdate, leadStage: "answering_question" };
+  }
+
   if (state.availability === "available" && state.askedForVenue && !state.venue && !extractedVenue) {
     return { ...baseUpdate, leadStage: "missing_location_or_venue" };
   }
@@ -469,15 +711,6 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
   if (state.calendarStatus === "available" && proposedCallTimeKnown && !customerEmailKnown) {
     return { ...baseUpdate, leadStage: "waiting_customer_email" };
   }
-
-  const dateKnown = Boolean(state.weddingDate) || Boolean(combinedWeddingDate) || Boolean(state.weddingDateText) || hasWeddingDate(message);
-  const yearKnown = state.weddingYearKnown || hasYear(message) || Boolean(extractedDate?.yearKnown) || Boolean(state.weddingYear);
-  const nextNames = extractedNames ?? state.names;
-  const namesKnown =
-    state.channel === "instagram"
-      ? hasCoupleNames(nextNames)
-      : Boolean(nextNames) || hasNames(message);
-  const locationKnown = Boolean(state.location) || hasLocation(message);
 
   if (dateKnown && !yearKnown) {
     return {
@@ -518,6 +751,13 @@ export async function analyzeWeddingSalesMessage(state: WeddingSalesState): Prom
   };
 }
 
+export async function analyzeWeddingSalesMessage(
+  state: WeddingSalesState,
+): Promise<Partial<WeddingSalesState>> {
+  const semantic = await analyzeWeddingSalesSemantics(state);
+  return analyzeWeddingSalesMessageWithSemantics(state, semantic);
+}
+
 export const weddingSalesAnalyzeTestHelpers = {
   extractLocation,
   extractNames,
@@ -525,4 +765,5 @@ export const weddingSalesAnalyzeTestHelpers = {
   normalizeBareTimeSelection,
   proposesCallDayWithoutTime,
   proposesCallTime,
+  analyzeWeddingSalesMessageWithSemantics,
 };

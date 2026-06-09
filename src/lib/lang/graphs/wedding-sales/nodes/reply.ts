@@ -49,6 +49,28 @@ export function createWeddingSalesReplyNodes(config: WeddingSalesConfig) {
         config,
         state,
       }),
+    confirmChange: async (state: WeddingSalesState) => {
+      const responseDraft = state.changeConfirmationRejected
+        ? "Got it, I’ll keep the previous details. What should I update instead?"
+        : state.pendingChangeField === "location"
+          ? `Just to confirm, do you mean ${state.pendingChangeDisplay ?? state.pendingChangeValue} is the updated wedding location?`
+          : `Just to confirm, is ${state.pendingChangeDisplay ?? state.pendingChangeValue} your updated wedding date?`;
+
+      return {
+        responseDraft,
+        assistantReplyCount: state.assistantReplyCount + 1,
+        lastAssistantIntent: "confirm_change",
+        conversationSummary: buildWeddingSalesConversationSummary({
+          state: {
+            ...state,
+            responseDraft,
+            assistantReplyCount: state.assistantReplyCount + 1,
+            lastAssistantIntent: "confirm_change",
+          },
+          intent: "ask_missing_info",
+        }),
+      };
+    },
     answerQuestion: async (state: WeddingSalesState) =>
       composeReplyUpdate({
         intent: "answer_question",

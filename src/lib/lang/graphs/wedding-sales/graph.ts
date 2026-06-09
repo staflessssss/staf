@@ -18,6 +18,7 @@ type WeddingSalesRoute =
   | "ask_missing_info"
   | "ask_location_or_venue"
   | "ask_wedding_year"
+  | "confirm_change"
   | "answer_question"
   | "ask_call_time"
   | "ask_email"
@@ -46,6 +47,8 @@ export function routeWeddingSalesState(state: WeddingSalesState): WeddingSalesRo
       return "ignored";
     case "waiting_wedding_year":
       return "ask_wedding_year";
+    case "confirming_change":
+      return "confirm_change";
     case "missing_location_or_venue":
       return "ask_location_or_venue";
     case "answering_question":
@@ -115,6 +118,7 @@ export function buildWeddingSalesGraph(args: {
     .addNode("ask_missing_info", replyNodes.askMissingInfo)
     .addNode("ask_location_or_venue", replyNodes.askLocationOrVenue)
     .addNode("ask_wedding_year", replyNodes.askWeddingYear)
+    .addNode("confirm_change", replyNodes.confirmChange)
     .addNode("answer_question", replyNodes.answerQuestion)
     .addNode("ask_call_time", replyNodes.askCallTime)
     .addNode("ask_email", replyNodes.askEmail)
@@ -127,6 +131,7 @@ export function buildWeddingSalesGraph(args: {
       ask_missing_info: "ask_missing_info",
       ask_location_or_venue: "ask_location_or_venue",
       ask_wedding_year: "ask_wedding_year",
+      confirm_change: "confirm_change",
       answer_question: "answer_question",
       ask_call_time: "ask_call_time",
       ask_email: "ask_email",
@@ -138,6 +143,7 @@ export function buildWeddingSalesGraph(args: {
     .addEdge("ask_missing_info", END)
     .addEdge("ask_location_or_venue", END)
     .addEdge("ask_wedding_year", END)
+    .addEdge("confirm_change", END)
     .addEdge("answer_question", END)
     .addEdge("ask_call_time", END)
     .addEdge("ask_email", END)
