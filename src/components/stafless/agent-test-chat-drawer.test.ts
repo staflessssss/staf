@@ -58,3 +58,11 @@ test("agent test chat drawer follows the dark reference shell and surfaces tool 
   assert.match(source, /Shift\+Enter adds a new line/);
   assert.match(source, /onKeyDown/);
 });
+
+test("agent test chat drawer renders image attachments returned by the test runtime", () => {
+  const source = fs.readFileSync(drawerPath, "utf8");
+
+  assert.match(source, /result\.item\.attachments/);
+  assert.match(source, /attachment\.mimeType\?\.startsWith\("image\/"\)/);
+  assert.match(source, /src=\{attachment\.publicUrl\}/);
+});

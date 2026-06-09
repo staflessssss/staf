@@ -116,8 +116,12 @@ function getWeddingSalesGuideAttachment(args: {
   channel: ChannelType | string;
   message: string;
   config: ReturnType<typeof buildWeddingSalesConfigFromChannelConfig>;
+  allowAttachments: boolean;
 }) {
-  if (args.channel !== ChannelType.INSTAGRAM || !/\bguide\b/i.test(args.message)) {
+  if (
+    (!args.allowAttachments && args.channel !== ChannelType.INSTAGRAM) ||
+    !/\bguide\b/i.test(args.message)
+  ) {
     return [];
   }
 
@@ -1083,6 +1087,7 @@ async function runWeddingSalesTestRuntime(args: {
       channel: args.agent.channel.type,
       message,
       config,
+      allowAttachments: readMessageBehaviorConfig(args.agent.channelConfig).allowAttachments,
     }),
     historyAppend: buildWeddingSalesTestHistoryAppend({
       state: graphResult,
@@ -1415,6 +1420,7 @@ async function runWeddingSalesRuntime(args: {
       channel: args.channel,
       message,
       config,
+      allowAttachments: readMessageBehaviorConfig(args.agent.channelConfig).allowAttachments,
     }),
   };
 }

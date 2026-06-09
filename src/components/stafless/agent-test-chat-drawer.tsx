@@ -20,6 +20,14 @@ type VisibleChatMessage = {
   toolResult?: unknown;
   durationMs?: number;
   usedTooling?: string[];
+  attachments?: TestChatAttachment[];
+};
+
+type TestChatAttachment = {
+  fileId: string;
+  fileName?: string;
+  mimeType?: string;
+  publicUrl?: string;
 };
 
 type HiddenHistoryMessage = {
@@ -37,6 +45,7 @@ type InvokeResponse = {
     usedTooling: string[];
     historyAppend?: HiddenHistoryMessage[];
     suppressReply?: boolean;
+    attachments?: TestChatAttachment[];
   };
   error?: string;
 };
@@ -76,6 +85,7 @@ function buildVisibleTraceMessages(args: {
   fallbackAssistantText: string;
   fallbackUsedTooling: string[];
   suppressReply?: boolean;
+  attachments?: TestChatAttachment[];
 }) {
   const visible = args.historyAppend
     .filter((entry) => entry.toolName !== HIDDEN_WEDDING_SALES_STATE_TOOL_NAME)
@@ -97,6 +107,7 @@ function buildVisibleTraceMessages(args: {
         role: "assistant",
         text: entry.content,
         usedTooling: args.fallbackUsedTooling,
+        attachments: args.attachments,
       };
     });
 
@@ -112,6 +123,7 @@ function buildVisibleTraceMessages(args: {
           role: "assistant" as const,
           text: args.fallbackAssistantText,
           usedTooling: args.fallbackUsedTooling,
+          attachments: args.attachments,
         },
       ];
 }
@@ -213,6 +225,7 @@ export function AgentTestChatDrawer({
         fallbackAssistantText: result.item.message,
         fallbackUsedTooling: result.item.usedTooling ?? [],
         suppressReply: result.item.suppressReply,
+        attachments: result.item.attachments,
       });
 
       setVisibleMessages((current) => [...current, ...visibleTraceMessages]);
@@ -331,7 +344,32 @@ export function AgentTestChatDrawer({
                         </pre>
                       </div>
                     ) : (
-                      <p className="whitespace-pre-wrap">{chatMessage.text}</p>
+                      <>
+                        <p className="whitespace-pre-wrap">{chatMessage.text}</p>
+                        {chatMessage.attachments?.map((attachment) =>
+                          attachment.publicUrl &&
+                          attachment.mimeType?.startsWith("image/") ? (
+                            // The URL is supplied by the saved agent's Google Drive attachment config.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              alt={attachment.fileName ?? "Agent attachment"}
+                              className="mt-3 max-h-80 w-full rounded-lg border border-white/[0.1] bg-black/20 object-contain"
+                              key={attachment.fileId}
+                              src={attachment.publicUrl}
+                            />
+                          ) : attachment.publicUrl ? (
+                            <a
+                              className="mt-3 inline-flex text-sm font-medium text-[#e9be86] underline decoration-[#e9be86]/40 underline-offset-4"
+                              href={attachment.publicUrl}
+                              key={attachment.fileId}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              {attachment.fileName ?? "Open attachment"}
+                            </a>
+                          ) : null,
+                        )}
+                      </>
                     )}
                     {chatMessage.role === "assistant" && chatMessage.usedTooling?.length ? (
                       <div className="mt-3 flex flex-wrap gap-2">
