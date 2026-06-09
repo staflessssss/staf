@@ -182,6 +182,35 @@ test("finalizeAssistantText softens false booking confirmations without a bookin
   assert.doesNotMatch(finalized, /you'?re all set/i);
 });
 
+test("finalizeAssistantText does not rewrite unavailable wedding-date language", () => {
+  const text = [
+    "May 29, 2027 is already booked for Charlotte NC.",
+    "We could still look at May 28 or May 30 if you have flexibility.",
+  ].join("\n\n");
+  const finalized = aiRuntimeTestHelpers.finalizeAssistantText({
+    text,
+    toolExecutions: [
+      {
+        toolName: "Check wedding availability",
+        toolResult: {
+          steps: [
+            {
+              result: {
+                status: "unavailable",
+                date: "2027-05-29",
+                suggestedDates: ["2027-05-28", "2027-05-30"],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  });
+
+  assert.equal(finalized, text);
+  assert.doesNotMatch(finalized, /booking action has actually succeeded/i);
+});
+
 test("finalizeAssistantText rewrites successful test-mode booking into simulation language", () => {
   const finalized = aiRuntimeTestHelpers.finalizeAssistantText({
     text: `You're all set for Tuesday at 11:30 AM Eastern and the invite is on the way.\n\nTaras Mynd\nFounder & Creative Director / MYNDFUL FILMS LLC`,

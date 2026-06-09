@@ -375,6 +375,21 @@ function hasAvailableCalendarCheckTurn(
   });
 }
 
+function hasUnavailableWeddingAvailabilityTurn(
+  toolExecutions: Array<{
+    toolName: string;
+    toolResult: unknown;
+  }>,
+) {
+  return toolExecutions.some((execution) => {
+    if (!/(wedding|availability)/i.test(execution.toolName)) {
+      return false;
+    }
+
+    return getStepResults(execution.toolResult).some((result) => result.status === "unavailable");
+  });
+}
+
 function hasSimulatedBookingToolTurn(
   toolExecutions: Array<{
     toolName: string;
@@ -400,6 +415,10 @@ function softenFalseBookingConfirmation(args: {
   }>;
 }) {
   if (hasSuccessfulBookingToolTurn(args.toolExecutions)) {
+    return args.text;
+  }
+
+  if (hasUnavailableWeddingAvailabilityTurn(args.toolExecutions)) {
     return args.text;
   }
 
