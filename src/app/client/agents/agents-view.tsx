@@ -118,7 +118,7 @@ export function AgentsView({
                   View dialogs
                   <ArrowUpRight className="size-4" />
                 </Link>
-                {agent.status === "ACTIVE" ? (
+                {agent.status === "ACTIVE" || agent.status === "PAUSED" ? (
                   <AgentTestChatDrawer
                     agentId={agent.id}
                     agentName={agent.name}

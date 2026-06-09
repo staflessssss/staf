@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 
 import { MessageRole } from "@prisma/client";
 
 import { sanitizeClientTestChatResponse } from "./redaction";
+
+test("client test chat accepts active and paused agents", () => {
+  const source = fs.readFileSync(new URL("./route.ts", import.meta.url), "utf8");
+
+  assert.match(source, /status: \{ in: \["ACTIVE", "PAUSED"\] \}/);
+});
 
 test("client test chat redacts raw tool params while preserving safe trace and hidden state", () => {
   const sanitized = sanitizeClientTestChatResponse({

@@ -64,7 +64,7 @@ export async function POST(
     where: {
       id: agentId,
       tenantId,
-      status: "ACTIVE",
+      status: { in: ["ACTIVE", "PAUSED"] },
     },
     include: {
       channel: {
@@ -74,7 +74,7 @@ export async function POST(
   });
 
   if (!agent) {
-    return NextResponse.json({ error: "Active agent not found." }, { status: 404 });
+    return NextResponse.json({ error: "Testable agent not found." }, { status: 404 });
   }
 
   const response = await invokeAgent({
