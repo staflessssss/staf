@@ -219,6 +219,10 @@ function asksWeddingAvailabilityQuestion(text: string) {
     /\b(?:date|day|wedding|you|team|videographer|filmmaker)\b/i.test(text);
 }
 
+function isBookedConversation(state: WeddingSalesState) {
+  return Boolean(state.bookingConfirmed || state.leadStage === "booked");
+}
+
 function pad2(value: number) {
   return String(value).padStart(2, "0");
 }
@@ -648,6 +652,10 @@ export function analyzeWeddingSalesMessageWithSemantics(
       leadStage: state.weddingDate && yearKnown ? "ready_for_availability" : "missing_names_or_date",
       weddingYearKnown: yearKnown,
     };
+  }
+
+  if (isBookedConversation(state) && !hasWeddingDate(message) && !hasYear(message)) {
+    return { ...baseUpdate, leadStage: "answering_question" };
   }
 
   if (state.calendarStatus === "available" && customerEmailKnown && (confirmsBooking(message) || extractedEmail)) {

@@ -1296,6 +1296,110 @@ test("instagram wedding sales confirms booking only after the booking tool succe
   assert.doesNotMatch(result.responseDraft ?? "", /I've sent/i);
 });
 
+test("instagram wedding sales stays in support mode after a consultation is booked", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Can u send ma price again?",
+    previousState: {
+      names: "Valerie and Krisitna",
+      weddingDate: "2026-11-05",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideOffered: true,
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "Monday at 10 AM Eastern",
+      calendarStatus: "available",
+      customerEmail: "lalala@gmail.com",
+      bookingConfirmed: true,
+      leadStage: "booked",
+      lastAssistantIntent: "booking_confirmed",
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.equal(result.turnToolObservations.length, 0);
+  assert.match(result.responseDraft ?? "", /\$2,750/);
+  assert.match(result.responseDraft ?? "", /all set/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Would you like to find a time|good time for a quick call/i);
+});
+
+test("instagram wedding sales does not recheck availability when customer says the call is already booked", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "we already booked quick call",
+    previousState: {
+      names: "Valerie and Krisitna",
+      weddingDate: "2026-11-05",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideOffered: true,
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "Monday at 10 AM Eastern",
+      calendarStatus: "available",
+      customerEmail: "lalala@gmail.com",
+      bookingConfirmed: true,
+      leadStage: "booked",
+      lastAssistantIntent: "booking_confirmed",
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.equal(result.turnToolObservations.length, 0);
+  assert.match(result.responseDraft ?? "", /all set/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /November 5, 2026.*available/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /quick call to go over everything/i);
+});
+
+test("instagram wedding sales can reopen availability when booked lead corrects the wedding date", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Sorry, the wedding date is actually October 17, 2026",
+    previousState: {
+      names: "Valerie and Krisitna",
+      weddingDate: "2026-11-05",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      availability: "available",
+      guideOffered: true,
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "Monday at 10 AM Eastern",
+      calendarStatus: "available",
+      customerEmail: "lalala@gmail.com",
+      bookingConfirmed: true,
+      leadStage: "booked",
+      lastAssistantIntent: "booking_confirmed",
+    },
+  });
+
+  assert.equal(result.weddingDate, "2026-10-17");
+  assert.equal(result.bookingConfirmed, false);
+  assert.equal(result.leadStage, "ready_for_availability");
+});
+
 test("semantic analysis accepts a naturally phrased pair of names without asking again", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

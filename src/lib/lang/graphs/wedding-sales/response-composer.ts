@@ -245,8 +245,16 @@ function asksAboutKnownWeddingAvailability(message?: string) {
   return /\b(?:available|availability|still open|still available|our date|the date|wedding date)\b/i.test(message);
 }
 
+function isBookedConversation(state: WeddingSalesState) {
+  return Boolean(state.bookingConfirmed || state.leadStage === "booked");
+}
+
 function nextStepAfterFaq(state: WeddingSalesState) {
   if (!isInstagram(state)) {
+    if (isBookedConversation(state)) {
+      return "You are all set for the consultation. Send me anything else you want to go over before the call.";
+    }
+
     if (state.calendarStatus === "available" && !state.customerEmail) {
       return "Send me the best email for the calendar invite when you are ready.";
     }
@@ -256,6 +264,10 @@ function nextStepAfterFaq(state: WeddingSalesState) {
     }
 
     return "Once I have your date and location, I can check availability and point you in the right direction.";
+  }
+
+  if (isBookedConversation(state)) {
+    return "You’re all set for the call. Anything else you’d like to know before we chat?";
   }
 
   if (state.calendarStatus === "available" && !state.customerEmail) {
@@ -589,6 +601,10 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           return faqAnswer;
         }
 
+        if (isInstagram(state) && isBookedConversation(state)) {
+          return "Yes, you’re all set for the consultation. If anything changes, just send it here and I’ll update it.";
+        }
+
         if (isInstagram(state) && state.leadStage === "answering_question" && state.calendarStatus === "available" && !state.customerEmail) {
           return [
             `Our collections start at ${config.pricing.startPrice}.`,
@@ -596,7 +612,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           ].join("\n\n");
         }
 
-        if (state.availability === "available" && asksAboutKnownWeddingAvailability(state.latestCustomerMessage)) {
+        if (state.availability === "available" && !isBookedConversation(state) && asksAboutKnownWeddingAvailability(state.latestCustomerMessage)) {
           if (isInstagram(state)) {
             return [
               `${weddingDate}${location} is still available.`,
