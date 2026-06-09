@@ -196,6 +196,9 @@ test("instagram webhook routes business message echoes as manual owner replies",
   assert.match(source, /setTimeout\(resolve, 150\)/);
   assert.match(source, /INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME/);
   assert.match(source, /path: \["messageId"\]/);
+  assert.match(source, /extractInstagramMessageText/);
+  assert.match(source, /isRecentAssistantTextEcho/);
+  assert.match(source, /contains: text/);
   assert.match(source, /ignored_known_outbound_echo/);
   assert.match(source, /isBusinessManualReply: true/);
   assert.match(source, /fromBusiness: true/);

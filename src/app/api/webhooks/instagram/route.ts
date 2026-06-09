@@ -178,6 +178,36 @@ function extractInstagramMessageId(payload: unknown) {
   return "";
 }
 
+function extractInstagramMessageText(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "";
+  }
+
+  const entry = "entry" in payload && Array.isArray(payload.entry) ? payload.entry : [];
+
+  for (const item of entry) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+
+    const messaging = "messaging" in item && Array.isArray(item.messaging) ? item.messaging : [];
+
+    for (const event of messaging) {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        continue;
+      }
+
+      const message = "message" in event ? event.message : null;
+
+      if (message && typeof message === "object" && !Array.isArray(message) && "text" in message) {
+        return String(message.text ?? "").trim();
+      }
+    }
+  }
+
+  return "";
+}
+
 function extractInstagramMessageAppId(payload: unknown) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return "";
@@ -463,13 +493,57 @@ async function isKnownInstagramOutboundEcho(args: {
   return Boolean(existing);
 }
 
+async function isRecentAssistantTextEcho(args: {
+  agentId: string;
+  contactId: string;
+  messageText: string;
+}) {
+  const text = args.messageText.trim();
+
+  if (!text) {
+    return false;
+  }
+
+  const recentAssistantMessage = await db.message.findFirst({
+    where: {
+      role: "ASSISTANT",
+      content: {
+        contains: text,
+      },
+      createdAt: {
+        gte: new Date(Date.now() - 5 * 60 * 1000),
+      },
+      conversation: {
+        agentId: args.agentId,
+        contactId: args.contactId,
+      },
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return Boolean(recentAssistantMessage);
+}
+
 async function waitForKnownInstagramOutboundEcho(args: {
   agentId: string;
   contactId: string;
   messageId: string;
+  messageText?: string;
 }) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    if (await isKnownInstagramOutboundEcho(args)) {
+    if (
+      (await isKnownInstagramOutboundEcho(args)) ||
+      (await isRecentAssistantTextEcho({
+        agentId: args.agentId,
+        contactId: args.contactId,
+        messageText: args.messageText ?? "",
+      }))
+    ) {
       return true;
     }
 
@@ -583,6 +657,7 @@ export async function POST(req: NextRequest) {
       const recipientId = extractInstagramRecipientId(eventPayload);
       const senderId = extractInstagramSenderId(eventPayload);
       const messageId = extractInstagramMessageId(eventPayload);
+      const messageText = extractInstagramMessageText(eventPayload);
       const route = await findInstagramAgentByRecipientId(recipientId);
       const agent = route?.agent ?? null;
 
@@ -602,6 +677,7 @@ export async function POST(req: NextRequest) {
               agentId: echoChannel.agent.id,
               contactId: recipientId,
               messageId,
+              messageText,
             }))
           ) {
             console.log("[instagram-webhook] ignored known outbound echo", {
