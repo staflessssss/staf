@@ -1,7 +1,9 @@
+import { cache } from "react";
+
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
-export async function getCurrentSession() {
+export const getCurrentSession = cache(async function getCurrentSession() {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -30,4 +32,4 @@ export async function getCurrentSession() {
       tenantId: currentUser.tenantId,
     },
   };
-}
+});

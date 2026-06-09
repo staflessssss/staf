@@ -11,7 +11,7 @@ export default async function ClientOverviewPage() {
   const session = await requireClientSession();
   const tenantId = session.user.tenantId;
 
-  const [agents, conversations, topFunctions] = await Promise.all([
+  const [agents, conversations] = await Promise.all([
     db.agent.findMany({
       where: { tenantId },
       include: { channel: true },
@@ -20,11 +20,21 @@ export default async function ClientOverviewPage() {
     db.conversation.findMany({
       where: { agent: { tenantId } },
       select: {
+        id: true,
         agentId: true,
         updatedAt: true,
-        messages: { select: { role: true } },
       },
     }),
+  ]);
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  const [messageCounts, topFunctions] = await Promise.all([
+    conversationIds.length > 0
+      ? db.message.groupBy({
+          by: ["conversationId", "role"],
+          where: { conversationId: { in: conversationIds } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
     db.message.groupBy({
       by: ["toolName"],
       where: {
@@ -38,6 +48,14 @@ export default async function ClientOverviewPage() {
     }),
   ]);
 
+  const countsByConversation = new Map<string, { messages: number; tools: number }>();
+  for (const count of messageCounts) {
+    const current = countsByConversation.get(count.conversationId) ?? { messages: 0, tools: 0 };
+    if (count.role === MessageRole.TOOL) current.tools += count._count._all;
+    else current.messages += count._count._all;
+    countsByConversation.set(count.conversationId, current);
+  }
+
   const tally = new Map<string, Tally>();
   for (const conversation of conversations) {
     const stat = tally.get(conversation.agentId) ?? {
@@ -47,10 +65,9 @@ export default async function ClientOverviewPage() {
       lastActivity: null,
     };
     stat.conversations += 1;
-    for (const message of conversation.messages) {
-      if (message.role === MessageRole.TOOL) stat.tools += 1;
-      else stat.messages += 1;
-    }
+    const counts = countsByConversation.get(conversation.id);
+    stat.messages += counts?.messages ?? 0;
+    stat.tools += counts?.tools ?? 0;
     if (!stat.lastActivity || conversation.updatedAt > stat.lastActivity) {
       stat.lastActivity = conversation.updatedAt;
     }

@@ -22,3 +22,10 @@ test("client dialogs show agent tool calls in the conversation timeline", () => 
   assert.match(source, /Agent called/);
   assert.match(source, /buildToolCallView/);
 });
+
+test("client dialogs load previews separately from the selected conversation history", () => {
+  assert.match(source, /toolName: "business_manual_message"/);
+  assert.match(source, /take: 1/);
+  assert.match(source, /conversationId: selectedConversation\.id/);
+  assert.match(source, /conversation: \{ agent: \{ tenantId \} \}/);
+});

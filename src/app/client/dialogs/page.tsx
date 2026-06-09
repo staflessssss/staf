@@ -339,23 +339,12 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                 },
                 {
                   role: MessageRole.TOOL,
-                  AND: [
-                    {
-                      toolName: {
-                        not: null,
-                      },
-                    },
-                    {
-                      NOT: {
-                        toolName: INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME,
-                      },
-                    },
-                  ],
+                  toolName: "business_manual_message",
                 },
               ],
             },
             orderBy: { createdAt: "desc" },
-            take: 100,
+            take: 1,
           },
           _count: {
             select: { messages: true },
@@ -422,9 +411,38 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   const selectedConversation =
     conversations.find((item) => item.id === conversation) ?? conversations[0] ?? null;
   const selectedMessages = selectedConversation
-    ? [...selectedConversation.messages]
-        .filter((message) => !isInternalInstagramDelivery(message))
-        .reverse()
+    ? (
+        await db.message.findMany({
+          where: {
+            conversationId: selectedConversation.id,
+            conversation: { agent: { tenantId } },
+            OR: [
+              {
+                role: {
+                  in: [MessageRole.USER, MessageRole.ASSISTANT],
+                },
+              },
+              {
+                role: MessageRole.TOOL,
+                AND: [
+                  {
+                    toolName: {
+                      not: null,
+                    },
+                  },
+                  {
+                    NOT: {
+                      toolName: INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          orderBy: { createdAt: "desc" },
+          take: 100,
+        })
+      ).reverse()
     : [];
   const selectedToolMessages = selectedMessages.filter(
     (message) => message.role === MessageRole.TOOL && !isBusinessManualMessage(message),
