@@ -47,6 +47,27 @@ const INSTAGRAM_FIRST_CONTACT_OPENING = [
   "",
   "I’m Taras, the founder of Myndful Films. Huge congratulations on your engagement, such an exciting season of life",
 ].join("\n");
+const INSTAGRAM_ROBOTIC_PHRASES = [
+  "to help us get started",
+  "this will allow me",
+  "provide the best information",
+  "tailored to your special day",
+  "perfectly personalized",
+  "help me assist you",
+  "plan accordingly",
+  "capture your story perfectly",
+  "tailor everything just right",
+  "that way",
+  "could you please",
+  "please provide",
+  "when you get a chance",
+  "whenever you're ready",
+  "to get a better sense",
+  "that'll help",
+  "that will help",
+  "next steps",
+  "get everything lined up",
+] as const;
 const BRAND_EMOJIS = ["🤍", "✨", "🎥"] as const;
 const BRAND_EMOJI_BY_INTENT: Partial<Record<WeddingSalesResponseIntent, (typeof BRAND_EMOJIS)[number]>> = {
   ask_missing_info: "🤍",
@@ -225,15 +246,35 @@ function asksAboutKnownWeddingAvailability(message?: string) {
 }
 
 function nextStepAfterFaq(state: WeddingSalesState) {
+  if (!isInstagram(state)) {
+    if (state.calendarStatus === "available" && !state.customerEmail) {
+      return "Send me the best email for the calendar invite when you are ready.";
+    }
+
+    if (state.callProposed || state.availability === "available") {
+      return "The next step is the quick consultation, so I can walk you through everything live.";
+    }
+
+    return "Once I have your date and location, I can check availability and point you in the right direction.";
+  }
+
   if (state.calendarStatus === "available" && !state.customerEmail) {
-    return "Send me the best email for the calendar invite when you are ready.";
+    return "What’s the best email for the calendar invite?";
+  }
+
+  if (!state.weddingDate && !state.weddingDateText) {
+    return "What’s your wedding date?";
+  }
+
+  if (!state.location) {
+    return "What city or venue is the wedding in?";
   }
 
   if (state.callProposed || state.availability === "available") {
-    return "The next step is the quick consultation, so I can walk you through everything live.";
+    return "Would you like to find a time for a quick call?";
   }
 
-  return "Once I have your date and location, I can check availability and point you in the right direction.";
+  return "What city or venue is the wedding in?";
 }
 
 function formatFaqAnswer(args: {
@@ -249,7 +290,9 @@ function formatFaqAnswer(args: {
     return [
       asksPricing ? `Our collections start at ${args.config.pricing.startPrice}.` : "",
       asksTravel
-        ? "Each collection includes travel miles. If the venue is beyond the included mileage, I will check the exact distance and have clear travel details ready for our call."
+        ? isInstagram(args.state)
+          ? "Each collection includes travel miles. I’ll confirm the exact details once I know the venue."
+          : "Each collection includes travel miles. If the venue is beyond the included mileage, I will check the exact distance and have clear travel details ready for our call."
         : "",
       nextStep,
     ].filter(Boolean).join("\n\n");
@@ -360,6 +403,15 @@ function formatUnavailableWeddingReply(args: {
   const requestedDate = `${args.weddingDate}${args.location}`;
   const softDecline = `I checked ${requestedDate}, and it looks like that date is already booked on our end.`;
 
+  if (isInstagram(args.state)) {
+    return formattedSuggestions.length > 0
+      ? [
+          `${requestedDate} is already booked.`,
+          `The closest open dates are ${formattedSuggestions.join(" or ")}. Would one of those work?`,
+        ].join("\n\n")
+      : `${requestedDate} is already booked. Do you have flexibility for a nearby date?`;
+  }
+
   if (formattedSuggestions.length > 0) {
     return [
       softDecline,
@@ -387,22 +439,25 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           const missingNames = !hasCoupleNames(state.names);
           const hasAnyName = Boolean(state.names?.trim());
           const questionEmoji = policy.allowGreeting ? "" : " ✨";
-          const askParts = [
-            missingNames ? (hasAnyName ? "your fiancé’s name" : "both of your names") : "",
-            missingDate ? "the date of your wedding" : "",
-          ].filter(Boolean);
+          const missingInfoQuestion = missingNames && missingDate
+            ? hasAnyName
+              ? "What’s your fiancé’s name and wedding date?"
+              : "What are both of your names, and what’s your wedding date?"
+            : missingNames
+              ? hasAnyName
+                ? "What’s your fiancé’s name?"
+                : "What are both of your names?"
+              : "What’s your wedding date?";
 
           if (missingNames && state.askedForNames && !missingDate) {
             return hasAnyName
-              ? "I may be missing it — could you send just your fiancé’s first name? ✨"
-              : "I may be missing it — could you send both of your first names? ✨";
+              ? "I may have missed it — what’s your fiancé’s first name?"
+              : "I may have missed it — what are both of your first names?";
           }
 
           return [
             policy.allowGreeting ? INSTAGRAM_FIRST_CONTACT_OPENING : "",
-            askParts.length
-              ? `Would you mind sharing ${askParts.join(" and ")}? That way I can check our availability${state.location ? ` for ${state.location}` : ""} and get you all set up${questionEmoji}`
-              : `Could you send the exact wedding date so I can check availability${state.location ? ` for ${state.location}` : ""}?${questionEmoji}`,
+            `${missingInfoQuestion}${questionEmoji}`,
           ]
             .filter(Boolean)
             .join("\n\n");
@@ -415,21 +470,25 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       case "ask_location_or_venue":
         if (isInstagram(state)) {
           return state.location
-            ? `Where in ${state.location} is your venue? I want to double-check the travel details included for the collections.`
-            : "Could you share the city or venue for the wedding? That way I can check availability and travel details correctly ✨";
+            ? `What’s the exact venue in ${state.location}?`
+            : "What city or venue is the wedding in? ✨";
         }
 
         return state.location
           ? `Could you share the venue in ${state.location}? I want to double-check the travel details before we move forward.`
           : "Could you share the city, venue, or location for the wedding? I can check availability once I have that.";
       case "ask_wedding_year":
-        if (isInstagram(state) && state.askedForWeddingYear && state.names) {
-          return `Got it — ${state.names}. What year is ${state.weddingDateText || "the wedding date"}? I want to check the right date for you.`;
+        if (isInstagram(state)) {
+          return state.askedForWeddingYear && state.names
+            ? `Got it — ${state.names}. What year is ${state.weddingDateText || "the wedding date"}?`
+            : `What year is ${state.weddingDateText || "the wedding date"}?`;
         }
 
         return "Thank you so much. Just so I check the right date, could you share the wedding year?";
       case "availability_tool_missing":
-        return "I have enough details to check the wedding date, but the availability tool is not configured yet.";
+        return isInstagram(state)
+          ? "I’m having trouble checking that date right now. Let me look into it."
+          : "I have enough details to check the wedding date, but the availability tool is not configured yet.";
       case "availability_unavailable":
         return formatUnavailableWeddingReply({ state, summary, weddingDate, location });
       case "availability_available": {
@@ -442,8 +501,8 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           if (!state.venue) {
             lines.push(
               state.location
-                ? `Where in ${state.location} is your venue? I want to double-check travel details included for the collections.`
-                : "Where is your venue? I want to double-check travel details included for the collections.",
+                ? `What’s the exact venue in ${state.location}?`
+                : "What’s the exact venue?",
             );
           } else {
             lines.push(
@@ -485,9 +544,26 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       }
       case "answer_question": {
         if (state.availability === "unavailable") {
-          const asksPricingOrTravel = /\b(?:pricing|price|cost|package|collection|travel)\b/i.test(
+          const asksPricingOrTravel = /\b(?:pricing|price|cost|package|packages|collection|collections|travel)\b/i.test(
             state.latestCustomerMessage ?? "",
           );
+          if (isInstagram(state)) {
+            const message = state.latestCustomerMessage ?? "";
+            const answers = [
+              `${weddingDate}${location} is still unavailable.`,
+              /\b(?:pricing|price|cost|package|packages|collection|collections)\b/i.test(message)
+                ? `Our collections start at ${config.pricing.startPrice}.`
+                : "",
+              /\btravel\b/i.test(message)
+                ? "Each collection includes travel miles."
+                : "",
+            ].filter(Boolean);
+
+            return [
+              answers.join(" "),
+              "Do you have another date in mind?",
+            ].join("\n\n");
+          }
           const followUp = asksPricingOrTravel
             ? `If you are flexible, send me another date and I can check it right away. Our collections start at ${config.pricing.startPrice}, and yes, we do travel for weddings.`
             : "If you are flexible, send me another date and I can check it right away.";
@@ -503,18 +579,29 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
 
         if (isInstagram(state) && state.leadStage === "answering_question" && state.calendarStatus === "available" && !state.customerEmail) {
           return [
-            `Our collections start at ${config.pricing.startPrice}. Yes, travel details are checked against the exact venue, and I’ll make sure everything is clear before our call.`,
-            "Send me the best email for the calendar invite when you’re ready ✨",
+            `Our collections start at ${config.pricing.startPrice}.`,
+            "What’s the best email for the calendar invite? ✨",
           ].join("\n\n");
         }
 
         if (state.availability === "available" && asksAboutKnownWeddingAvailability(state.latestCustomerMessage)) {
+          if (isInstagram(state)) {
+            return [
+              `${weddingDate}${location} is still available.`,
+              state.callProposed ? "Would you like to find a time for a quick call?" : "Would you like to set up a quick call?",
+            ].join("\n\n");
+          }
+
           return [
             `${weddingDate}${location} is still showing available on my end.`,
             state.callProposed
               ? "The next step is still the quick consultation, so I can hear more about your day and answer anything you are weighing."
               : "The next step would be a quick consultation, so I can hear more about your day and answer anything you are weighing.",
           ].join("\n\n");
+        }
+
+        if (isInstagram(state)) {
+          return "Could you tell me a little more about what you’d like to know?";
         }
 
         return [
@@ -526,8 +613,8 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         if (isInstagram(state)) {
           return [
             state.venue
-              ? `${state.venue} sounds lovely 🤍 I’ll check the exact travel details for your date and venue so we’re all set.`
-              : "That sounds lovely 🤍 I’ll check the exact travel details for your date and venue so we’re all set.",
+              ? `${state.venue} sounds lovely 🤍`
+              : "That sounds lovely 🤍",
             "When would be a good time for a quick call to go over everything? I’m free Mon-Fri, 9 AM to 2 PM Eastern ✨",
           ].join("\n\n");
         }
@@ -554,17 +641,31 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         ].join("\n\n");
       }
       case "calendar_time_missing":
+        if (isInstagram(state)) {
+          return state.calendarStatus === "busy"
+            ? "That time isn’t available. What other time works for you?"
+            : "What time works for you?";
+        }
+
         return state.calendarStatus === "busy"
           ? "That time was not available, so I cannot book it yet. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?"
           : "I can check that consultation time once I have the requested time.";
       case "calendar_available":
-        return "That time looks available on the calendar. Would you like me to go ahead and book it for you?";
+        return isInstagram(state)
+          ? "That time is available. Would you like me to book it?"
+          : "That time looks available on the calendar. Would you like me to go ahead and book it for you?";
       case "calendar_busy":
-        return "That time is already taken on the calendar, so I do not want to book the wrong slot. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?";
+        return isInstagram(state)
+          ? "That time is already taken. What other time works for you?"
+          : "That time is already taken on the calendar, so I do not want to book the wrong slot. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?";
       case "calendar_outside_window":
-        return `${summary || "Consultation calls are only available Monday through Friday between 9 AM and 2 PM Eastern."} Could you send another time in that window?`;
+        return isInstagram(state)
+          ? "Calls are available Mon-Fri, 9 AM to 2 PM Eastern. What time in that window works for you?"
+          : `${summary || "Consultation calls are only available Monday through Friday between 9 AM and 2 PM Eastern."} Could you send another time in that window?`;
       case "booking_tool_missing":
-        return "I can book the consultation once I have the confirmed time and booking tool configured.";
+        return isInstagram(state)
+          ? "I’m having trouble with the booking tool right now. Let me look into it."
+          : "I can book the consultation once I have the confirmed time and booking tool configured.";
       case "booking_confirmed":
         if (args.testMode || (summary && /\btest mode\b/i.test(summary))) {
           const callTime = formatCallTimeForReply(state.proposedCallTime);
@@ -596,7 +697,9 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           "I am really looking forward to hearing more about your day and answering any questions you both have 🤍",
         ].join("\n\n");
       case "booking_failed":
-        return "I am sorry, I could not get the calendar invite fully confirmed on my end. Could you send one more time option Monday through Friday between 9 AM and 2 PM Eastern?";
+        return isInstagram(state)
+          ? "I couldn’t confirm that time. What other time works for you?"
+          : "I am sorry, I could not get the calendar invite fully confirmed on my end. Could you send one more time option Monday through Friday between 9 AM and 2 PM Eastern?";
     }
   })();
 
@@ -763,6 +866,15 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       ? "Instagram style: 1-3 short message bubbles separated by blank lines. No signature. No HTML. Warm, direct, founder-like, and concise. Ask only the next missing question."
       : "",
     args.state.channel === "instagram"
+      ? "Instagram brevity rule: after the required first-contact introduction, use no more than 35 words. Usually write one short answer and one short question. Do not explain why you need routine details."
+      : "",
+    args.state.channel === "instagram"
+      ? `Never use formal marketing filler such as: ${INSTAGRAM_ROBOTIC_PHRASES.join("; ")}.`
+      : "",
+    args.state.channel === "instagram"
+      ? "Answer only what the customer asked. For a pricing question, give the starting price and the single next missing question; do not add travel information unless travel was asked about."
+      : "",
+    args.state.channel === "instagram"
       ? "For Instagram, do not paste URLs or long collection details. Mention that you can send examples or the guide naturally instead."
       : "",
     args.state.channel === "instagram"
@@ -801,6 +913,9 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       : "",
     args.state.channel === "instagram"
       ? "For Instagram, fail and rewrite if the draft sounds like an email, repeats the intro, repeats the call-time question, asks for permission to book before asking for email, or says an invite was sent before booking is confirmed."
+      : "",
+    args.state.channel === "instagram"
+      ? `For Instagram, fail and rewrite if the text after the required first-contact introduction exceeds 35 words, explains why routine information is needed, answers an unasked topic, or uses any of these phrases: ${INSTAGRAM_ROBOTIC_PHRASES.join("; ")}.`
       : "",
     args.state.channel === "instagram"
       ? "For Instagram, fail and rewrite if a customer supplied a useful fact and the draft does not acknowledge it before asking for the next missing fact."
@@ -849,6 +964,31 @@ function normalizeMarkdownLinksForRichEmail(text: string) {
   return text.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
 }
 
+function stripDuplicateInstagramFirstContactIntro(text: string) {
+  let remainder = text.trim();
+  const duplicateIntroPatterns = [
+    /^Thank you so much for reaching out(?:\s*[🤍✨🎥]+)?[.!]?\s*/i,
+    /^Congratulations on your engagement[.!]?\s*/i,
+    /^Huge congratulations on your engagement(?:,\s*such an exciting season of life)?[.!]?\s*/i,
+    /^I[’']?m Taras(?:,\s*the founder of Myndful Films| from Myndful Films)?[.!]?\s*/i,
+  ];
+
+  let changed = true;
+  while (remainder && changed) {
+    changed = false;
+
+    for (const pattern of duplicateIntroPatterns) {
+      const cleaned = remainder.replace(pattern, "").trim();
+      if (cleaned !== remainder) {
+        remainder = cleaned;
+        changed = true;
+      }
+    }
+  }
+
+  return remainder;
+}
+
 function ensureInstagramFirstContactOpening(args: ComposeWeddingSalesResponseArgs, text: string) {
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
 
@@ -859,7 +999,11 @@ function ensureInstagramFirstContactOpening(args: ComposeWeddingSalesResponseArg
   const trimmed = text.trim();
 
   if (trimmed.startsWith(INSTAGRAM_FIRST_CONTACT_OPENING)) {
-    return trimmed;
+    const remainder = stripDuplicateInstagramFirstContactIntro(
+      trimmed.slice(INSTAGRAM_FIRST_CONTACT_OPENING.length),
+    );
+
+    return [INSTAGRAM_FIRST_CONTACT_OPENING, remainder].filter(Boolean).join("\n\n");
   }
 
   const paragraphs = trimmed.split(/\n\s*\n/);
@@ -871,7 +1015,61 @@ function ensureInstagramFirstContactOpening(args: ComposeWeddingSalesResponseArg
     paragraphs.shift();
   }
 
-  return [INSTAGRAM_FIRST_CONTACT_OPENING, paragraphs.join("\n\n").trim()].filter(Boolean).join("\n\n");
+  const remainder = stripDuplicateInstagramFirstContactIntro(paragraphs.join("\n\n"));
+
+  return [INSTAGRAM_FIRST_CONTACT_OPENING, remainder].filter(Boolean).join("\n\n");
+}
+
+function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, text: string, fallback: string) {
+  if (args.state.channel !== "instagram") {
+    return text.trim();
+  }
+
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+  const body = policy.allowGreeting && text.startsWith(INSTAGRAM_FIRST_CONTACT_OPENING)
+    ? text.slice(INSTAGRAM_FIRST_CONTACT_OPENING.length).trim()
+    : text.trim();
+  const normalizedBody = body
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"');
+  const wordCount = body.split(/\s+/).filter(Boolean).length;
+  const paragraphCount = body.split(/\n\s*\n/).filter(Boolean).length;
+  const questionCount = body.split("?").length - 1;
+  const hasRoboticPhrase = INSTAGRAM_ROBOTIC_PHRASES.some((phrase) => normalizedBody.includes(phrase));
+  const latestCustomerMessage = (args.state.latestCustomerMessage ?? "").toLowerCase();
+  const addsUnaskedTravelAnswer = args.intent === "answer_question"
+    && normalizedBody.includes("travel")
+    && !latestCustomerMessage.includes("travel")
+    && !latestCustomerMessage.includes("mileage")
+    && !latestCustomerMessage.includes("distance");
+  const addsUnaskedPricingAnswer = args.intent === "answer_question"
+    && (normalizedBody.includes("$") || normalizedBody.includes("pricing") || normalizedBody.includes("start at"))
+    && !latestCustomerMessage.includes("price")
+    && !latestCustomerMessage.includes("pricing")
+    && !latestCustomerMessage.includes("cost")
+    && !latestCustomerMessage.includes("package")
+    && !latestCustomerMessage.includes("collection");
+  const missesRequiredNextQuestion = args.intent === "answer_question"
+    && (
+      (args.state.calendarStatus === "available" && !args.state.customerEmail && !normalizedBody.includes("email"))
+      || (!args.state.weddingDate && !args.state.weddingDateText && !normalizedBody.includes("date"))
+      || (Boolean(args.state.weddingDate || args.state.weddingDateText)
+        && !args.state.location
+        && !normalizedBody.includes("location")
+        && !normalizedBody.includes("venue")
+        && !normalizedBody.includes("city"))
+    );
+
+  return wordCount > 35
+    || paragraphCount > 3
+    || questionCount > 1
+    || hasRoboticPhrase
+    || addsUnaskedTravelAnswer
+    || addsUnaskedPricingAnswer
+    || missesRequiredNextQuestion
+    ? fallback.trim()
+    : text.trim();
 }
 
 export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { text: string }) {
@@ -997,7 +1195,7 @@ async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs
 }
 
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
-  const fallback = composeWeddingSalesResponse(args);
+  const fallback = ensureInstagramFirstContactOpening(args, composeWeddingSalesResponse(args));
 
   if (args.testMode && args.intent === "booking_confirmed") {
     return fallback;
@@ -1018,9 +1216,15 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
 
     const draft = finalizeLlmWeddingSalesResponse({ ...args, text: trimmed });
 
-    return reflectWeddingSalesResponse({ ...args, draft });
+    const reflected = await reflectWeddingSalesResponse({ ...args, draft });
+
+    return enforceInstagramResponseStyle(args, reflected, fallback);
   } catch (error) {
     console.warn("[wedding-sales] LLM response composer failed; using fallback.", error);
     return fallback;
   }
 }
+
+export const weddingSalesResponseComposerTestHelpers = {
+  enforceInstagramResponseStyle,
+};

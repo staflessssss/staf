@@ -7,6 +7,7 @@ import {
   composeWeddingSalesResponse,
   finalizeLlmWeddingSalesResponse,
   parseWeddingSalesReflectionJson,
+  weddingSalesResponseComposerTestHelpers,
 } from "./response-composer";
 import type { WeddingSalesState } from "./state";
 
@@ -142,6 +143,28 @@ test("wedding sales composer uses plain links for instagram", () => {
   assert.doesNotMatch(response, /MYNDFUL FILMS/);
 });
 
+test("instagram pricing answer stays short and does not add unasked travel details", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "answering_question",
+      names: undefined,
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      location: undefined,
+      availability: undefined,
+      latestCustomerMessage: "What’s your price?",
+    },
+  });
+
+  assert.equal(response, "Our collections start at $2,750.\n\nWhat’s your wedding date?");
+  assert.doesNotMatch(response, /travel/i);
+  assert.doesNotMatch(response, /tailored|next steps/i);
+});
+
 test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";
@@ -162,7 +185,35 @@ test("instagram human composer keeps deterministic fallback when the LLM compose
       },
     });
 
-    assert.equal(response, "Would you mind sharing the date of your wedding? That way I can check our availability for Charlotte and get you all set up ✨");
+    assert.equal(response, "What’s your wedding date? ✨");
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
+test("instagram human composer keeps the first-contact introduction when the LLM composer is disabled", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "availability_available",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        assistantReplyCount: 0,
+        hasGreeted: false,
+      },
+    });
+
+    assert.ok(response.startsWith(instagramFirstContactOpening));
+    assert.match(response, /available/i);
+    assert.match(response, /\$2,750/);
   } finally {
     if (originalComposerFlag === undefined) {
       delete process.env.WEDDING_SALES_LLM_COMPOSER;
@@ -214,8 +265,8 @@ test("instagram missing-name follow-up avoids repeating the same full prompt", (
     },
   });
 
-  assert.match(response, /missing it/i);
-  assert.match(response, /just your fiancé’s first name/i);
+  assert.match(response, /missed it/i);
+  assert.match(response, /what’s your fiancé’s first name/i);
   assert.doesNotMatch(response, /That way I can check our availability/i);
 });
 
@@ -239,7 +290,7 @@ test("instagram first missing-info reply asks for both names when no name is kno
   assert.ok(response.startsWith(instagramFirstContactOpening));
   assert.equal((response.match(/[🤍✨🎥]/gu) ?? []).length, 2);
   assert.match(response, /both of your names/i);
-  assert.match(response, /date of your wedding/i);
+  assert.match(response, /wedding date/i);
   assert.doesNotMatch(response, /sharing your fiancé’s name and the date/i);
 });
 
@@ -262,7 +313,7 @@ test("instagram later missing-info replies do not repeat the first-contact intro
   assert.doesNotMatch(response, /Thank you so much for reaching out/i);
   assert.doesNotMatch(response, /I’m Taras, the founder/i);
   assert.match(response, /fianc/i);
-  assert.match(response, /date of your wedding/i);
+  assert.match(response, /wedding date/i);
 });
 
 test("instagram first missing-info reply asks only for fiance name when customer name is known", () => {
@@ -283,7 +334,7 @@ test("instagram first missing-info reply asks only for fiance name when customer
   });
 
   assert.match(response, /fiancé’s name/i);
-  assert.match(response, /date of your wedding/i);
+  assert.match(response, /wedding date/i);
   assert.doesNotMatch(response, /both of your names/i);
 });
 
@@ -450,6 +501,158 @@ test("LLM wedding sales finalizer enforces the exact Instagram first-contact int
   assert.ok(response.startsWith(instagramFirstContactOpening));
   assert.equal(response.match(/I’m Taras/g)?.length, 1);
   assert.match(response, /both of your names and the exact wedding date/i);
+});
+
+test("LLM wedding sales finalizer removes a duplicate model greeting joined to the first question", () => {
+  const response = finalizeLlmWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "missing_names_or_date",
+      names: undefined,
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      assistantReplyCount: 0,
+      hasGreeted: false,
+    },
+    text: "Thank you so much for reaching out 🤍✨ Congratulations on your engagement! To help us get started, could you please share both of your names and the exact date of your wedding?",
+  });
+
+  assert.ok(response.startsWith(instagramFirstContactOpening));
+  assert.equal(response.match(/Thank you so much for reaching out/g)?.length, 1);
+  assert.equal(response.match(/Congratulations on your engagement/gi)?.length, 1);
+  assert.match(response, /To help us get started, could you please share both of your names/i);
+});
+
+test("instagram style gate falls back from robotic or overly long model copy", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "missing_names_or_date",
+    names: undefined,
+    weddingDate: undefined,
+    weddingDateText: undefined,
+    assistantReplyCount: 1,
+    hasGreeted: true,
+  };
+  const fallback = "What are both of your names, and what’s your wedding date?";
+  const robotic = "To help us get started, could you please share both of your names and the exact date of your wedding? This will allow me to provide the best information tailored to your special day.";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "ask_missing_info", config, state },
+    robotic,
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
+test("instagram style gate catches robotic phrases with typographic apostrophes", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "missing_names_or_date",
+    names: "Anna and Mark",
+    weddingDate: undefined,
+    weddingDateText: undefined,
+    assistantReplyCount: 1,
+    hasGreeted: true,
+  };
+  const fallback = "What’s your wedding date? ✨";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "ask_missing_info", config, state },
+    "Lovely to meet you! What’s your wedding date? That’ll help me check availability.",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
+test("instagram style gate removes an unasked travel answer from a pricing reply", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "answering_question",
+    latestCustomerMessage: "What’s your price?",
+    assistantReplyCount: 1,
+    hasGreeted: true,
+  };
+  const fallback = "Our collections start at $2,750.\n\nWhat’s your wedding date?";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "answer_question", config, state },
+    "Our collections start at $2,750. Travel miles are included depending on the collection.",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
+test("instagram style gate removes an unasked pricing answer from a travel reply", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "answering_question",
+    latestCustomerMessage: "Do you charge for travel?",
+    assistantReplyCount: 1,
+    hasGreeted: true,
+  };
+  const fallback = "Each collection includes travel miles. I’ll confirm the exact details once I know the venue.\n\nWhat city or venue is the wedding in?";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "answer_question", config, state },
+    "Travel miles are included with each collection. Collections start at $2,750. What city is the wedding in?",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
+test("instagram style gate keeps FAQ replies on the next missing qualification question", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "answering_question",
+    names: undefined,
+    weddingDate: undefined,
+    weddingDateText: undefined,
+    location: undefined,
+    latestCustomerMessage: "What’s your price?",
+    assistantReplyCount: 1,
+    hasGreeted: true,
+  };
+  const fallback = "Our collections start at $2,750.\n\nWhat’s your wedding date?";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "answer_question", config, state },
+    "Collections start at $2,750. What venue are you considering?",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
+test("instagram style gate keeps only one clear question per reply", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "asking_call_time",
+    venue: "Evergreen Park",
+    assistantReplyCount: 3,
+    hasGreeted: true,
+  };
+  const fallback = "Evergreen Park sounds lovely 🤍\n\nWhen would be a good time for a quick call?";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "ask_call_time", config, state },
+    "Do mornings or afternoons work best? When would you like to connect?",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
 });
 
 test("LLM wedding sales finalizer converts markdown links for rich Gmail replies", () => {

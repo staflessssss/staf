@@ -575,7 +575,7 @@ test("instagram wedding sales first reply asks for fiance name and wedding date 
   assert.match(result.responseDraft ?? "", /Hey there! Thank you so much for reaching out/);
   assert.match(result.responseDraft ?? "", /I’m Taras, the founder of Myndful Films/);
   assert.match(result.responseDraft ?? "", /fianc/i);
-  assert.match(result.responseDraft ?? "", /date of your wedding/i);
+  assert.match(result.responseDraft ?? "", /wedding date/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Founder & Creative Director|MYNDFUL FILMS/);
 });
 
