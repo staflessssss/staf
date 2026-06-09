@@ -24,10 +24,14 @@ import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { saveMessages } from "@/lib/agent-memory";
 import type { InvokeAgentResult } from "@/lib/ai-runtime";
+import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 
 type RuntimeInvokeAgent = typeof import("@/lib/ai-runtime").invokeAgent;
 
 type RuntimeAttachment = NonNullable<InvokeAgentResult["attachments"]>[number];
+
+class PartialChannelDeliveryError extends Error {}
+class PostDeliveryPersistenceError extends Error {}
 
 type ReplyContext = {
   contactId: string;
@@ -412,6 +416,8 @@ export async function scheduleFollowUpsForReplyWithDb(args: {
 }
 
 async function deliverThroughChannel(args: {
+  database: RuntimeDeps["db"];
+  conversationId: string;
   agent: {
     channelConfig: unknown;
     channel: { type: ChannelType; credentialsEnc: string };
@@ -443,8 +449,22 @@ async function deliverThroughChannel(args: {
     channelConfig: args.agent.channelConfig,
   });
 
+  if (args.agent.channel.type === ChannelType.INSTAGRAM) {
+    try {
+      await recordInstagramOutboundDeliveries({
+        database: args.database,
+        conversationId: args.conversationId,
+        delivery,
+      });
+    } catch (error) {
+      throw new PostDeliveryPersistenceError(
+        error instanceof Error ? error.message : "instagram_outbound_marker_save_failed",
+      );
+    }
+  }
+
   if (isPartialDeliveryResult(delivery)) {
-    throw new Error(
+    throw new PartialChannelDeliveryError(
       delivery.error ??
         `partial delivery after ${delivery.deliveredCount}/${delivery.totalParts} message parts`,
     );
@@ -584,6 +604,8 @@ async function processBufferedReply(args: {
   }
 
   await deliverThroughChannel({
+    database: args.deps.db,
+    conversationId: args.delivery.conversationId,
     agent: args.delivery.agent,
     decryptValue: args.deps.decrypt,
     getAdapter: args.deps.getChannelAdapter,
@@ -692,6 +714,8 @@ async function processFollowUp(args: {
       if (!existingResumeMessage) {
         try {
           await deliverThroughChannel({
+            database: args.deps.db,
+            conversationId: args.delivery.conversationId,
             agent: args.delivery.agent,
             decryptValue: args.deps.decrypt,
             getAdapter: args.deps.getChannelAdapter,
@@ -911,6 +935,8 @@ async function processFollowUp(args: {
   }
 
   await deliverThroughChannel({
+    database: args.deps.db,
+    conversationId: args.delivery.conversationId,
     agent: args.delivery.agent,
     decryptValue: args.deps.decrypt,
     getAdapter: args.deps.getChannelAdapter,
@@ -978,6 +1004,24 @@ export async function processDelayedDeliveryByIdWithDeps(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "delayed_delivery_failed";
     const attemptCount = delivery?.attempts ?? 1;
+
+    if (error instanceof PartialChannelDeliveryError || error instanceof PostDeliveryPersistenceError) {
+      await markDeliveryStatus({
+        database: deps.db,
+        deliveryId,
+        status: DelayedDeliveryStatus.FAILED,
+        error: errorMessage,
+      });
+
+      return {
+        ok: false,
+        status:
+          error instanceof PartialChannelDeliveryError
+            ? ("delayed_delivery_partial_failed" as const)
+            : ("delayed_delivery_post_delivery_failed" as const),
+        error: errorMessage,
+      };
+    }
 
     if (delivery && attemptCount < 3) {
       const retryAt = new Date(now.getTime() + getDelayedDeliveryRetryDelayMs(attemptCount));

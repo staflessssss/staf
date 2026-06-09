@@ -573,7 +573,9 @@ export async function processGmailPubSubNotification(args: {
     include: {
       agents: {
         where: {
-          status: "ACTIVE",
+          status: {
+            in: ["ACTIVE", "PAUSED"],
+          },
         },
         take: 1,
       },

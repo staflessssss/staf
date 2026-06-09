@@ -45,6 +45,7 @@ export type WeddingSalesState = {
     result: string;
   }>;
   conversationSummary?: string;
+  conversationContext?: string;
   latestCustomerMessage?: string;
   responseDraft?: string;
   assistantReplyCount: number;
@@ -88,6 +89,7 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
     default: () => [],
   }),
   conversationSummary: Annotation<string | undefined>(),
+  conversationContext: Annotation<string | undefined>(),
   latestCustomerMessage: Annotation<string | undefined>(),
   responseDraft: Annotation<string | undefined>(),
   assistantReplyCount: Annotation<number>(),
@@ -108,6 +110,7 @@ export function createInitialWeddingSalesState(args: {
   channel: WeddingSalesChannel;
   message: string;
   customerEmail?: string;
+  conversationContext?: string;
   previousState?: Partial<WeddingSalesState>;
 }): WeddingSalesState {
   return {
@@ -131,6 +134,7 @@ export function createInitialWeddingSalesState(args: {
     toolObservations: [],
     turnToolObservations: [],
     conversationSummary: args.previousState?.conversationSummary,
+    conversationContext: args.conversationContext ?? args.previousState?.conversationContext,
     latestCustomerMessage: args.message,
     responseDraft: args.previousState?.responseDraft,
     assistantReplyCount: args.previousState?.assistantReplyCount ?? 0,

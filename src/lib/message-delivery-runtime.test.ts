@@ -891,3 +891,97 @@ test("processDelayedDeliveryByIdWithDeps requeues transient failures with backof
     "2026-04-20T16:00:15.000Z",
   );
 });
+
+test("processDelayedDeliveryByIdWithDeps does not retry a partial Instagram delivery", async () => {
+  const updates: Record<string, unknown>[] = [];
+  const now = new Date("2026-04-20T16:00:00.000Z");
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-partial",
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-partial",
+            agentId: "agent-1",
+            conversationId: "conv-partial",
+            kind: DelayedDeliveryKind.FOLLOW_UP,
+            attempts: 1,
+            payload: {
+              replyContext: {
+                contactId: "contact-partial",
+              },
+              instruction: "Ping",
+              outOfHoursBehavior: "send_immediately_ignore_schedule",
+              sendLimit: "once_per_dialog",
+              ruleIndex: 0,
+              anchorCreatedAt: "2026-04-20T15:00:00.000Z",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.INSTAGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-partial",
+              status: ConversationStatus.ACTIVE,
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return args;
+          },
+          findMany: async () => [],
+        },
+        message: {
+          createMany: async () => ({ count: 1 }),
+          findFirst: async () => null,
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => [text, "Second part"],
+          sendReply: async () => ({
+            ok: false,
+            mode: "meta_partial_delivery",
+            deliveredCount: 1,
+            totalParts: 2,
+            deliveries: [{ message_id: "mid-delivered" }],
+            error: "Meta unavailable",
+          }),
+        }) as never,
+      invokeAgent: async () => ({
+        message: "Generated follow-up",
+        promptPreview: "prompt",
+        usedTooling: [],
+        conversationId: "conv-partial",
+        model: "test-model",
+      }),
+      saveMessages: async () => {
+        throw new Error("saveMessages should not run on failed send");
+      },
+    },
+    now,
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "delayed_delivery_partial_failed");
+  assert.equal(updates.length, 1);
+  assert.equal(
+    updates[0]?.data && typeof updates[0].data === "object"
+      ? (updates[0].data as Record<string, unknown>).status
+      : null,
+    DelayedDeliveryStatus.FAILED,
+  );
+});

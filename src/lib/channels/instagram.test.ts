@@ -81,6 +81,28 @@ test("instagram adapter can read contact profile fields from sender metadata", (
   assert.equal(parsed.contactDisplayName, "Smoking Crypto");
 });
 
+test("instagram adapter routes business echoes to the customer conversation as manual replies", () => {
+  const parsed = instagramAdapter.parseIncoming({
+    contactId: "customer-1",
+    fromBusiness: true,
+    entry: [
+      {
+        messaging: [
+          {
+            sender: { id: "business-1" },
+            recipient: { id: "customer-1" },
+            message: { text: "The additional hour is already paid.", mid: "mid-owner-1" },
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(parsed.contactId, "customer-1");
+  assert.equal(parsed.isBusinessManualReply, true);
+  assert.equal(parsed.message, "The additional hour is already paid.");
+});
+
 test("instagram adapter sends plain text through Meta Graph API", async () => {
   let requestUrl = "";
   let requestBody: unknown = null;
@@ -177,7 +199,10 @@ test("instagram adapter sends image attachments as separate Meta messages", asyn
       },
     },
   ]);
-  assert.deepEqual(result, { recipient_id: "ig-user-1", message_id: "mid-1" });
+  assert.deepEqual(result, [
+    { recipient_id: "ig-user-1", message_id: "mid-1" },
+    { recipient_id: "ig-user-1", message_id: "mid-2" },
+  ]);
 });
 
 test("instagram adapter uses Instagram Login igUserId as the sender account", async () => {

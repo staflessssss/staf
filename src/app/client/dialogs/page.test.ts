@@ -5,11 +5,13 @@ import { join } from "node:path";
 
 const source = readFileSync(join(process.cwd(), "src/app/client/dialogs/page.tsx"), "utf8");
 
-test("client dialogs do not expose manual business controls or messages", () => {
+test("client dialogs show manual business messages without exposing manual reply controls", () => {
   assert.doesNotMatch(source, /ClientDialogActivationButton/);
   assert.doesNotMatch(source, /api\/client\/conversations\/.*activate/);
-  assert.doesNotMatch(source, /Operator<\/span>/);
-  assert.match(source, /!isBusinessManualMessage/);
+  assert.match(source, /isBusinessManualMessage\(message\)/);
+  assert.match(source, /Business owner/);
+  assert.match(source, /INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME/);
+  assert.match(source, /isInternalInstagramDelivery/);
   assert.doesNotMatch(source, /Send className/);
   assert.doesNotMatch(source, /Paperclip className/);
   assert.doesNotMatch(source, /Notes/);

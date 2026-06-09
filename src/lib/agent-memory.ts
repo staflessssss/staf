@@ -1,6 +1,7 @@
 import { ChannelType, MessageRole, Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import { INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME } from "@/lib/instagram-outbound";
 
 export type RuntimeHistoryMessage = {
   id: string;
@@ -84,16 +85,18 @@ export async function loadConversationHistory(agentId: string, contactId: string
   return {
     conversationId: conversation?.id ?? null,
     messages:
-      conversation?.messages.map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.content,
-        toolName: message.toolName,
-        toolInput: message.toolInput,
-        toolResult: message.toolResult,
-        model: message.model,
-        createdAt: message.createdAt,
-      })) ?? [],
+      conversation?.messages
+        .filter((message) => message.toolName !== INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME)
+        .map((message) => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          toolName: message.toolName,
+          toolInput: message.toolInput,
+          toolResult: message.toolResult,
+          model: message.model,
+          createdAt: message.createdAt,
+        })) ?? [],
   };
 }
 

@@ -13,6 +13,7 @@ import { type TelegramReplyMarkup, telegramAdapter } from "@/lib/channels/telegr
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
+import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 
 export const OWNER_HANDOFF_REQUEST_TOOL_NAME = "owner_handoff_request";
 export const OWNER_HANDOFF_RESPONSE_TOOL_NAME = "owner_handoff_response";
@@ -451,7 +452,7 @@ async function sendReplyThroughConversationChannel(args: {
   const adapter = getChannelAdapter(conversation.agent.channel.type) as HandoffChannelAdapter;
   const formattedReply = adapter.formatReply(args.text, conversation.agent.channelConfig);
 
-  await adapter.sendReply({
+  const delivery = await adapter.sendReply({
     credentials:
       conversation.agent.channel.type === ChannelType.GMAIL
         ? conversation.agent.channel.credentialsEnc
@@ -463,6 +464,14 @@ async function sendReplyThroughConversationChannel(args: {
     subject: replyContext.subject,
     channelConfig: conversation.agent.channelConfig,
   });
+
+  if (conversation.agent.channel.type === ChannelType.INSTAGRAM) {
+    await recordInstagramOutboundDeliveries({
+      database: db,
+      conversationId: conversation.id,
+      delivery,
+    });
+  }
 
   await db.message.createMany({
     data: [

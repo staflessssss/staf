@@ -314,6 +314,8 @@ export const instagramAdapter = {
       }
     }
 
-    return Array.isArray(params.message) ? deliveries : deliveries[0];
+    return deliveries.length === 1 && !Array.isArray(params.message) && imageAttachments.length === 0
+      ? deliveries[0]
+      : deliveries;
   },
 };

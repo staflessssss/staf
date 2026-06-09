@@ -38,6 +38,9 @@ export function buildWeddingSalesConversationSummary(args: {
     state.askedForEmail ? "Agent has already asked for customer email." : "",
     `Last assistant intent: ${intent}.`,
     state.latestCustomerMessage ? `Latest customer message: ${compact(state.latestCustomerMessage, 220)}.` : "",
+    state.conversationContext
+      ? `Recent conversation transcript: ${compact(state.conversationContext, 900)}.`
+      : "",
     state.responseDraft ? `Latest assistant reply: ${compact(state.responseDraft, 260)}.` : "",
   ].filter(Boolean);
 

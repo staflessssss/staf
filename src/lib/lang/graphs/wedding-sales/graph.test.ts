@@ -18,6 +18,20 @@ test("wedding sales graph asks for year before checking availability", async () 
   assert.match(result.responseDraft ?? "", /year/i);
 });
 
+test("wedding sales graph keeps the recent manual conversation in context", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Thank you",
+    conversationContext:
+      "customer: Did my parents pay for the additional hour?\nbusiness: Yes, they already paid.",
+  });
+
+  assert.match(
+    result.conversationSummary ?? "",
+    /Recent conversation transcript: customer: Did my parents pay for the additional hour\? business: Yes, they already paid\./,
+  );
+});
+
 test("wedding sales analyzer recognizes Florida locations", () => {
   assert.equal(
     weddingSalesAnalyzeTestHelpers.extractLocation("We are getting married in Tampa, Florida."),

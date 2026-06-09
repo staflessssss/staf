@@ -13,6 +13,7 @@ import {
 } from "@/lib/client-analytics";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
+import { INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME } from "@/lib/instagram-outbound";
 import { isQualifiedLeadToolMessage } from "@/lib/lead-qualification";
 
 type DialogsPageProps = {
@@ -110,9 +111,21 @@ function isEmail(value: string | null | undefined) {
   return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
 }
 
-function getLastMessagePreview(messages: Array<{ content: string; role: MessageRole }>) {
+function isInternalInstagramDelivery(message: { role: MessageRole; toolName?: string | null }) {
+  return (
+    message.role === MessageRole.TOOL &&
+    message.toolName === INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME
+  );
+}
+
+function getLastMessagePreview(
+  messages: Array<{ content: string; role: MessageRole; toolName?: string | null }>,
+) {
   const message = messages.find(
-    (item) => item.role === MessageRole.USER || item.role === MessageRole.ASSISTANT,
+    (item) =>
+      item.role === MessageRole.USER ||
+      item.role === MessageRole.ASSISTANT ||
+      isBusinessManualMessage(item),
   );
   const content = message?.content.trim();
 
@@ -326,9 +339,18 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                 },
                 {
                   role: MessageRole.TOOL,
-                  NOT: {
-                    toolName: null,
-                  },
+                  AND: [
+                    {
+                      toolName: {
+                        not: null,
+                      },
+                    },
+                    {
+                      NOT: {
+                        toolName: INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME,
+                      },
+                    },
+                  ],
                 },
               ],
             },
@@ -352,9 +374,17 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           conversation: {
             agent: { tenantId },
           },
-          role: {
-            in: [MessageRole.USER, MessageRole.ASSISTANT],
-          },
+          OR: [
+            {
+              role: {
+                in: [MessageRole.USER, MessageRole.ASSISTANT],
+              },
+            },
+            {
+              role: MessageRole.TOOL,
+              toolName: "business_manual_message",
+            },
+          ],
         },
       }),
       db.message.findMany({
@@ -363,9 +393,18 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
             agent: { tenantId },
           },
           role: MessageRole.TOOL,
-          NOT: {
-            toolName: null,
-          },
+          AND: [
+            {
+              toolName: {
+                not: null,
+              },
+            },
+            {
+              NOT: {
+                toolName: INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME,
+              },
+            },
+          ],
         },
         include: {
           conversation: {
@@ -384,11 +423,14 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
     conversations.find((item) => item.id === conversation) ?? conversations[0] ?? null;
   const selectedMessages = selectedConversation
     ? [...selectedConversation.messages]
-        .filter((message) => !isBusinessManualMessage(message))
+        .filter((message) => !isInternalInstagramDelivery(message))
         .reverse()
     : [];
   const selectedToolMessages = selectedMessages.filter(
-    (message) => message.role === MessageRole.TOOL,
+    (message) => message.role === MessageRole.TOOL && !isBusinessManualMessage(message),
+  );
+  const agentToolMessages = toolMessages.filter(
+    (message) => !isBusinessManualMessage(message) && !isInternalInstagramDelivery(message),
   );
   const selectedContactName = selectedConversation
     ? getConversationContactName(selectedConversation)
@@ -397,7 +439,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
     ? formatChannel(selectedConversation.channel)
     : "No channel";
   const selectedInitials = getInitials(selectedContactName);
-  const targetActions = toolMessages.filter((message) =>
+  const targetActions = agentToolMessages.filter((message) =>
     isQualifiedLeadToolMessage({
       toolName: message.toolName,
       toolResult: message.toolResult,
@@ -406,10 +448,10 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   const latestOutcome =
     (selectedConversation
       ? targetActions.find((message) => message.conversationId === selectedConversation.id) ??
-        toolMessages.find((message) => message.conversationId === selectedConversation.id)
+        agentToolMessages.find((message) => message.conversationId === selectedConversation.id)
       : null) ??
     targetActions[0] ??
-    toolMessages[0] ??
+    agentToolMessages[0] ??
     null;
   const selectedQualifiedActions = selectedConversation
     ? targetActions.filter((message) => message.conversationId === selectedConversation.id)
@@ -417,7 +459,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   const selectedLatestOutcome =
     selectedQualifiedActions[0] ??
     (selectedConversation
-      ? toolMessages.find((message) => message.conversationId === selectedConversation.id)
+      ? agentToolMessages.find((message) => message.conversationId === selectedConversation.id)
       : null) ??
     null;
   const latestLeadDetails = latestOutcome
@@ -685,6 +727,19 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                   </div>
                 ) : (
                   selectedMessages.map((message) => {
+                    if (isBusinessManualMessage(message)) {
+                      return (
+                        <div key={message.id} className="flex justify-end">
+                          <div className="max-w-[82%] rounded-xl border border-[#d7a96d]/28 bg-[#3a2c1e] px-4 py-3 text-sm leading-6 text-white md:text-base">
+                            <p className="mb-1 text-xs text-[#e9be86]/72">
+                              Business owner - {formatMessageTime(message.createdAt)}
+                            </p>
+                            {message.content}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     if (message.role === MessageRole.TOOL) {
                       const toolCall = buildToolCallView(message);
 

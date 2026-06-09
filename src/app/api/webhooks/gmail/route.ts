@@ -19,7 +19,9 @@ export async function POST(req: NextRequest) {
   const agent = await db.agent.findFirst({
     where: {
       id: agentId,
-      status: "ACTIVE",
+      status: {
+        in: ["ACTIVE", "PAUSED"],
+      },
       channel: {
         type: "GMAIL",
       },

@@ -33,6 +33,7 @@ export type InvokeWeddingSalesGraphInput = {
   agentId?: string;
   contactId?: string;
   customerEmail?: string;
+  conversationContext?: string;
   previousState?: Partial<WeddingSalesState>;
   config?: Partial<WeddingSalesConfig>;
   toolContext?: WeddingSalesToolContext | null;
@@ -159,6 +160,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
     channel: input.channel,
     message: input.message,
     customerEmail: input.customerEmail,
+    conversationContext: input.conversationContext,
     previousState: input.previousState,
   });
 
@@ -178,6 +180,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
       ? {
           channel: input.channel,
           customerEmail: input.customerEmail,
+          conversationContext: input.conversationContext,
           latestCustomerMessage: input.message,
           toolObservations: [],
           turnToolObservations: [],

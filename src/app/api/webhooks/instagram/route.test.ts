@@ -183,24 +183,31 @@ test("instagram webhook signature can use the shared Meta app secret", () => {
   assert.match(source, /META_APP_SECRET/);
 });
 
-test("instagram webhook ignores business message echoes instead of routing them as inbound", () => {
+test("instagram webhook routes business message echoes as manual owner replies", () => {
   const source = readFileSync(
     "src/app/api/webhooks/instagram/route.ts",
     "utf8",
   );
 
   assert.match(source, /findInstagramChannelByAccountId/);
-  assert.match(source, /ignored_business_echo/);
+  assert.match(source, /isKnownInstagramOutboundEcho/);
+  assert.match(source, /isOwnInstagramAppEcho/);
+  assert.match(source, /waitForKnownInstagramOutboundEcho/);
+  assert.match(source, /setTimeout\(resolve, 150\)/);
+  assert.match(source, /INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME/);
+  assert.match(source, /path: \["messageId"\]/);
+  assert.match(source, /ignored_known_outbound_echo/);
+  assert.match(source, /isBusinessManualReply: true/);
+  assert.match(source, /fromBusiness: true/);
   assert.doesNotMatch(source, /single active Instagram agent fallback/);
 });
 
-test("instagram webhook acknowledges messages without replying while an agent is paused", () => {
+test("instagram webhook routes paused-agent messages to runtime for persistence", () => {
   const source = readFileSync(
     "src/app/api/webhooks/instagram/route.ts",
     "utf8",
   );
 
   assert.match(source, /in: \["ACTIVE", "PAUSED"\]/);
-  assert.match(source, /agent\.status === "PAUSED"/);
-  assert.match(source, /ignored_agent_paused/);
+  assert.doesNotMatch(source, /ignored_agent_paused/);
 });

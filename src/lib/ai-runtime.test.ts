@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ConversationStatus, MessageRole } from "@prisma/client";
+import { AgentStatus, ConversationStatus, MessageRole } from "@prisma/client";
 
 import { aiRuntimeTestHelpers, invokeAgent } from "@/lib/ai-runtime";
 import { getDefaultControlConfig } from "@/lib/agent-config";
@@ -749,6 +749,90 @@ test("handleIncomingEventWithDeps pauses a dialog after a manual business reply"
     "business_auto_resume",
   );
   assert.equal(deliveryUpdates.length, 2);
+});
+
+test("handleIncomingEventWithDeps records messages without invoking the agent while globally paused", async () => {
+  const createdMessages: Array<Record<string, unknown>> = [];
+  const conversation = {
+    id: "conv-paused",
+    status: ConversationStatus.ESCALATED,
+  };
+  const fakeDb = {
+    agent: {
+      findFirst: async () => ({
+        id: "agent-paused",
+        tenantId: "tenant-1",
+        status: AgentStatus.PAUSED,
+        channelConfig: {},
+        channel: {
+          type: "INSTAGRAM",
+          credentialsEnc: "encrypted",
+        },
+      }),
+    },
+    message: {
+      findFirst: async () => null,
+    },
+    conversation: {
+      findUnique: async () => conversation,
+    },
+    $transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        conversation: {
+          findUnique: async () => conversation,
+          create: async () => conversation,
+          update: async () => conversation,
+        },
+        message: {
+          create: async (args: Record<string, unknown>) => {
+            createdMessages.push(args);
+            return { id: "message-paused" };
+          },
+        },
+      }),
+  } as never;
+  let invokeCalled = false;
+  let sendReplyCalled = false;
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-paused",
+      channel: "INSTAGRAM" as never,
+      payload: {},
+    },
+    {
+      db: fakeDb,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => {
+        invokeCalled = true;
+        throw new Error("Paused agent must not be invoked.");
+      },
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "customer-1",
+            message: "Are you still there?",
+            messageId: "paused-message-1",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sendReplyCalled = true;
+            return {};
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal("status" in result ? result.status : null, "inbound_recorded_agent_paused");
+  assert.equal(invokeCalled, false);
+  assert.equal(sendReplyCalled, false);
+  assert.equal(
+    createdMessages[0]?.data && typeof createdMessages[0].data === "object"
+      ? (createdMessages[0].data as Record<string, unknown>).content
+      : null,
+    "Are you still there?",
+  );
 });
 
 test("handleIncomingEventWithDeps keeps closed dialogs closed and avoids auto-reply", async () => {

@@ -12,6 +12,7 @@ import {
   scheduleDelayedDeliverySweepBackground,
 } from "@/lib/delayed-delivery-background";
 import { splitInstagramMessagingPayloads } from "@/lib/instagram-webhook";
+import { INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME } from "@/lib/instagram-outbound";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 type InstagramCredentials = ReturnType<typeof parseInstagramCredentials>;
@@ -175,6 +176,45 @@ function extractInstagramMessageId(payload: unknown) {
   }
 
   return "";
+}
+
+function extractInstagramMessageAppId(payload: unknown) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "";
+  }
+
+  const entry = "entry" in payload && Array.isArray(payload.entry) ? payload.entry : [];
+
+  for (const item of entry) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+
+    const messaging = "messaging" in item && Array.isArray(item.messaging) ? item.messaging : [];
+
+    for (const event of messaging) {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        continue;
+      }
+
+      const message = "message" in event ? event.message : null;
+
+      if (message && typeof message === "object" && !Array.isArray(message) && "app_id" in message) {
+        return String(message.app_id ?? "").trim();
+      }
+    }
+  }
+
+  return "";
+}
+
+function isOwnInstagramAppEcho(payload: unknown) {
+  const appId = extractInstagramMessageAppId(payload);
+  const ownAppIds = [process.env.INSTAGRAM_APP_ID, process.env.META_APP_ID]
+    .map((value) => value?.trim())
+    .filter(Boolean);
+
+  return Boolean(appId && ownAppIds.includes(appId));
 }
 
 function readMetadataRecord(metadata: Prisma.JsonValue | null) {
@@ -355,10 +395,19 @@ async function findInstagramChannelByAccountId(accountId: string) {
       type: "INSTAGRAM",
       status: "CONNECTED",
     },
-    select: {
-      id: true,
-      credentialsEnc: true,
-      metadata: true,
+    include: {
+      agents: {
+        where: {
+          status: {
+            in: ["ACTIVE", "PAUSED"],
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+        take: 1,
+      },
     },
   });
 
@@ -372,6 +421,7 @@ async function findInstagramChannelByAccountId(accountId: string) {
       credentials.pageId === accountId
     ) {
       return {
+        agent: channel.agents[0] ?? null,
         channelId: channel.id,
         metadata: channel.metadata,
       };
@@ -379,6 +429,56 @@ async function findInstagramChannelByAccountId(accountId: string) {
   }
 
   return null;
+}
+
+async function isKnownInstagramOutboundEcho(args: {
+  agentId: string;
+  contactId: string;
+  messageId: string;
+}) {
+  const messageId = args.messageId.trim();
+
+  if (!messageId) {
+    return false;
+  }
+
+  const existing = await db.message.findFirst({
+    where: {
+      role: "TOOL",
+      toolName: INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME,
+      toolInput: {
+        path: ["messageId"],
+        equals: messageId,
+      },
+      conversation: {
+        agentId: args.agentId,
+        contactId: args.contactId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(existing);
+}
+
+async function waitForKnownInstagramOutboundEcho(args: {
+  agentId: string;
+  contactId: string;
+  messageId: string;
+}) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (await isKnownInstagramOutboundEcho(args)) {
+      return true;
+    }
+
+    if (attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+
+  return false;
 }
 
 export async function GET(req: NextRequest) {
@@ -495,26 +595,68 @@ export async function POST(req: NextRequest) {
       if (!route || !agent) {
         const echoChannel = await findInstagramChannelByAccountId(senderId);
 
-        if (echoChannel) {
-          console.log("[instagram-webhook] ignored business message echo", {
+        if (echoChannel?.agent) {
+          if (
+            isOwnInstagramAppEcho(eventPayload) ||
+            (await waitForKnownInstagramOutboundEcho({
+              agentId: echoChannel.agent.id,
+              contactId: recipientId,
+              messageId,
+            }))
+          ) {
+            console.log("[instagram-webhook] ignored known outbound echo", {
+              senderId,
+              recipientId,
+              messageId,
+              agentId: echoChannel.agent.id,
+            });
+
+            await safeRecordInstagramWebhookStatus({
+              channelId: echoChannel.channelId,
+              metadata: echoChannel.metadata,
+              status: "ignored_known_outbound_echo",
+              recipientId,
+              senderId,
+              messageId,
+              agentId: echoChannel.agent.id,
+            });
+
+            results.push({
+              ok: true,
+              status: "ignored_known_outbound_echo",
+            });
+            continue;
+          }
+
+          console.log("[instagram-webhook] routing business message echo", {
             senderId,
             recipientId,
             messageId,
+            agentId: echoChannel.agent.id,
+          });
+
+          const result = await handleIncomingEvent({
+            agentId: echoChannel.agent.id,
+            channel: "INSTAGRAM",
+            payload: {
+              ...(eventPayload as Record<string, unknown>),
+              contactId: recipientId,
+              isBusinessManualReply: true,
+              fromBusiness: true,
+            },
           });
 
           await safeRecordInstagramWebhookStatus({
             channelId: echoChannel.channelId,
             metadata: echoChannel.metadata,
-            status: "ignored_business_echo",
+            status: readRuntimeResultStatus(result),
             recipientId,
             senderId,
             messageId,
+            agentId: echoChannel.agent.id,
           });
 
-          results.push({
-            ok: true,
-            status: "ignored_business_echo",
-          });
+          results.push(result);
           continue;
         }
 
@@ -523,24 +665,6 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ error: "Agent not found." }, { status: 404 });
-      }
-
-      if (agent.status === "PAUSED") {
-        await safeRecordInstagramWebhookStatus({
-          channelId: route.channelId,
-          metadata: route.metadata,
-          status: "ignored_agent_paused",
-          recipientId,
-          senderId,
-          messageId,
-          agentId: agent.id,
-        });
-
-        results.push({
-          ok: true,
-          status: "ignored_agent_paused",
-        });
-        continue;
       }
 
       const contactProfile = await resolveInstagramContactProfile(senderId, route.credentials);

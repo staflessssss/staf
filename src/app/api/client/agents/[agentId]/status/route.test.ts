@@ -27,9 +27,13 @@ test("runtime checks that the agent is still active immediately before delivery"
     "src/lib/message-delivery-runtime.ts",
     "utf8",
   );
+  const gmailRouteSource = readFileSync("src/app/api/webhooks/gmail/route.ts", "utf8");
+  const gmailWatchSource = readFileSync("src/lib/gmail-watch.ts", "utf8");
 
   assert.match(runtimeSource, /agentStillActive/);
-  assert.match(runtimeSource, /reply_suppressed_agent_paused/);
+  assert.match(runtimeSource, /inbound_recorded_agent_paused/);
+  assert.match(gmailRouteSource, /in: \["ACTIVE", "PAUSED"\]/);
+  assert.match(gmailWatchSource, /in: \["ACTIVE", "PAUSED"\]/);
   assert.match(deliveryRuntimeSource, /buffered_reply_suppressed_agent_paused/);
   assert.match(deliveryRuntimeSource, /follow_up_suppressed_agent_paused/);
   assert.match(deliveryRuntimeSource, /business_auto_resume_suppressed_agent_paused/);

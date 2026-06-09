@@ -50,6 +50,7 @@ import {
   pauseConversationForBusinessHandoffWithDb,
   shouldPauseAfterBusinessManualMessage,
 } from "@/lib/business-handoff";
+import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import {
   hasConnectedOwnerTelegram,
   requestOwnerHandoffWithDb,
@@ -1328,6 +1329,41 @@ async function runWeddingSalesRuntime(args: {
     defaultEmail,
   });
   const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
+  const recentConversationMessages =
+    typeof args.database.message.findMany === "function"
+      ? await args.database.message.findMany({
+          where: {
+            conversationId: conversation.id,
+            OR: [
+              {
+                role: {
+                  in: [MessageRole.USER, MessageRole.ASSISTANT],
+                },
+              },
+              {
+                role: MessageRole.TOOL,
+                toolName: BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
+              },
+            ],
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 12,
+        })
+      : [];
+  const conversationContext = renderHistory(
+    [...recentConversationMessages].reverse().map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      toolName: message.toolName,
+      toolInput: message.toolInput,
+      toolResult: message.toolResult,
+      model: message.model,
+      createdAt: message.createdAt,
+    })),
+  );
 
   const graphResult = await invokeWeddingSalesGraph({
     tenantId: args.agent.tenantId,
@@ -1336,6 +1372,7 @@ async function runWeddingSalesRuntime(args: {
     channel: getWeddingSalesGraphChannel(args.channel),
     message: args.incoming.message,
     customerEmail: defaultEmail,
+    conversationContext,
     config,
     toolContext,
     checkpoint: args.database === db,
@@ -1878,7 +1915,9 @@ async function handleIncomingEventWithDeps(
   const agent = await deps.db.agent.findFirst({
     where: {
       id: args.agentId,
-      status: AgentStatus.ACTIVE,
+      status: {
+        in: [AgentStatus.ACTIVE, AgentStatus.PAUSED],
+      },
       channel: {
         type: args.channel,
       },
@@ -1987,6 +2026,45 @@ async function handleIncomingEventWithDeps(
       status: true,
     },
   });
+
+  if (agent.status === AgentStatus.PAUSED) {
+    const conversation = incoming.isBusinessManualReply
+      ? await recordBusinessManualMessageWithDb(deps.db, {
+          agentId: agent.id,
+          contactId: incoming.contactId,
+          contactUsername: incoming.contactUsername,
+          contactDisplayName: incoming.contactDisplayName,
+          channel: agent.channel.type,
+          message: incoming.message,
+          messageId: incoming.messageId,
+          gmailMessageId: incoming.gmailMessageId,
+          threadId: incoming.threadId,
+          subject: incoming.subject,
+        })
+      : await recordInboundMessageWithDb(deps.db, {
+          agentId: agent.id,
+          contactId: incoming.contactId,
+          contactUsername: incoming.contactUsername,
+          contactDisplayName: incoming.contactDisplayName,
+          channel: agent.channel.type,
+          message: incoming.message,
+          messageId: incoming.messageId,
+          gmailMessageId: incoming.gmailMessageId,
+          threadId: incoming.threadId,
+          subject: incoming.subject,
+          conversationStatus: existingConversation?.status,
+        });
+
+    return {
+      ok: true,
+      agentId: agent.id,
+      conversationId: conversation.id,
+      status: incoming.isBusinessManualReply
+        ? "business_manual_reply_recorded_agent_paused"
+        : "inbound_recorded_agent_paused",
+    };
+  }
+
   const agentSettings = getRuntimeAgentSettingsConfig(agent.channelConfig);
   const control = getRuntimeControlConfig(agent.channelConfig);
   const messageBehavior = readMessageBehaviorConfig(agent.channelConfig);
@@ -2349,6 +2427,14 @@ async function handleIncomingEventWithDeps(
         : undefined,
     channelConfig: agent.channelConfig,
   });
+
+  if (args.channel === ChannelType.INSTAGRAM && result.conversationId) {
+    await recordInstagramOutboundDeliveries({
+      database: deps.db,
+      conversationId: result.conversationId,
+      delivery,
+    });
+  }
 
   if (isPartialDeliveryResult(delivery)) {
     return {
