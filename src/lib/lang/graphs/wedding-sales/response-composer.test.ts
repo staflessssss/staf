@@ -160,7 +160,7 @@ test("instagram pricing answer stays short and does not add unasked travel detai
     },
   });
 
-  assert.equal(response, "Our collections start at $2,750.\n\nWhat’s your wedding date?");
+  assert.equal(response, "Our collections start at $2,750.\n\nWhat are both of your names, and what’s your wedding date?");
   assert.doesNotMatch(response, /travel/i);
   assert.doesNotMatch(response, /tailored|next steps/i);
 });

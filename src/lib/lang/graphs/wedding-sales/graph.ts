@@ -7,6 +7,7 @@ import { defaultWeddingSalesConfig, type WeddingSalesConfig } from "./config";
 import { analyzeWeddingSalesMessage } from "./nodes/analyze";
 import { createWeddingSalesReplyNodes } from "./nodes/reply";
 import { createWeddingSalesToolNodes } from "./nodes/tools";
+import { hasAssistantReplyInConversationContext, isInstagramCtaStarter } from "./starter-intents";
 import {
   createInitialWeddingSalesState,
   WeddingSalesStateAnnotation,
@@ -100,6 +101,15 @@ function mergeWeddingSalesConfig(config?: Partial<WeddingSalesConfig>): WeddingS
   };
 }
 
+function shouldResetCheckpointForFreshInstagramStarter(input: InvokeWeddingSalesGraphInput) {
+  return Boolean(
+    input.checkpoint &&
+      input.channel === "instagram" &&
+      isInstagramCtaStarter(input.message) &&
+      !hasAssistantReplyInConversationContext(input.conversationContext),
+  );
+}
+
 export function buildWeddingSalesGraph(args: {
   config?: Partial<WeddingSalesConfig>;
   toolContext?: WeddingSalesToolContext | null;
@@ -182,7 +192,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
       : undefined;
 
   const graphInput =
-    configurable && !input.previousState
+    configurable && !input.previousState && !shouldResetCheckpointForFreshInstagramStarter(input)
       ? {
           channel: input.channel,
           customerEmail: input.customerEmail,

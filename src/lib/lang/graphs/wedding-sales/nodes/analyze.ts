@@ -3,6 +3,7 @@ import {
   analyzeWeddingSalesSemantics,
   type WeddingSalesSemanticAnalysis,
 } from "../semantic-analyzer";
+import { isInstagramCtaStarter } from "../starter-intents";
 
 const monthPattern =
   "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
@@ -526,6 +527,24 @@ export function analyzeWeddingSalesMessageWithSemantics(
       ? hasCoupleNames(nextNames)
       : Boolean(nextNames) || hasNames(message);
   const locationKnown = Boolean(state.location || extractedLocation) || hasLocation(message);
+
+  if (state.channel === "instagram" && isInstagramCtaStarter(message) && (!namesKnown || !dateKnown)) {
+    return {
+      ...baseUpdate,
+      leadStage: "missing_names_or_date",
+      weddingYearKnown: yearKnown,
+    };
+  }
+
+  if (
+    state.channel === "instagram" &&
+    !dateKnown &&
+    !hasYear(message) &&
+    !asksWeddingAvailabilityQuestion(message) &&
+    (semanticBusinessQuestion || asksGeneralQuestion(message))
+  ) {
+    return { ...baseUpdate, leadStage: "answering_question" };
+  }
 
   if (state.pendingChangeField && state.pendingChangeValue) {
     if (semanticConfirmsPendingChange || confirmsPendingChange(message)) {

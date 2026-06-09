@@ -262,6 +262,18 @@ function nextStepAfterFaq(state: WeddingSalesState) {
     return "What’s the best email for the calendar invite?";
   }
 
+  if (!hasCoupleNames(state.names) && !state.weddingDate && !state.weddingDateText) {
+    return state.names?.trim()
+      ? "What’s your fiancé’s name and wedding date?"
+      : "What are both of your names, and what’s your wedding date?";
+  }
+
+  if (!hasCoupleNames(state.names)) {
+    return state.names?.trim()
+      ? "What’s your fiancé’s name?"
+      : "What are both of your names?";
+  }
+
   if (!state.weddingDate && !state.weddingDateText) {
     return "What’s your wedding date?";
   }

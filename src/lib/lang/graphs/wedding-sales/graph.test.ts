@@ -57,6 +57,99 @@ test("wedding sales graph keeps the recent manual conversation in context", asyn
   );
 });
 
+test("instagram wedding sales treats get in touch as a fresh inquiry starter", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Get in touch",
+  });
+
+  assert.equal(result.leadStage, "missing_names_or_date");
+  assert.match(result.responseDraft ?? "", /Hey there!/);
+  assert.match(result.responseDraft ?? "", /founder of Myndful Films/);
+  assert.match(result.responseDraft ?? "", /What are both of your names/i);
+  assert.match(result.responseDraft ?? "", /wedding date/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /tell me a little more/i);
+});
+
+test("instagram wedding sales greets and qualifies a plain first hello", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Hello",
+  });
+
+  assert.equal(result.leadStage, "missing_names_or_date");
+  assert.match(result.responseDraft ?? "", /Hey there!/);
+  assert.match(result.responseDraft ?? "", /founder of Myndful Films/);
+  assert.match(result.responseDraft ?? "", /both of your names/i);
+  assert.match(result.responseDraft ?? "", /wedding date/i);
+});
+
+test("instagram wedding sales answers first-message pricing and continues qualification", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "What's your price?",
+    previousState: {
+      leadStage: "new",
+      assistantReplyCount: 0,
+      hasGreeted: false,
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.match(result.responseDraft ?? "", /Hey there!/);
+  assert.match(result.responseDraft ?? "", /\$2,750/);
+  assert.match(result.responseDraft ?? "", /both of your names/i);
+  assert.match(result.responseDraft ?? "", /wedding date/i);
+});
+
+test("instagram wedding sales greets before processing complete first-message details", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "We are Bob and Sara. Our wedding is August 8, 2026 in Charlotte NC.",
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.names, "Bob and Sara");
+  assert.equal(result.weddingDate, "2026-08-08");
+  assert.equal(result.location, "Charlotte NC");
+  assert.equal(result.leadStage, "availability_checked");
+  assert.match(result.responseDraft ?? "", /Hey there!/);
+  assert.match(result.responseDraft ?? "", /August 8, 2026.*available/i);
+});
+
+test("instagram wedding sales does not re-greet when cta appears inside an active thread", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "inquire",
+    previousState: {
+      assistantReplyCount: 1,
+      hasGreeted: true,
+      askedForNames: true,
+      leadStage: "missing_names_or_date",
+    },
+  });
+
+  assert.equal(result.leadStage, "missing_names_or_date");
+  assert.doesNotMatch(result.responseDraft ?? "", /Hey there!/);
+  assert.match(result.responseDraft ?? "", /names/i);
+  assert.match(result.responseDraft ?? "", /wedding date/i);
+});
+
 test("wedding sales analyzer recognizes Florida locations", () => {
   assert.equal(
     weddingSalesAnalyzeTestHelpers.extractLocation("We are getting married in Tampa, Florida."),
