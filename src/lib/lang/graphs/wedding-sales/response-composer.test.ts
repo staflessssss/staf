@@ -57,6 +57,12 @@ const config = {
   signature: "Taras Mynd\nMYNDFUL FILMS",
 };
 
+const instagramFirstContactOpening = [
+  "Hey there! Thank you so much for reaching out 🤍✨",
+  "",
+  "I’m Taras, the founder of Myndful Films. Huge congratulations on your engagement, such an exciting season of life",
+].join("\n");
+
 test("wedding sales composer formats rich gmail links and one signature", () => {
   const response = composeWeddingSalesResponse({
     intent: "availability_available",
@@ -230,9 +236,33 @@ test("instagram first missing-info reply asks for both names when no name is kno
     },
   });
 
+  assert.ok(response.startsWith(instagramFirstContactOpening));
+  assert.equal((response.match(/[🤍✨🎥]/gu) ?? []).length, 2);
   assert.match(response, /both of your names/i);
   assert.match(response, /date of your wedding/i);
   assert.doesNotMatch(response, /sharing your fiancé’s name and the date/i);
+});
+
+test("instagram later missing-info replies do not repeat the first-contact introduction", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "missing_names_or_date",
+      names: "Rachel",
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      assistantReplyCount: 1,
+      hasGreeted: true,
+    },
+  });
+
+  assert.doesNotMatch(response, /Thank you so much for reaching out/i);
+  assert.doesNotMatch(response, /I’m Taras, the founder/i);
+  assert.match(response, /fianc/i);
+  assert.match(response, /date of your wedding/i);
 });
 
 test("instagram first missing-info reply asks only for fiance name when customer name is known", () => {
@@ -394,6 +424,32 @@ test("LLM wedding sales finalizer strips greetings and signatures from schedulin
   assert.doesNotMatch(response, /^Hi\b/i);
   assert.doesNotMatch(response, /Taras/i);
   assert.match(response, /^Monday at 10 AM Eastern/i);
+});
+
+test("LLM wedding sales finalizer enforces the exact Instagram first-contact introduction", () => {
+  const response = finalizeLlmWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "missing_names_or_date",
+      names: undefined,
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      assistantReplyCount: 0,
+      hasGreeted: false,
+    },
+    text: [
+      "Hi! I’m Taras and it is lovely to meet you.",
+      "",
+      "Could you share both of your names and the exact wedding date?",
+    ].join("\n"),
+  });
+
+  assert.ok(response.startsWith(instagramFirstContactOpening));
+  assert.equal(response.match(/I’m Taras/g)?.length, 1);
+  assert.match(response, /both of your names and the exact wedding date/i);
 });
 
 test("LLM wedding sales finalizer converts markdown links for rich Gmail replies", () => {

@@ -572,10 +572,11 @@ test("instagram wedding sales first reply asks for fiance name and wedding date 
   assert.equal(result.leadStage, "missing_names_or_date");
   assert.equal(result.names, "Rachel");
   assert.equal(result.location, "Charlotte");
-  assert.match(result.responseDraft ?? "", /Taras from Myndful Films/i);
+  assert.match(result.responseDraft ?? "", /Hey there! Thank you so much for reaching out/);
+  assert.match(result.responseDraft ?? "", /I’m Taras, the founder of Myndful Films/);
   assert.match(result.responseDraft ?? "", /fianc/i);
   assert.match(result.responseDraft ?? "", /date of your wedding/i);
-  assert.doesNotMatch(result.responseDraft ?? "", /Founder|MYNDFUL FILMS/);
+  assert.doesNotMatch(result.responseDraft ?? "", /Founder & Creative Director|MYNDFUL FILMS/);
 });
 
 test("instagram wedding sales keeps real DM state and reaches availability tool", async () => {

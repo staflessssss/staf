@@ -42,6 +42,11 @@ type WeddingSalesReflectionReview = {
 
 const DEFAULT_RESPONSE_MODEL = "gpt-4.1-mini";
 const DEFAULT_REFLECTION_MODEL = "gpt-4.1-mini";
+const INSTAGRAM_FIRST_CONTACT_OPENING = [
+  "Hey there! Thank you so much for reaching out 🤍✨",
+  "",
+  "I’m Taras, the founder of Myndful Films. Huge congratulations on your engagement, such an exciting season of life",
+].join("\n");
 const BRAND_EMOJIS = ["🤍", "✨", "🎥"] as const;
 const BRAND_EMOJI_BY_INTENT: Partial<Record<WeddingSalesResponseIntent, (typeof BRAND_EMOJIS)[number]>> = {
   ask_missing_info: "🤍",
@@ -176,12 +181,6 @@ function getPartnerName(names?: string) {
 
 function hasCoupleNames(names?: string) {
   return Boolean(names && /\s+(?:and|&)\s+/i.test(names));
-}
-
-function formatInstagramCustomerAddress(state: WeddingSalesState) {
-  const customerName = getPrimaryCustomerName(state.names);
-
-  return customerName ? ` ${customerName}` : "";
 }
 
 function formatInstagramAvailabilityLine(state: WeddingSalesState) {
@@ -384,10 +383,10 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
     switch (intent) {
       case "ask_missing_info":
         if (isInstagram(state)) {
-          const customerName = formatInstagramCustomerAddress(state);
           const missingDate = !state.weddingDate && !state.weddingDateText;
           const missingNames = !hasCoupleNames(state.names);
           const hasAnyName = Boolean(state.names?.trim());
+          const questionEmoji = policy.allowGreeting ? "" : " ✨";
           const askParts = [
             missingNames ? (hasAnyName ? "your fiancé’s name" : "both of your names") : "",
             missingDate ? "the date of your wedding" : "",
@@ -400,10 +399,10 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           }
 
           return [
-            policy.allowGreeting ? `Hey${customerName}, I’m Taras from Myndful Films 🤍` : "",
+            policy.allowGreeting ? INSTAGRAM_FIRST_CONTACT_OPENING : "",
             askParts.length
-              ? `Would you mind sharing ${askParts.join(" and ")}? That way I can check our availability${state.location ? ` for ${state.location}` : ""} and get you all set up ✨`
-              : `Could you send the exact wedding date so I can check availability${state.location ? ` for ${state.location}` : ""}? ✨`,
+              ? `Would you mind sharing ${askParts.join(" and ")}? That way I can check our availability${state.location ? ` for ${state.location}` : ""} and get you all set up${questionEmoji}`
+              : `Could you send the exact wedding date so I can check availability${state.location ? ` for ${state.location}` : ""}?${questionEmoji}`,
           ]
             .filter(Boolean)
             .join("\n\n");
@@ -727,7 +726,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     ? `End with this exact signature once:\n${args.config.signature || "(no signature configured)"}`
     : "Do not include an email signature or sign-off.";
   const greetingInstruction = policy.allowGreeting
-    ? "A short natural greeting is allowed."
+    ? args.state.channel === "instagram"
+      ? `Start with this exact introduction, verbatim, and then ask only the next missing question:\n${INSTAGRAM_FIRST_CONTACT_OPENING}`
+      : "A short natural greeting is allowed."
     : "Do not start with a greeting like Hi, Hello, Hey, or Hi Anna and Mark. Continue the existing thread naturally.";
   const modeInstruction = policy.replyMode === "scheduling_reply"
     ? "For scheduling and booking replies, answer directly in 1-2 short paragraphs. No greeting, no sign-off, no signature."
@@ -774,7 +775,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       ? "If you need the wedding year after the customer gave a fiance name, do not repeat the prior year question verbatim. Acknowledge the fiance name naturally and ask for the year in a fresh short line."
       : "",
     "Brand voice: warm, reassuring, lightly excited, and founder-like. Use natural contractions when they fit.",
-    "Allowed emojis only: 🤍 ✨ 🎥. Use exactly one brand emoji in warm first replies, availability replies, and booking confirmations. For routine scheduling/error replies, usually use no emoji. Never use more than one emoji unless the customer is very enthusiastic.",
+    policy.allowGreeting && args.state.channel === "instagram"
+      ? "Keep the two emojis in the required first-contact introduction. Do not add any other emoji to this reply."
+      : "Allowed emojis only: 🤍 ✨ 🎥. Use exactly one brand emoji in warm first replies, availability replies, and booking confirmations. For routine scheduling/error replies, usually use no emoji. Never use more than one emoji unless the customer is very enthusiastic.",
     "Avoid filler openings like 'Thanks for sharing' on every turn. Vary phrasing naturally.",
     args.state.channel === "instagram"
       ? "Write compact DM bubbles, usually 1-3 short paragraphs. Scheduling replies should not ask for permission to book if email is still missing; ask for email instead."
@@ -846,6 +849,31 @@ function normalizeMarkdownLinksForRichEmail(text: string) {
   return text.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
 }
 
+function ensureInstagramFirstContactOpening(args: ComposeWeddingSalesResponseArgs, text: string) {
+  const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+
+  if (args.state.channel !== "instagram" || !policy.allowGreeting) {
+    return text.trim();
+  }
+
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith(INSTAGRAM_FIRST_CONTACT_OPENING)) {
+    return trimmed;
+  }
+
+  const paragraphs = trimmed.split(/\n\s*\n/);
+  while (
+    paragraphs.length > 0 &&
+    !paragraphs[0].includes("?") &&
+    /^(?:hi|hello|hey)\b|reaching out|i[’']?m Taras|founder|congratulations|engagement/i.test(paragraphs[0])
+  ) {
+    paragraphs.shift();
+  }
+
+  return [INSTAGRAM_FIRST_CONTACT_OPENING, paragraphs.join("\n\n").trim()].filter(Boolean).join("\n\n");
+}
+
 export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { text: string }) {
   const formatting = getChannelFormatting(args.config, args.state);
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
@@ -856,8 +884,9 @@ export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesRespons
   const normalizedLinks = formatting.richLinks
     ? normalizeMarkdownLinksForRichEmail(withoutThreadGreeting)
     : withoutThreadGreeting;
+  const withFirstContactOpening = ensureInstagramFirstContactOpening(args, normalizedLinks);
 
-  const withBrandEmoji = applyBrandEmojiCadence({ ...args, text: normalizedLinks });
+  const withBrandEmoji = applyBrandEmojiCadence({ ...args, text: withFirstContactOpening });
 
   return policy.includeSignature
     ? appendSignatureOnce(withBrandEmoji, args.config.signature)
