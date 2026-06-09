@@ -121,6 +121,7 @@ function hasBareTimeSelection(text: string) {
 
 function isSchedulingContinuationContext(state: WeddingSalesState) {
   return (
+    state.leadStage === "asking_call_time" ||
     state.leadStage === "checking_calendar" ||
     state.leadStage === "call_proposed" ||
     state.lastAssistantIntent === "calendar_busy" ||
@@ -130,7 +131,7 @@ function isSchedulingContinuationContext(state: WeddingSalesState) {
 }
 
 function extractWeekday(text?: string) {
-  return text?.match(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)?.[1];
+  return text?.match(/\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)?.[1];
 }
 
 function extractMeridiem(text?: string) {

@@ -625,6 +625,49 @@ test("instagram wedding sales asks for a time when customer only says tomorrow",
   assert.match(result.responseDraft ?? "", /9 AM to 2 PM Eastern/i);
 });
 
+test("instagram wedding sales checks the consultation calendar for a time-only reply after tomorrow", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "10 am",
+    previousState: {
+      names: "Rick and Julie",
+      weddingDate: "2026-10-11",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      venue: "Evergreen Park",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "Yes we can call tomorrow",
+      bookingConfirmed: false,
+      leadStage: "asking_call_time",
+      askedForCallTime: true,
+      lastAssistantIntent: "ask_call_time",
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.proposedCallTime, "tomorrow at 10 AM");
+  assert.equal(result.turnToolObservations[0]?.toolName, "check_consultation_calendar");
+  assert.doesNotMatch(result.responseDraft ?? "", /October 11, 2026.*available/i);
+});
+
 test("instagram wedding sales does not treat filler replies as a venue", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",
