@@ -201,14 +201,18 @@ function extractWeddingDate(text: string) {
     };
   }
 
-  const numericDate = text.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-]((?:19|20)?\d{2}))?\b/);
+  const numericDate = text.match(/\b(\d{1,2})([./-])(\d{1,2})(?:\2((?:19|20)?\d{2}))?\b/);
   if (!numericDate) {
     return null;
   }
 
-  const month = Number(numericDate[1]);
-  const day = Number(numericDate[2]);
-  const rawYear = numericDate[3];
+  const firstPart = Number(numericDate[1]);
+  const separator = numericDate[2];
+  const secondPart = Number(numericDate[3]);
+  const rawYear = numericDate[4];
+  const usesDayFirst = separator === "." || (firstPart > 12 && secondPart <= 12);
+  const month = usesDayFirst ? secondPart : firstPart;
+  const day = usesDayFirst ? firstPart : secondPart;
   const year = rawYear?.length === 2 ? `20${rawYear}` : rawYear;
 
   return {
@@ -269,12 +273,31 @@ function hasCoupleNames(value?: string) {
 }
 
 function extractNames(text: string, currentNames?: string) {
-  const directCoupleMatch = text.match(
-    /\b([A-Z][A-Za-z'-]+)\s+(?:and|&)\s+([A-Z][A-Za-z'-]+)\b(?:\s+(?:and\s+)?(?:date|wedding|venue|location|in|at)\b|[.,]|$)/,
+  const matchingText = text.replace(new RegExp(`\\b${monthPattern}\\b`, "gi"), (match) => match.toLowerCase());
+  const nameTokenPattern = `(?!${monthPattern}\\b)[A-Z][A-Za-z'-]+`;
+  const standaloneCoupleMatch = matchingText.match(
+    new RegExp(`^\\s*(${nameTokenPattern}(?:\\s+${nameTokenPattern})?)\\s+(?:and|And|AND|&)\\s+(${nameTokenPattern}(?:\\s+${nameTokenPattern})?)\\s*[.!]?\\s*$`),
+  );
+
+  if (standaloneCoupleMatch?.[1] && standaloneCoupleMatch[2]) {
+    return `${standaloneCoupleMatch[1]} and ${standaloneCoupleMatch[2]}`;
+  }
+
+  const directCoupleMatch = matchingText.match(
+    new RegExp(
+      `\\b(${nameTokenPattern})\\s+(?:and|And|AND|&)\\s+(${nameTokenPattern})\\b(?:[\\s\\n]+(?:and\\s+)?(?:date|wedding|venue|location|in|at|on)\\b|[\\s\\n]+${monthNamePattern}\\b|[\\s\\n]+\\d{1,2}\\b|[.,!]|$)`,
+    ),
   );
 
   if (directCoupleMatch?.[1] && directCoupleMatch[2]) {
     return `${directCoupleMatch[1]} and ${directCoupleMatch[2]}`;
+  }
+
+  const brideMatch = matchingText.match(new RegExp(`\\bbride\\s*(?:name\\s*)?(?:is|:)\\s+(${nameTokenPattern}(?:\\s+${nameTokenPattern})?)`, "i"));
+  const groomMatch = matchingText.match(new RegExp(`\\bgroom\\s*(?:name\\s*)?(?:is|:)\\s+(${nameTokenPattern}(?:\\s+${nameTokenPattern})?)`, "i"));
+
+  if (brideMatch?.[1] && groomMatch?.[1]) {
+    return `${brideMatch[1]} and ${groomMatch[1]}`;
   }
 
   const namedCoupleMatch = text.match(
@@ -319,7 +342,7 @@ function extractLocation(text: string) {
     return match[1].trim();
   }
 
-  const knownCity = text.match(/^\s*(Charlotte|Atlanta|Savannah|Tampa|Miami|Orlando)\s*(?:[,.\s]|$)/i)?.[1];
+  const knownCity = text.match(/\b(Charlotte|Atlanta|Savannah|Tampa|Miami|Orlando)\b/i)?.[1];
   return knownCity ? knownCity.charAt(0).toUpperCase() + knownCity.slice(1).toLowerCase() : undefined;
 }
 

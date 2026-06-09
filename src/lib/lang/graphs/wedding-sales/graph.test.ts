@@ -281,6 +281,11 @@ test("wedding sales analyze node extracts normalized wedding details", () => {
     iso: "2027-05-29",
     yearKnown: true,
   });
+  assert.deepEqual(weddingSalesAnalyzeTestHelpers.extractWeddingDate("Bob and Sara\n08.02.2028\nCharlotte NC"), {
+    display: "08.02.2028",
+    iso: "2028-02-08",
+    yearKnown: true,
+  });
   assert.equal(
     weddingSalesAnalyzeTestHelpers.extractNames(
       "We are Anna and Mark. Our wedding is June 14, 2027 in Charlotte, NC.",
@@ -293,9 +298,37 @@ test("wedding sales analyze node extracts normalized wedding details", () => {
     ),
     "Charlotte",
   );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractLocation("Bob and Sara\n08.02.2028\nCharlotte NC"),
+    "Charlotte",
+  );
 });
 
 test("wedding sales analyzer extracts Instagram-style couple names", () => {
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("It’s Taras and Valerie\nNovember 5"),
+    "Taras and Valerie",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Taras And Valerie"),
+    "Taras and Valerie",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Bob and Sara\n08.02.2028\nCharlotte NC"),
+    "Bob and Sara",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Bob & Sara 08/02/2028 Charlotte NC"),
+    "Bob and Sara",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Taras Kucherenko and Valerie Savchina"),
+    "Taras Kucherenko and Valerie Savchina",
+  );
+  assert.equal(
+    weddingSalesAnalyzeTestHelpers.extractNames("Bride: Sara, Groom: Bob, wedding 08.02.2028"),
+    "Sara and Bob",
+  );
   assert.equal(
     weddingSalesAnalyzeTestHelpers.extractNames("Mark and Julie and date is October 11"),
     "Mark and Julie",
@@ -324,6 +357,43 @@ test("wedding sales analyzer extracts Instagram-style couple names", () => {
     weddingSalesAnalyzeTestHelpers.extractNames("hey im Anna, wedding in Charlotte"),
     "Anna",
   );
+  assert.equal(weddingSalesAnalyzeTestHelpers.extractNames("Charlotte NC"), undefined);
+  assert.equal(weddingSalesAnalyzeTestHelpers.extractNames("May 29, 2026"), undefined);
+});
+
+test("instagram wedding sales accepts compact multiline lead details", async () => {
+  const first = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "inquire",
+  });
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Bob and Sara\n08.02.2028\nCharlotte NC",
+    previousState: first,
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.equal(result.names, "Bob and Sara");
+  assert.equal(result.weddingDate, "2028-02-08");
+  assert.equal(result.location, "Charlotte");
+  assert.equal(result.leadStage, "availability_checked");
+  assert.equal(result.turnToolObservations[0]?.toolName, "check_wedding_availability");
+  assert.doesNotMatch(result.responseDraft ?? "", /names/i);
 });
 
 test("wedding sales graph records availability tool observations", async () => {
