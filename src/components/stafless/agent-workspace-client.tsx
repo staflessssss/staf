@@ -132,7 +132,10 @@ type FunctionResultTargetDraft = FunctionBlockConfig["resultTargets"][number] & 
   uiId: string;
 };
 
+type AgentRuntimeType = "legacy" | "langgraph_wedding_sales";
+
 type ChannelConfigDraft = {
+  runtimeType: AgentRuntimeType;
   priceAttachmentFileId: string;
   priceAttachmentFileName: string;
   priceAttachmentMimeType: string;
@@ -505,6 +508,10 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
     status: (agent?.status as AgentStatus) ?? AgentStatus.DRAFT,
     channelId: selectedChannelId,
     channelConfig: {
+      runtimeType:
+        rawChannelConfig.runtimeType === "langgraph_wedding_sales"
+          ? "langgraph_wedding_sales"
+          : "legacy",
       priceAttachmentFileId:
         typeof rawChannelConfig.priceAttachmentFileId === "string"
           ? rawChannelConfig.priceAttachmentFileId
@@ -1609,6 +1616,7 @@ export function AgentWorkspaceClient({
         status: draft.status,
         channelId: draft.channelId,
         channelConfig: {
+          runtimeType: draft.channelConfig.runtimeType,
           priceAttachmentFileId: draft.channelConfig.priceAttachmentFileId || undefined,
           priceAttachmentFileName: draft.channelConfig.priceAttachmentFileName || undefined,
           priceAttachmentMimeType: draft.channelConfig.priceAttachmentMimeType || undefined,

@@ -117,6 +117,13 @@ test("agent workspace clears hidden legacy prompting language and visibility fie
   assert.match(source, /prompting: promptingForPayload/);
 });
 
+test("agent workspace preserves runtime type when saving channel config", () => {
+  const source = readFileSync(workspaceClientPath, "utf8");
+
+  assert.match(source, /runtimeType:\s*rawChannelConfig\.runtimeType === "langgraph_wedding_sales"/);
+  assert.match(source, /runtimeType:\s*draft\.channelConfig\.runtimeType/);
+});
+
 test("agent workspace saves and applies per-agent integration allowlist", () => {
   const source = readFileSync(workspaceClientPath, "utf8");
 
