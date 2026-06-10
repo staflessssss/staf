@@ -216,7 +216,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         },
         {
           role: "ASSISTANT",
-          content: "Amazing, thank you so much, Anna and Mark. June 14, 2027 in Charlotte is available for Myndful, so you reached out at a great time. Our collections start at $2,950.",
+          content: "Amazing, thank you so much, Anna and Mark. June 14, 2027 in Charlotte is available for Myndful, so you reached out at a great time. Our 8-hour collections start at $3,490.",
         },
       ],
       message: "Could you send pricing again? Also do you travel?",
@@ -225,7 +225,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
       {
         id: "answers-current-question",
         description: "Reply answers pricing and travel directly.",
-        mustInclude: ["$2,950", "travel"],
+        mustInclude: ["$3,490", "travel"],
       },
       {
         id: "does-not-repeat-availability-intro",
@@ -247,7 +247,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         },
         {
           role: "ASSISTANT",
-          content: "Our collections start at $2,950. Here are a few recent wedding films: Callista and Kevin, McCord & Kristopher, Valeriia and Kirk. Google Reviews. Would you be open to a consultation?",
+          content: "Our 8-hour collections start at $3,490. Here are a few recent wedding films: Callista and Kevin, McCord & Kristopher, Valeriia and Kirk. Google Reviews. Would you be open to a consultation?",
         },
       ],
       message: "Thanks, that helps. What is included in the starting package?",
@@ -272,7 +272,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         },
         {
           role: "ASSISTANT",
-          content: "June 14, 2027 in Charlotte is available for Myndful. Our collections start at $2,950.",
+          content: "June 14, 2027 in Charlotte is available for Myndful. Our 8-hour collections start at $3,490.",
         },
       ],
       message: "Just double checking, is June 14, 2027 still available?",
@@ -298,7 +298,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         },
         {
           role: "ASSISTANT",
-          content: "June 14, 2027 in Charlotte is available for Myndful. Our collections start at $2,950.",
+          content: "June 14, 2027 in Charlotte is available for Myndful. Our 8-hour collections start at $3,490.",
         },
       ],
       message: "What about June 21, 2027 instead?",
@@ -324,7 +324,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         },
         {
           role: "ASSISTANT",
-          content: "June 14, 2027 in Charlotte is available for Myndful. Our collections start at $2,950.",
+          content: "June 14, 2027 in Charlotte is available for Myndful. Our 8-hour collections start at $3,490.",
         },
       ],
       message: "Just double checking, is our date still available?",
@@ -334,7 +334,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         id: "answers-from-memory",
         description: "Reply answers from known state without rerunning Sheets or switching to pricing/travel.",
         mustInclude: ["available"],
-        mustNotInclude: ["$2,950", "travel", "collections start"],
+        mustNotInclude: ["$3,490", "travel", "collections start"],
         usedToolingExcludes: ["Wedding availability"],
       },
     ],
@@ -377,7 +377,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         },
         {
           role: "ASSISTANT",
-          content: "June 14, 2027 in Charlotte is available. Our collections start at $2,950. Would you be open to a consultation?",
+          content: "June 14, 2027 in Charlotte is available. Our 8-hour collections start at $3,490. Would you be open to a consultation?",
         },
         {
           role: "USER",
@@ -396,7 +396,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         description: "Runtime treats the short time answer as scheduling continuation.",
         usedToolingIncludes: ["Calendar"],
         usedToolingExcludes: ["Wedding availability"],
-        mustNotInclude: ["$2,950", "wedding date", "collections start"],
+        mustNotInclude: ["$3,490", "wedding date", "collections start"],
       },
     ],
   },
@@ -411,7 +411,7 @@ export const weddingSalesStressCases: WeddingSalesEvalCase[] = [
         { role: "USER", content: "We are Anna and Mark. Our wedding is June 14 in Charlotte." },
         { role: "ASSISTANT", content: "Could you share the wedding year?" },
         { role: "USER", content: "2027. The venue is in Charlotte, NC." },
-        { role: "ASSISTANT", content: "June 14, 2027 in Charlotte is available. Our collections start at $2,950. Would you be open to a consultation?" },
+        { role: "ASSISTANT", content: "June 14, 2027 in Charlotte is available. Our 8-hour collections start at $3,490. Would you be open to a consultation?" },
         { role: "USER", content: "Could we do Monday at 10 AM Eastern?" },
         { role: "ASSISTANT", content: "Monday at 10 AM Eastern looks available. Would you like me to book it?" },
       ],

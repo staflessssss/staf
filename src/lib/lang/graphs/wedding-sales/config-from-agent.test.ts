@@ -11,10 +11,12 @@ test("buildWeddingSalesConfigFromChannelConfig maps Myndful channel config into 
     priceAttachmentPublicUrl: "https://drive.google.com/uc?export=download&id=file-1",
     pricingByRegion: {
       FL: {
-        startPrice: "$3,490",
+        startPrice: "$2,950",
+        coverageHours: 8,
       },
       NC_SC_GA: {
-        startPrice: "$2,950",
+        startPrice: "$3,490",
+        coverageHours: 8,
       },
     },
     priceAttachmentsByRegion: {
@@ -73,9 +75,11 @@ test("buildWeddingSalesConfigFromChannelConfig maps Myndful channel config into 
   assert.equal(config.guide.fileId, "file-1");
   assert.equal(config.guide.fileName, "price.png");
   assert.equal(config.guide.imageUrl, "https://drive.google.com/uc?export=download&id=file-1");
-  assert.equal(config.pricing.startPrice, "$2,950");
-  assert.equal(config.pricingByRegion?.FL?.startPrice, "$3,490");
-  assert.equal(config.pricingByRegion?.NC_SC_GA?.startPrice, "$2,950");
+  assert.equal(config.pricing.startPrice, "$3,490");
+  assert.equal(config.pricing.coverageHours, 8);
+  assert.equal(config.pricingByRegion?.FL?.startPrice, "$2,950");
+  assert.equal(config.pricingByRegion?.FL?.coverageHours, 8);
+  assert.equal(config.pricingByRegion?.NC_SC_GA?.startPrice, "$3,490");
   assert.equal(config.guidesByRegion?.FL?.fileId, "fl-price");
   assert.equal(config.guidesByRegion?.NC_SC_GA?.fileName, "price-nc-sc-ga.png");
   assert.deepEqual(config.portfolio, [

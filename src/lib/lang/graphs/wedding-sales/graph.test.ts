@@ -97,7 +97,7 @@ test("instagram wedding sales answers first-message pricing and continues qualif
 
   assert.equal(result.leadStage, "answering_question");
   assert.match(result.responseDraft ?? "", /Hey there!/);
-  assert.match(result.responseDraft ?? "", /\$2,950/);
+  assert.doesNotMatch(result.responseDraft ?? "", /\$/);
   assert.match(result.responseDraft ?? "", /both of your names/i);
   assert.match(result.responseDraft ?? "", /wedding date/i);
 });
@@ -124,8 +124,9 @@ test("instagram wedding sales uses Florida start price for known Florida leads",
 
   assert.equal(result.leadStage, "answering_question");
   assert.equal(result.location, "Tampa");
-  assert.match(result.responseDraft ?? "", /\$3,490/);
-  assert.doesNotMatch(result.responseDraft ?? "", /\$2,950/);
+  assert.match(result.responseDraft ?? "", /\$2,950/);
+  assert.doesNotMatch(result.responseDraft ?? "", /\$3,490/);
+  assert.match(result.responseDraft ?? "", /8-hour collections/i);
 });
 
 test("instagram wedding sales greets before processing complete first-message details", async () => {
@@ -311,7 +312,7 @@ test("wedding sales graph answers pricing and travel questions without recheckin
   assert.equal(result.leadStage, "answering_question");
   assert.equal(result.weddingDate, "2027-06-14");
   assert.equal(result.toolObservations.length, 0);
-  assert.match(result.responseDraft ?? "", /\$2,950/);
+  assert.match(result.responseDraft ?? "", /\$3,490/);
   assert.match(result.responseDraft ?? "", /travel/i);
   assert.match(result.conversationSummary ?? "", /Latest customer message: Could you send pricing again\? Also do you travel\?/);
   assert.match(result.conversationSummary ?? "", /Last assistant intent: answer_question/);
@@ -338,7 +339,7 @@ test("wedding sales graph answers after an unavailable date without rechecking t
   assert.equal(result.leadStage, "answering_question");
   assert.equal(result.weddingDate, "2026-09-19");
   assert.equal(result.toolObservations.length, 0);
-  assert.match(result.responseDraft ?? "", /\$2,950/);
+  assert.match(result.responseDraft ?? "", /\$3,490/);
   assert.match(result.responseDraft ?? "", /unavailable/i);
   assert.match(result.responseDraft ?? "", /travel/i);
 });
@@ -1409,7 +1410,7 @@ test("instagram wedding sales stays in support mode after a consultation is book
 
   assert.equal(result.leadStage, "answering_question");
   assert.equal(result.turnToolObservations.length, 0);
-  assert.match(result.responseDraft ?? "", /\$2,950/);
+  assert.match(result.responseDraft ?? "", /\$3,490/);
   assert.match(result.responseDraft ?? "", /all set/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Would you like to find a time|good time for a quick call/i);
 });

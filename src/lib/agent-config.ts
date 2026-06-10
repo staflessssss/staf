@@ -961,6 +961,7 @@ export const channelConfigSchema = z
             .max(20)
             .optional()
             .transform((value) => (value ? value : undefined)),
+          coverageHours: z.number().int().positive().max(24).optional(),
         }),
       )
       .optional(),

@@ -4,6 +4,7 @@ export type WeddingSalesConfig = {
   pricing: {
     startPrice: string;
     currency?: string;
+    coverageHours?: number;
   };
   pricingByRegion?: Record<string, WeddingSalesPricingConfig>;
   guide: WeddingSalesGuideConfig;
@@ -42,6 +43,7 @@ export type WeddingSalesConfig = {
 export type WeddingSalesPricingConfig = {
   startPrice: string;
   currency?: string;
+  coverageHours?: number;
 };
 
 export type WeddingSalesGuideConfig = {
@@ -53,17 +55,20 @@ export type WeddingSalesGuideConfig = {
 
 export const defaultWeddingSalesConfig: WeddingSalesConfig = {
   pricing: {
-    startPrice: "$2,950",
+    startPrice: "$3,490",
     currency: "USD",
+    coverageHours: 8,
   },
   pricingByRegion: {
     FL: {
-      startPrice: "$3,490",
-      currency: "USD",
-    },
-    NC_SC_GA: {
       startPrice: "$2,950",
       currency: "USD",
+      coverageHours: 8,
+    },
+    NC_SC_GA: {
+      startPrice: "$3,490",
+      currency: "USD",
+      coverageHours: 8,
     },
   },
   guide: {},

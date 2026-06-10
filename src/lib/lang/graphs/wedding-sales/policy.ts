@@ -69,7 +69,7 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
     case "availability_available":
       return [
         state.weddingDate ? `confirm ${state.weddingDate} is available` : "confirm the date is available",
-        `starting price ${selectWeddingSalesPricing(config, state).startPrice}`,
+        `${selectWeddingSalesPricing(config, state).coverageHours ?? 8}-hour collection starting price ${selectWeddingSalesPricing(config, state).startPrice}`,
         state.guideSent || state.guideOffered ? "" : "mention the collections guide",
         state.channel === "instagram" && !state.venue ? "ask for the exact venue before proposing a call" : "",
         state.channel === "instagram" && !state.venue ? "" : state.callProposed ? "" : "propose a consultation call",
@@ -84,7 +84,9 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
       return [
         "answer only the customer's current question",
         "if availability or their date is asked and availability is already known, answer from the current state without repeating the full availability intro",
-        "if pricing is asked, say collections start at the configured starting price",
+        state.availability
+          ? `if pricing is asked, say the ${selectWeddingSalesPricing(config, state).coverageHours ?? 8}-hour collections start at the configured regional price`
+          : "do not quote pricing before wedding availability and region are known; continue qualification instead",
         "if travel is asked, say roundtrip travel coverage is included by collection and exact travel details can be covered on the call",
         "end with one natural next step toward consultation",
       ];

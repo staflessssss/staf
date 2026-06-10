@@ -151,11 +151,16 @@ function readPricingByRegion(channelConfig: Record<string, unknown>) {
     const config = asObject(value);
     const startPrice = asString(config.startPrice);
     const currency = asString(config.currency);
+    const coverageHours =
+      typeof config.coverageHours === "number" && Number.isFinite(config.coverageHours)
+        ? config.coverageHours
+        : undefined;
 
     if (startPrice) {
       pricingByRegion[region.toUpperCase()] = {
         startPrice,
         currency: currency || defaultWeddingSalesConfig.pricing.currency,
+        coverageHours: coverageHours ?? defaultWeddingSalesConfig.pricing.coverageHours,
       };
     }
   }
@@ -177,8 +182,14 @@ export function buildWeddingSalesConfigFromChannelConfig(
   return {
     ...defaultWeddingSalesConfig,
     pricing: {
-      startPrice: asString(asObject(channelConfig.pricing).startPrice) || "$2,950",
+      startPrice:
+        asString(asObject(channelConfig.pricing).startPrice) ||
+        defaultWeddingSalesConfig.pricing.startPrice,
       currency: "USD",
+      coverageHours:
+        typeof asObject(channelConfig.pricing).coverageHours === "number"
+          ? (asObject(channelConfig.pricing).coverageHours as number)
+          : defaultWeddingSalesConfig.pricing.coverageHours,
     },
     pricingByRegion: readPricingByRegion(channelConfig) ?? defaultWeddingSalesConfig.pricingByRegion,
     guide: {
