@@ -950,6 +950,46 @@ export const channelConfigSchema = z
       .max(1000)
       .optional()
       .transform((value) => (value ? value : undefined)),
+    priceAttachmentsByRegion: z
+      .record(
+        z.string().trim().min(1).max(40),
+        z.object({
+          fileId: z
+            .string()
+            .trim()
+            .max(500)
+            .optional()
+            .transform((value) => (value ? value : undefined)),
+          fileName: z
+            .string()
+            .trim()
+            .max(240)
+            .optional()
+            .transform((value) => (value ? value : undefined)),
+          imageUrl: z
+            .string()
+            .trim()
+            .url()
+            .max(1000)
+            .optional()
+            .transform((value) => (value ? value : undefined)),
+          publicUrl: z
+            .string()
+            .trim()
+            .url()
+            .max(1000)
+            .optional()
+            .transform((value) => (value ? value : undefined)),
+          link: z
+            .string()
+            .trim()
+            .url()
+            .max(1000)
+            .optional()
+            .transform((value) => (value ? value : undefined)),
+        }),
+      )
+      .optional(),
     channelBehavior: z
       .object({
         preset: z.enum(channelBehaviorPresetOptions).default("recommended_for_channel"),
@@ -1158,6 +1198,7 @@ export const channelConfigSchema = z
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,
     priceAttachmentPublicUrl: undefined,
+    priceAttachmentsByRegion: undefined,
     channelBehavior: undefined,
     conversationPlaybook: undefined,
     prompting: undefined,
@@ -1173,6 +1214,7 @@ const agentManagedChannelConfigKeys = [
   "priceAttachmentFileName",
   "priceAttachmentMimeType",
   "priceAttachmentPublicUrl",
+  "priceAttachmentsByRegion",
   "channelBehavior",
   "conversationPlaybook",
   "prompting",

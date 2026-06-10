@@ -112,11 +112,35 @@ function buildPublicGoogleDriveDownloadUrl(fileId?: string) {
   return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(trimmed)}`;
 }
 
+function resolveWeddingSalesGuideRegion(state?: Pick<WeddingSalesState, "location" | "venue">) {
+  const text = [state?.location, state?.venue].filter(Boolean).join(" ").toLowerCase();
+
+  if (/\b(?:fl|florida|tampa|miami|orlando|st\.?\s*augustine|saint augustine|jacksonville)\b/i.test(text)) {
+    return "FL";
+  }
+
+  if (/\b(?:nc|north carolina|sc|south carolina|ga|georgia|charlotte|raleigh|charleston|atlanta|savannah)\b/i.test(text)) {
+    return "NC_SC_GA";
+  }
+
+  return undefined;
+}
+
+function selectWeddingSalesGuide(args: {
+  config: ReturnType<typeof buildWeddingSalesConfigFromChannelConfig>;
+  state?: Pick<WeddingSalesState, "location" | "venue">;
+}) {
+  const region = resolveWeddingSalesGuideRegion(args.state);
+
+  return (region ? args.config.guidesByRegion?.[region] : undefined) ?? args.config.guide;
+}
+
 function getWeddingSalesGuideAttachment(args: {
   channel: ChannelType | string;
   message: string;
   config: ReturnType<typeof buildWeddingSalesConfigFromChannelConfig>;
   allowAttachments: boolean;
+  state?: Pick<WeddingSalesState, "location" | "venue">;
 }) {
   if (
     (!args.allowAttachments && args.channel !== ChannelType.INSTAGRAM) ||
@@ -125,17 +149,18 @@ function getWeddingSalesGuideAttachment(args: {
     return [];
   }
 
-  const publicUrl = args.config.guide.imageUrl ?? buildPublicGoogleDriveDownloadUrl(args.config.guide.fileId);
+  const guide = selectWeddingSalesGuide({ config: args.config, state: args.state });
+  const publicUrl = guide.imageUrl ?? buildPublicGoogleDriveDownloadUrl(guide.fileId);
 
-  if (!args.config.guide.fileId && !publicUrl) {
+  if (!guide.fileId && !publicUrl) {
     return [];
   }
 
   return [
     {
       source: "google_drive",
-      fileId: args.config.guide.fileId ?? publicUrl ?? "collections-guide",
-      fileName: args.config.guide.fileName,
+      fileId: guide.fileId ?? publicUrl ?? "collections-guide",
+      fileName: guide.fileName,
       mimeType: "image/png",
       publicUrl,
     },
@@ -1113,6 +1138,7 @@ async function runWeddingSalesTestRuntime(args: {
       message,
       config,
       allowAttachments: readMessageBehaviorConfig(args.agent.channelConfig).allowAttachments,
+      state: graphResult,
     }),
     historyAppend: buildWeddingSalesTestHistoryAppend({
       state: graphResult,
@@ -1446,6 +1472,7 @@ async function runWeddingSalesRuntime(args: {
       message,
       config,
       allowAttachments: readMessageBehaviorConfig(args.agent.channelConfig).allowAttachments,
+      state: graphResult,
     }),
   };
 }

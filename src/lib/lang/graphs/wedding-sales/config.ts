@@ -5,12 +5,8 @@ export type WeddingSalesConfig = {
     startPrice: string;
     currency?: string;
   };
-  guide: {
-    fileId?: string;
-    fileName?: string;
-    link?: string;
-    imageUrl?: string;
-  };
+  guide: WeddingSalesGuideConfig;
+  guidesByRegion?: Record<string, WeddingSalesGuideConfig>;
   portfolio: Array<{
     label: string;
     url: string;
@@ -40,6 +36,13 @@ export type WeddingSalesConfig = {
       allowedEmojis: string[];
     }
   >;
+};
+
+export type WeddingSalesGuideConfig = {
+  fileId?: string;
+  fileName?: string;
+  link?: string;
+  imageUrl?: string;
 };
 
 export const defaultWeddingSalesConfig: WeddingSalesConfig = {

@@ -220,6 +220,12 @@ test("messages section edits follow-up rules", async () => {
   });
 });
 
+test("messages section allows longer split-message delays for Instagram pacing", () => {
+  const source = fs.readFileSync(messagesSectionPath, "utf8");
+
+  assert.match(source, /splitMessageDelayOptions = \[0, 1, 2, 3, 4, 5, 6, 7\]/);
+});
+
 test("messages follow-up default is schedulable by runtime", () => {
   const runtimeBehavior = readMessageBehaviorConfig({
     channelBehavior: {

@@ -306,15 +306,16 @@ function nextStepAfterFaq(state: WeddingSalesState) {
 }
 
 function formatTravelAnswer(state: WeddingSalesState) {
-  if (state.venue) {
-    const venueContext = state.location ? `${state.venue} in ${state.location}` : state.venue;
+  const callHandOff = state.callProposed
+    ? "We can go over the exact travel details on the call."
+    : "Once we set up the call, we can go over the exact travel details together.";
 
-    return `Each collection includes travel miles. For ${venueContext}, I’ll double-check the exact travel details before the call.`;
-  }
-
-  return isInstagram(state)
-    ? "Each collection includes travel miles. Once I have the venue, I’ll confirm the exact travel details."
-    : "Each collection includes travel miles. If the venue is beyond the included mileage, I will check the exact distance and have clear travel details ready for our call.";
+  return [
+    "Our collections include roundtrip travel coverage 🤍",
+    "Classic Collection → 100 miles\nPremium Collection → 125 miles\nExclusive Collection → 175 miles",
+    "If your wedding location is farther than the included travel distance, we simply add a small travel fee to help cover gas for the additional round trip mileage.",
+    callHandOff,
+  ].join("\n\n");
 }
 
 function formatFaqAnswer(args: {
@@ -350,8 +351,10 @@ function formatFaqAnswer(args: {
 
   if (/\b(?:timeline|delivery time|deliver|edit|editing|sneak peek)\b/i.test(message)) {
     return [
-      "The Sneak Peek is usually delivered about 2 weeks after the wedding. The Wedding Film and Cinematic Clip are usually around 4 months.",
-      nextStep,
+      "Thank you so much for checking in! 🤍",
+      "Our average delivery time for the final films is around 4 months, but it may be sooner.",
+      "I’ll keep you updated and will send everything over as soon as it’s ready!",
+      "Thank you so much for your patience 🙏✨",
     ].join("\n\n");
   }
 
@@ -591,7 +594,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
                 ? `Our collections start at ${config.pricing.startPrice}.`
                 : "",
               /\btravel\b/i.test(message)
-                ? "Each collection includes travel miles."
+                ? "Our collections include roundtrip travel coverage."
                 : "",
             ].filter(Boolean);
 
@@ -601,7 +604,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
             ].join("\n\n");
           }
           const followUp = asksPricingOrTravel
-            ? `If you are flexible, send me another date and I can check it right away. Our collections start at ${config.pricing.startPrice}, and yes, we do travel for weddings.`
+            ? `If you are flexible, send me another date and I can check it right away. Our collections start at ${config.pricing.startPrice}. We can go over travel details on the call.`
             : "If you are flexible, send me another date and I can check it right away.";
 
           return [`${weddingDate}${location} is still showing unavailable on my end.`, followUp].join("\n\n");
@@ -650,12 +653,12 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         }
 
         if (isInstagram(state)) {
-          return "Could you tell me a little more about what you’d like to know?";
+          return nextStepAfterFaq(state);
         }
 
         return [
           `Our collections start at ${config.pricing.startPrice}. Yes, we do travel for weddings.`,
-          "Each collection includes travel miles, and if the venue is beyond the included mileage, I can check the exact travel details for your location before the call.",
+          "Our collections include roundtrip travel coverage. If the venue is beyond the included mileage, we can go over the exact travel details on the call.",
         ].join("\n\n");
       }
       case "ask_call_time":
@@ -752,9 +755,11 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
     }
   })();
 
-  return policy.includeSignature
+  const finalText = policy.includeSignature
     ? appendSignatureOnce(response, config.signature)
     : response.trim();
+
+  return normalizeCustomerFacingPunctuation(finalText);
 }
 
 function shouldUseLlmComposer() {
@@ -837,9 +842,9 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
           "Sneak Peek is usually delivered about 2 weeks after the wedding. Wedding Film and Cinematic Clip are usually around 4 months.",
         music: "Couples can choose music for their films.",
         hiddenFees:
-          "No taxes and no hidden fees. Only possible additional cost is travel if venue is beyond included mileage.",
+          "No taxes and no hidden fees. Only possible additional cost is a small travel fee if venue is beyond included mileage.",
         travel:
-          "Classic includes 100 miles, Premium 125 miles, Exclusive 175 miles. If beyond included mileage, do not calculate in chat; say the exact travel details will be checked for the venue.",
+          "Collections include roundtrip travel coverage: Classic 100 miles, Premium 125 miles, Exclusive 175 miles. If beyond included mileage, do not calculate in chat; say we can go over exact travel details on the call.",
         insurance:
           "Myndful carries insurance and can provide a Certificate of Insurance to the venue or planner when needed.",
         photographers:
@@ -905,7 +910,7 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Use the provided facts only. Do not invent availability, calendar status, prices, links, event IDs, or bookings.",
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
     "For FAQ questions, answer from businessConfig.faq and then move to one clear next step. Do not over-answer with collection details unless the customer specifically asks.",
-    "For travel fees, never calculate distance or claim there is no travel fee. Say travel miles are included and exact travel details are checked from the venue.",
+    "For travel fees, never calculate distance or claim there is no travel fee. Say roundtrip travel coverage is included by collection and exact travel details can be covered on the call.",
     args.testMode
       ? "TEST MODE IS ACTIVE: do not claim a real invite was sent or created. Say this is test mode and that the system would send/create the calendar invite."
       : "",
@@ -1011,6 +1016,13 @@ function stripGreetingLikeOpening(text: string) {
 
 function normalizeMarkdownLinksForRichEmail(text: string) {
   return text.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
+}
+
+function normalizeCustomerFacingPunctuation(text: string) {
+  return text
+    .replace(/\s*[—–]\s*/g, " - ")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
 }
 
 function stripDuplicateInstagramFirstContactIntro(text: string) {
@@ -1135,9 +1147,11 @@ export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesRespons
 
   const withBrandEmoji = applyBrandEmojiCadence({ ...args, text: withFirstContactOpening });
 
-  return policy.includeSignature
+  const finalText = policy.includeSignature
     ? appendSignatureOnce(withBrandEmoji, args.config.signature)
     : withBrandEmoji.trim();
+
+  return normalizeCustomerFacingPunctuation(finalText);
 }
 
 export function parseWeddingSalesReflectionJson(text: string) {
@@ -1244,7 +1258,9 @@ async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs
 }
 
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
-  const fallback = ensureInstagramFirstContactOpening(args, composeWeddingSalesResponse(args));
+  const fallback = normalizeCustomerFacingPunctuation(
+    ensureInstagramFirstContactOpening(args, composeWeddingSalesResponse(args)),
+  );
 
   if (args.testMode && args.intent === "booking_confirmed") {
     return fallback;
@@ -1267,7 +1283,7 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
 
     const reflected = await reflectWeddingSalesResponse({ ...args, draft });
 
-    return enforceInstagramResponseStyle(args, reflected, fallback);
+    return normalizeCustomerFacingPunctuation(enforceInstagramResponseStyle(args, reflected, fallback));
   } catch (error) {
     console.warn("[wedding-sales] LLM response composer failed; using fallback.", error);
     return fallback;

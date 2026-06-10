@@ -85,7 +85,7 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
         "answer only the customer's current question",
         "if availability or their date is asked and availability is already known, answer from the current state without repeating the full availability intro",
         "if pricing is asked, say collections start at the configured starting price",
-        "if travel is asked, say Myndful travels and travel miles are included by collection, with exact travel details handled after venue/location is known",
+        "if travel is asked, say roundtrip travel coverage is included by collection and exact travel details can be covered on the call",
         "end with one natural next step toward consultation",
       ];
     case "ask_call_time":

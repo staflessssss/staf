@@ -9,6 +9,18 @@ test("buildWeddingSalesConfigFromChannelConfig maps Myndful channel config into 
     priceAttachmentFileId: "file-1",
     priceAttachmentFileName: "price.png",
     priceAttachmentPublicUrl: "https://drive.google.com/uc?export=download&id=file-1",
+    priceAttachmentsByRegion: {
+      FL: {
+        fileId: "fl-price",
+        fileName: "price-fl.png",
+        imageUrl: "https://drive.google.com/uc?export=download&id=fl-price",
+      },
+      NC_SC_GA: {
+        fileId: "carolina-price",
+        fileName: "price-nc-sc-ga.png",
+        imageUrl: "https://drive.google.com/uc?export=download&id=carolina-price",
+      },
+    },
     channelBehavior: {
       useRichFormatting: true,
       allowAttachments: true,
@@ -53,6 +65,8 @@ test("buildWeddingSalesConfigFromChannelConfig maps Myndful channel config into 
   assert.equal(config.guide.fileId, "file-1");
   assert.equal(config.guide.fileName, "price.png");
   assert.equal(config.guide.imageUrl, "https://drive.google.com/uc?export=download&id=file-1");
+  assert.equal(config.guidesByRegion?.FL?.fileId, "fl-price");
+  assert.equal(config.guidesByRegion?.NC_SC_GA?.fileName, "price-nc-sc-ga.png");
   assert.deepEqual(config.portfolio, [
     {
       label: "Film One",

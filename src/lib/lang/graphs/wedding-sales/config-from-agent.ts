@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-import { defaultWeddingSalesConfig, type WeddingSalesConfig } from "./config";
+import { defaultWeddingSalesConfig, type WeddingSalesConfig, type WeddingSalesGuideConfig } from "./config";
 
 function asObject(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -106,6 +106,43 @@ function readBookingWindow(channelConfig: Record<string, unknown>) {
   return defaultWeddingSalesConfig.callBookingWindow;
 }
 
+function readGuideConfig(value: unknown): WeddingSalesGuideConfig | undefined {
+  const config = asObject(value);
+  const fileId = asString(config.fileId) || asString(config.priceAttachmentFileId);
+  const fileName = asString(config.fileName) || asString(config.priceAttachmentFileName);
+  const imageUrl =
+    asString(config.imageUrl) ||
+    asString(config.publicUrl) ||
+    asString(config.priceAttachmentPublicUrl);
+  const link = asString(config.link);
+
+  if (!fileId && !fileName && !imageUrl && !link) {
+    return undefined;
+  }
+
+  return {
+    fileId: fileId || undefined,
+    fileName: fileName || undefined,
+    imageUrl: imageUrl || undefined,
+    link: link || undefined,
+  };
+}
+
+function readGuidesByRegion(channelConfig: Record<string, unknown>) {
+  const raw = asObject(channelConfig.priceAttachmentsByRegion);
+  const guidesByRegion: Record<string, WeddingSalesGuideConfig> = {};
+
+  for (const [region, value] of Object.entries(raw)) {
+    const guide = readGuideConfig(value);
+
+    if (guide) {
+      guidesByRegion[region.toUpperCase()] = guide;
+    }
+  }
+
+  return Object.keys(guidesByRegion).length > 0 ? guidesByRegion : undefined;
+}
+
 export function buildWeddingSalesConfigFromChannelConfig(
   channelConfigValue: Prisma.JsonValue | null | undefined,
 ): WeddingSalesConfig {
@@ -133,6 +170,7 @@ export function buildWeddingSalesConfigFromChannelConfig(
         undefined,
       link: undefined,
     },
+    guidesByRegion: readGuidesByRegion(channelConfig),
     portfolio,
     reviews,
     coverage: {

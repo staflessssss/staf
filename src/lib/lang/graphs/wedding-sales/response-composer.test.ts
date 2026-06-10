@@ -120,8 +120,12 @@ test("wedding sales composer gives travel answer without guessing fees", () => {
     },
   });
 
-  assert.match(response, /travel miles/i);
-  assert.match(response, /exact distance|exact travel details/i);
+  assert.match(response, /roundtrip travel coverage/i);
+  assert.match(response, /Classic Collection/i);
+  assert.match(response, /Premium Collection/i);
+  assert.match(response, /Exclusive Collection/i);
+  assert.match(response, /small travel fee/i);
+  assert.match(response, /call/i);
   assert.doesNotMatch(response, /no travel fee/i);
   assert.doesNotMatch(response, /\$0\.65/i);
 });
@@ -600,7 +604,7 @@ test("instagram style gate removes an unasked pricing answer from a travel reply
     assistantReplyCount: 1,
     hasGreeted: true,
   };
-  const fallback = "Each collection includes travel miles. I’ll confirm the exact details once I know the venue.\n\nWhat city or venue is the wedding in?";
+  const fallback = "Our collections include roundtrip travel coverage.\n\nWe can go over the exact travel details on the call.";
 
   const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
     { intent: "answer_question", config, state },

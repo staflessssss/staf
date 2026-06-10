@@ -23,7 +23,7 @@ const compactInputClassName =
   "w-full rounded-[10px] border border-[#dde3ee] bg-white px-3 py-2 text-sm text-[#344054] outline-none transition focus:border-[#6c63ff] focus:ring-4 focus:ring-[#6c63ff]/10 disabled:bg-[#f8fafc] disabled:text-[#98a2b3]";
 
 const bufferDelayOptions = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60];
-const splitMessageDelayOptions = [0, 1, 2, 3, 4, 5];
+const splitMessageDelayOptions = [0, 1, 2, 3, 4, 5, 6, 7];
 const hourOptions = Array.from({ length: 24 }, (_, option) => String(option).padStart(2, "0"));
 const minuteOptions = ["00", "05", "10", "15", "20", "30", "45", "55"];
 

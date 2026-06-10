@@ -1146,6 +1146,8 @@ test("instagram wedding sales answers travel fees using the known venue", async 
       availability: "available",
       guideSent: true,
       callProposed: true,
+      assistantReplyCount: 3,
+      hasGreeted: true,
       calendarStatus: undefined,
       bookingConfirmed: false,
       leadStage: "asking_call_time",
@@ -1154,9 +1156,13 @@ test("instagram wedding sales answers travel fees using the known venue", async 
   });
 
   assert.equal(result.leadStage, "answering_question");
-  assert.match(result.responseDraft ?? "", /Evergreen Park/i);
+  assert.match(result.responseDraft ?? "", /roundtrip travel coverage/i);
+  assert.match(result.responseDraft ?? "", /Classic Collection/i);
+  assert.match(result.responseDraft ?? "", /Premium Collection/i);
+  assert.match(result.responseDraft ?? "", /Exclusive Collection/i);
   assert.match(result.responseDraft ?? "", /exact travel details/i);
   assert.match(result.responseDraft ?? "", /What time works best/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Evergreen Park/i);
   assert.doesNotMatch(result.responseDraft ?? "", /once I know the venue/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Could you tell me a little more/i);
 });
