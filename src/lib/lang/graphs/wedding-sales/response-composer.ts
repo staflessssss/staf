@@ -294,11 +294,27 @@ function nextStepAfterFaq(state: WeddingSalesState) {
     return "What city or venue is the wedding in?";
   }
 
-  if (state.callProposed || state.availability === "available") {
+  if (state.callProposed) {
+    return "What time works best for the quick call? I’m free Mon-Fri, 9 AM to 2 PM Eastern.";
+  }
+
+  if (state.availability === "available") {
     return "Would you like to find a time for a quick call?";
   }
 
   return "What city or venue is the wedding in?";
+}
+
+function formatTravelAnswer(state: WeddingSalesState) {
+  if (state.venue) {
+    const venueContext = state.location ? `${state.venue} in ${state.location}` : state.venue;
+
+    return `Each collection includes travel miles. For ${venueContext}, I’ll double-check the exact travel details before the call.`;
+  }
+
+  return isInstagram(state)
+    ? "Each collection includes travel miles. Once I have the venue, I’ll confirm the exact travel details."
+    : "Each collection includes travel miles. If the venue is beyond the included mileage, I will check the exact distance and have clear travel details ready for our call.";
 }
 
 function formatFaqAnswer(args: {
@@ -313,11 +329,7 @@ function formatFaqAnswer(args: {
   if (asksPricing || asksTravel) {
     return [
       asksPricing ? `Our collections start at ${args.config.pricing.startPrice}.` : "",
-      asksTravel
-        ? isInstagram(args.state)
-          ? "Each collection includes travel miles. I’ll confirm the exact details once I know the venue."
-          : "Each collection includes travel miles. If the venue is beyond the included mileage, I will check the exact distance and have clear travel details ready for our call."
-        : "",
+      asksTravel ? formatTravelAnswer(args.state) : "",
       nextStep,
     ].filter(Boolean).join("\n\n");
   }
@@ -625,6 +637,15 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
             state.callProposed
               ? "The next step is still the quick consultation, so I can hear more about your day and answer anything you are weighing."
               : "The next step would be a quick consultation, so I can hear more about your day and answer anything you are weighing.",
+          ].join("\n\n");
+        }
+
+        if (isInstagram(state) && state.venue && /\bvenue\b/i.test(state.latestCustomerMessage ?? "")) {
+          const venueContext = state.location ? `${state.venue} in ${state.location}` : state.venue;
+
+          return [
+            `Got it, I have ${venueContext} as the venue.`,
+            nextStepAfterFaq(state),
           ].join("\n\n");
         }
 

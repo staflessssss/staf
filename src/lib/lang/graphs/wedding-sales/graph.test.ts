@@ -1132,6 +1132,62 @@ test("instagram wedding sales answers questions while waiting for email without 
   assert.doesNotMatch(result.responseDraft ?? "", /^Perfect, tomorrow at 11 AM Eastern works great!/i);
 });
 
+test("instagram wedding sales answers travel fees using the known venue", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Any travel fees?",
+    previousState: {
+      names: "Rick and Rachel",
+      weddingDate: "2026-11-08",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      venue: "Evergreen Park",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      calendarStatus: undefined,
+      bookingConfirmed: false,
+      leadStage: "asking_call_time",
+      askedForCallTime: true,
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.match(result.responseDraft ?? "", /Evergreen Park/i);
+  assert.match(result.responseDraft ?? "", /exact travel details/i);
+  assert.match(result.responseDraft ?? "", /What time works best/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /once I know the venue/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Could you tell me a little more/i);
+});
+
+test("instagram wedding sales acknowledges a repeated venue instead of falling back", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "i say venue is Evergreen Park",
+    previousState: {
+      names: "Rick and Rachel",
+      weddingDate: "2026-11-08",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      venue: "Evergreen Park",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      calendarStatus: undefined,
+      bookingConfirmed: false,
+      leadStage: "asking_call_time",
+      askedForCallTime: true,
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.match(result.responseDraft ?? "", /I have Evergreen Park in Charlotte as the venue/i);
+  assert.match(result.responseDraft ?? "", /What time works best/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Could you tell me a little more/i);
+});
+
 test("instagram wedding sales routes a collected email to booking after an available call time", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",
