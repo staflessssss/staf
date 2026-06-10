@@ -1,10 +1,11 @@
-import type { WeddingSalesChannel } from "./state";
+import type { WeddingSalesChannel, WeddingSalesState } from "./state";
 
 export type WeddingSalesConfig = {
   pricing: {
     startPrice: string;
     currency?: string;
   };
+  pricingByRegion?: Record<string, WeddingSalesPricingConfig>;
   guide: WeddingSalesGuideConfig;
   guidesByRegion?: Record<string, WeddingSalesGuideConfig>;
   portfolio: Array<{
@@ -38,6 +39,11 @@ export type WeddingSalesConfig = {
   >;
 };
 
+export type WeddingSalesPricingConfig = {
+  startPrice: string;
+  currency?: string;
+};
+
 export type WeddingSalesGuideConfig = {
   fileId?: string;
   fileName?: string;
@@ -47,8 +53,18 @@ export type WeddingSalesGuideConfig = {
 
 export const defaultWeddingSalesConfig: WeddingSalesConfig = {
   pricing: {
-    startPrice: "$2,750",
+    startPrice: "$2,950",
     currency: "USD",
+  },
+  pricingByRegion: {
+    FL: {
+      startPrice: "$3,490",
+      currency: "USD",
+    },
+    NC_SC_GA: {
+      startPrice: "$2,950",
+      currency: "USD",
+    },
   },
   guide: {},
   portfolio: [],
@@ -87,3 +103,35 @@ export const defaultWeddingSalesConfig: WeddingSalesConfig = {
     },
   },
 };
+
+export function resolveWeddingSalesRegion(state?: Pick<WeddingSalesState, "location" | "venue">) {
+  const text = [state?.location, state?.venue].filter(Boolean).join(" ").toLowerCase();
+
+  if (/\b(?:fl|florida|tampa|miami|orlando|st\.?\s*augustine|saint augustine|jacksonville)\b/i.test(text)) {
+    return "FL";
+  }
+
+  if (/\b(?:nc|north carolina|sc|south carolina|ga|georgia|charlotte|raleigh|charleston|atlanta|savannah)\b/i.test(text)) {
+    return "NC_SC_GA";
+  }
+
+  return undefined;
+}
+
+export function selectWeddingSalesPricing(
+  config: WeddingSalesConfig,
+  state?: Pick<WeddingSalesState, "location" | "venue">,
+): WeddingSalesPricingConfig {
+  const region = resolveWeddingSalesRegion(state);
+
+  return (region ? config.pricingByRegion?.[region] : undefined) ?? config.pricing;
+}
+
+export function selectWeddingSalesGuide(
+  config: WeddingSalesConfig,
+  state?: Pick<WeddingSalesState, "location" | "venue">,
+) {
+  const region = resolveWeddingSalesRegion(state);
+
+  return (region ? config.guidesByRegion?.[region] : undefined) ?? config.guide;
+}

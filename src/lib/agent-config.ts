@@ -950,6 +950,20 @@ export const channelConfigSchema = z
       .max(1000)
       .optional()
       .transform((value) => (value ? value : undefined)),
+    pricingByRegion: z
+      .record(
+        z.string().trim().min(1).max(40),
+        z.object({
+          startPrice: z.string().trim().min(1).max(40),
+          currency: z
+            .string()
+            .trim()
+            .max(20)
+            .optional()
+            .transform((value) => (value ? value : undefined)),
+        }),
+      )
+      .optional(),
     priceAttachmentsByRegion: z
       .record(
         z.string().trim().min(1).max(40),
@@ -1198,6 +1212,7 @@ export const channelConfigSchema = z
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,
     priceAttachmentPublicUrl: undefined,
+    pricingByRegion: undefined,
     priceAttachmentsByRegion: undefined,
     channelBehavior: undefined,
     conversationPlaybook: undefined,
@@ -1214,6 +1229,7 @@ const agentManagedChannelConfigKeys = [
   "priceAttachmentFileName",
   "priceAttachmentMimeType",
   "priceAttachmentPublicUrl",
+  "pricingByRegion",
   "priceAttachmentsByRegion",
   "channelBehavior",
   "conversationPlaybook",

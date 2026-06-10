@@ -1,4 +1,4 @@
-import type { WeddingSalesConfig } from "./config";
+import { selectWeddingSalesPricing, type WeddingSalesConfig } from "./config";
 import type { WeddingSalesResponseIntent } from "./response-composer";
 import type { WeddingSalesState } from "./state";
 
@@ -69,7 +69,7 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
     case "availability_available":
       return [
         state.weddingDate ? `confirm ${state.weddingDate} is available` : "confirm the date is available",
-        `starting price ${config.pricing.startPrice}`,
+        `starting price ${selectWeddingSalesPricing(config, state).startPrice}`,
         state.guideSent || state.guideOffered ? "" : "mention the collections guide",
         state.channel === "instagram" && !state.venue ? "ask for the exact venue before proposing a call" : "",
         state.channel === "instagram" && !state.venue ? "" : state.callProposed ? "" : "propose a consultation call",

@@ -3,7 +3,7 @@ import { generateText } from "ai";
 
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 
-import type { WeddingSalesConfig } from "./config";
+import { selectWeddingSalesPricing, type WeddingSalesConfig } from "./config";
 import { buildWeddingSalesDialogPolicy, type WeddingSalesDialogPolicy } from "./policy";
 import type { WeddingSalesState } from "./state";
 
@@ -153,6 +153,10 @@ function formatGuideText(config: WeddingSalesConfig, state: WeddingSalesState) {
   }
 
   return "I can send over the collections guide with the full details.";
+}
+
+function formatStartPrice(config: WeddingSalesConfig, state: Pick<WeddingSalesState, "location" | "venue">) {
+  return selectWeddingSalesPricing(config, state).startPrice;
 }
 
 function formatWeddingDateForReply(value?: string) {
@@ -329,7 +333,7 @@ function formatFaqAnswer(args: {
 
   if (asksPricing || asksTravel) {
     return [
-      asksPricing ? `Our collections start at ${args.config.pricing.startPrice}.` : "",
+      asksPricing ? `Our collections start at ${formatStartPrice(args.config, args.state)}.` : "",
       asksTravel ? formatTravelAnswer(args.state) : "",
       nextStep,
     ].filter(Boolean).join("\n\n");
@@ -534,7 +538,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         if (isInstagram(state)) {
           const lines = [
             formatInstagramAvailabilityLine(state),
-            `Our collections start at ${config.pricing.startPrice} — let me send you the guide so you can see everything ✨`,
+            `Our collections start at ${formatStartPrice(config, state)} — let me send you the guide so you can see everything ✨`,
           ];
 
           if (!state.venue) {
@@ -573,7 +577,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
 
         return [
           intro,
-          `Our collections start at ${config.pricing.startPrice}. ${formatGuideText(config, state)}`,
+          `Our collections start at ${formatStartPrice(config, state)}. ${formatGuideText(config, state)}`,
           links ? `Here are a few recent wedding films:\n${links}` : "",
           reviews ? `And here are reviews from couples: ${reviews}` : "",
           "Would you be open to a 30-minute consultation Monday through Friday between 9 AM and 2 PM Eastern?",
@@ -591,7 +595,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
             const answers = [
               `${weddingDate}${location} is still unavailable.`,
               /\b(?:pricing|price|cost|package|packages|collection|collections)\b/i.test(message)
-                ? `Our collections start at ${config.pricing.startPrice}.`
+                ? `Our collections start at ${formatStartPrice(config, state)}.`
                 : "",
               /\btravel\b/i.test(message)
                 ? "Our collections include roundtrip travel coverage."
@@ -604,7 +608,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
             ].join("\n\n");
           }
           const followUp = asksPricingOrTravel
-            ? `If you are flexible, send me another date and I can check it right away. Our collections start at ${config.pricing.startPrice}. We can go over travel details on the call.`
+            ? `If you are flexible, send me another date and I can check it right away. Our collections start at ${formatStartPrice(config, state)}. We can go over travel details on the call.`
             : "If you are flexible, send me another date and I can check it right away.";
 
           return [`${weddingDate}${location} is still showing unavailable on my end.`, followUp].join("\n\n");
@@ -622,7 +626,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
 
         if (isInstagram(state) && state.leadStage === "answering_question" && state.calendarStatus === "available" && !state.customerEmail) {
           return [
-            `Our collections start at ${config.pricing.startPrice}.`,
+            `Our collections start at ${formatStartPrice(config, state)}.`,
             "What’s the best email for the calendar invite? ✨",
           ].join("\n\n");
         }
@@ -657,7 +661,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         }
 
         return [
-          `Our collections start at ${config.pricing.startPrice}. Yes, we do travel for weddings.`,
+          `Our collections start at ${formatStartPrice(config, state)}. Yes, we do travel for weddings.`,
           "Our collections include roundtrip travel coverage. If the venue is beyond the included mileage, we can go over the exact travel details on the call.",
         ].join("\n\n");
       }
@@ -826,7 +830,7 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
         result: observation.result.slice(0, 1200),
       })),
     businessConfig: {
-      startPrice: config.pricing.startPrice,
+      startPrice: formatStartPrice(config, state),
       guideAvailable: Boolean(config.guide.fileName || config.guide.link),
       portfolio: config.portfolio,
       reviews: config.reviews,

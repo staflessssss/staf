@@ -141,7 +141,7 @@ test("wedding sales composer uses plain links for instagram", () => {
   });
 
   assert.doesNotMatch(response, /<a href=/);
-  assert.match(response, /\$2,750/);
+  assert.match(response, /\$2,950/);
   assert.match(response, /venue/i);
   assert.doesNotMatch(response, /Taras Mynd/);
   assert.doesNotMatch(response, /MYNDFUL FILMS/);
@@ -164,9 +164,26 @@ test("instagram pricing answer stays short and does not add unasked travel detai
     },
   });
 
-  assert.equal(response, "Our collections start at $2,750.\n\nWhat are both of your names, and what’s your wedding date?");
+  assert.equal(response, "Our collections start at $2,950.\n\nWhat are both of your names, and what’s your wedding date?");
   assert.doesNotMatch(response, /travel/i);
   assert.doesNotMatch(response, /tailored|next steps/i);
+});
+
+test("wedding sales composer uses Florida start price for Florida leads", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "answering_question",
+      location: "Tampa, FL",
+      latestCustomerMessage: "What’s your price?",
+    },
+  });
+
+  assert.match(response, /\$3,490/);
+  assert.doesNotMatch(response, /\$2,950/);
 });
 
 test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {
@@ -217,7 +234,7 @@ test("instagram human composer keeps the first-contact introduction when the LLM
 
     assert.ok(response.startsWith(instagramFirstContactOpening));
     assert.match(response, /available/i);
-    assert.match(response, /\$2,750/);
+    assert.match(response, /\$2,950/);
   } finally {
     if (originalComposerFlag === undefined) {
       delete process.env.WEDDING_SALES_LLM_COMPOSER;
@@ -362,7 +379,7 @@ test("unavailable-date follow-up answers pricing without repeating availability 
   });
 
   assert.match(response, /unavailable/i);
-  assert.match(response, /\$2,750/);
+  assert.match(response, /\$2,950/);
   assert.match(response, /travel/i);
   assert.doesNotMatch(response, /I checked/i);
 });
@@ -584,7 +601,7 @@ test("instagram style gate removes an unasked travel answer from a pricing reply
     assistantReplyCount: 1,
     hasGreeted: true,
   };
-  const fallback = "Our collections start at $2,750.\n\nWhat’s your wedding date?";
+  const fallback = "Our collections start at $2,950.\n\nWhat’s your wedding date?";
 
   const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
     { intent: "answer_question", config, state },
@@ -628,7 +645,7 @@ test("instagram style gate keeps FAQ replies on the next missing qualification q
     assistantReplyCount: 1,
     hasGreeted: true,
   };
-  const fallback = "Our collections start at $2,750.\n\nWhat’s your wedding date?";
+  const fallback = "Our collections start at $2,950.\n\nWhat’s your wedding date?";
 
   const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
     { intent: "answer_question", config, state },

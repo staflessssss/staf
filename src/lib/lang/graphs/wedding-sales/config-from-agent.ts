@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
-import { defaultWeddingSalesConfig, type WeddingSalesConfig, type WeddingSalesGuideConfig } from "./config";
+import { defaultWeddingSalesConfig, type WeddingSalesConfig, type WeddingSalesGuideConfig, type WeddingSalesPricingConfig } from "./config";
 
 function asObject(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -143,6 +143,26 @@ function readGuidesByRegion(channelConfig: Record<string, unknown>) {
   return Object.keys(guidesByRegion).length > 0 ? guidesByRegion : undefined;
 }
 
+function readPricingByRegion(channelConfig: Record<string, unknown>) {
+  const raw = asObject(channelConfig.pricingByRegion);
+  const pricingByRegion: Record<string, WeddingSalesPricingConfig> = {};
+
+  for (const [region, value] of Object.entries(raw)) {
+    const config = asObject(value);
+    const startPrice = asString(config.startPrice);
+    const currency = asString(config.currency);
+
+    if (startPrice) {
+      pricingByRegion[region.toUpperCase()] = {
+        startPrice,
+        currency: currency || defaultWeddingSalesConfig.pricing.currency,
+      };
+    }
+  }
+
+  return Object.keys(pricingByRegion).length > 0 ? pricingByRegion : undefined;
+}
+
 export function buildWeddingSalesConfigFromChannelConfig(
   channelConfigValue: Prisma.JsonValue | null | undefined,
 ): WeddingSalesConfig {
@@ -157,9 +177,10 @@ export function buildWeddingSalesConfigFromChannelConfig(
   return {
     ...defaultWeddingSalesConfig,
     pricing: {
-      startPrice: "$2,750",
+      startPrice: asString(asObject(channelConfig.pricing).startPrice) || "$2,950",
       currency: "USD",
     },
+    pricingByRegion: readPricingByRegion(channelConfig) ?? defaultWeddingSalesConfig.pricingByRegion,
     guide: {
       fileId: asString(channelConfig.priceAttachmentFileId) || undefined,
       fileName: asString(channelConfig.priceAttachmentFileName) || undefined,

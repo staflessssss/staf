@@ -29,6 +29,7 @@ import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { selectWeddingSalesGuide } from "@/lib/lang/graphs/wedding-sales/config";
 import { buildWeddingSalesConfigFromChannelConfig } from "@/lib/lang/graphs/wedding-sales/config-from-agent";
 import { invokeWeddingSalesGraph } from "@/lib/lang/graphs/wedding-sales/graph";
 import type { WeddingSalesState } from "@/lib/lang/graphs/wedding-sales/state";
@@ -112,29 +113,6 @@ function buildPublicGoogleDriveDownloadUrl(fileId?: string) {
   return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(trimmed)}`;
 }
 
-function resolveWeddingSalesGuideRegion(state?: Pick<WeddingSalesState, "location" | "venue">) {
-  const text = [state?.location, state?.venue].filter(Boolean).join(" ").toLowerCase();
-
-  if (/\b(?:fl|florida|tampa|miami|orlando|st\.?\s*augustine|saint augustine|jacksonville)\b/i.test(text)) {
-    return "FL";
-  }
-
-  if (/\b(?:nc|north carolina|sc|south carolina|ga|georgia|charlotte|raleigh|charleston|atlanta|savannah)\b/i.test(text)) {
-    return "NC_SC_GA";
-  }
-
-  return undefined;
-}
-
-function selectWeddingSalesGuide(args: {
-  config: ReturnType<typeof buildWeddingSalesConfigFromChannelConfig>;
-  state?: Pick<WeddingSalesState, "location" | "venue">;
-}) {
-  const region = resolveWeddingSalesGuideRegion(args.state);
-
-  return (region ? args.config.guidesByRegion?.[region] : undefined) ?? args.config.guide;
-}
-
 function getWeddingSalesGuideAttachment(args: {
   channel: ChannelType | string;
   message: string;
@@ -149,7 +127,7 @@ function getWeddingSalesGuideAttachment(args: {
     return [];
   }
 
-  const guide = selectWeddingSalesGuide({ config: args.config, state: args.state });
+  const guide = selectWeddingSalesGuide(args.config, args.state);
   const publicUrl = guide.imageUrl ?? buildPublicGoogleDriveDownloadUrl(guide.fileId);
 
   if (!guide.fileId && !publicUrl) {
