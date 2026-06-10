@@ -1454,6 +1454,39 @@ test("semantic analysis uses context to recognize an unlabeled venue answer", ()
   assert.equal(result.leadStage, "asking_call_time");
 });
 
+test("semantic analysis ignores hallucinated date when customer answers with venue address", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "333 S. Franklin Street, Tampa, FL 33602",
+    previousState: {
+      names: "Suzie and Rick",
+      weddingDate: "2026-10-11",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Tampa",
+      availability: "available",
+      leadStage: "availability_checked",
+      askedForVenue: true,
+      lastAssistantIntent: "availability_available",
+    },
+  });
+
+  const result = weddingSalesAnalyzeTestHelpers.analyzeWeddingSalesMessageWithSemantics(
+    state,
+    semanticAnalysis({
+      answersRequestedField: "venue",
+      venue: "333 S. Franklin Street, Tampa, FL 33602",
+      weddingDate: "2026-10-10",
+      weddingDateText: "October 10, 2026",
+    }),
+  );
+
+  assert.equal(result.venue, "333 S. Franklin Street, Tampa, FL 33602");
+  assert.equal(result.pendingChangeField, undefined);
+  assert.equal(result.weddingDate, undefined);
+  assert.equal(result.leadStage, "asking_call_time");
+});
+
 test("semantic analysis accepts an unknown unlabeled city as the wedding location", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

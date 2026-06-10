@@ -450,14 +450,17 @@ export function analyzeWeddingSalesMessageWithSemantics(
   const message = stripQuotedEmailText(state.latestCustomerMessage ?? "");
   const useSemantic = hasSemanticConfidence(semantic);
   const deterministicDate = extractWeddingDate(message);
-  const semanticCanSupplyIsoDate = hasYear(message) || Boolean(state.weddingYear);
+  const deterministicVenue = extractVenue(message, state);
+  const latestMessageHasWeddingDateSignal = Boolean(deterministicDate) || hasWeddingDate(message);
+  const semanticCanSupplyDate = useSemantic && latestMessageHasWeddingDateSignal;
+  const semanticCanSupplyIsoDate = semanticCanSupplyDate && (hasYear(message) || Boolean(state.weddingYear));
   const semanticDate = useSemantic && semantic?.weddingDate && semanticCanSupplyIsoDate
     ? {
         display: semantic.weddingDateText ?? semantic.weddingDate,
         iso: semantic.weddingDate,
         yearKnown: true,
       }
-    : useSemantic && semantic?.weddingDateText
+    : semanticCanSupplyDate && semantic?.weddingDateText
       ? extractWeddingDate(semantic.weddingDateText)
       : null;
   const extractedDate = deterministicDate ?? semanticDate;
@@ -471,7 +474,7 @@ export function analyzeWeddingSalesMessageWithSemantics(
     extractNames(message, state.names),
   );
   const extractedLocation = extractLocation(message) ?? (useSemantic ? semantic?.location ?? undefined : undefined);
-  const extractedVenue = extractVenue(message, state) ?? (useSemantic ? semantic?.venue ?? undefined : undefined);
+  const extractedVenue = deterministicVenue ?? (useSemantic ? semantic?.venue ?? undefined : undefined);
   const extractedEmail = extractEmail(message) ?? (useSemantic ? semantic?.email ?? undefined : undefined);
   const combinedWeddingDate =
     extractedDate?.iso ??
