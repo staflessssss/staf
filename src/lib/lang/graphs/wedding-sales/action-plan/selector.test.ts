@@ -320,6 +320,56 @@ test("action selector checks calendar before answering a call-time availability 
   );
 });
 
+test("action selector rechecks calendar when customer provides a new call time after an available slot", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Actually Friday at 10am would be better",
+    previousState: {
+      leadStage: "waiting_customer_email",
+      names: "Mia and Ethan",
+      customerName: "Mia",
+      partnerName: "Ethan",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      proposedCallTime: "tomorrow at 11",
+      calendarStatus: "available",
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "request_modification",
+          confidence: 0.95,
+          targetField: "callTime",
+          evidence: "Actually Friday at 10am would be better",
+        },
+      ],
+      entities: [
+        {
+          field: "callTime",
+          value: "Friday at 10am",
+          normalizedValue: "Friday at 10am",
+          confidence: 0.95,
+          evidence: "Friday at 10am",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(plan.responseGoal, "run_tools_then_reply");
+  assert.deepEqual(
+    plan.actions.map((item) => item.type),
+    ["check_consultation_calendar"],
+  );
+});
+
 test("action selector does not ask for names after customer and partner names are structured", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

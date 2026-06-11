@@ -34,6 +34,12 @@ function hasSchedulingObjection(analysis: SemanticAnalysisV2) {
   );
 }
 
+function hasFreshCallTime(analysis: SemanticAnalysisV2) {
+  return analysis.entities.some(
+    (entity) => entity.field === "callTime" && entity.confidence >= 0.75,
+  );
+}
+
 export function isOwnerContext(state: WeddingSalesState, analysis: SemanticAnalysisV2) {
   const clientType = state.clientType ?? analysis.clientType?.value;
   return Boolean(clientType && OWNER_CONTEXT_TYPES.has(clientType));
@@ -86,7 +92,10 @@ export function canCheckConsultationCalendar(args: {
     return { allowed: false, reason: "missing_explicit_call_time" };
   }
 
-  if (state.calendarStatus === "available" || state.calendarStatus === "busy") {
+  if (
+    (state.calendarStatus === "available" || state.calendarStatus === "busy") &&
+    !hasFreshCallTime(analysis)
+  ) {
     return { allowed: false, reason: "calendar_status_already_known" };
   }
 

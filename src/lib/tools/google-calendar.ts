@@ -494,6 +494,12 @@ function parseSchedulingRequest(args: {
   const source = normalizeTimeSelectionText(args.timeText || args.request);
   const reference = args.referenceDate ?? new Date();
   const base = getTimeZoneParts(reference, args.timeZone);
+  const time = parseTimeFromText(source);
+
+  if (!time) {
+    return null;
+  }
+
   const hasExplicitDate = Boolean(args.explicitDate && /^\d{4}-\d{2}-\d{2}$/.test(args.explicitDate));
   let targetDate = hasExplicitDate
     ? new Date(`${args.explicitDate}T00:00:00Z`)
@@ -511,7 +517,7 @@ function parseSchedulingRequest(args: {
 
       if (foundWeekday) {
         let diff = foundWeekday[1] - targetDate.getUTCDay();
-        if (diff <= 0) {
+        if (diff < 0) {
           diff += 7;
         }
         targetDate = addUtcDays(targetDate, diff);
@@ -538,23 +544,23 @@ function parseSchedulingRequest(args: {
     }
   }
 
-  const time = parseTimeFromText(source);
-
-  if (!time) {
-    return null;
-  }
-
   const dateIso = targetDate.toISOString().slice(0, 10);
   const offset = getTimeZoneOffsetString(dateIso, args.timeZone);
   const endMinutesTotal = time.hours * 60 + time.minutes + args.slotDurationMinutes;
   const endHours = Math.floor(endMinutesTotal / 60);
   const endMinutes = endMinutesTotal % 60;
+  const startTime = `${dateIso}T${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}:00${offset}`;
+  const endTime = `${dateIso}T${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}:00${offset}`;
+
+  if (Date.parse(startTime) <= reference.getTime()) {
+    return null;
+  }
 
   return {
     date: dateIso,
     time: time.time,
-    startTime: `${dateIso}T${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}:00${offset}`,
-    endTime: `${dateIso}T${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}:00${offset}`,
+    startTime,
+    endTime,
   } satisfies ParsedSchedulingRequest;
 }
 
@@ -1111,11 +1117,20 @@ async function sendOwnerTelegramNotification(args: {
     };
   }
 
-  await telegramAdapter.sendReply({
-    credentials: decrypt(telegramChannel.credentialsEnc),
-    contactId: args.chatId,
-    message: args.message,
-  });
+  try {
+    await telegramAdapter.sendReply({
+      credentials: decrypt(telegramChannel.credentialsEnc),
+      contactId: args.chatId,
+      message: args.message,
+    });
+  } catch (error) {
+    return {
+      status: "failed",
+      summary: error instanceof Error
+        ? error.message
+        : "Owner Telegram notification failed.",
+    };
+  }
 
   return {
     status: "sent",
