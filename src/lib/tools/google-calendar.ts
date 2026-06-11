@@ -1059,35 +1059,42 @@ async function appendLeadRow(args: {
     };
   }
 
-  const sheets = createSheetsClient(args.credentialsEnc);
-  const range = `'${args.config.leadSheetName.replace(/'/g, "''")}'`;
-  const headersResponse = await sheets.spreadsheets.values.get({
-    spreadsheetId: args.config.leadSpreadsheetId,
-    range: `${range}!${args.config.leadHeaderRow}:${args.config.leadHeaderRow}`,
-  });
-  const headers = headersResponse.data.values?.[0] ?? [];
+  try {
+    const sheets = createSheetsClient(args.credentialsEnc);
+    const range = `'${args.config.leadSheetName.replace(/'/g, "''")}'`;
+    const headersResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: args.config.leadSpreadsheetId,
+      range: `${range}!${args.config.leadHeaderRow}:${args.config.leadHeaderRow}`,
+    });
+    const headers = headersResponse.data.values?.[0] ?? [];
 
-  if (!headers.length) {
+    if (!headers.length) {
+      return {
+        status: "skipped",
+        summary: "Lead logging sheet does not have a readable header row.",
+      };
+    }
+
+    const values = headers.map((header) => args.row[String(header).trim()] ?? "");
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: args.config.leadSpreadsheetId,
+      range,
+      valueInputOption: "USER_ENTERED",
+      requestBody: {
+        values: [values],
+      },
+    });
+
     return {
-      status: "skipped",
-      summary: "Lead logging sheet does not have a readable header row.",
+      status: "logged",
+      summary: "Lead row appended to Google Sheets.",
+    };
+  } catch (error) {
+    return {
+      status: "failed",
+      summary: error instanceof Error ? error.message : "Lead logging failed.",
     };
   }
-
-  const values = headers.map((header) => args.row[String(header).trim()] ?? "");
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: args.config.leadSpreadsheetId,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: {
-      values: [values],
-    },
-  });
-
-  return {
-    status: "logged",
-    summary: "Lead row appended to Google Sheets.",
-  };
 }
 
 async function sendOwnerTelegramNotification(args: {

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { mock } from "node:test";
+import { google } from "googleapis";
 
+import { encrypt } from "@/lib/crypto";
 import {
   calendarSchedulingTestHelpers,
   executeGoogleCalendarStep,
@@ -326,6 +328,103 @@ test("validateSchedulingWindow uses configured business days and timezone in use
   assert.match(String(weekend.summary), /Tuesday and Thursday/i);
   assert.equal(early.ok, false);
   assert.match(String(early.summary), /Europe\/Moscow/);
+});
+
+test("executeGoogleCalendarStep keeps booking successful when lead logging fails after invite creation", async () => {
+  const originalClientId = process.env.GOOGLE_CLIENT_ID;
+  const originalClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  process.env.GOOGLE_CLIENT_ID = "test-client";
+  process.env.GOOGLE_CLIENT_SECRET = "test-secret";
+
+  const calendarMock = mock.method(google, "calendar", () => ({
+    freebusy: {
+      query: async () => ({
+        data: {
+          calendars: {
+            primary: {
+              busy: [],
+            },
+          },
+        },
+      }),
+    },
+    events: {
+      insert: async () => ({
+        data: {
+          id: "event-1",
+          hangoutLink: "https://meet.google.com/test-meet",
+        },
+      }),
+    },
+  }));
+  const sheetsMock = mock.method(google, "sheets", () => ({
+    spreadsheets: {
+      values: {
+        get: async () => {
+          throw new Error("Sheets unavailable");
+        },
+        append: async () => ({
+          data: {},
+        }),
+      },
+    },
+  }));
+
+  try {
+    const result = await executeGoogleCalendarStep({
+      tenantId: "tenant-1",
+      action: "book_call",
+      request: "Book consultation call for June 12, 2026 at 10:30 with Alex and Sam at alex@example.com",
+      timeText: "June 12, 2026 at 10:30",
+      coupleName: "Alex and Sam",
+      weddingDate: "2026-07-20",
+      location: "Charlotte",
+      email: "alex@example.com",
+      channel: "instagram",
+      credentialsEnc: encrypt(JSON.stringify({ access_token: "test-token" })),
+      params: {
+        calendarId: "primary",
+        timeZone: "America/New_York",
+        bookingDateSource: "time_text",
+        bookingTimeSource: "time_text",
+        inviteEmailSource: "customer_email",
+        slotDurationMinutes: 30,
+        businessWindowStartHour: 9,
+        businessWindowEndHour: 14,
+        businessDays: [1, 2, 3, 4, 5],
+        checkConflictsBeforeBooking: true,
+        inviteCustomerByEmail: true,
+        createMeetLink: true,
+        syncLeadToSheets: true,
+        leadSpreadsheetId: "sheet-1",
+        leadSheetName: "Leads",
+        leadHeaderRow: 1,
+      },
+    });
+
+    assert.equal(result.status, "booked");
+    assert.equal(result.eventId, "event-1");
+    assert.equal(result.meetLink, "https://meet.google.com/test-meet");
+    assert.equal(result.leadLog.status, "failed");
+    assert.match(String(result.leadLog.summary), /Sheets unavailable/);
+    assert.equal(result.telegramNotification.status, "skipped");
+  } finally {
+    calendarMock.mock.restore();
+    sheetsMock.mock.restore();
+
+    if (originalClientId === undefined) {
+      delete process.env.GOOGLE_CLIENT_ID;
+    } else {
+      process.env.GOOGLE_CLIENT_ID = originalClientId;
+    }
+
+    if (originalClientSecret === undefined) {
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    } else {
+      process.env.GOOGLE_CLIENT_SECRET = originalClientSecret;
+    }
+  }
 });
 
 test("buildCalendarInsertPayload respects booking toggles and preserves template spacing", () => {
