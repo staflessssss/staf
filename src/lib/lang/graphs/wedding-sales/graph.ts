@@ -3,6 +3,10 @@ import { END, START, StateGraph } from "@langchain/langgraph";
 import { buildLangGraphThreadId, getLangGraphPostgresSaver } from "@/lib/lang/checkpointing";
 import type { WeddingSalesToolContext } from "@/lib/lang/tools/wedding-sales";
 
+import {
+  createWeddingSalesActionPlanExecutor,
+  isWeddingSalesActionRuntimeV2Enabled,
+} from "./action-plan/executor";
 import { defaultWeddingSalesConfig, type WeddingSalesConfig } from "./config";
 import { analyzeWeddingSalesMessage } from "./nodes/analyze";
 import { createWeddingSalesReplyNodes } from "./nodes/reply";
@@ -26,7 +30,10 @@ type WeddingSalesRoute =
   | "check_availability"
   | "check_calendar"
   | "book_call"
+  | "execute_action_plan"
   | "ignored";
+
+type WeddingSalesPostAvailabilityRoute = "check_calendar" | "done";
 
 export type InvokeWeddingSalesGraphInput = {
   channel: WeddingSalesChannel;
@@ -43,6 +50,10 @@ export type InvokeWeddingSalesGraphInput = {
 };
 
 export function routeWeddingSalesState(state: WeddingSalesState): WeddingSalesRoute {
+  if (isWeddingSalesActionRuntimeV2Enabled(state.agentId) && state.lastActionPlan) {
+    return "execute_action_plan";
+  }
+
   switch (state.leadStage) {
     case "ignored":
       return "ignored";
@@ -68,6 +79,14 @@ export function routeWeddingSalesState(state: WeddingSalesState): WeddingSalesRo
     default:
       return "ask_missing_info";
   }
+}
+
+export function routeAfterWeddingAvailability(
+  state: WeddingSalesState,
+): WeddingSalesPostAvailabilityRoute {
+  return state.availability === "available" && Boolean(state.proposedCallTime)
+    ? "check_calendar"
+    : "done";
 }
 
 function mergeWeddingSalesConfig(config?: Partial<WeddingSalesConfig>): WeddingSalesConfig {
@@ -122,9 +141,14 @@ export function buildWeddingSalesGraph(args: {
     config: resolvedConfig,
     toolContext,
   });
+  const executeActionPlan = createWeddingSalesActionPlanExecutor({
+    config: resolvedConfig,
+    toolContext,
+  });
 
   const workflow = new StateGraph(WeddingSalesStateAnnotation)
     .addNode("analyze", analyzeWeddingSalesMessage)
+    .addNode("execute_action_plan", executeActionPlan)
     .addNode("ask_missing_info", replyNodes.askMissingInfo)
     .addNode("ask_location_or_venue", replyNodes.askLocationOrVenue)
     .addNode("ask_wedding_year", replyNodes.askWeddingYear)
@@ -148,8 +172,10 @@ export function buildWeddingSalesGraph(args: {
       check_availability: "check_availability",
       check_calendar: "check_calendar",
       book_call: "book_call",
+      execute_action_plan: "execute_action_plan",
       ignored: "ignored",
     })
+    .addEdge("execute_action_plan", END)
     .addEdge("ask_missing_info", END)
     .addEdge("ask_location_or_venue", END)
     .addEdge("ask_wedding_year", END)
@@ -157,7 +183,10 @@ export function buildWeddingSalesGraph(args: {
     .addEdge("answer_question", END)
     .addEdge("ask_call_time", END)
     .addEdge("ask_email", END)
-    .addEdge("check_availability", END)
+    .addConditionalEdges("check_availability", routeAfterWeddingAvailability, {
+      check_calendar: "check_calendar",
+      done: END,
+    })
     .addEdge("check_calendar", END)
     .addEdge("book_call", END)
     .addEdge("ignored", END);
@@ -173,6 +202,9 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
     checkpointer,
   });
   const initialState = createInitialWeddingSalesState({
+    tenantId: input.tenantId,
+    agentId: input.agentId,
+    contactId: input.contactId,
     channel: input.channel,
     message: input.message,
     customerEmail: input.customerEmail,
@@ -194,6 +226,9 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
   const graphInput =
     configurable && !input.previousState && !shouldResetCheckpointForFreshInstagramStarter(input)
       ? {
+          tenantId: input.tenantId,
+          agentId: input.agentId,
+          contactId: input.contactId,
           channel: input.channel,
           customerEmail: input.customerEmail,
           conversationContext: input.conversationContext,

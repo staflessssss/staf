@@ -44,6 +44,23 @@ test("capacity availability region matching uses configured aliases", () => {
   assert.equal(rule?.capacity, 2);
 });
 
+test("capacity availability region matching prioritizes validated location over raw request text", () => {
+  const rule = googleSheetsTestHelpers.inferRequestedCapacityRule({
+    request: "Actually not Tampa, it will be in Charlotte NC",
+    location: "Charlotte, NC",
+    capacityRules: [
+      { region: "FL", aliases: ["FL", "Florida", "Tampa"], capacity: 1 },
+      {
+        region: "NC/SC/GA",
+        aliases: ["NC/SC/GA", "North Carolina", "Charlotte", "NC"],
+        capacity: 2,
+      },
+    ],
+  });
+
+  assert.equal(rule?.region, "NC/SC/GA");
+});
+
 test("capacity availability runtime does not silently default explicit empty rules", async () => {
   const result = await executeGoogleSheetsStep({
     action: "check capacity availability in sheet",

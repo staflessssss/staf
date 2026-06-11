@@ -551,7 +551,19 @@ function inferRequestedCapacityRule(args: {
   location?: string;
   capacityRules: SheetsCapacityRuleConfig[];
 }) {
-  const sources = [args.location ?? "", args.request];
+  const location = args.location?.trim();
+
+  if (location) {
+    const locationRule = args.capacityRules.find((rule) =>
+      matchesAlias(location, [rule.region, ...rule.aliases]),
+    );
+
+    if (locationRule) {
+      return locationRule;
+    }
+  }
+
+  const sources = [args.request];
 
   return args.capacityRules.find((rule) =>
     sources.some((source) => source.trim() && matchesAlias(source, [rule.region, ...rule.aliases])),

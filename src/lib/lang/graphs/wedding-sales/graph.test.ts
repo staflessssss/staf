@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { encrypt } from "@/lib/crypto";
 
-import { invokeWeddingSalesGraph } from "./graph";
+import { invokeWeddingSalesGraph, routeAfterWeddingAvailability } from "./graph";
 import { weddingSalesAnalyzeTestHelpers } from "./nodes/analyze";
 import type { WeddingSalesSemanticAnalysis } from "./semantic-analyzer";
 import { createInitialWeddingSalesState } from "./state";
@@ -57,6 +57,93 @@ test("wedding sales graph keeps the recent manual conversation in context", asyn
   );
 });
 
+test("wedding sales graph carries runtime identity metadata for scoped shadow analysis", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    tenantId: "tenant-demo-client",
+    agentId: "agent-be-sky",
+    contactId: "contact-smoke",
+    message: "Hello",
+  });
+
+  assert.equal(result.tenantId, "tenant-demo-client");
+  assert.equal(result.agentId, "agent-be-sky");
+  assert.equal(result.contactId, "contact-smoke");
+});
+
+test("wedding sales graph chains availability to calendar only when a call time is already known", () => {
+  assert.equal(
+    routeAfterWeddingAvailability(
+      createInitialWeddingSalesState({
+        channel: "instagram",
+        message: "test",
+        previousState: {
+          leadStage: "availability_checked",
+          availability: "available",
+          proposedCallTime: "tomorrow at 11am",
+        },
+      }),
+    ),
+    "check_calendar",
+  );
+
+  assert.equal(
+    routeAfterWeddingAvailability(
+      createInitialWeddingSalesState({
+        channel: "instagram",
+        message: "test",
+        previousState: {
+          leadStage: "availability_checked",
+          availability: "available",
+        },
+      }),
+    ),
+    "done",
+  );
+});
+
+test("wedding sales graph preserves chained tool calls in the same turn", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    message: "Yeah October 18 works, can we do a call tomorrow at 11am?",
+    previousState: {
+      leadStage: "ready_for_availability",
+      names: "Sarah and Michael",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      venue: "Evergreen Park",
+      proposedCallTime: "tomorrow at 11am",
+      availability: undefined,
+      calendarStatus: undefined,
+      callProposed: false,
+      bookingConfirmed: false,
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
+    },
+  });
+
+  assert.deepEqual(
+    result.turnToolObservations.map((observation) => observation.toolName),
+    ["check_wedding_availability", "check_consultation_calendar"],
+  );
+});
+
 test("instagram wedding sales treats get in touch as a fresh inquiry starter", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",
@@ -97,7 +184,8 @@ test("instagram wedding sales answers first-message pricing and continues qualif
 
   assert.equal(result.leadStage, "answering_question");
   assert.match(result.responseDraft ?? "", /Hey there!/);
-  assert.doesNotMatch(result.responseDraft ?? "", /\$/);
+  assert.match(result.responseDraft ?? "", /\$2,950/);
+  assert.match(result.responseDraft ?? "", /\$3,490/);
   assert.match(result.responseDraft ?? "", /both of your names/i);
   assert.match(result.responseDraft ?? "", /wedding date/i);
 });

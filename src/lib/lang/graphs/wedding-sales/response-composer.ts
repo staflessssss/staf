@@ -3,8 +3,10 @@ import { generateText } from "ai";
 
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 
+import { buildWeddingSalesResponseContext } from "./action-plan/response-context";
 import { resolveWeddingSalesRegion, selectWeddingSalesPricing, type WeddingSalesConfig } from "./config";
 import { buildWeddingSalesDialogPolicy, type WeddingSalesDialogPolicy } from "./policy";
+import type { WeddingSalesField } from "./semantic-v2/schema";
 import type { WeddingSalesState } from "./state";
 
 export type WeddingSalesResponseIntent =
@@ -45,7 +47,7 @@ const DEFAULT_REFLECTION_MODEL = "gpt-4.1-mini";
 const INSTAGRAM_FIRST_CONTACT_OPENING = [
   "Hey there! Thank you so much for reaching out 🤍✨",
   "",
-  "I’m Taras, the founder of Myndful Films. Huge congratulations on your engagement, such an exciting season of life",
+  "I’m Taras, the founder of Myndful Films. Huge congratulations on your engagement, such an exciting season of life.",
 ].join("\n");
 const INSTAGRAM_ROBOTIC_PHRASES = [
   "to help us get started",
@@ -166,6 +168,19 @@ function formatStartingPriceLine(config: WeddingSalesConfig, state: Pick<Wedding
   return `Our ${coverageHours}-hour collections start at ${pricing.startPrice}.`;
 }
 
+function formatRegionalPricingLine(config: WeddingSalesConfig) {
+  const florida = config.pricingByRegion?.FL;
+  const carolinas = config.pricingByRegion?.NC_SC_GA;
+
+  if (!florida || !carolinas) {
+    return formatStartingPriceLine(config, {});
+  }
+
+  const coverageHours = florida.coverageHours ?? carolinas.coverageHours ?? config.pricing.coverageHours ?? 8;
+
+  return `Our ${coverageHours}-hour collections start at ${florida.startPrice} in Florida and ${carolinas.startPrice} for NC, SC, and GA.`;
+}
+
 function canShareRegionalPricing(state: Pick<WeddingSalesState, "availability" | "location" | "venue">) {
   return Boolean(state.availability && resolveWeddingSalesRegion(state));
 }
@@ -207,6 +222,10 @@ function getPrimaryCustomerName(names?: string) {
     .trim();
 }
 
+function getCustomerNameForState(state: WeddingSalesState) {
+  return state.customerName?.trim() || getPrimaryCustomerName(state.names);
+}
+
 function getPartnerName(names?: string) {
   return names
     ?.split(/\s+(?:and|&)\s+/i)[1]
@@ -215,13 +234,21 @@ function getPartnerName(names?: string) {
     .trim();
 }
 
+function getPartnerNameForState(state: WeddingSalesState) {
+  return state.partnerName?.trim() || getPartnerName(state.names);
+}
+
 function hasCoupleNames(names?: string) {
   return Boolean(names && /\s+(?:and|&)\s+/i.test(names));
 }
 
+function hasCoupleNamesForState(state: WeddingSalesState) {
+  return Boolean(getCustomerNameForState(state) && getPartnerNameForState(state)) || hasCoupleNames(state.names);
+}
+
 function formatInstagramAvailabilityLine(state: WeddingSalesState) {
-  const customerName = getPrimaryCustomerName(state.names);
-  const partnerName = getPartnerName(state.names);
+  const customerName = getCustomerNameForState(state);
+  const partnerName = getPartnerNameForState(state);
   const weddingDate = formatWeddingDateForReply(state.weddingDate);
   const location = state.location ? ` for your ${state.location} wedding` : " for your wedding";
 
@@ -264,7 +291,42 @@ function isBookedConversation(state: WeddingSalesState) {
   return Boolean(state.bookingConfirmed || state.leadStage === "booked");
 }
 
+function plannedAskField(state: WeddingSalesState): WeddingSalesField | null {
+  return buildWeddingSalesResponseContext(state).plannedQuestionField;
+}
+
+function shouldUseActionPlanQuestionAuthority(state: WeddingSalesState) {
+  return buildWeddingSalesResponseContext(state).hasActionPlanAuthority;
+}
+
+function questionForPlannedField(state: WeddingSalesState, field: WeddingSalesField | null) {
+  switch (field) {
+    case "names":
+      return getCustomerNameForState(state)
+        ? "What’s your fiancé’s name?"
+        : "What are both of your names?";
+    case "weddingDate":
+      return "What’s your wedding date?";
+    case "weddingYear":
+      return `What year is ${state.weddingDateText || "the wedding date"}?`;
+    case "location":
+      return "What city or venue is the wedding in?";
+    case "venue":
+      return state.location ? `What’s the exact venue in ${state.location}?` : "What’s the exact venue?";
+    case "callTime":
+      return "What time works best for the quick call? I’m free Mon-Fri, 9 AM to 2 PM Eastern.";
+    case "email":
+      return "What’s the best email for the calendar invite?";
+    default:
+      return "";
+  }
+}
+
 function nextStepAfterFaq(state: WeddingSalesState) {
+  if (shouldUseActionPlanQuestionAuthority(state)) {
+    return questionForPlannedField(state, plannedAskField(state));
+  }
+
   if (!isInstagram(state)) {
     if (isBookedConversation(state)) {
       return "You are all set for the consultation. Send me anything else you want to go over before the call.";
@@ -289,14 +351,14 @@ function nextStepAfterFaq(state: WeddingSalesState) {
     return "What’s the best email for the calendar invite?";
   }
 
-  if (!hasCoupleNames(state.names) && !state.weddingDate && !state.weddingDateText) {
-    return state.names?.trim()
+  if (!hasCoupleNamesForState(state) && !state.weddingDate && !state.weddingDateText) {
+    return getCustomerNameForState(state)
       ? "What’s your fiancé’s name and wedding date?"
       : "What are both of your names, and what’s your wedding date?";
   }
 
-  if (!hasCoupleNames(state.names)) {
-    return state.names?.trim()
+  if (!hasCoupleNamesForState(state)) {
+    return getCustomerNameForState(state)
       ? "What’s your fiancé’s name?"
       : "What are both of your names?";
   }
@@ -338,35 +400,107 @@ function formatFaqAnswer(args: {
   state: WeddingSalesState;
 }) {
   const message = args.state.latestCustomerMessage ?? "";
+  const responseContext = buildWeddingSalesResponseContext(args.state);
   const nextStep = nextStepAfterFaq(args.state);
-  const asksPricing = /\b(?:pricing|price|cost|package|packages|collection|collections)\b/i.test(message);
-  const asksTravel = /\b(?:travel|travel fee|distance|mileage|venue fee)\b/i.test(message);
+  const hasTopic = (topicId: string) => responseContext.answerTopicIds.includes(topicId);
+  const asksPricing = responseContext.hasActionPlanAuthority
+    ? hasTopic("pricing")
+    : /\b(?:pricing|price|cost|package|packages|collection|collections)\b/i.test(message);
+  const asksTravel = responseContext.hasActionPlanAuthority
+    ? hasTopic("travel_fees")
+    : /\b(?:travel|travel fee|distance|mileage|venue fee)\b/i.test(message);
+  const topicIs = (topicId: string, pattern: RegExp) =>
+    responseContext.hasActionPlanAuthority ? hasTopic(topicId) : pattern.test(message);
 
   if (asksPricing || asksTravel) {
     return [
       asksPricing && canShareRegionalPricing(args.state)
         ? formatStartingPriceLine(args.config, args.state)
-        : "",
+        : asksPricing
+          ? formatRegionalPricingLine(args.config)
+          : "",
       asksTravel ? formatTravelAnswer(args.state) : "",
       nextStep,
     ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:style|approach|cinematic|documentary|pose|posed)\b/i.test(message)) {
+  if (topicIs("venue_travel_details", /\b(?:venue|location|travel details)\b/i)) {
+    const venueLine = args.state.venue
+      ? `I have ${args.state.venue}${args.state.location ? ` in ${args.state.location}` : ""} as the venue.`
+      : "The venue helps us double-check travel details and make sure we are looking at the right coverage for your day.";
+
     return [
-      "Our style is cinematic documentary: natural backstage moments, real emotion, and no cheesy posing.",
-      `We work alongside the photographer without getting in the way. ${nextStep}`,
-    ].join("\n\n");
+      venueLine,
+      nextStep,
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:include|included|what comes with|what's included|whats included)\b/i.test(message)) {
+  if (topicIs("availability", /\b(?:available|availability|open|free|our date|wedding date)\b/i)) {
+    if (args.state.availability === "available") {
+      return [`${formatWeddingDateForReply(args.state.weddingDate)}${formatLocationSuffix(args.state.location)} is still available.`, nextStep]
+        .filter(Boolean)
+        .join("\n\n");
+    }
+
+    if (args.state.availability === "unavailable") {
+      return [`${formatWeddingDateForReply(args.state.weddingDate)}${formatLocationSuffix(args.state.location)} is still unavailable.`, nextStep]
+        .filter(Boolean)
+        .join("\n\n");
+    }
+
+    return ["I can check availability once I have the wedding date and location.", nextStep]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  if (topicIs("booking", /\b(?:next step|book|booking|call|schedule|are we booking)\b/i)) {
+    if (isBookedConversation(args.state)) {
+      return "Yes, you’re all set for the consultation. If anything changes, just send it here and I’ll update it.";
+    }
+
+    if (args.state.calendarStatus === "busy") {
+      return "That time is already taken, so I can’t book that slot yet. What other time works for you Mon-Fri, 9 AM to 2 PM Eastern?";
+    }
+
+    if (args.state.calendarStatus === "available" && !args.state.customerEmail) {
+      return "That time is available. What’s the best email for the calendar invite? ✨";
+    }
+
+    if (args.state.calendarStatus === "available") {
+      return "Yes, the next step is booking the consultation call.";
+    }
+
+    if (args.state.proposedCallTime) {
+      return "I’ll check that time first, then I can send the calendar invite once it’s open.";
+    }
+
+    return nextStep || "The next step is a quick consultation call. What time works for you Mon-Fri, 9 AM to 2 PM Eastern?";
+  }
+
+  if (topicIs("style", /\b(?:style|approach|cinematic|documentary|pose|posed)\b/i)) {
+    return [
+      "Our style is cinematic documentary: natural backstage moments, real emotion, and no cheesy posing.",
+      ["We work alongside the photographer without getting in the way.", nextStep]
+        .filter(Boolean)
+        .join(" "),
+    ].filter(Boolean).join("\n\n");
+  }
+
+  if (topicIs("package_inclusions", /\b(?:include|included|what comes with|what's included|whats included)\b/i)) {
     return [
       "All collections include the full ceremony and speeches, a cinematic clip, a wedding film, drone footage, raw footage, and digital delivery.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:timeline|delivery time|deliver|edit|editing|sneak peek)\b/i.test(message)) {
+  if (topicIs("film_length", /\b(?:film length|how long.*film|how long.*video|duration|minutes|min)\b/i)) {
+    return [
+      "The final wedding film length depends on the collection and the flow of the day. Classic is usually 10-25 minutes, Premium 15-30 minutes, and Exclusive 20-45 minutes.",
+      nextStep,
+    ].filter(Boolean).join("\n\n");
+  }
+
+  if (topicIs("final_film_delivery", /\b(?:timeline|delivery time|deliver|edit|editing|sneak peek)\b/i)) {
     return [
       "Thank you so much for checking in! 🤍",
       "Our average delivery time for the final films is around 4 months, but it may be sooner.",
@@ -375,28 +509,28 @@ function formatFaqAnswer(args: {
     ].join("\n\n");
   }
 
-  if (/\b(?:music|song|songs)\b/i.test(message)) {
+  if (topicIs("music", /\b(?:music|song|songs)\b/i)) {
     return [
       "Yes, couples can choose music for their films.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:hidden fee|hidden fees|tax|taxes)\b/i.test(message)) {
+  if (topicIs("hidden_fees", /\b(?:hidden fee|hidden fees|tax|taxes)\b/i)) {
     return [
       "There are no taxes or hidden fees. The only possible extra cost is travel if the venue is beyond the included mileage.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:insurance|certificate of insurance|coi)\b/i.test(message)) {
+  if (topicIs("insurance", /\b(?:insurance|certificate of insurance|coi)\b/i)) {
     return [
       "Yes, we carry insurance and can provide a COI to the venue or planner when needed.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:review|reviews|testimonial|testimonials)\b/i.test(message)) {
+  if (topicIs("reviews", /\b(?:review|reviews|testimonial|testimonials)\b/i)) {
     const reviews = args.config.reviews.url && args.state.channel !== "instagram"
       ? formatLink({
           label: args.config.reviews.label || "Google Reviews",
@@ -406,10 +540,10 @@ function formatFaqAnswer(args: {
         })
       : "I can point you to recent reviews from our couples.";
 
-    return [reviews, nextStep].join("\n\n");
+    return [reviews, nextStep].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:film|films|portfolio|gallery|galleries|example|examples|work)\b/i.test(message)) {
+  if (topicIs("portfolio", /\b(?:film|films|portfolio|gallery|galleries|example|examples|work)\b/i)) {
     const portfolio = args.state.channel !== "instagram"
       ? formatPortfolioLinks(args.config, args.state)
       : "";
@@ -417,28 +551,28 @@ function formatFaqAnswer(args: {
     return [
       portfolio ? `Here are a few recent wedding films:\n${portfolio}` : "I can share a few recent wedding films so you can get a feel for the work.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:photographer|photographers)\b/i.test(message)) {
+  if (topicIs("photographers", /\b(?:photographer|photographers)\b/i)) {
     return [
       "Yes, we always work collaboratively with photographers and never interfere with their flow.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:florida|tampa)\b/i.test(message) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
+  if (topicIs("team_florida", /\b(?:florida|tampa)\b/i) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
     return [
       "For Florida, our lead filmmaker is Jay in Tampa.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
-  if (/\b(?:nc|north carolina|south carolina|sc|georgia|ga|charlotte)\b/i.test(message) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
+  if (topicIs("team_nc_sc_ga", /\b(?:nc|north carolina|south carolina|sc|georgia|ga|charlotte)\b/i) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
     return [
       "For NC, SC, and GA, our lead filmmakers are Dima and Marie, a husband-wife team based in Charlotte.",
       nextStep,
-    ].join("\n\n");
+    ].filter(Boolean).join("\n\n");
   }
 
   return null;
@@ -492,8 +626,8 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       case "ask_missing_info":
         if (isInstagram(state)) {
           const missingDate = !state.weddingDate && !state.weddingDateText;
-          const missingNames = !hasCoupleNames(state.names);
-          const hasAnyName = Boolean(state.names?.trim());
+          const missingNames = !hasCoupleNamesForState(state);
+          const hasAnyName = Boolean(getCustomerNameForState(state) || getPartnerNameForState(state));
           const questionEmoji = policy.allowGreeting ? "" : " ✨";
           const missingInfoQuestion = missingNames && missingDate
             ? hasAnyName
@@ -797,6 +931,7 @@ function safeJson(value: unknown) {
 function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
   const { config, state, intent, summary } = args;
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+  const responseContext = buildWeddingSalesResponseContext(state);
 
   return {
     intent,
@@ -807,6 +942,10 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
     leadState: {
       leadStage: state.leadStage,
       names: state.names,
+      customerName: state.customerName,
+      partnerName: state.partnerName,
+      coupleDisplayName: state.coupleDisplayName,
+      nameCollectionStatus: state.nameCollectionStatus,
       weddingDate: state.weddingDate,
       weddingDateText: state.weddingDateText,
       weddingYear: state.weddingYear,
@@ -821,6 +960,8 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
       calendarStatus: state.calendarStatus,
       bookingConfirmed: state.bookingConfirmed,
     },
+    responseContext,
+    actionPlan: state.lastActionPlan,
     behavioralMemory: {
       assistantReplyCount: state.assistantReplyCount,
       hasGreeted: state.hasGreeted,
@@ -899,6 +1040,7 @@ function buildTraceMetadata(args: ComposeWeddingSalesResponseArgs, extra: Record
 
 function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+  const responseContext = buildWeddingSalesResponseContext(args.state);
   const signatureInstruction = policy.includeSignature
     ? `End with this exact signature once:\n${args.config.signature || "(no signature configured)"}`
     : "Do not include an email signature or sign-off.";
@@ -921,6 +1063,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Move the conversation forward from the customer's latest message. Answer their current question before adding the next step.",
     "If the customer just supplied one useful missing fact but another fact is still missing, acknowledge the supplied fact briefly, then ask only for the remaining fact.",
     "Never ask again for a detail that is already present in leadState.",
+    responseContext.hasActionPlanAuthority
+      ? `Action-plan authority is active. Answer only these FAQ topic IDs: ${responseContext.answerTopicIds.join(", ") || "(none)"}. Ask only this missing field: ${responseContext.plannedQuestionField ?? "(none)"}. Do not add any other customer-facing question.`
+      : "",
     greetingInstruction,
     `Reply mode: ${policy.replyMode}. Maximum paragraphs: ${policy.maxParagraphs}. Link style: ${policy.linkStyle}.`,
     modeInstruction,
@@ -929,12 +1074,16 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     policy.forbiddenPhrases.length ? `Forbidden phrases or concepts. Do not use these even if they seem natural:\n- ${policy.forbiddenPhrases.join("\n- ")}` : "",
     "Use the provided facts only. Do not invent availability, calendar status, prices, links, event IDs, or bookings.",
     "Never confirm that the wedding itself is booked, reserved, contracted, or retained. Only confirm consultation calls.",
-    "For FAQ questions, answer from businessConfig.faq and then move to one clear next step. Do not over-answer with collection details unless the customer specifically asks.",
+    responseContext.hasActionPlanAuthority
+      ? "For FAQ questions, answer only the topic IDs listed in responseContext. Do not infer extra topics from the raw customer text."
+      : "For FAQ questions, answer from businessConfig.faq and then move to one clear next step. Do not over-answer with collection details unless the customer specifically asks.",
     "For travel fees, never calculate distance or claim there is no travel fee. Say roundtrip travel coverage is included by collection and exact travel details can be covered on the call.",
     args.testMode
       ? "TEST MODE IS ACTIVE: do not claim a real invite was sent or created. Say this is test mode and that the system would send/create the calendar invite."
       : "",
-    "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
+    responseContext.hasActionPlanAuthority
+      ? "If information is missing, ask only the field allowed by responseContext.plannedQuestionField. If it is null, do not ask for missing information."
+      : "If information is missing, ask a focused question. If a tool failed, apologize simply and ask for the next actionable option.",
     "Gmail can use HTML links. Instagram and Telegram must use plain URLs.",
     args.state.channel === "instagram"
       ? "Instagram style: 1-3 short message bubbles separated by blank lines. No signature. No HTML. Warm, direct, founder-like, and concise. Ask only the next missing question."
@@ -974,6 +1123,7 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
 
 function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+  const responseContext = buildWeddingSalesResponseContext(args.state);
 
   return [
     "You are the final quality reviewer for a Myndful Films sales email.",
@@ -982,6 +1132,15 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     '{"status":"pass"|"rewrite","issues":["short issue"],"revisedText":"final reply if rewrite, otherwise empty string"}',
     "Rewrite only when needed. If rewriting, preserve all required facts and do not invent any new facts.",
     "Fail and rewrite if the draft repeats the previous assistant response, greets mid-thread, includes a forbidden signature, sounds like a bot status message, ignores the customer's latest question, or exceeds the paragraph limit.",
+    responseContext.hasActionPlanAuthority
+      ? `Action-plan authority is active. The final reply may answer only these FAQ topic IDs: ${responseContext.answerTopicIds.join(", ") || "(none)"}. It may ask only this missing field: ${responseContext.plannedQuestionField ?? "(none)"}. If the draft asks any other customer-facing question, fail and rewrite.`
+      : "",
+    responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField === null
+      ? "Fail and rewrite if the draft asks for names, fiance name, wedding date, wedding year, location, venue, call time, email, or any other qualification detail."
+      : "",
+    responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField !== "names"
+      ? "Fail and rewrite if the draft asks for names, both names, full names, or fiance name."
+      : "",
     args.testMode
       ? "Fail and rewrite if the draft says a real calendar invite was sent, created, booked, or confirmed. In test mode it must say the invite would be sent/created."
       : "",
@@ -1107,6 +1266,7 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
   }
 
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
+  const responseContext = buildWeddingSalesResponseContext(args.state);
   const body = policy.allowGreeting && text.startsWith(INSTAGRAM_FIRST_CONTACT_OPENING)
     ? text.slice(INSTAGRAM_FIRST_CONTACT_OPENING.length).trim()
     : text.trim();
@@ -1117,6 +1277,12 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
   const wordCount = body.split(/\s+/).filter(Boolean).length;
   const paragraphCount = body.split(/\n\s*\n/).filter(Boolean).length;
   const questionCount = body.split("?").length - 1;
+  const asksQuestionWithoutPlan = responseContext.hasActionPlanAuthority
+    && responseContext.plannedQuestionField === null
+    && questionCount > 0;
+  const asksUnplannedNameQuestion = responseContext.hasActionPlanAuthority
+    && responseContext.plannedQuestionField !== "names"
+    && /\b(?:names?|fiance|fiancee|full names?)\b/i.test(normalizedBody);
   const hasRoboticPhrase = INSTAGRAM_ROBOTIC_PHRASES.some((phrase) => normalizedBody.includes(phrase));
   const latestCustomerMessage = (args.state.latestCustomerMessage ?? "").toLowerCase();
   const addsUnaskedTravelAnswer = args.intent === "answer_question"
@@ -1132,19 +1298,23 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
     && !latestCustomerMessage.includes("package")
     && !latestCustomerMessage.includes("collection");
   const missesRequiredNextQuestion = args.intent === "answer_question"
-    && (
-      (args.state.calendarStatus === "available" && !args.state.customerEmail && !normalizedBody.includes("email"))
-      || (!args.state.weddingDate && !args.state.weddingDateText && !normalizedBody.includes("date"))
-      || (Boolean(args.state.weddingDate || args.state.weddingDateText)
-        && !args.state.location
-        && !normalizedBody.includes("location")
-        && !normalizedBody.includes("venue")
-        && !normalizedBody.includes("city"))
-    );
+    && (responseContext.hasActionPlanAuthority
+      ? Boolean(responseContext.plannedQuestionField && !normalizedBody.includes("?"))
+      : (
+        (args.state.calendarStatus === "available" && !args.state.customerEmail && !normalizedBody.includes("email"))
+        || (!args.state.weddingDate && !args.state.weddingDateText && !normalizedBody.includes("date"))
+        || (Boolean(args.state.weddingDate || args.state.weddingDateText)
+          && !args.state.location
+          && !normalizedBody.includes("location")
+          && !normalizedBody.includes("venue")
+          && !normalizedBody.includes("city"))
+      ));
 
   return wordCount > 35
     || paragraphCount > 3
     || questionCount > 1
+    || asksQuestionWithoutPlan
+    || asksUnplannedNameQuestion
     || hasRoboticPhrase
     || addsUnaskedTravelAnswer
     || addsUnaskedPricingAnswer

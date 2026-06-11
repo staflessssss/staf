@@ -130,6 +130,123 @@ test("wedding sales composer gives travel answer without guessing fees", () => {
   assert.doesNotMatch(response, /\$0\.65/i);
 });
 
+test("wedding sales composer does not add a name question outside the v2 action plan", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 2,
+      names: "Mia and Ethan",
+      customerName: "Mia",
+      partnerName: "Ethan",
+      coupleDisplayName: "Mia and Ethan",
+      nameCollectionStatus: "both",
+      latestCustomerMessage: "Do you charge travel fees?",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "travel_fees",
+            reason: "customer_asked_current_business_question",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  assert.match(response, /roundtrip travel coverage/i);
+  assert.doesNotMatch(response, /fianc/i);
+  assert.doesNotMatch(response, /both of your names/i);
+});
+
+test("instagram style gate rejects unplanned v2 qualification questions", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    semanticStateVersion: 2,
+    names: "Mia and Ethan",
+    customerName: "Mia",
+    partnerName: "Ethan",
+    coupleDisplayName: "Mia and Ethan",
+    nameCollectionStatus: "both",
+    latestCustomerMessage: "Do you charge travel fees?",
+    assistantReplyCount: 2,
+    hasGreeted: true,
+    lastActionPlan: {
+      schemaVersion: 1,
+      responseGoal: "answer_and_qualify",
+      actions: [
+        {
+          type: "answer_question",
+          field: null,
+          topicId: "travel_fees",
+          reason: "customer_asked_current_business_question",
+        },
+      ],
+      guardrailTrace: [],
+    },
+  };
+  const fallback = "Our collections include roundtrip travel coverage.\n\nWe can go over exact travel details on the call.";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "answer_question", config, state },
+    "Our collections include roundtrip travel coverage. What is your fiance's name?",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
+test("instagram style gate allows only the v2 planned missing-field question", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    semanticStateVersion: 2,
+    names: "Mia and Ethan",
+    customerName: "Mia",
+    partnerName: "Ethan",
+    coupleDisplayName: "Mia and Ethan",
+    nameCollectionStatus: "both",
+    latestCustomerMessage: "Do you charge travel fees?",
+    assistantReplyCount: 2,
+    hasGreeted: true,
+    lastActionPlan: {
+      schemaVersion: 1,
+      responseGoal: "answer_and_qualify",
+      actions: [
+        {
+          type: "answer_question",
+          field: null,
+          topicId: "travel_fees",
+          reason: "customer_asked_current_business_question",
+        },
+        {
+          type: "ask_missing_field",
+          field: "venue",
+          topicId: null,
+          reason: "venue_is_the_next_missing_field",
+        },
+      ],
+      guardrailTrace: [],
+    },
+  };
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "answer_question", config, state },
+    "Our collections include roundtrip travel coverage. What is the exact venue?",
+    "fallback",
+  );
+
+  assert.match(response, /exact venue/i);
+});
+
+
 test("wedding sales composer uses plain links for instagram", () => {
   const response = composeWeddingSalesResponse({
     intent: "availability_available",
@@ -165,8 +282,10 @@ test("instagram pricing answer stays short and does not add unasked travel detai
     },
   });
 
-  assert.equal(response, "What are both of your names, and what’s your wedding date?");
-  assert.doesNotMatch(response, /\$/);
+  assert.match(response, /\$2,950/);
+  assert.match(response, /\$3,490/);
+  assert.match(response, /What are both of your names/i);
+  assert.match(response, /wedding date/i);
   assert.doesNotMatch(response, /travel/i);
   assert.doesNotMatch(response, /tailored|next steps/i);
 });
@@ -187,6 +306,47 @@ test("wedding sales composer uses Florida start price for Florida leads", () => 
   assert.match(response, /\$2,950/);
   assert.doesNotMatch(response, /\$3,490/);
   assert.match(response, /8-hour collections/i);
+});
+
+test("instagram booking question after a busy calendar check asks for another time", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 2,
+      leadStage: "checking_calendar",
+      names: "Mia and Ethan",
+      customerName: "Mia",
+      partnerName: "Ethan",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      proposedCallTime: "tomorrow at 11",
+      calendarStatus: "busy",
+      latestCustomerMessage: "What’s next step? Are we booking?",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "booking",
+            reason: "customer_asked_current_business_question",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.match(response, /already taken/i);
+  assert.match(response, /What other time works/i);
 });
 
 test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {

@@ -3,7 +3,15 @@ import {
   analyzeWeddingSalesSemantics,
   type WeddingSalesSemanticAnalysis,
 } from "../semantic-analyzer";
+import { selectWeddingSalesActionPlan } from "../action-plan/selector";
+import { analyzeWeddingSalesSemanticsV2 } from "../semantic-v2/analyzer";
+import { runWeddingSalesSemanticV2Shadow } from "../semantic-v2/shadow";
 import { isInstagramCtaStarter } from "../starter-intents";
+import {
+  applySemanticV2StateMutation,
+  buildSemanticV2MutationFailureUpdate,
+  isSemanticV2ExecutionEnabled,
+} from "../state-v2/mutator";
 
 const monthPattern =
   "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
@@ -784,8 +792,58 @@ export function analyzeWeddingSalesMessageWithSemantics(
 export async function analyzeWeddingSalesMessage(
   state: WeddingSalesState,
 ): Promise<Partial<WeddingSalesState>> {
+  if (isSemanticV2ExecutionEnabled(state.agentId)) {
+    try {
+      const semanticV2 = await analyzeWeddingSalesSemanticsV2(state);
+      const mutation = applySemanticV2StateMutation({
+        state,
+        analysis: semanticV2,
+      });
+      const nextState = {
+        ...state,
+        ...mutation,
+      };
+
+      return {
+        ...mutation,
+        lastActionPlan: selectWeddingSalesActionPlan({
+          state: nextState,
+          analysis: semanticV2,
+        }),
+      };
+    } catch (error) {
+      const failureReason =
+        error instanceof Error ? error.message : "semantic_v2_execution_failed";
+
+      return {
+        ...buildSemanticV2MutationFailureUpdate(state, failureReason),
+        leadStage: "answering_question",
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "clarify",
+          actions: [
+            {
+              type: "request_clarification",
+              field: null,
+              topicId: null,
+              reason: failureReason,
+            },
+          ],
+          guardrailTrace: [],
+        },
+      };
+    }
+  }
+
   const semantic = await analyzeWeddingSalesSemantics(state);
-  return analyzeWeddingSalesMessageWithSemantics(state, semantic);
+  const legacyResult = analyzeWeddingSalesMessageWithSemantics(state, semantic);
+
+  void runWeddingSalesSemanticV2Shadow({
+    state,
+    legacyResult,
+  });
+
+  return legacyResult;
 }
 
 export const weddingSalesAnalyzeTestHelpers = {
