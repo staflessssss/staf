@@ -1,9 +1,9 @@
 import type { WeddingSalesState } from "../state";
 import { calculateEffectiveEntityConfidence } from "../semantic-v2/effective-confidence";
-import type { SemanticAnalysisV2, WeddingSalesField } from "../semantic-v2/schema";
+import type { SemanticAnalysisV2, SemanticProvidedValueV2, WeddingSalesField } from "../semantic-v2/schema";
 import {
-  extractStructuredNamesFromMessage,
   hasStructuredCoupleNames,
+  mergeNameRoleFromSemanticV2,
   mergeNamesFromSemanticV2,
   migrateWeddingSalesNames,
 } from "./names";
@@ -89,6 +89,22 @@ function isAccepted(entry: ReturnType<typeof selectBestValue>) {
 
 function isPendingCandidate(entry: ReturnType<typeof selectBestValue>) {
   return Boolean(entry && entry.effectiveConfidence >= PENDING_ENTITY_THRESHOLD);
+}
+
+function evidenceIsPresent(message: string | undefined, evidence: string) {
+  return Boolean(
+    message &&
+      evidence.trim() &&
+      normalizeForComparison(message).includes(normalizeForComparison(evidence)),
+  );
+}
+
+function isAcceptedProvidedInfo(provided: SemanticProvidedValueV2, message: string | undefined) {
+  return Boolean(
+    provided &&
+      provided.confidence >= ACCEPT_ENTITY_THRESHOLD &&
+      evidenceIsPresent(message, provided.evidence),
+  );
 }
 
 function workingState(state: WeddingSalesState, update: Partial<WeddingSalesState>): WeddingSalesState {
@@ -247,19 +263,37 @@ export function applySemanticV2StateMutation(args: {
     });
   }
 
-  const messageNameRoles = extractStructuredNamesFromMessage({
-    state: workingState(state, update),
-    message: state.latestCustomerMessage,
-  });
+  for (const role of ["customerName", "partnerName"] as const) {
+    const provided = analysis.providedInfo?.[role];
 
-  if (messageNameRoles) {
-    Object.assign(update, messageNameRoles);
-    acceptedFields.add("names");
+    if (!provided) {
+      continue;
+    }
+
+    if (!isAcceptedProvidedInfo(provided, state.latestCustomerMessage)) {
+      trace.push({
+        action: "rejected",
+        field: role,
+        value: provided.value,
+        reason: "provided_name_role_below_threshold_or_evidence_missing",
+      });
+      continue;
+    }
+
+    Object.assign(
+      update,
+      mergeNameRoleFromSemanticV2({
+        state: workingState(state, update),
+        role,
+        provided,
+      }),
+    );
+    acceptedFields.add(role);
     trace.push({
       action: "accepted",
-      field: "names",
-      value: messageNameRoles.names,
-      reason: "deterministic_name_role_extraction",
+      field: role,
+      value: provided.value,
+      reason: "semantic_v2_structured_name_role",
     });
   }
 

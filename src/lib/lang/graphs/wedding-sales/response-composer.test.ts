@@ -246,6 +246,44 @@ test("instagram style gate allows only the v2 planned missing-field question", (
   assert.match(response, /exact venue/i);
 });
 
+test("wedding sales composer asks the action-plan partnerName field without recomputing names", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 2,
+      names: "Bob",
+      customerName: "Bob",
+      nameCollectionStatus: "customer_only",
+      weddingDate: "2026-10-23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, NC",
+      assistantReplyCount: 2,
+      hasGreeted: true,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "partnerName",
+            topicId: null,
+            reason: "partner_name_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  assert.match(response, /fianc/i);
+  assert.doesNotMatch(response, /wedding date/i);
+  assert.doesNotMatch(response, /both of your names/i);
+});
+
 
 test("wedding sales composer uses plain links for instagram", () => {
   const response = composeWeddingSalesResponse({

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const weddingSalesFieldSchema = z.enum([
+  "customerName",
+  "partnerName",
   "names",
   "weddingDate",
   "weddingYear",
@@ -11,6 +13,14 @@ export const weddingSalesFieldSchema = z.enum([
 ]);
 
 export type WeddingSalesField = z.infer<typeof weddingSalesFieldSchema>;
+
+export const semanticProvidedValueSchema = z.object({
+  value: z.string().min(1).max(500),
+  normalizedValue: z.string().min(1).max(500).nullable(),
+  confidence: z.number().min(0).max(1),
+  evidence: z.string().max(500),
+  alternatives: z.array(z.string().max(500)).max(5),
+});
 
 export const semanticIntentCategorySchema = z.enum([
   "provide_info",
@@ -43,14 +53,20 @@ export const semanticAnalysisV2Schema = z.object({
     .array(
       z.object({
         field: weddingSalesFieldSchema,
-        value: z.string().min(1).max(500),
-        normalizedValue: z.string().min(1).max(500).nullable(),
-        confidence: z.number().min(0).max(1),
-        evidence: z.string().max(500),
-        alternatives: z.array(z.string().max(500)).max(5),
+        value: semanticProvidedValueSchema.shape.value,
+        normalizedValue: semanticProvidedValueSchema.shape.normalizedValue,
+        confidence: semanticProvidedValueSchema.shape.confidence,
+        evidence: semanticProvidedValueSchema.shape.evidence,
+        alternatives: semanticProvidedValueSchema.shape.alternatives,
       }),
     )
     .max(20),
+  providedInfo: z
+    .object({
+      customerName: semanticProvidedValueSchema.nullable(),
+      partnerName: semanticProvidedValueSchema.nullable(),
+    })
+    .optional(),
   questions: z
     .array(
       z.object({
@@ -105,3 +121,4 @@ export const semanticAnalysisV2Schema = z.object({
 
 export type SemanticAnalysisV2 = z.infer<typeof semanticAnalysisV2Schema>;
 export type SemanticEntityV2 = SemanticAnalysisV2["entities"][number];
+export type SemanticProvidedValueV2 = z.infer<typeof semanticProvidedValueSchema>;

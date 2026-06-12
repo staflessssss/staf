@@ -416,3 +416,41 @@ test("action selector does not ask for names after customer and partner names ar
     false,
   );
 });
+
+test("action selector asks specifically for partner name when customer name is already known", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "What are your fees?",
+    previousState: {
+      leadStage: "answering_question",
+      names: "Bob",
+      customerName: "Bob",
+      nameCollectionStatus: "customer_only",
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "ask_question",
+          confidence: 0.95,
+          targetField: null,
+          evidence: "fees",
+        },
+      ],
+      questions: [
+        {
+          topicId: "pricing",
+          normalizedQuestion: "What are your fees?",
+          confidence: 0.95,
+          evidence: "fees",
+        },
+      ],
+    }),
+  });
+
+  const missingAction = plan.actions.find((item) => item.type === "ask_missing_field");
+
+  assert.equal(missingAction?.field, "partnerName");
+});

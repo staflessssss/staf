@@ -252,6 +252,46 @@ test("semantic v2 mutator merges fiance name into existing customer name", () =>
   assert.match(JSON.stringify(result.lastStateMutationTrace), /accepted/);
 });
 
+test("semantic v2 mutator applies structured customer and partner name roles", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Hi, this is Bob. My fiance is Marie. Our wedding is October 23 2026 in Raleigh NC.",
+    previousState: {
+      leadStage: "missing_names_or_date",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      providedInfo: {
+        customerName: {
+          value: "Bob",
+          normalizedValue: null,
+          confidence: 0.96,
+          evidence: "this is Bob",
+          alternatives: [],
+        },
+        partnerName: {
+          value: "Marie",
+          normalizedValue: null,
+          confidence: 0.96,
+          evidence: "My fiance is Marie",
+          alternatives: [],
+        },
+      },
+    }),
+    fallbackLeadStage: "missing_names_or_date",
+  });
+
+  assert.equal(result.names, "Bob and Marie");
+  assert.equal(result.customerName, "Bob");
+  assert.equal(result.partnerName, "Marie");
+  assert.equal(result.coupleDisplayName, "Bob and Marie");
+  assert.equal(result.nameCollectionStatus, "both");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /semantic_v2_structured_name_role/);
+});
+
 test("semantic v2 mutator captures self and fiance names from the same message", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
@@ -264,24 +304,22 @@ test("semantic v2 mutator captures self and fiance names from the same message",
   const result = applySemanticV2StateMutation({
     state,
     analysis: analysis({
-      intents: [
-        {
-          category: "provide_info",
-          confidence: 0.95,
-          targetField: "names",
-          evidence: "this is Bob",
-        },
-      ],
-      entities: [
-        {
-          field: "names",
+      providedInfo: {
+        customerName: {
           value: "Bob",
           normalizedValue: null,
           confidence: 0.95,
           evidence: "this is Bob",
           alternatives: [],
         },
-      ],
+        partnerName: {
+          value: "Marie",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "My fiance is Marie",
+          alternatives: [],
+        },
+      },
     }),
     fallbackLeadStage: "missing_names_or_date",
   });
@@ -291,7 +329,7 @@ test("semantic v2 mutator captures self and fiance names from the same message",
   assert.equal(result.partnerName, "Marie");
   assert.equal(result.coupleDisplayName, "Bob and Marie");
   assert.equal(result.nameCollectionStatus, "both");
-  assert.match(JSON.stringify(result.lastStateMutationTrace), /deterministic_name_role_extraction/);
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /semantic_v2_structured_name_role/);
 });
 
 test("semantic v2 mutator captures partner reminder after the partner name was missed", () => {
@@ -309,15 +347,16 @@ test("semantic v2 mutator captures partner reminder after the partner name was m
   const result = applySemanticV2StateMutation({
     state,
     analysis: analysis({
-      intents: [
-        {
-          category: "provide_info",
+      providedInfo: {
+        customerName: null,
+        partnerName: {
+          value: "Marie",
+          normalizedValue: null,
           confidence: 0.95,
-          targetField: "names",
           evidence: "she's name Marie",
+          alternatives: [],
         },
-      ],
-      entities: [],
+      },
     }),
     fallbackLeadStage: "missing_names_or_date",
   });
@@ -327,7 +366,7 @@ test("semantic v2 mutator captures partner reminder after the partner name was m
   assert.equal(result.partnerName, "Marie");
   assert.equal(result.coupleDisplayName, "Bob and Marie");
   assert.equal(result.nameCollectionStatus, "both");
-  assert.match(JSON.stringify(result.lastStateMutationTrace), /deterministic_name_role_extraction/);
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /semantic_v2_structured_name_role/);
 });
 
 test("semantic v2 mutator treats street address as venue without changing wedding date", () => {

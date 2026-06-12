@@ -19,8 +19,9 @@ Extract only information supported by exact evidence in the latest customer mess
 Use conversation and current state only to resolve references, corrections, confirmations, and what the assistant asked last.
 
 Rules:
-- "Olivia and Daniel" is a valid names value. Never require surnames unless the customer explicitly distinguishes them.
-- For names, preserve role evidence: "I'm Mia" means the customer name is Mia; "my fiance is Ethan" means Ethan is the partner name. Do not replace one with the other.
+- "Olivia and Daniel" is a valid couple display value. Never require surnames unless the customer explicitly distinguishes them.
+- For names, use providedInfo.customerName and providedInfo.partnerName whenever the latest message supports either role. "I'm Mia" means customerName=Mia. "my fiance is Ethan" means partnerName=Ethan. Do not replace one with the other.
+- Do not put customer or partner names only in generic entities when their role is clear. The structured providedInfo role is the source of truth for names.
 - A city, state, or region is location. A business name or street address is venue.
 - A street number, ZIP code, package price, or film duration is never a wedding date.
 - A call-related objection is not a call-time proposal and must not produce a callTime entity.

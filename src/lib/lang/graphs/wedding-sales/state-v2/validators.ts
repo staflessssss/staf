@@ -38,6 +38,8 @@ export function isValidSemanticFieldValue(entity: SemanticEntityV2) {
     case "weddingYear":
       return /^(?:19|20)\d{2}$/.test(value);
     case "names":
+    case "customerName":
+    case "partnerName":
       return (
         value.length >= 2 &&
         !/\b(?:not ready|schedule|call|question|price|wedding date|venue|location)\b/i.test(value)

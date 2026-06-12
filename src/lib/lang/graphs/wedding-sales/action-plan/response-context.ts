@@ -24,6 +24,8 @@ export function replyActionForMissingField(
       return "askCallTime";
     case "email":
       return "askEmail";
+    case "customerName":
+    case "partnerName":
     case "names":
     case "weddingDate":
     default:

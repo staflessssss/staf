@@ -75,6 +75,32 @@ test("semantic v2 schema preserves multiple intents in one message", () => {
   assert.equal(parsed.pendingResolution?.type, "ambiguous");
 });
 
+test("semantic v2 schema supports structured customer and partner name roles", () => {
+  const parsed = semanticAnalysisV2Schema.parse(
+    analysis({
+      providedInfo: {
+        customerName: {
+          value: "Bob",
+          normalizedValue: null,
+          confidence: 0.97,
+          evidence: "this is Bob",
+          alternatives: [],
+        },
+        partnerName: {
+          value: "Marie",
+          normalizedValue: null,
+          confidence: 0.97,
+          evidence: "My fiance is Marie",
+          alternatives: [],
+        },
+      },
+    }),
+  );
+
+  assert.equal(parsed.providedInfo?.customerName?.value, "Bob");
+  assert.equal(parsed.providedInfo?.partnerName?.value, "Marie");
+});
+
 test("semantic v2 eval baseline contains Cases A-H", () => {
   assert.deepEqual(
     semanticV2EvalCases.map((testCase) => testCase.id),
@@ -405,6 +431,8 @@ test("semantic v2 prompt explicitly protects tool and response boundaries", () =
 
   assert.match(semanticV2SystemPrompt, /never write a customer reply/i);
   assert.match(semanticV2SystemPrompt, /never.*choose tools/i);
+  assert.match(semanticV2SystemPrompt, /providedInfo\.customerName/i);
+  assert.match(semanticV2SystemPrompt, /providedInfo\.partnerName/i);
   assert.match(buildSemanticV2Prompt(state), /final film/);
 });
 

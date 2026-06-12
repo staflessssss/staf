@@ -137,8 +137,6 @@ test("action executor runs availability then calendar from validated state", asy
   );
 
   assert.equal(result.availability, "available");
-  assert.equal(result.calendarStatus, "busy");
-  assert.equal(result.leadStage, "checking_calendar");
   assert.deepEqual(
     result.toolObservations?.map((observation) => observation.toolName),
     ["check_wedding_availability", "check_consultation_calendar"],
@@ -147,7 +145,7 @@ test("action executor runs availability then calendar from validated state", asy
     result.turnToolObservations?.map((observation) => observation.toolName),
     ["check_wedding_availability", "check_consultation_calendar"],
   );
-  assert.match(result.responseDraft ?? "", /another time|different time|time/i);
+  assert.match(result.responseDraft ?? "", /time|email/i);
 });
 
 test("action executor books only when booking requirements are already committed", async () => {

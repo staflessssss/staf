@@ -315,6 +315,10 @@ function shouldUseActionPlanQuestionAuthority(state: WeddingSalesState) {
 
 function questionForPlannedField(state: WeddingSalesState, field: WeddingSalesField | null) {
   switch (field) {
+    case "customerName":
+      return "What are both of your names?";
+    case "partnerName":
+      return "What’s your fiancé’s name?";
     case "names":
       return getCustomerNameForState(state)
         ? "What’s your fiancé’s name?"
@@ -670,6 +674,19 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
     switch (intent) {
       case "ask_missing_info":
         if (isInstagram(state)) {
+          if (shouldUseActionPlanQuestionAuthority(state)) {
+            const plannedQuestion = questionForPlannedField(state, plannedAskField(state));
+
+            if (plannedQuestion) {
+              return [
+                policy.allowGreeting ? INSTAGRAM_FIRST_CONTACT_OPENING : "",
+                `${plannedQuestion}${policy.allowGreeting ? "" : " ✨"}`,
+              ]
+                .filter(Boolean)
+                .join("\n\n");
+            }
+          }
+
           const missingDate = !state.weddingDate && !state.weddingDateText;
           const missingNames = !hasCoupleNamesForState(state);
           const hasAnyName = Boolean(getCustomerNameForState(state) || getPartnerNameForState(state));
@@ -1187,7 +1204,8 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField === null
       ? "Fail and rewrite if the draft asks for names, fiance name, wedding date, wedding year, location, venue, call time, email, or any other qualification detail."
       : "",
-    responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField !== "names"
+    responseContext.hasActionPlanAuthority &&
+    !["names", "customerName", "partnerName"].includes(responseContext.plannedQuestionField ?? "")
       ? "Fail and rewrite if the draft asks for names, both names, full names, or fiance name."
       : "",
     args.testMode
@@ -1333,7 +1351,7 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
     && responseContext.plannedQuestionField === null
     && questionCount > 0;
   const asksUnplannedNameQuestion = responseContext.hasActionPlanAuthority
-    && responseContext.plannedQuestionField !== "names"
+    && !["names", "customerName", "partnerName"].includes(responseContext.plannedQuestionField ?? "")
     && /\b(?:names?|fiance|fiancee|full names?)\b/i.test(normalizedBody);
   const hasRoboticPhrase = INSTAGRAM_ROBOTIC_PHRASES.some((phrase) => normalizedBody.includes(phrase));
   const latestCustomerMessage = (args.state.latestCustomerMessage ?? "").toLowerCase();

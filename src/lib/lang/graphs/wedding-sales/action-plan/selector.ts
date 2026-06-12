@@ -16,7 +16,8 @@ import type {
 } from "./schema";
 
 const FIELD_QUESTION_ORDER: WeddingSalesField[] = [
-  "names",
+  "customerName",
+  "partnerName",
   "weddingDate",
   "weddingYear",
   "location",
@@ -81,8 +82,11 @@ function firstMissingField(state: WeddingSalesState): WeddingSalesField | null {
 
   for (const field of FIELD_QUESTION_ORDER) {
     switch (field) {
-      case "names":
-        if (!hasStructuredCoupleNames(effectiveState)) return field;
+      case "customerName":
+        if (!effectiveState.customerName && !hasStructuredCoupleNames(effectiveState)) return field;
+        break;
+      case "partnerName":
+        if (!effectiveState.partnerName && !hasStructuredCoupleNames(effectiveState)) return field;
         break;
       case "weddingDate":
         if (!state.weddingDate) return field;
