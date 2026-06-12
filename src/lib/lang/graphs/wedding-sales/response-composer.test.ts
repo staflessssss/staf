@@ -349,6 +349,33 @@ test("instagram booking question after a busy calendar check asks for another ti
   assert.match(response, /What other time works/i);
 });
 
+test("instagram availability copy says we have the date available", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "availability_available",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      names: "Bob and Marie",
+      customerName: "Bob",
+      partnerName: "Marie",
+      weddingDate: "2026-10-23",
+      weddingDateText: "October 23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, NC",
+      availability: "available",
+      guideSent: false,
+      callProposed: false,
+      assistantReplyCount: 1,
+      hasGreeted: true,
+    },
+  });
+
+  assert.match(response, /Awesome Bob! We have October 23, 2026 available/i);
+  assert.doesNotMatch(response, /You and Marie have/i);
+});
+
 test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";

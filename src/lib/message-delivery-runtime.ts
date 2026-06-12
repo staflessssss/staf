@@ -563,6 +563,32 @@ async function processBufferedReply(args: {
     skipInboundPersistence: true,
   });
 
+  if (payload.triggerMessageId) {
+    const latestUserMessageBeforeSend = await args.deps.db.message.findFirst({
+      where: {
+        conversationId: args.delivery.conversationId,
+        role: MessageRole.USER,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (latestUserMessageBeforeSend?.id && latestUserMessageBeforeSend.id !== payload.triggerMessageId) {
+      await markDeliveryStatus({
+        database: args.deps.db,
+        deliveryId: args.deliveryId,
+        status: DelayedDeliveryStatus.CANCELED,
+        error: "buffered_delivery_superseded_during_processing",
+      });
+
+      return { ok: true, status: "buffered_delivery_superseded_during_processing" as const };
+    }
+  }
+
   if (result.suppressReply) {
     await markDeliveryStatus({
       database: args.deps.db,

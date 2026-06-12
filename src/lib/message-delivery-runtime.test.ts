@@ -6,6 +6,7 @@ import {
   ConversationStatus,
   DelayedDeliveryKind,
   DelayedDeliveryStatus,
+  MessageRole,
 } from "@prisma/client";
 
 import { messageDeliveryRuntimeTestHelpers } from "@/lib/message-delivery-runtime";
@@ -338,6 +339,9 @@ test("processDelayedDeliveryByIdWithDeps cancels buffered reply when control sup
           },
         },
         message: {
+          findFirst: async () => ({
+            id: "message-2",
+          }),
           findMany: async () => [
             {
               id: "message-1",
@@ -889,6 +893,103 @@ test("processDelayedDeliveryByIdWithDeps requeues transient failures with backof
       ? ((updates[0].data as Record<string, unknown>).dueAt as Date).toISOString()
       : null,
     "2026-04-20T16:00:15.000Z",
+  );
+});
+
+test("processDelayedDeliveryByIdWithDeps cancels buffered reply superseded while processing", async () => {
+  const updates: Record<string, unknown>[] = [];
+  let sendReplyCalled = false;
+  const now = new Date("2026-04-20T16:00:00.000Z");
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-buffered-race",
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
+        delayedDelivery: {
+          updateMany: async () => ({ count: 1 }),
+          findUnique: async () => ({
+            id: "delivery-buffered-race",
+            agentId: "agent-1",
+            conversationId: "conv-buffered-race",
+            kind: DelayedDeliveryKind.BUFFERED_REPLY,
+            attempts: 1,
+            payload: {
+              replyContext: {
+                contactId: "contact-buffered-race",
+              },
+              triggerMessageId: "message-old",
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.INSTAGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-buffered-race",
+              status: ConversationStatus.ACTIVE,
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return args;
+          },
+          findMany: async () => [],
+          create: async (args: Record<string, unknown>) => args,
+        },
+        message: {
+          findMany: async () => [
+            {
+              id: "message-old",
+              role: MessageRole.USER,
+              content: "Who is the shooter?",
+              createdAt: new Date("2026-04-20T15:59:00.000Z"),
+            },
+          ],
+          findFirst: async () => ({
+            id: "message-new",
+          }),
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sendReplyCalled = true;
+            return { ok: true };
+          },
+        }) as never,
+      invokeAgent: async () => ({
+        message: "What time works best for the quick call?",
+        promptPreview: "prompt",
+        usedTooling: [],
+        conversationId: "conv-buffered-race",
+        model: "test-model",
+      }),
+      saveMessages: async () => {
+        throw new Error("saveMessages should not run for a superseded buffered reply");
+      },
+    },
+    now,
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "buffered_delivery_superseded_during_processing");
+  assert.equal(sendReplyCalled, false);
+  assert.equal(
+    updates[0]?.data && typeof updates[0].data === "object"
+      ? (updates[0].data as Record<string, unknown>).status
+      : null,
+    DelayedDeliveryStatus.CANCELED,
   );
 });
 

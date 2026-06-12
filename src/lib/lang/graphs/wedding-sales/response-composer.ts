@@ -248,19 +248,33 @@ function hasCoupleNamesForState(state: WeddingSalesState) {
 
 function formatInstagramAvailabilityLine(state: WeddingSalesState) {
   const customerName = getCustomerNameForState(state);
-  const partnerName = getPartnerNameForState(state);
   const weddingDate = formatWeddingDateForReply(state.weddingDate);
   const location = state.location ? ` for your ${state.location} wedding` : " for your wedding";
 
-  if (customerName && partnerName) {
-    return `Awesome ${customerName}! You and ${partnerName} have ${weddingDate} available${location} 🎥`;
-  }
-
   if (customerName) {
-    return `Awesome ${customerName}! ${weddingDate} is available${location} 🎥`;
+    return `Awesome ${customerName}! We have ${weddingDate} available${location} 🎥`;
   }
 
-  return `Awesome, ${weddingDate} is available${location} 🎥`;
+  return `Awesome, we have ${weddingDate} available${location} 🎥`;
+}
+
+function isFullVenueAddress(value?: string | null) {
+  if (!value) {
+    return false;
+  }
+
+  return (
+    /\b\d{1,6}\s+[A-Za-z0-9 .'-]+?\s+(?:street|st\.?|road|rd\.?|avenue|ave\.?|lane|ln\.?|drive|dr\.?|boulevard|blvd\.?|way|court|ct\.?|place|pl\.?|highway|hwy\.?)\b/i.test(value) ||
+    value.split(",").length >= 3
+  );
+}
+
+function formatVenueAcknowledgement(state: WeddingSalesState) {
+  if (!state.venue || isFullVenueAddress(state.venue)) {
+    return "That sounds lovely 🤍";
+  }
+
+  return `${state.venue} sounds lovely 🤍`;
 }
 
 function formatCallTimeForReply(timeText?: string) {
@@ -426,7 +440,9 @@ function formatFaqAnswer(args: {
 
   if (topicIs("venue_travel_details", /\b(?:venue|location|travel details)\b/i)) {
     const venueLine = args.state.venue
-      ? `I have ${args.state.venue}${args.state.location ? ` in ${args.state.location}` : ""} as the venue.`
+      ? isFullVenueAddress(args.state.venue)
+        ? "I have the venue details noted."
+        : `I have ${args.state.venue}${args.state.location ? ` in ${args.state.location}` : ""} as the venue.`
       : "The venue helps us double-check travel details and make sure we are looking at the right coverage for your day.";
 
     return [
@@ -798,7 +814,9 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           const venueContext = state.location ? `${state.venue} in ${state.location}` : state.venue;
 
           return [
-            `Got it, I have ${venueContext} as the venue.`,
+            isFullVenueAddress(state.venue)
+              ? "Got it, I have the venue details noted."
+              : `Got it, I have ${venueContext} as the venue.`,
             nextStepAfterFaq(state),
           ].join("\n\n");
         }
@@ -815,9 +833,7 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
       case "ask_call_time":
         if (isInstagram(state)) {
           return [
-            state.venue
-              ? `${state.venue} sounds lovely 🤍`
-              : "That sounds lovely 🤍",
+            formatVenueAcknowledgement(state),
             "When would be a good time for a quick call to go over everything? I’m free Mon-Fri, 9 AM to 2 PM Eastern ✨",
           ].join("\n\n");
         }
@@ -1060,6 +1076,7 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       ? "This is a real ongoing Instagram DM thread. Write only the next short DM reply, not a generic bot status update."
       : "This is a real ongoing email thread. Write only the next reply, not a generic bot status update.",
     "Never repeat the previous assistant response. Never restate the same availability intro, same guide pitch, or same call proposal unless the current customer message asks for it.",
+    "For availability replies, say 'We have [date] available...' rather than '[couple] have [date] available'.",
     "Move the conversation forward from the customer's latest message. Answer their current question before adding the next step.",
     "If the customer just supplied one useful missing fact but another fact is still missing, acknowledge the supplied fact briefly, then ask only for the remaining fact.",
     "Never ask again for a detail that is already present in leadState.",
@@ -1099,6 +1116,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       : "",
     args.state.channel === "instagram"
       ? "For Instagram, do not paste URLs or long collection details. Mention that you can send examples or the guide naturally instead."
+      : "",
+    args.state.channel === "instagram"
+      ? "If the customer gives a full street address or long venue address, acknowledge naturally like 'That sounds lovely' or 'I have the venue details noted.' Do not repeat the full address back."
       : "",
     args.state.channel === "instagram"
       ? "Instagram sales sequence: ask fiance name/date, confirm availability and starting price, ask exact venue, ask call time, ask email, then confirm the calendar invite only after booking succeeds."
@@ -1146,6 +1166,9 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
       : "",
     args.state.channel === "instagram"
       ? "For Instagram, fail and rewrite if the draft sounds like an email, repeats the intro, repeats the call-time question, asks for permission to book before asking for email, or says an invite was sent before booking is confirmed."
+      : "",
+    args.state.channel === "instagram"
+      ? "For Instagram, fail and rewrite if an availability reply says the couple 'have' the date available instead of 'we have' the date available, or if it repeats a full street address back to the customer."
       : "",
     args.state.channel === "instagram"
       ? `For Instagram, fail and rewrite if the text after the required first-contact introduction exceeds 35 words, explains why routine information is needed, answers an unasked topic, or uses any of these phrases: ${INSTAGRAM_ROBOTIC_PHRASES.join("; ")}.`

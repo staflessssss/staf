@@ -1089,7 +1089,9 @@ test("instagram wedding sales accepts full street address as venue answer", asyn
   assert.equal(result.leadStage, "asking_call_time");
   assert.equal(result.venue, "8033 Hood Rd, Charlotte, NC 28215, United States");
   assert.equal(result.callProposed, true);
+  assert.match(result.responseDraft ?? "", /That sounds lovely/i);
   assert.match(result.responseDraft ?? "", /9 AM to 2 PM Eastern/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /8033 Hood Rd/i);
   assert.doesNotMatch(result.responseDraft ?? "", /both of your full names/i);
 });
 
