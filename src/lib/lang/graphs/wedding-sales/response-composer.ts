@@ -409,6 +409,27 @@ function formatTravelAnswer(state: WeddingSalesState) {
   ].join("\n\n");
 }
 
+function previousAssistantAskedForVenue(state: WeddingSalesState) {
+  return /\b(?:exact venue|wedding venue|share (?:your|the) venue|could you share .*venue)\b/i.test(
+    state.responseDraft ?? "",
+  );
+}
+
+function withoutRepeatedVenueQuestion(state: WeddingSalesState, nextStep: string) {
+  if (previousAssistantAskedForVenue(state) && /\bvenue\b/i.test(nextStep)) {
+    return "";
+  }
+
+  return nextStep;
+}
+
+function asksIfTarasWillShoot(message: string) {
+  return (
+    /\b(?:are|will)\s+you\b[\s\S]{0,80}\b(?:shoot|shooter|film|filming)\b/i.test(message) ||
+    /\b(?:shoot|shooter|film|filming)\b[\s\S]{0,80}\b(?:you|taras)\b/i.test(message)
+  );
+}
+
 function formatFaqAnswer(args: {
   config: WeddingSalesConfig;
   state: WeddingSalesState;
@@ -577,17 +598,25 @@ function formatFaqAnswer(args: {
     ].filter(Boolean).join("\n\n");
   }
 
-  if (topicIs("team_florida", /\b(?:florida|tampa)\b/i) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
+  if (topicIs("team_florida", /\b(?:florida|tampa)\b/i) && /\b(?:filmmaker|team|who|shoot|shooter)\b/i.test(message)) {
+    const teamAnswer = asksIfTarasWillShoot(message)
+      ? "I personally won’t be the lead shooter in Florida. Jay is our lead filmmaker there, and he shoots in the same Myndful style."
+      : "For Florida, our lead filmmaker is Jay in Tampa.";
+
     return [
-      "For Florida, our lead filmmaker is Jay in Tampa.",
-      nextStep,
+      teamAnswer,
+      withoutRepeatedVenueQuestion(args.state, nextStep),
     ].filter(Boolean).join("\n\n");
   }
 
-  if (topicIs("team_nc_sc_ga", /\b(?:nc|north carolina|south carolina|sc|georgia|ga|charlotte)\b/i) && /\b(?:filmmaker|team|who)\b/i.test(message)) {
+  if (topicIs("team_nc_sc_ga", /\b(?:nc|north carolina|south carolina|sc|georgia|ga|charlotte)\b/i) && /\b(?:filmmaker|team|who|shoot|shooter)\b/i.test(message)) {
+    const teamAnswer = asksIfTarasWillShoot(message)
+      ? "I personally won’t be the lead shooter for NC, SC, or GA weddings. Dima and Marie are our lead filmmakers there, and they shoot in the same Myndful style."
+      : "For NC, SC, and GA, our lead filmmakers are Dima and Marie, a husband-wife team based in Charlotte.";
+
     return [
-      "For NC, SC, and GA, our lead filmmakers are Dima and Marie, a husband-wife team based in Charlotte.",
-      nextStep,
+      teamAnswer,
+      withoutRepeatedVenueQuestion(args.state, nextStep),
     ].filter(Boolean).join("\n\n");
   }
 

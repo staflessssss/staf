@@ -334,6 +334,8 @@ export function getDefaultChannelBehaviorConfig(
         ctaStyle: "offer_options",
         emojiUsage: "limited",
         ...base,
+        splitMessageDelaySeconds: 6,
+        bufferDelaySeconds: 8,
         useSignature: false,
         useRichFormatting: false,
         allowAttachments: false,

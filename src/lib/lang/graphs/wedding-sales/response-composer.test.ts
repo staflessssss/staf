@@ -376,6 +376,55 @@ test("instagram availability copy says we have the date available", () => {
   assert.doesNotMatch(response, /You and Marie have/i);
 });
 
+test("instagram team follow-up answers shooter question without repeating venue prompt", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 2,
+      leadStage: "missing_location_or_venue",
+      names: "Bob and Marie",
+      customerName: "Bob",
+      partnerName: "Marie",
+      weddingDate: "2026-10-23",
+      weddingDateText: "October 23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, North Carolina, USA",
+      availability: "available",
+      guideSent: true,
+      askedForVenue: true,
+      responseDraft:
+        "Our lead filmmakers for North Carolina, South Carolina, and Georgia are Dima and Marie in Charlotte.\n\nCould you share your wedding venue?",
+      latestCustomerMessage: "Are you going to be a shooter?",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "team_nc_sc_ga",
+            reason: "customer_asked_current_business_question",
+          },
+          {
+            type: "ask_missing_field",
+            field: "venue",
+            reason: "venue_is_the_next_missing_field",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.match(response, /I personally won’t be the lead shooter/i);
+  assert.match(response, /Dima and Marie/i);
+  assert.doesNotMatch(response, /venue/i);
+});
+
 test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AgentStatus, ConnectionStatus, FeatureType, IntegrationType } from "@prisma/client";
+import { AgentStatus, ChannelType, ConnectionStatus, FeatureType, IntegrationType } from "@prisma/client";
 
 import {
   agentDraftSchema,
@@ -127,6 +127,14 @@ test("agentDraftSchema normalizes empty language preference to null", () => {
 
   assert.equal(parsed.languagePreference, null);
   assert.equal(parsed.status, AgentStatus.ACTIVE);
+});
+
+test("instagram default behavior buffers rapid messages and spaces split replies", () => {
+  const behavior = getDefaultChannelBehaviorConfig(ChannelType.INSTAGRAM);
+
+  assert.equal(behavior.messageFormat, "split_into_2_3_messages");
+  assert.equal(behavior.bufferDelaySeconds, 8);
+  assert.equal(behavior.splitMessageDelaySeconds, 6);
 });
 
 test("agentDraftSchema accepts explicit active and paused statuses", () => {
