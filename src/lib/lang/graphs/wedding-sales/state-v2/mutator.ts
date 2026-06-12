@@ -1,7 +1,12 @@
 import type { WeddingSalesState } from "../state";
 import { calculateEffectiveEntityConfidence } from "../semantic-v2/effective-confidence";
 import type { SemanticAnalysisV2, WeddingSalesField } from "../semantic-v2/schema";
-import { hasStructuredCoupleNames, mergeNamesFromSemanticV2, migrateWeddingSalesNames } from "./names";
+import {
+  extractStructuredNamesFromMessage,
+  hasStructuredCoupleNames,
+  mergeNamesFromSemanticV2,
+  migrateWeddingSalesNames,
+} from "./names";
 import type { WeddingSalesStateMutationTrace, WeddingSalesClientType } from "./schema";
 import { normalizeForComparison } from "./validators";
 
@@ -239,6 +244,22 @@ export function applySemanticV2StateMutation(args: {
       field: undefined,
       value: clientType,
       reason: "high_confidence_client_type",
+    });
+  }
+
+  const messageNameRoles = extractStructuredNamesFromMessage({
+    state: workingState(state, update),
+    message: state.latestCustomerMessage,
+  });
+
+  if (messageNameRoles) {
+    Object.assign(update, messageNameRoles);
+    acceptedFields.add("names");
+    trace.push({
+      action: "accepted",
+      field: "names",
+      value: messageNameRoles.names,
+      reason: "deterministic_name_role_extraction",
     });
   }
 

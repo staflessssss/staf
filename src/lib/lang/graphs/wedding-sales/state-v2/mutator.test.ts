@@ -252,6 +252,84 @@ test("semantic v2 mutator merges fiance name into existing customer name", () =>
   assert.match(JSON.stringify(result.lastStateMutationTrace), /accepted/);
 });
 
+test("semantic v2 mutator captures self and fiance names from the same message", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Hi, this is Bob. My fiance is Marie. Our wedding is October 23 2026 in Raleigh NC.",
+    previousState: {
+      leadStage: "missing_names_or_date",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "provide_info",
+          confidence: 0.95,
+          targetField: "names",
+          evidence: "this is Bob",
+        },
+      ],
+      entities: [
+        {
+          field: "names",
+          value: "Bob",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "this is Bob",
+          alternatives: [],
+        },
+      ],
+    }),
+    fallbackLeadStage: "missing_names_or_date",
+  });
+
+  assert.equal(result.names, "Bob and Marie");
+  assert.equal(result.customerName, "Bob");
+  assert.equal(result.partnerName, "Marie");
+  assert.equal(result.coupleDisplayName, "Bob and Marie");
+  assert.equal(result.nameCollectionStatus, "both");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /deterministic_name_role_extraction/);
+});
+
+test("semantic v2 mutator captures partner reminder after the partner name was missed", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "As I say she's name Marie",
+    previousState: {
+      leadStage: "missing_names_or_date",
+      names: "Bob",
+      customerName: "Bob",
+      nameCollectionStatus: "customer_only",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "provide_info",
+          confidence: 0.95,
+          targetField: "names",
+          evidence: "she's name Marie",
+        },
+      ],
+      entities: [],
+    }),
+    fallbackLeadStage: "missing_names_or_date",
+  });
+
+  assert.equal(result.names, "Bob and Marie");
+  assert.equal(result.customerName, "Bob");
+  assert.equal(result.partnerName, "Marie");
+  assert.equal(result.coupleDisplayName, "Bob and Marie");
+  assert.equal(result.nameCollectionStatus, "both");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /deterministic_name_role_extraction/);
+});
+
 test("semantic v2 mutator treats street address as venue without changing wedding date", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
