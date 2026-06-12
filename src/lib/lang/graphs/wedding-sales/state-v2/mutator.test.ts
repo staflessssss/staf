@@ -18,6 +18,10 @@ function analysis(update: Partial<SemanticAnalysisV2> = {}): SemanticAnalysisV2 
     ],
     primaryIntent: "provide_info",
     entities: [],
+    providedInfo: {
+      customerName: null,
+      partnerName: null,
+    },
     questions: [],
     objections: [],
     pendingResolution: null,

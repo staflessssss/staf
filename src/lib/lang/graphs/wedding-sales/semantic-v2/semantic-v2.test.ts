@@ -24,6 +24,10 @@ function analysis(
     ],
     primaryIntent: "provide_info",
     entities: [],
+    providedInfo: {
+      customerName: null,
+      partnerName: null,
+    },
     questions: [],
     objections: [],
     pendingResolution: null,

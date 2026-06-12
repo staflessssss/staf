@@ -65,8 +65,7 @@ export const semanticAnalysisV2Schema = z.object({
     .object({
       customerName: semanticProvidedValueSchema.nullable(),
       partnerName: semanticProvidedValueSchema.nullable(),
-    })
-    .optional(),
+    }),
   questions: z
     .array(
       z.object({
