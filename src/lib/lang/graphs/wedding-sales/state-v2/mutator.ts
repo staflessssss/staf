@@ -93,6 +93,36 @@ function workingState(state: WeddingSalesState, update: Partial<WeddingSalesStat
   };
 }
 
+function extractRelativeOrWeekdayCallTime(text?: string) {
+  if (!text) {
+    return undefined;
+  }
+
+  const dayFirst = text.match(
+    /\b((?:day after tomorrow|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*(?:eastern|et|est|edt))?)\b/i,
+  );
+
+  if (dayFirst?.[1]) {
+    return dayFirst[1].trim();
+  }
+
+  const timeFirst = text.match(
+    /\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*(?:eastern|et|est|edt))?\s+(?:today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i,
+  );
+
+  return timeFirst?.[1]?.trim();
+}
+
+function callTimeValueForState(state: WeddingSalesState, semanticValue: string) {
+  const latestMessageCallTime = extractRelativeOrWeekdayCallTime(state.latestCustomerMessage);
+
+  if (latestMessageCallTime) {
+    return latestMessageCallTime;
+  }
+
+  return semanticValue;
+}
+
 function deriveLeadStage(args: {
   state: WeddingSalesState;
   update: Partial<WeddingSalesState>;
@@ -350,12 +380,16 @@ export function applySemanticV2StateMutation(args: {
         update.customerEmail = entry.value.toLowerCase();
         break;
       case "callTime":
-        if (state.proposedCallTime && normalizeForComparison(state.proposedCallTime) !== normalizeForComparison(entry.value)) {
-          update.calendarStatus = undefined;
-          update.bookingConfirmed = false;
-          update.bookedEventId = undefined;
+        {
+          const callTimeValue = callTimeValueForState(state, entry.value);
+
+          if (state.proposedCallTime && normalizeForComparison(state.proposedCallTime) !== normalizeForComparison(callTimeValue)) {
+            update.calendarStatus = undefined;
+            update.bookingConfirmed = false;
+            update.bookedEventId = undefined;
+          }
+          update.proposedCallTime = callTimeValue;
         }
-        update.proposedCallTime = entry.value;
         break;
     }
 

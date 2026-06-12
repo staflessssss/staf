@@ -349,6 +349,34 @@ test("instagram booking question after a busy calendar check asks for another ti
   assert.match(response, /What other time works/i);
 });
 
+test("instagram missing calendar time does not claim the slot is taken", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "calendar_time_missing",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 2,
+      leadStage: "checking_calendar",
+      names: "Bob and Marie",
+      customerName: "Bob",
+      partnerName: "Marie",
+      weddingDate: "2026-10-23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      proposedCallTime: "sometime tomorrow",
+      calendarStatus: undefined,
+      latestCustomerMessage: "Can we call sometime tomorrow?",
+    },
+  });
+
+  assert.doesNotMatch(response, /taken|busy|not available/i);
+  assert.match(response, /What time works/i);
+});
+
 test("instagram availability copy says we have the date available", () => {
   const response = composeWeddingSalesResponse({
     intent: "availability_available",

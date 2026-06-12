@@ -272,16 +272,27 @@ export function createWeddingSalesToolNodes(args: {
       const parsedResult = parseToolJson(result);
       const steps = getStepResults(parsedResult);
       const available = steps.some((step) => step.status === "available");
+      const busy = steps.some((step) => step.status === "busy");
+      const needsTime = steps.some((step) => step.status === "needs_time");
       const outsideWindow = steps.some(
         (step) => step.status === "outside_business_days" || step.status === "outside_business_hours",
       );
       const summary = getSummary(parsedResult) || steps.map(getSummary).find(Boolean);
 
-      const nextIntent: WeddingSalesResponseIntent = available && !state.customerEmail ? "ask_email" : available ? "calendar_available" : outsideWindow ? "calendar_outside_window" : "calendar_busy";
+      const nextIntent: WeddingSalesResponseIntent = available && !state.customerEmail
+        ? "ask_email"
+        : available
+          ? "calendar_available"
+          : outsideWindow
+            ? "calendar_outside_window"
+            : needsTime || !busy
+              ? "calendar_time_missing"
+              : "calendar_busy";
       const nextLeadStage = available && !state.customerEmail ? "waiting_customer_email" : available ? "call_proposed" : "checking_calendar";
+      const nextCalendarStatus = available ? "available" : busy ? "busy" : undefined;
 
       return {
-        calendarStatus: available ? "available" : "busy",
+        calendarStatus: nextCalendarStatus,
         customerEmail: state.customerEmail,
         leadStage: nextLeadStage,
         ...(await composeReplyUpdate({
@@ -290,7 +301,7 @@ export function createWeddingSalesToolNodes(args: {
           state,
           summary,
           statePatch: {
-            calendarStatus: available ? "available" : "busy",
+            calendarStatus: nextCalendarStatus,
             customerEmail: state.customerEmail,
             leadStage: nextLeadStage,
           },

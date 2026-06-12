@@ -67,6 +67,27 @@ test("parseSchedulingRequest parses relative consultation time in ET", () => {
   assert.match(parsed?.startTime ?? "", /^2026-04-10T10:30:00-0[45]:00$/);
 });
 
+test("parseSchedulingRequest lets window validation reject tomorrow on a non-business day", () => {
+  const parsed = calendarSchedulingTestHelpers.parseSchedulingRequest({
+    request: "Can we call tomorrow at 11am?",
+    timeZone: "America/New_York",
+    slotDurationMinutes: 30,
+    referenceDate: new Date("2026-06-12T17:00:00Z"),
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed?.date, "2026-06-13");
+  assert.equal(parsed?.time, "11:00");
+
+  const validation = calendarSchedulingTestHelpers.validateSchedulingWindow(
+    parsed,
+    schedulingConfig(),
+  );
+
+  assert.equal(validation.ok, false);
+  assert.equal(validation.reason, "outside_business_days");
+});
+
 test("parseSchedulingRequest normalizes dashed and spaced time selections", () => {
   const dashed = calendarSchedulingTestHelpers.parseSchedulingRequest({
     request: "Tuesday at 10-00 looks good",
@@ -375,8 +396,8 @@ test("executeGoogleCalendarStep keeps booking successful when lead logging fails
     const result = await executeGoogleCalendarStep({
       tenantId: "tenant-1",
       action: "book_call",
-      request: "Book consultation call for June 12, 2026 at 10:30 with Alex and Sam at alex@example.com",
-      timeText: "June 12, 2026 at 10:30",
+      request: "Book consultation call for June 15, 2026 at 10:30 with Alex and Sam at alex@example.com",
+      timeText: "June 15, 2026 at 10:30",
       coupleName: "Alex and Sam",
       weddingDate: "2026-07-20",
       location: "Charlotte",

@@ -163,6 +163,52 @@ test("semantic v2 mutator routes accepted call time to calendar check when avail
   assert.equal(result.leadStage, "checking_calendar");
 });
 
+test("semantic v2 mutator preserves customer relative call time over normalized LLM date", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Can we call tomorrow at 11am?",
+    previousState: {
+      leadStage: "asking_call_time",
+      names: "Bob and Marie",
+      weddingDate: "2026-10-23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      venue: "Evergreen Park",
+      availability: "available",
+      callProposed: true,
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "provide_info",
+          confidence: 0.95,
+          targetField: "callTime",
+          evidence: "tomorrow at 11am",
+        },
+      ],
+      entities: [
+        {
+          field: "callTime",
+          value: "2024-06-14T11:00:00-04:00",
+          normalizedValue: "2024-06-14T11:00:00-04:00",
+          confidence: 0.95,
+          evidence: "tomorrow at 11am",
+          alternatives: [],
+        },
+      ],
+    }),
+    fallbackLeadStage: "asking_call_time",
+  });
+
+  assert.equal(result.proposedCallTime, "tomorrow at 11am");
+  assert.equal(result.leadStage, "checking_calendar");
+});
+
 test("semantic v2 mutator merges fiance name into existing customer name", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
