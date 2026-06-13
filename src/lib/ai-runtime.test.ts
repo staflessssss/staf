@@ -780,6 +780,46 @@ test("handleIncomingEventWithDeps pauses a dialog after a manual business reply"
   assert.equal(deliveryUpdates.length, 2);
 });
 
+test("wedding sales runtime detects action-plan owner handoff requests", () => {
+  assert.equal(
+    aiRuntimeTestHelpers.getWeddingSalesOwnerHandoffReason({
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "handoff",
+        actions: [
+          {
+            type: "recommend_owner_handoff",
+            field: null,
+            topicId: null,
+            reason: "message_is_not_a_new_lead_sales_question",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    } as never),
+    "message_is_not_a_new_lead_sales_question",
+  );
+
+  assert.equal(
+    aiRuntimeTestHelpers.getWeddingSalesOwnerHandoffReason({
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "final_film_delivery",
+            reason: "customer_asked_current_business_question",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    } as never),
+    null,
+  );
+});
+
 test("handleIncomingEventWithDeps records messages without invoking the agent while globally paused", async () => {
   const createdMessages: Array<Record<string, unknown>> = [];
   const conversation = {

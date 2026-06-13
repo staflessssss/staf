@@ -53,6 +53,7 @@ import {
 } from "@/lib/business-handoff";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import {
+  OWNER_HANDOFF_REQUEST_TOOL_NAME,
   hasConnectedOwnerTelegram,
   requestOwnerHandoffWithDb,
   shouldRequestOwnerHandoff,
@@ -218,6 +219,14 @@ type LangGraphToolObservation = {
 };
 
 const WEDDING_SALES_TEST_STATE_TOOL_NAME = "__wedding_sales_state";
+
+function getWeddingSalesOwnerHandoffReason(state: WeddingSalesState) {
+  return (
+    state.lastActionPlan?.actions.find(
+      (action) => action.type === "recommend_owner_handoff",
+    )?.reason ?? null
+  );
+}
 
 export type InvokeAgentResult = {
   message: string;
@@ -1414,6 +1423,29 @@ async function runWeddingSalesRuntime(args: {
   const message = graphResult.responseDraft ?? "";
 
   if (!message) {
+    const ownerHandoffReason = getWeddingSalesOwnerHandoffReason(graphResult);
+
+    if (ownerHandoffReason) {
+      const handoff = await requestOwnerHandoffWithDb({
+        database: args.database,
+        agent: args.agent,
+        conversationId: conversation.id,
+        customerMessage: args.incoming.message,
+        reason: ownerHandoffReason,
+      });
+
+      if (handoff.status === "owner_handoff_requested") {
+        return {
+          message: "",
+          promptPreview: "langgraph_wedding_sales",
+          usedTooling: [OWNER_HANDOFF_REQUEST_TOOL_NAME],
+          conversationId: conversation.id,
+          model: "langgraph_wedding_sales",
+          suppressReply: true,
+        };
+      }
+    }
+
     return {
       message: "",
       promptPreview: "langgraph_wedding_sales",
@@ -1933,6 +1965,7 @@ export const aiRuntimeTestHelpers = {
   extractDelayedFollowUpGuidance,
   finalizeAssistantText,
   getInboundConversationPolicy,
+  getWeddingSalesOwnerHandoffReason,
   handleIncomingEventWithDeps,
   isWithinAgentSchedule,
   buildRuntimeContextLines,
