@@ -495,6 +495,7 @@ function parseSchedulingRequest(args: {
   const reference = args.referenceDate ?? new Date();
   const base = getTimeZoneParts(reference, args.timeZone);
   const time = parseTimeFromText(source);
+  let matchedWeekdayWithoutExplicitDate = false;
 
   if (!time) {
     return null;
@@ -516,6 +517,7 @@ function parseSchedulingRequest(args: {
       const foundWeekday = Object.entries(weekdayMap).find(([label]) => source.includes(label));
 
       if (foundWeekday) {
+        matchedWeekdayWithoutExplicitDate = true;
         let diff = foundWeekday[1] - targetDate.getUTCDay();
         if (diff < 0) {
           diff += 7;
@@ -544,13 +546,25 @@ function parseSchedulingRequest(args: {
     }
   }
 
-  const dateIso = targetDate.toISOString().slice(0, 10);
-  const offset = getTimeZoneOffsetString(dateIso, args.timeZone);
+  let dateIso = targetDate.toISOString().slice(0, 10);
+  let offset = getTimeZoneOffsetString(dateIso, args.timeZone);
   const endMinutesTotal = time.hours * 60 + time.minutes + args.slotDurationMinutes;
   const endHours = Math.floor(endMinutesTotal / 60);
   const endMinutes = endMinutesTotal % 60;
-  const startTime = `${dateIso}T${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}:00${offset}`;
-  const endTime = `${dateIso}T${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}:00${offset}`;
+  let startTime = `${dateIso}T${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}:00${offset}`;
+  let endTime = `${dateIso}T${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}:00${offset}`;
+
+  if (
+    Date.parse(startTime) <= reference.getTime() &&
+    matchedWeekdayWithoutExplicitDate &&
+    !source.includes("today")
+  ) {
+    targetDate = addUtcDays(targetDate, 7);
+    dateIso = targetDate.toISOString().slice(0, 10);
+    offset = getTimeZoneOffsetString(dateIso, args.timeZone);
+    startTime = `${dateIso}T${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}:00${offset}`;
+    endTime = `${dateIso}T${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}:00${offset}`;
+  }
 
   if (Date.parse(startTime) <= reference.getTime()) {
     return null;

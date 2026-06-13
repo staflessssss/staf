@@ -124,7 +124,7 @@ test("parseSchedulingRequest respects an explicit bound date when the request te
   assert.equal(parsed?.time, "10:30");
 });
 
-test("parseSchedulingRequest uses same-day weekday time only while it is still in the future", () => {
+test("parseSchedulingRequest uses same-day weekday time while future and next week after it passes", () => {
   const beforeSlot = calendarSchedulingTestHelpers.parseSchedulingRequest({
     request: "Friday at 10am works",
     timeZone: "America/New_York",
@@ -141,7 +141,23 @@ test("parseSchedulingRequest uses same-day weekday time only while it is still i
   assert.ok(beforeSlot);
   assert.equal(beforeSlot?.date, "2026-04-10");
   assert.equal(beforeSlot?.time, "10:00");
-  assert.equal(afterSlot, null);
+  assert.ok(afterSlot);
+  assert.equal(afterSlot?.date, "2026-04-17");
+  assert.equal(afterSlot?.time, "10:00");
+});
+
+test("parseSchedulingRequest treats Friday time after business day as next Friday", () => {
+  const parsed = calendarSchedulingTestHelpers.parseSchedulingRequest({
+    request: "Check consultation calendar for Friday 10am with Bob and Marie",
+    timeText: "Friday 10am",
+    timeZone: "America/New_York",
+    slotDurationMinutes: 30,
+    referenceDate: new Date("2026-06-13T00:22:00Z"),
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed?.date, "2026-06-19");
+  assert.equal(parsed?.time, "10:00");
 });
 
 test("parseSchedulingRequest treats an explicit bound date as authoritative over relative request text", () => {
