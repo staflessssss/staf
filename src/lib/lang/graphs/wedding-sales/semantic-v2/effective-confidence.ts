@@ -137,6 +137,10 @@ function confirmsAlternateWeddingDate(args: {
   );
 }
 
+function isReplaceableSchedulingField(field: WeddingSalesField) {
+  return field === "callTime";
+}
+
 function isSchedulingObjection(analysis: SemanticAnalysisV2) {
   return analysis.objections.some(
     (objection) =>
@@ -186,6 +190,7 @@ export function calculateEffectiveEntityConfidence(args: {
 
     if (
       conflictsWithCommittedState &&
+      !isReplaceableSchedulingField(entity.field) &&
       !hasAuthorizedConflict({
         analysis: args.analysis,
         state: args.state,
