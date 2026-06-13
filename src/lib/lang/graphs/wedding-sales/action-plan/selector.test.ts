@@ -204,6 +204,51 @@ test("action selector keeps active sales booking questions in the sales flow", (
   assert.notEqual(plan.actions[0]?.type, "recommend_owner_handoff");
 });
 
+test("action selector answers known FAQ questions after a consultation is booked", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "When will we get the final film?",
+    previousState: {
+      leadStage: "booked",
+      bookingConfirmed: true,
+      names: "Rick and Kris",
+      customerName: "Rick",
+      partnerName: "Kris",
+      weddingDate: "2026-06-12",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      calendarStatus: "available",
+      proposedCallTime: "Monday 11am",
+      customerEmail: "rick@example.com",
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      clientType: {
+        value: "existing_client",
+        confidence: 0.95,
+        evidence: "get the final film",
+      },
+      questions: [
+        {
+          topicId: "final_film_delivery",
+          normalizedQuestion: "When will we get the final film?",
+          confidence: 0.95,
+          evidence: "final film",
+        },
+      ],
+    }),
+  });
+
+  assert.equal(plan.responseGoal, "answer_and_qualify");
+  assert.equal(plan.actions[0]?.type, "answer_question");
+  assert.equal(plan.actions[0]?.topicId, "final_film_delivery");
+});
+
 test("action selector does not authorize availability without location", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

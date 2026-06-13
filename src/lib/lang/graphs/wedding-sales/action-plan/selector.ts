@@ -26,6 +26,26 @@ const FIELD_QUESTION_ORDER: WeddingSalesField[] = [
   "email",
 ];
 
+const ACTIVE_SALES_CONTINUATION_TOPICS = new Set([
+  "availability",
+  "booking",
+  "film_length",
+  "final_film_delivery",
+  "hidden_fees",
+  "insurance",
+  "music",
+  "package_inclusions",
+  "photographers",
+  "portfolio",
+  "pricing",
+  "reviews",
+  "style",
+  "team_florida",
+  "team_nc_sc_ga",
+  "travel_fees",
+  "venue_travel_details",
+]);
+
 function hasHighConfidenceQuestion(analysis: SemanticAnalysisV2) {
   return analysis.questions.some((question) => question.confidence >= 0.75);
 }
@@ -62,14 +82,7 @@ function isActiveSalesContinuationQuestion(state: WeddingSalesState, analysis: S
   return Boolean(
     activeSalesStage &&
       topic &&
-      [
-        "booking",
-        "availability",
-        "pricing",
-        "travel_fees",
-        "venue_travel_details",
-        "package_inclusions",
-      ].includes(topic),
+      ACTIVE_SALES_CONTINUATION_TOPICS.has(topic),
   );
 }
 
