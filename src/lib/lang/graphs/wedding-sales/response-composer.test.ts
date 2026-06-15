@@ -1113,6 +1113,50 @@ test("instagram style gate keeps FAQ replies on the next missing qualification q
   assert.equal(response, fallback);
 });
 
+test("instagram style gate requires venue question after availability price guide reply", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "availability_checked",
+    location: "Fort Lauderdale",
+    venue: undefined,
+    availability: "available",
+    assistantReplyCount: 3,
+    hasGreeted: true,
+  };
+  const fallback = "Awesome Samantha! March 6, 2027 is available.\n\nOur 8-hour collections start at $2,950.\n\nWhat’s the exact venue in Fort Lauderdale?";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "availability_available", config, state },
+    "Awesome Samantha! March 6, 2027 is available.\n\nOur 8-hour collections start at $2,950 — let me send you the guide so you can see everything ✨",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
+test("instagram style gate requires call question after availability reply when venue is known", () => {
+  const state: WeddingSalesState = {
+    ...baseState,
+    channel: "instagram",
+    leadStage: "availability_checked",
+    location: "Fort Lauderdale",
+    venue: "Ritz",
+    availability: "available",
+    assistantReplyCount: 3,
+    hasGreeted: true,
+  };
+  const fallback = "The Ritz sounds lovely.\n\nWhen would be a good time for a quick call?";
+
+  const response = weddingSalesResponseComposerTestHelpers.enforceInstagramResponseStyle(
+    { intent: "availability_available", config, state },
+    "March 6, 2027 is available, and our collections start at $2,950.",
+    fallback,
+  );
+
+  assert.equal(response, fallback);
+});
+
 test("instagram style gate keeps only one clear question per reply", () => {
   const state: WeddingSalesState = {
     ...baseState,

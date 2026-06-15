@@ -1437,6 +1437,13 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
     && !latestCustomerMessage.includes("cost")
     && !latestCustomerMessage.includes("package")
     && !latestCustomerMessage.includes("collection");
+  const missesAvailabilityNextQuestion = args.intent === "availability_available"
+    && (
+      (!args.state.venue && !/\b(?:venue|where|location|place)\b/i.test(normalizedBody)) ||
+      (Boolean(args.state.venue) && !/\b(?:call|time|mon|fri|eastern|schedule)\b/i.test(normalizedBody))
+    );
+  const missesEmailQuestion = args.intent === "ask_email"
+    && !/\b(?:email|e-mail|mail)\b/i.test(normalizedBody);
   const missesRequiredNextQuestion = args.intent === "answer_question"
     && (responseContext.hasActionPlanAuthority
       ? Boolean(responseContext.plannedQuestionField && !normalizedBody.includes("?"))
@@ -1458,6 +1465,8 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
     || hasRoboticPhrase
     || addsUnaskedTravelAnswer
     || addsUnaskedPricingAnswer
+    || missesAvailabilityNextQuestion
+    || missesEmailQuestion
     || missesRequiredNextQuestion
     ? fallback.trim()
     : text.trim();
