@@ -161,6 +161,20 @@ function buildCalendarToolTimeInput(proposedCallTime: string) {
   };
 }
 
+function buildPostToolResponseState(
+  state: WeddingSalesState,
+  statePatch?: Partial<WeddingSalesState>,
+) {
+  return {
+    ...state,
+    ...statePatch,
+    // The action plan was selected before the tool ran. Once a tool result
+    // chooses the response intent, that stale plan must not suppress the
+    // deterministic post-tool reply or next question.
+    lastActionPlan: undefined,
+  };
+}
+
 function buildBookingToolRequest(state: WeddingSalesState) {
   return [
     "Book consultation call",
@@ -181,10 +195,7 @@ async function composeReplyUpdate(args: {
   statePatch?: Partial<WeddingSalesState>;
   summaryStatePatch?: Partial<WeddingSalesState>;
 }) {
-  const stateForPolicy = {
-    ...args.state,
-    ...args.statePatch,
-  };
+  const stateForPolicy = buildPostToolResponseState(args.state, args.statePatch);
   const policy = buildWeddingSalesDialogPolicy({
     ...args,
     state: stateForPolicy,
@@ -490,6 +501,7 @@ export const weddingSalesToolNodeTestHelpers = {
   getBookingOutcome,
   getCalendarSlotState,
   buildCalendarToolTimeInput,
+  buildPostToolResponseState,
   buildAvailabilityToolRequest,
   buildCalendarToolRequest,
   buildBookingToolRequest,

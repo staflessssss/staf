@@ -3,6 +3,9 @@ import test from "node:test";
 
 import { calendarSchedulingTestHelpers } from "@/lib/tools/google-calendar";
 
+import { defaultWeddingSalesConfig } from "../config";
+import { composeWeddingSalesResponse } from "../response-composer";
+import { createInitialWeddingSalesState } from "../state";
 import { weddingSalesToolNodeTestHelpers } from "./tools";
 
 test("wedding sales tool node treats booked status as confirmed without event id", () => {
@@ -95,4 +98,45 @@ test("canonical state datetime survives the wedding tool boundary and calendar p
   assert.ok(parsed);
   assert.equal(parsed?.date, "2026-06-24");
   assert.equal(parsed?.time, "13:00");
+});
+
+test("post-tool response is not suppressed by the stale pre-tool action plan", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "13:00 works too",
+    previousState: {
+      semanticStateVersion: 2,
+      names: "Samantha and Collin",
+      proposedCallTime: "2026-06-24T13:00:00",
+      lastActionPlan: {
+        schemaVersion: 1,
+        actions: [
+          {
+            type: "check_consultation_calendar",
+            field: null,
+            topicId: null,
+            reason: "call_time_is_ready_and_wedding_date_is_available",
+          },
+        ],
+        responseGoal: "run_tools_then_reply",
+        guardrailTrace: [],
+      },
+    },
+  });
+  const postToolState = weddingSalesToolNodeTestHelpers.buildPostToolResponseState(state, {
+    calendarStatus: "available",
+    checkedCallDate: "2026-06-24",
+    checkedCallTime: "13:00",
+    leadStage: "waiting_customer_email",
+  });
+
+  assert.equal(postToolState.lastActionPlan, undefined);
+  assert.match(
+    composeWeddingSalesResponse({
+      intent: "ask_email",
+      config: defaultWeddingSalesConfig,
+      state: postToolState,
+    }),
+    /email/i,
+  );
 });
