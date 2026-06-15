@@ -787,6 +787,10 @@ function extractEmail(args: CalendarExecutionArgs) {
 }
 
 function resolveAvailabilityDate(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (args.date && /^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
+    return args.date;
+  }
+
   if (config.availabilityDateSource === "literal" && /^\d{4}-\d{2}-\d{2}$/.test(config.availabilityDateValue)) {
     return config.availabilityDateValue;
   }
@@ -1523,6 +1527,7 @@ export const calendarSchedulingTestHelpers = {
   parseSchedulingRequest,
   validateSchedulingWindow,
   inferRequestedDate,
+  resolveAvailabilityDate,
   buildCalendarInsertPayload,
 };
 

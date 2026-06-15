@@ -144,6 +144,23 @@ function buildCalendarToolRequest(state: WeddingSalesState) {
     .join(" ");
 }
 
+function buildCalendarToolTimeInput(proposedCallTime: string) {
+  const canonicalMatch = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/.exec(
+    proposedCallTime.trim(),
+  );
+
+  if (canonicalMatch) {
+    return {
+      date: canonicalMatch[1],
+      timeText: canonicalMatch[2],
+    };
+  }
+
+  return {
+    timeText: proposedCallTime,
+  };
+}
+
 function buildBookingToolRequest(state: WeddingSalesState) {
   return [
     "Book consultation call",
@@ -318,7 +335,7 @@ export function createWeddingSalesToolNodes(args: {
 
       const result = await invokeTool(checkConsultationCalendarTool(toolContext), {
         request: buildCalendarToolRequest(state),
-        timeText: state.proposedCallTime,
+        ...buildCalendarToolTimeInput(state.proposedCallTime),
         coupleName: state.names,
         weddingDate: state.weddingDate,
         location: state.location,
@@ -472,6 +489,7 @@ export function createWeddingSalesToolNodes(args: {
 export const weddingSalesToolNodeTestHelpers = {
   getBookingOutcome,
   getCalendarSlotState,
+  buildCalendarToolTimeInput,
   buildAvailabilityToolRequest,
   buildCalendarToolRequest,
   buildBookingToolRequest,

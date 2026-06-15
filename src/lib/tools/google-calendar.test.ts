@@ -126,6 +126,24 @@ test("parseSchedulingRequest respects an explicit bound date when the request te
   assert.equal(parsed?.time, "10:30");
 });
 
+test("structured calendar date takes priority over time-text source configuration", () => {
+  const date = calendarSchedulingTestHelpers.resolveAvailabilityDate(
+    {
+      tenantId: "tenant-1",
+      action: "check consultation calendar",
+      params: {},
+      request: "Check consultation calendar for 2026-06-24T13:00:00",
+      date: "2026-06-24",
+      timeText: "13:00",
+    },
+    schedulingConfig({
+      availabilityDateSource: "time_text",
+    }),
+  );
+
+  assert.equal(date, "2026-06-24");
+});
+
 test("parseSchedulingRequest uses same-day weekday time while future and next week after it passes", () => {
   const beforeSlot = calendarSchedulingTestHelpers.parseSchedulingRequest({
     request: "Friday at 10am works",
