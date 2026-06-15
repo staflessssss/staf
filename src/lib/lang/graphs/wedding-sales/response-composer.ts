@@ -964,6 +964,9 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         ].join("\n\n");
       }
       case "calendar_time_missing":
+        if (state.calendarContextDate) {
+          return `What time on ${formatWeddingDateForReply(state.calendarContextDate)} works for you?`;
+        }
         if (isInstagram(state)) {
           return state.calendarStatus === "busy"
             ? "That time isn’t available. What other time works for you?"
@@ -982,6 +985,9 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           ? "That time is available. Would you like me to book it?"
           : "That time looks available on the calendar. Would you like me to go ahead and book it for you?";
       case "calendar_busy":
+        if (state.calendarContextDate && state.suggestedCallTimes?.length) {
+          return `That time on ${formatWeddingDateForReply(state.calendarContextDate)} is already taken. Would ${state.suggestedCallTimes.join(", ")} work instead?`;
+        }
         return isInstagram(state)
           ? "That time is already taken. What other time works for you?"
           : "That time is already taken on the calendar, so I do not want to book the wrong slot. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?";

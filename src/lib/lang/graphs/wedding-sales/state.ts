@@ -55,6 +55,8 @@ export type WeddingSalesState = {
   callProposed: boolean;
   proposedCallTime?: string;
   calendarStatus?: "available" | "busy";
+  calendarContextDate?: string;
+  suggestedCallTimes?: string[];
   checkedCallDate?: string;
   checkedCallTime?: string;
   checkedCallStartTime?: string;
@@ -127,6 +129,8 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   callProposed: Annotation<boolean>(),
   proposedCallTime: Annotation<string | undefined>(),
   calendarStatus: Annotation<"available" | "busy" | undefined>(),
+  calendarContextDate: Annotation<string | undefined>(),
+  suggestedCallTimes: Annotation<string[] | undefined>(),
   checkedCallDate: Annotation<string | undefined>(),
   checkedCallTime: Annotation<string | undefined>(),
   checkedCallStartTime: Annotation<string | undefined>(),
@@ -209,6 +213,8 @@ export function createInitialWeddingSalesState(args: {
     callProposed: args.previousState?.callProposed ?? false,
     proposedCallTime: args.previousState?.proposedCallTime,
     calendarStatus: args.previousState?.calendarStatus,
+    calendarContextDate: args.previousState?.calendarContextDate,
+    suggestedCallTimes: args.previousState?.suggestedCallTimes,
     checkedCallDate: args.previousState?.checkedCallDate,
     checkedCallTime: args.previousState?.checkedCallTime,
     checkedCallStartTime: args.previousState?.checkedCallStartTime,

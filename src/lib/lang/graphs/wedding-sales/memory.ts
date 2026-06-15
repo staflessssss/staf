@@ -29,6 +29,7 @@ export function buildWeddingSalesConversationSummary(args: {
     state.callProposed ? "Consultation call has been proposed." : "",
     state.proposedCallTime ? `Latest proposed consultation time: ${compact(state.proposedCallTime, 120)}.` : "",
     state.calendarStatus ? `Latest calendar check: ${state.calendarStatus}.` : "",
+    state.calendarContextDate ? `Consultation date currently being discussed: ${state.calendarContextDate}.` : "",
     state.bookingConfirmed ? "Consultation booking is confirmed." : "",
     state.bookedEventId ? `Booked calendar event id: ${state.bookedEventId}.` : "",
     state.askedForNames ? "Agent has already asked for names." : "",

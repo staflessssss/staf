@@ -34,3 +34,26 @@ test("wedding sales tool node preserves booked event id when present", () => {
     },
   );
 });
+
+test("wedding sales tool node preserves busy date context without marking the slot checked", () => {
+  assert.deepEqual(
+    weddingSalesToolNodeTestHelpers.getCalendarSlotState([
+      {
+        status: "busy",
+        date: "2026-06-24",
+        requestedTime: "12:30",
+        suggestedTimes: ["11:30", "12:00", "13:00"],
+      },
+    ]),
+    {
+      available: false,
+      busy: true,
+      calendarContextDate: "2026-06-24",
+      suggestedCallTimes: ["11:30", "12:00", "13:00"],
+      checkedCallDate: undefined,
+      checkedCallTime: undefined,
+      checkedCallStartTime: undefined,
+      checkedCallEndTime: undefined,
+    },
+  );
+});

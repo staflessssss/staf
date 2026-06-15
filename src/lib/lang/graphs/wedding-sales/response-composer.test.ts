@@ -393,6 +393,8 @@ test("wedding sales human composer keeps required calendar busy follow-up under 
         availability: "available",
         proposedCallTime: "Wednesday June 24 at 12:30",
         calendarStatus: "busy",
+        calendarContextDate: "2026-06-24",
+        suggestedCallTimes: ["11:30", "12:00", "13:00"],
         latestCustomerMessage: "Wednesday June 24 at 12:30",
         assistantReplyCount: 5,
         hasGreeted: true,
@@ -420,7 +422,10 @@ test("wedding sales human composer keeps required calendar busy follow-up under 
     });
 
     assert.notEqual(response, "");
-    assert.match(response, /taken|available|other time|works/i);
+    assert.match(response, /June 24, 2026/);
+    assert.match(response, /11:30/);
+    assert.match(response, /12:00/);
+    assert.match(response, /13:00/);
     assert.match(response, /\?/);
   } finally {
     if (originalComposerFlag === undefined) {

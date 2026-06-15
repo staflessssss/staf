@@ -468,6 +468,62 @@ test("semantic v2 mutator replaces a previously rejected call time with a fresh 
   assert.equal(result.leadStage, "checking_calendar");
 });
 
+test("semantic v2 mutator resolves a bare alternative time against the busy calendar date", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "13:00 works too",
+    previousState: {
+      leadStage: "checking_calendar",
+      names: "Samantha and Collin",
+      weddingDate: "2027-03-06",
+      weddingYear: "2027",
+      weddingYearKnown: true,
+      location: "Fort Lauderdale, FL",
+      venue: "Ritz",
+      availability: "available",
+      callProposed: true,
+      proposedCallTime: "Wednesday June 24 at 12:30",
+      calendarStatus: "busy",
+      calendarContextDate: "2026-06-24",
+      suggestedCallTimes: ["11:30", "12:00", "13:00"],
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "callTime",
+          value: "13:00",
+          normalizedValue: null,
+          confidence: 0.98,
+          evidence: "13:00",
+          alternatives: [],
+        },
+      ],
+    }),
+    fallbackLeadStage: "checking_calendar",
+  });
+
+  assert.equal(result.proposedCallTime, "2026-06-24T13:00:00");
+  assert.equal({ ...state, ...result }.calendarContextDate, "2026-06-24");
+  assert.equal(result.calendarStatus, undefined);
+  assert.equal(result.checkedCallDate, undefined);
+  assert.equal(result.checkedCallTime, undefined);
+  assert.equal(result.leadStage, "checking_calendar");
+
+  const plan = selectWeddingSalesActionPlan({
+    state: {
+      ...state,
+      ...result,
+    },
+    analysis: analysis(),
+  });
+
+  assert.equal(plan.actions[0]?.type, "check_consultation_calendar");
+});
+
 test("semantic v2 mutator merges structured partner name into existing customer name", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

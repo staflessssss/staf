@@ -57,6 +57,36 @@ function clearCheckedCallSlot() {
   } satisfies Partial<WeddingSalesState>;
 }
 
+function clearCalendarContext() {
+  return {
+    calendarContextDate: undefined,
+    suggestedCallTimes: undefined,
+  } satisfies Partial<WeddingSalesState>;
+}
+
+function normalizeBareCallTime(value: string) {
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i.exec(value.trim());
+  if (!match) {
+    return undefined;
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] ?? "0");
+  const meridiem = match[3]?.toLowerCase();
+
+  if (hour > 23 || minute > 59 || (meridiem && (hour < 1 || hour > 12))) {
+    return undefined;
+  }
+
+  if (meridiem === "am" && hour === 12) {
+    hour = 0;
+  } else if (meridiem === "pm" && hour !== 12) {
+    hour += 12;
+  }
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 function clearBookingResult() {
   return {
     bookingConfirmed: false,
@@ -496,11 +526,19 @@ export function applySemanticV2StateMutation(args: {
       case "callTime":
         {
           const callTimeValue = entry.value;
+          const bareCallTime = normalizeBareCallTime(callTimeValue);
+          const resolvedCallTime =
+            bareCallTime && state.calendarContextDate
+              ? `${state.calendarContextDate}T${bareCallTime}:00`
+              : callTimeValue;
 
-          if (state.proposedCallTime && normalizeForComparison(state.proposedCallTime) !== normalizeForComparison(callTimeValue)) {
+          if (state.proposedCallTime && normalizeForComparison(state.proposedCallTime) !== normalizeForComparison(resolvedCallTime)) {
             Object.assign(update, clearCheckedCallSlot(), clearBookingResult());
           }
-          update.proposedCallTime = callTimeValue;
+          if (!bareCallTime) {
+            Object.assign(update, clearCalendarContext());
+          }
+          update.proposedCallTime = resolvedCallTime;
         }
         break;
     }

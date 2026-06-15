@@ -77,6 +77,8 @@ export function buildSemanticV2Prompt(state: WeddingSalesState) {
         availability: state.availability,
         proposedCallTime: state.proposedCallTime,
         calendarStatus: state.calendarStatus,
+        calendarContextDate: state.calendarContextDate,
+        suggestedCallTimes: state.suggestedCallTimes,
         bookingConfirmed: state.bookingConfirmed,
         pendingChangeField: state.pendingChangeField,
         pendingChangeValue: state.pendingChangeValue,

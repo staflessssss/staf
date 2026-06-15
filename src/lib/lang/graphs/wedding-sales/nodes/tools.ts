@@ -52,6 +52,38 @@ function getString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function getStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map(getString).filter((entry): entry is string => Boolean(entry))
+    : [];
+}
+
+function getCalendarSlotState(
+  steps: Record<string, unknown>[],
+  previousContextDate?: string,
+) {
+  const availableStep = steps.find((step) => step.status === "available");
+  const busyStep = steps.find((step) => step.status === "busy");
+  const available = Boolean(availableStep);
+  const busy = Boolean(busyStep);
+
+  return {
+    available,
+    busy,
+    calendarContextDate:
+      getString(availableStep?.date) ??
+      getString(busyStep?.date) ??
+      previousContextDate,
+    suggestedCallTimes: busy
+      ? getStringArray(busyStep?.suggestedTimes)
+      : [],
+    checkedCallDate: available ? getString(availableStep?.date) : undefined,
+    checkedCallTime: available ? getString(availableStep?.time) : undefined,
+    checkedCallStartTime: available ? getString(availableStep?.startTime) : undefined,
+    checkedCallEndTime: available ? getString(availableStep?.endTime) : undefined,
+  };
+}
+
 function getAvailabilityRegion(steps: Record<string, unknown>[]) {
   for (const step of steps) {
     const region = normalizeWeddingSalesRegionKey(
@@ -295,9 +327,16 @@ export function createWeddingSalesToolNodes(args: {
       });
       const parsedResult = parseToolJson(result);
       const steps = getStepResults(parsedResult);
-      const availableStep = steps.find((step) => step.status === "available");
-      const available = Boolean(availableStep);
-      const busy = steps.some((step) => step.status === "busy");
+      const {
+        available,
+        busy,
+        calendarContextDate,
+        suggestedCallTimes,
+        checkedCallDate,
+        checkedCallTime,
+        checkedCallStartTime,
+        checkedCallEndTime,
+      } = getCalendarSlotState(steps, state.calendarContextDate);
       const needsTime = steps.some((step) => step.status === "needs_time");
       const dateMismatch = steps.some((step) => step.status === "date_weekday_mismatch");
       const outsideWindow = steps.some(
@@ -318,13 +357,10 @@ export function createWeddingSalesToolNodes(args: {
                 : "calendar_busy";
       const nextLeadStage = available && !state.customerEmail ? "waiting_customer_email" : available ? "call_proposed" : "checking_calendar";
       const nextCalendarStatus = available ? "available" : busy ? "busy" : undefined;
-      const checkedCallDate = available ? getString(availableStep?.date) : undefined;
-      const checkedCallTime = available ? getString(availableStep?.time) : undefined;
-      const checkedCallStartTime = available ? getString(availableStep?.startTime) : undefined;
-      const checkedCallEndTime = available ? getString(availableStep?.endTime) : undefined;
-
       return {
         calendarStatus: nextCalendarStatus,
+        calendarContextDate,
+        suggestedCallTimes,
         checkedCallDate,
         checkedCallTime,
         checkedCallStartTime,
@@ -338,6 +374,8 @@ export function createWeddingSalesToolNodes(args: {
           summary,
           statePatch: {
             calendarStatus: nextCalendarStatus,
+            calendarContextDate,
+            suggestedCallTimes,
             checkedCallDate,
             checkedCallTime,
             checkedCallStartTime,
@@ -433,6 +471,7 @@ export function createWeddingSalesToolNodes(args: {
 
 export const weddingSalesToolNodeTestHelpers = {
   getBookingOutcome,
+  getCalendarSlotState,
   buildAvailabilityToolRequest,
   buildCalendarToolRequest,
   buildBookingToolRequest,
