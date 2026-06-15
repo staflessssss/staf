@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test, { mock } from "node:test";
 import { google } from "googleapis";
 
+import { telegramAdapter } from "@/lib/channels/telegram";
 import { encrypt } from "@/lib/crypto";
+import { db } from "@/lib/db";
 import {
   calendarSchedulingTestHelpers,
   executeGoogleCalendarStep,
@@ -449,6 +451,116 @@ test("executeGoogleCalendarStep keeps booking successful when lead logging fails
   } finally {
     calendarMock.mock.restore();
     sheetsMock.mock.restore();
+
+    if (originalClientId === undefined) {
+      delete process.env.GOOGLE_CLIENT_ID;
+    } else {
+      process.env.GOOGLE_CLIENT_ID = originalClientId;
+    }
+
+    if (originalClientSecret === undefined) {
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    } else {
+      process.env.GOOGLE_CLIENT_SECRET = originalClientSecret;
+    }
+  }
+});
+
+test("executeGoogleCalendarStep sends booking notifications to the linked tenant owner chat", async () => {
+  const originalClientId = process.env.GOOGLE_CLIENT_ID;
+  const originalClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const tenantId = `tenant-booking-notify-${Date.now()}`;
+  const slug = `tenant-booking-notify-${Date.now()}`;
+  let sentTelegram: Parameters<typeof telegramAdapter.sendReply>[0] | null = null;
+
+  process.env.GOOGLE_CLIENT_ID = "test-client";
+  process.env.GOOGLE_CLIENT_SECRET = "test-secret";
+
+  await db.tenant.create({
+    data: {
+      id: tenantId,
+      name: "Booking Notification Tenant",
+      slug,
+      channelConnections: {
+        create: {
+          type: "TELEGRAM",
+          status: "CONNECTED",
+          credentialsEnc: encrypt("telegram-token"),
+          metadata: {
+            ownerHandoff: {
+              enabled: true,
+              ownerChatId: "linked-owner-chat",
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const calendarMock = mock.method(google, "calendar", () => ({
+    freebusy: {
+      query: async () => ({
+        data: {
+          calendars: {
+            primary: {
+              busy: [],
+            },
+          },
+        },
+      }),
+    },
+    events: {
+      insert: async () => ({
+        data: {
+          id: "event-telegram-1",
+          hangoutLink: "https://meet.google.com/test-telegram",
+        },
+      }),
+    },
+  }));
+  const telegramMock = mock.method(telegramAdapter, "sendReply", async (args) => {
+    sentTelegram = args;
+    return { ok: true, result: { message_id: 77 } };
+  });
+
+  try {
+    const result = await executeGoogleCalendarStep({
+      tenantId,
+      action: "book_call",
+      request: "Book consultation call for June 15, 2026 at 10:30 with Alex and Sam at alex@example.com",
+      timeText: "June 15, 2026 at 10:30",
+      coupleName: "Alex and Sam",
+      weddingDate: "2026-07-20",
+      location: "Charlotte",
+      email: "alex@example.com",
+      channel: "instagram",
+      credentialsEnc: encrypt(JSON.stringify({ access_token: "test-token" })),
+      params: {
+        calendarId: "primary",
+        timeZone: "America/New_York",
+        bookingDateSource: "time_text",
+        bookingTimeSource: "time_text",
+        inviteEmailSource: "customer_email",
+        slotDurationMinutes: 30,
+        businessWindowStartHour: 9,
+        businessWindowEndHour: 14,
+        businessDays: [1, 2, 3, 4, 5],
+        checkConflictsBeforeBooking: true,
+        inviteCustomerByEmail: true,
+        createMeetLink: true,
+        ownerTelegramChatId: "stale-copied-chat",
+      },
+    });
+
+    assert.equal(result.status, "booked");
+    assert.equal(result.telegramNotification.status, "sent");
+    assert.equal(sentTelegram?.contactId, "linked-owner-chat");
+    assert.notEqual(sentTelegram?.contactId, "stale-copied-chat");
+  } finally {
+    telegramMock.mock.restore();
+    calendarMock.mock.restore();
+    await db.channelConnection.deleteMany({ where: { tenantId } });
+    await db.tenant.deleteMany({ where: { id: tenantId } });
 
     if (originalClientId === undefined) {
       delete process.env.GOOGLE_CLIENT_ID;

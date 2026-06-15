@@ -42,6 +42,8 @@ function applyResourceOverrides(
   }
 
   const params = asObject(parsed);
+  delete params.ownerTelegramChatId;
+
   if (resourceOverrides.spreadsheetId) {
     if (typeof params.spreadsheetId === "string") {
       params.spreadsheetId = resourceOverrides.spreadsheetId;
@@ -193,6 +195,10 @@ export function prepareClonedChannelConfig(
 
       nextBlock.steps = nextBlock.steps.map((step) => {
         const nextStep = asObject(step);
+        if ("params" in nextStep) {
+          nextStep.params = applyResourceOverrides(nextStep.params, resourceOverrides);
+        }
+
         const sourceId = nextStep.integrationId;
         if (typeof sourceId !== "string") {
           return nextStep;
@@ -204,7 +210,6 @@ export function prepareClonedChannelConfig(
         }
 
         nextStep.integrationId = mappedId;
-        nextStep.params = applyResourceOverrides(nextStep.params, resourceOverrides);
         return nextStep;
       });
       return nextBlock;

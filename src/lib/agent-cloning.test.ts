@@ -121,6 +121,34 @@ test("prepareClonedChannelConfig replaces tenant-specific resource IDs", () => {
   assert.equal(step.params.calendarId, "target-calendar-id");
 });
 
+test("prepareClonedChannelConfig strips tenant-specific owner Telegram chat IDs", () => {
+  const result = prepareClonedChannelConfig(
+    {
+      functionBlocks: [
+        {
+          steps: [
+            {
+              integrationId: "source-calendar",
+              params: JSON.stringify({
+                calendarId: "source-calendar-id",
+                ownerTelegramChatId: "source-owner-chat",
+              }),
+            },
+          ],
+        },
+      ],
+    },
+    new Map([["source-calendar", "target-calendar"]]),
+  );
+  const step = (
+    result.functionBlocks as Array<{ steps: Array<{ params: string }> }>
+  )[0]!.steps[0]!;
+  const params = JSON.parse(step.params) as Record<string, unknown>;
+
+  assert.equal(params.ownerTelegramChatId, undefined);
+  assert.equal(params.calendarId, "source-calendar-id");
+});
+
 test("getReferencedIntegrationIds includes enabled and function integration IDs once", () => {
   assert.deepEqual(
     getReferencedIntegrationIds({

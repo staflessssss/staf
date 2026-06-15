@@ -3034,19 +3034,6 @@ export function FunctionsSection({
                                       />
                                       Send calendar invite to customer email when available
                                     </label>
-                                    <FormField label="Owner Telegram chat ID">
-                                      <input
-                                        className={inputClassName}
-                                        onChange={(event) =>
-                                          onUpdateFunctionStepParams(functionIndex, stepIndex, {
-                                            ownerTelegramChatId: event.target.value,
-                                          })
-                                        }
-                                        placeholder="Optional escalation target"
-                                        readOnly={isReadOnlyMode}
-                                        value={calendarParams.ownerTelegramChatId}
-                                      />
-                                    </FormField>
                                   </div>
                                 ) : null}
                               */}
@@ -3142,19 +3129,6 @@ export function FunctionsSection({
                                     />
                                     Send calendar invite to customer email when available
                                   </label>
-                                  <FormField label="Owner Telegram chat ID">
-                                    <input
-                                      className={inputClassName}
-                                      onChange={(event) =>
-                                        onUpdateFunctionStepParams(functionIndex, stepIndex, {
-                                          ownerTelegramChatId: event.target.value,
-                                        })
-                                      }
-                                      placeholder="Optional escalation target"
-                                      readOnly={isReadOnlyMode}
-                                      value={calendarParams.ownerTelegramChatId}
-                                    />
-                                  </FormField>
                                 </div>
 
                                 <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">

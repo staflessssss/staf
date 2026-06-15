@@ -70,7 +70,7 @@ function readRecord(value: Prisma.JsonValue | null | undefined) {
     : {};
 }
 
-function readOwnerHandoffConfig(metadata: Prisma.JsonValue | null | undefined) {
+export function readOwnerHandoffConfig(metadata: Prisma.JsonValue | null | undefined) {
   const record = readRecord(metadata);
   const raw = record.ownerHandoff;
   const ownerHandoff =

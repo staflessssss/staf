@@ -78,7 +78,6 @@ export type GoogleCalendarParams = {
   reminderMinutesBefore: number;
   eventSummaryTemplate: string;
   eventDescriptionTemplate: string;
-  ownerTelegramChatId: string;
   syncLeadToSheets: boolean;
   leadSpreadsheetId: string;
   leadSpreadsheetTitle: string;
@@ -457,7 +456,6 @@ export function getDefaultGoogleCalendarParams(): Omit<GoogleCalendarParams, "op
     eventSummaryTemplate: "Consultation call with {{coupleName}}",
     eventDescriptionTemplate:
       "Wedding date: {{weddingDate}}\nLocation: {{location}}\nChannel: {{channel}}",
-    ownerTelegramChatId: "",
     syncLeadToSheets: false,
     leadSpreadsheetId: "",
     leadSpreadsheetTitle: "",
@@ -553,10 +551,6 @@ export function getGoogleCalendarParams(step: StepLike): GoogleCalendarParams {
       typeof params.eventDescriptionTemplate === "string"
         ? params.eventDescriptionTemplate
         : defaults.eventDescriptionTemplate,
-    ownerTelegramChatId:
-      typeof params.ownerTelegramChatId === "string"
-        ? params.ownerTelegramChatId
-        : defaults.ownerTelegramChatId,
     syncLeadToSheets:
       typeof params.syncLeadToSheets === "boolean"
         ? params.syncLeadToSheets

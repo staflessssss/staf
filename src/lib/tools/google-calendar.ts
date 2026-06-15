@@ -5,6 +5,7 @@ import { telegramAdapter } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { createGoogleOAuthClientFromEncryptedCredentials } from "@/lib/google-api-client";
+import { readOwnerHandoffConfig } from "@/lib/owner-handoff";
 import { isValidTimezone } from "@/lib/timezones";
 
 type CalendarExecutionArgs = {
@@ -49,7 +50,6 @@ type SchedulingConfig = {
   reminderMinutesBefore: number;
   eventSummaryTemplate: string;
   eventDescriptionTemplate: string;
-  ownerTelegramChatId?: string;
   syncLeadToSheets: boolean;
   leadSpreadsheetId?: string;
   leadSpreadsheetTitle?: string;
@@ -185,7 +185,6 @@ function parseCalendarConfig(params: Prisma.JsonValue, metadata?: Prisma.JsonVal
     eventDescriptionTemplate:
       asString(config?.eventDescriptionTemplate) ||
       "Wedding date: {{weddingDate}}\nLocation: {{location}}\nChannel: {{channel}}",
-    ownerTelegramChatId: asString(config?.ownerTelegramChatId) || undefined,
     syncLeadToSheets:
       typeof config?.syncLeadToSheets === "boolean"
         ? config.syncLeadToSheets
@@ -1113,16 +1112,8 @@ async function appendLeadRow(args: {
 
 async function sendOwnerTelegramNotification(args: {
   tenantId: string;
-  chatId?: string;
   message: string;
 }) {
-  if (!args.chatId) {
-    return {
-      status: "skipped",
-      summary: "Owner Telegram chat is not configured for this booking tool.",
-    };
-  }
-
   const telegramChannel = await db.channelConnection.findFirst({
     where: {
       tenantId: args.tenantId,
@@ -1138,10 +1129,21 @@ async function sendOwnerTelegramNotification(args: {
     };
   }
 
+  const ownerConfig = readOwnerHandoffConfig(telegramChannel.metadata);
+
+  if (!ownerConfig.enabled || !ownerConfig.ownerChatId) {
+    return {
+      status: "skipped",
+      summary: ownerConfig.enabled
+        ? "Connected Telegram channel does not have a linked owner chat for notifications."
+        : "Owner Telegram notifications are not enabled for this tenant.",
+    };
+  }
+
   try {
     await telegramAdapter.sendReply({
       credentials: decrypt(telegramChannel.credentialsEnc),
-      contactId: args.chatId,
+      contactId: ownerConfig.ownerChatId,
       message: args.message,
     });
   } catch (error) {
@@ -1327,7 +1329,6 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
 
   const telegramNotification = await sendOwnerTelegramNotification({
     tenantId: args.tenantId,
-    chatId: config.ownerTelegramChatId,
     message: [
       "New Lead",
       `Names - ${coupleName}`,
