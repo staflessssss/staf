@@ -119,7 +119,7 @@ function getWeddingSalesGuideAttachment(args: {
   message: string;
   config: ReturnType<typeof buildWeddingSalesConfigFromChannelConfig>;
   allowAttachments: boolean;
-  state?: Pick<WeddingSalesState, "location" | "venue">;
+  state?: Pick<WeddingSalesState, "location" | "venue" | "availabilityRegion">;
 }) {
   if (
     (!args.allowAttachments && args.channel !== ChannelType.INSTAGRAM) ||

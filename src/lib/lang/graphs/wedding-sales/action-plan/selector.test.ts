@@ -229,6 +229,8 @@ test("action selector answers known FAQ questions after a consultation is booked
       venue: "Evergreen Park",
       availability: "available",
       calendarStatus: "available",
+      checkedCallDate: "2026-06-15",
+      checkedCallTime: "11:00",
       proposedCallTime: "Monday 11am",
       customerEmail: "rick@example.com",
     },
@@ -380,6 +382,8 @@ test("action selector plans booking when email arrives after available calendar"
       venue: "Evergreen Park",
       availability: "available",
       calendarStatus: "available",
+      checkedCallDate: "2026-10-19",
+      checkedCallTime: "11:00",
       proposedCallTime: "tomorrow at 11am",
       customerEmail: "sarah@example.com",
     },
@@ -402,6 +406,82 @@ test("action selector plans booking when email arrives after available calendar"
 
   assert.equal(plan.responseGoal, "book_call");
   assert.equal(plan.actions[0]?.type, "book_consultation");
+});
+
+test("action selector rechecks calendar instead of booking when available status has no checked slot", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "sarah@example.com",
+    previousState: {
+      leadStage: "ready_to_book",
+      names: "Sarah and Michael",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte",
+      venue: "Evergreen Park",
+      availability: "available",
+      calendarStatus: "available",
+      proposedCallTime: "tomorrow at 11am",
+      customerEmail: "sarah@example.com",
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "email",
+          value: "sarah@example.com",
+          normalizedValue: "sarah@example.com",
+          confidence: 0.95,
+          evidence: "sarah@example.com",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(plan.responseGoal, "run_tools_then_reply");
+  assert.deepEqual(
+    plan.actions.map((item) => item.type),
+    ["check_consultation_calendar"],
+  );
+});
+
+test("action selector recommends owner handoff for unknown service questions", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Do you offer photography for rehearsal dinner and videography for the wedding day?",
+    previousState: {
+      leadStage: "availability_checked",
+      names: "Sam and Alex",
+      customerName: "Sam",
+      partnerName: "Alex",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Fort Lauderdale, FL",
+      venue: "Harborside Chapel",
+      availability: "available",
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      questions: [
+        {
+          topicId: "unknown_service_request",
+          normalizedQuestion: "Do you offer photography for rehearsal dinner and videography for the wedding day?",
+          confidence: 0.92,
+          evidence: "photography for rehearsal dinner",
+        },
+      ],
+    }),
+  });
+
+  assert.equal(plan.responseGoal, "handoff");
+  assert.equal(plan.actions[0]?.type, "recommend_owner_handoff");
 });
 
 test("action selector checks calendar before answering a call-time availability question", () => {

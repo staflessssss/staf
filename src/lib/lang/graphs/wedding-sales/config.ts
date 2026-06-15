@@ -109,10 +109,42 @@ export const defaultWeddingSalesConfig: WeddingSalesConfig = {
   },
 };
 
-export function resolveWeddingSalesRegion(state?: Pick<WeddingSalesState, "location" | "venue">) {
+export function normalizeWeddingSalesRegionKey(region: string | undefined | null) {
+  const normalized = region?.trim().toUpperCase().replace(/[,\s/]+/g, "_");
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (normalized === "FL" || normalized === "FLORIDA") {
+    return "FL";
+  }
+
+  if (
+    normalized === "NC_SC_GA" ||
+    normalized === "NC" ||
+    normalized === "SC" ||
+    normalized === "GA" ||
+    normalized === "NORTH_CAROLINA" ||
+    normalized === "SOUTH_CAROLINA" ||
+    normalized === "GEORGIA"
+  ) {
+    return "NC_SC_GA";
+  }
+
+  return normalized;
+}
+
+export function resolveWeddingSalesRegion(state?: Pick<WeddingSalesState, "location" | "venue" | "availabilityRegion">) {
+  const committedRegion = normalizeWeddingSalesRegionKey(state?.availabilityRegion);
+
+  if (committedRegion) {
+    return committedRegion;
+  }
+
   const text = [state?.location, state?.venue].filter(Boolean).join(" ").toLowerCase();
 
-  if (/\b(?:fl|florida|tampa|miami|orlando|st\.?\s*augustine|saint augustine|jacksonville)\b/i.test(text)) {
+  if (/\b(?:fl|florida|tampa|miami|orlando|st\.?\s*augustine|saint augustine|jacksonville|fort lauderdale|palm beach)\b/i.test(text)) {
     return "FL";
   }
 
@@ -125,7 +157,7 @@ export function resolveWeddingSalesRegion(state?: Pick<WeddingSalesState, "locat
 
 export function selectWeddingSalesPricing(
   config: WeddingSalesConfig,
-  state?: Pick<WeddingSalesState, "location" | "venue">,
+  state?: Pick<WeddingSalesState, "location" | "venue" | "availabilityRegion">,
 ): WeddingSalesPricingConfig {
   const region = resolveWeddingSalesRegion(state);
 
@@ -134,7 +166,7 @@ export function selectWeddingSalesPricing(
 
 export function selectWeddingSalesGuide(
   config: WeddingSalesConfig,
-  state?: Pick<WeddingSalesState, "location" | "venue">,
+  state?: Pick<WeddingSalesState, "location" | "venue" | "availabilityRegion">,
 ) {
   const region = resolveWeddingSalesRegion(state);
 

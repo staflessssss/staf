@@ -7,7 +7,7 @@ import {
   type WeddingSalesToolContext,
 } from "@/lib/lang/tools/wedding-sales";
 
-import type { WeddingSalesConfig } from "../config";
+import { normalizeWeddingSalesRegionKey, type WeddingSalesConfig } from "../config";
 import { buildWeddingSalesConversationSummary } from "../memory";
 import { buildWeddingSalesDialogPolicy, getWeddingSalesBehavioralStateUpdate } from "../policy";
 import { composeHumanWeddingSalesResponse } from "../response-composer";
@@ -46,6 +46,24 @@ function getStepResults(toolResult: Record<string, unknown>) {
 
 function getSummary(toolResult: Record<string, unknown>) {
   return typeof toolResult.summary === "string" ? toolResult.summary : "";
+}
+
+function getString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function getAvailabilityRegion(steps: Record<string, unknown>[]) {
+  for (const step of steps) {
+    const region = normalizeWeddingSalesRegionKey(
+      getString(step.requestedRegion) ?? getString(step.region),
+    );
+
+    if (region) {
+      return region;
+    }
+  }
+
+  return undefined;
 }
 
 function getBookingOutcome(toolResult: Record<string, unknown>) {
@@ -204,11 +222,13 @@ export function createWeddingSalesToolNodes(args: {
       const steps = getStepResults(parsedResult);
       const available = steps.some((step) => step.status === "available");
       const unavailable = steps.some((step) => step.status === "unavailable");
+      const availabilityRegion = getAvailabilityRegion(steps);
       const summary = getSummary(parsedResult);
 
       if (unavailable && !available) {
         return {
           availability: "unavailable",
+          availabilityRegion,
           leadStage: "availability_checked",
           ...(await composeReplyUpdate({
             intent: "availability_unavailable",
@@ -217,6 +237,7 @@ export function createWeddingSalesToolNodes(args: {
             summary,
             statePatch: {
               availability: "unavailable",
+              availabilityRegion,
               leadStage: "availability_checked",
             },
           })),
@@ -228,6 +249,7 @@ export function createWeddingSalesToolNodes(args: {
 
       return {
         availability: "available",
+        availabilityRegion,
         guideSent: true,
         callProposed: !askVenueBeforeCall,
         leadStage: "availability_checked",
@@ -237,10 +259,12 @@ export function createWeddingSalesToolNodes(args: {
           state,
           statePatch: {
             availability: "available",
+            availabilityRegion,
             leadStage: "availability_checked",
           },
           summaryStatePatch: {
             availability: "available",
+            availabilityRegion,
             guideSent: true,
             callProposed: !askVenueBeforeCall,
             leadStage: "availability_checked",
@@ -271,9 +295,11 @@ export function createWeddingSalesToolNodes(args: {
       });
       const parsedResult = parseToolJson(result);
       const steps = getStepResults(parsedResult);
-      const available = steps.some((step) => step.status === "available");
+      const availableStep = steps.find((step) => step.status === "available");
+      const available = Boolean(availableStep);
       const busy = steps.some((step) => step.status === "busy");
       const needsTime = steps.some((step) => step.status === "needs_time");
+      const dateMismatch = steps.some((step) => step.status === "date_weekday_mismatch");
       const outsideWindow = steps.some(
         (step) => step.status === "outside_business_days" || step.status === "outside_business_hours",
       );
@@ -283,16 +309,26 @@ export function createWeddingSalesToolNodes(args: {
         ? "ask_email"
         : available
           ? "calendar_available"
-          : outsideWindow
-            ? "calendar_outside_window"
-            : needsTime || !busy
-              ? "calendar_time_missing"
-              : "calendar_busy";
+          : dateMismatch
+            ? "calendar_date_mismatch"
+            : outsideWindow
+              ? "calendar_outside_window"
+              : needsTime || !busy
+                ? "calendar_time_missing"
+                : "calendar_busy";
       const nextLeadStage = available && !state.customerEmail ? "waiting_customer_email" : available ? "call_proposed" : "checking_calendar";
       const nextCalendarStatus = available ? "available" : busy ? "busy" : undefined;
+      const checkedCallDate = available ? getString(availableStep?.date) : undefined;
+      const checkedCallTime = available ? getString(availableStep?.time) : undefined;
+      const checkedCallStartTime = available ? getString(availableStep?.startTime) : undefined;
+      const checkedCallEndTime = available ? getString(availableStep?.endTime) : undefined;
 
       return {
         calendarStatus: nextCalendarStatus,
+        checkedCallDate,
+        checkedCallTime,
+        checkedCallStartTime,
+        checkedCallEndTime,
         customerEmail: state.customerEmail,
         leadStage: nextLeadStage,
         ...(await composeReplyUpdate({
@@ -302,6 +338,10 @@ export function createWeddingSalesToolNodes(args: {
           summary,
           statePatch: {
             calendarStatus: nextCalendarStatus,
+            checkedCallDate,
+            checkedCallTime,
+            checkedCallStartTime,
+            checkedCallEndTime,
             customerEmail: state.customerEmail,
             leadStage: nextLeadStage,
           },
@@ -310,11 +350,25 @@ export function createWeddingSalesToolNodes(args: {
       };
     },
     bookCall: async (state: WeddingSalesState): Promise<Partial<WeddingSalesState>> => {
-      if (!toolContext || !state.proposedCallTime) {
+      if (!toolContext) {
         return {
           bookingConfirmed: false,
           ...(await composeReplyUpdate({
             intent: "booking_tool_missing",
+            config,
+            state,
+            statePatch: {
+              bookingConfirmed: false,
+            },
+          })),
+        };
+      }
+
+      if (!state.proposedCallTime || !state.checkedCallDate || !state.checkedCallTime) {
+        return {
+          bookingConfirmed: false,
+          ...(await composeReplyUpdate({
+            intent: "calendar_time_missing",
             config,
             state,
             statePatch: {
@@ -342,7 +396,8 @@ export function createWeddingSalesToolNodes(args: {
 
       const result = await invokeTool(bookConsultationTool(toolContext), {
         request: buildBookingToolRequest(state),
-        timeText: state.proposedCallTime,
+        date: state.checkedCallDate,
+        timeText: state.checkedCallTime,
         coupleName: state.names,
         weddingDate: state.weddingDate,
         location: state.location,

@@ -29,6 +29,7 @@ const schedulingIntents = new Set<WeddingSalesResponseIntent>([
   "calendar_busy",
   "calendar_outside_window",
   "calendar_time_missing",
+  "calendar_date_mismatch",
   "booking_confirmed",
   "booking_failed",
 ]);
@@ -109,6 +110,8 @@ function buildMustInclude(args: BuildWeddingSalesDialogPolicyArgs) {
       return ["explain that availability cannot be checked yet"];
     case "calendar_time_missing":
       return ["ask for a consultation time"];
+    case "calendar_date_mismatch":
+      return [summary || "say the weekday and date do not match", "ask them to confirm the exact date before checking or booking"];
     case "booking_tool_missing":
       return ["explain that booking cannot be completed yet"];
   }

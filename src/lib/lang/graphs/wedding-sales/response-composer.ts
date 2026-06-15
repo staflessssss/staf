@@ -20,6 +20,7 @@ export type WeddingSalesResponseIntent =
   | "ask_call_time"
   | "ask_email"
   | "calendar_time_missing"
+  | "calendar_date_mismatch"
   | "calendar_available"
   | "calendar_busy"
   | "calendar_outside_window"
@@ -972,6 +973,10 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         return state.calendarStatus === "busy"
           ? "That time was not available, so I cannot book it yet. Could you send another time Monday through Friday between 9 AM and 2 PM Eastern?"
           : "I can check that consultation time once I have the requested time.";
+      case "calendar_date_mismatch":
+        return isInstagram(state)
+          ? `${summary || "I want to make sure I book the right day."} Could you confirm the exact date you mean?`
+          : `${summary || "The weekday and date do not seem to match."} Could you confirm the exact date before I check or book the call?`;
       case "calendar_available":
         return isInstagram(state)
           ? "That time is available. Would you like me to book it?"

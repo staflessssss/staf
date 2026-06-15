@@ -193,6 +193,23 @@ function clearPendingChange() {
   } satisfies Partial<WeddingSalesState>;
 }
 
+function clearCalendarResult() {
+  return {
+    calendarStatus: undefined,
+    checkedCallDate: undefined,
+    checkedCallTime: undefined,
+    checkedCallStartTime: undefined,
+    checkedCallEndTime: undefined,
+  } satisfies Partial<WeddingSalesState>;
+}
+
+function clearAvailabilityResult() {
+  return {
+    availability: undefined,
+    availabilityRegion: undefined,
+  } satisfies Partial<WeddingSalesState>;
+}
+
 function hasSemanticConfidence(semantic: WeddingSalesSemanticAnalysis | null) {
   return Boolean(semantic && semantic.confidence >= 0.6);
 }
@@ -564,8 +581,8 @@ export function analyzeWeddingSalesMessageWithSemantics(
           weddingDate: state.pendingChangeValue,
           weddingYear: state.pendingChangeValue.slice(0, 4),
           weddingYearKnown: true,
-          availability: undefined,
-          calendarStatus: undefined,
+          ...clearAvailabilityResult(),
+          ...clearCalendarResult(),
           proposedCallTime: undefined,
           callProposed: false,
           bookingConfirmed: false,
@@ -578,8 +595,8 @@ export function analyzeWeddingSalesMessageWithSemantics(
         ...clearPendingChange(),
         location: state.pendingChangeValue,
         venue: undefined,
-        availability: undefined,
-        calendarStatus: undefined,
+        ...clearAvailabilityResult(),
+        ...clearCalendarResult(),
         proposedCallTime: undefined,
         callProposed: false,
         bookingConfirmed: false,
@@ -619,8 +636,8 @@ export function analyzeWeddingSalesMessageWithSemantics(
     return {
       ...baseUpdate,
       ...clearPendingChange(),
-      availability: undefined,
-      calendarStatus: undefined,
+      ...clearAvailabilityResult(),
+      ...clearCalendarResult(),
       proposedCallTime: undefined,
       callProposed: false,
       bookingConfirmed: false,
@@ -649,8 +666,8 @@ export function analyzeWeddingSalesMessageWithSemantics(
       ...baseUpdate,
       ...clearPendingChange(),
       venue: undefined,
-      availability: undefined,
-      calendarStatus: undefined,
+      ...clearAvailabilityResult(),
+      ...clearCalendarResult(),
       proposedCallTime: undefined,
       callProposed: false,
       bookingConfirmed: false,
@@ -679,6 +696,7 @@ export function analyzeWeddingSalesMessageWithSemantics(
   if (isSchedulingContinuationContext(state) && hasBareTimeSelection(message)) {
     return {
       ...baseUpdate,
+      ...clearCalendarResult(),
       leadStage: "checking_calendar",
       proposedCallTime: normalizeBareTimeSelection(message, state.proposedCallTime),
     };
@@ -687,6 +705,7 @@ export function analyzeWeddingSalesMessageWithSemantics(
   if ((state.callProposed || state.availability === "available") && proposesCallDayWithoutTime(message)) {
     return {
       ...baseUpdate,
+      ...clearCalendarResult(),
       leadStage: "asking_call_time",
       proposedCallTime: message,
     };
@@ -699,6 +718,7 @@ export function analyzeWeddingSalesMessageWithSemantics(
   ) {
     return {
       ...baseUpdate,
+      ...clearCalendarResult(),
       leadStage: "checking_calendar",
       proposedCallTime: proposesCallTime(message) || asksForCall(message)
         ? message

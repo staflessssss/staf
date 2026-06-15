@@ -71,6 +71,17 @@ function bestQuestionTopic(analysis: SemanticAnalysisV2) {
   );
 }
 
+function hasUnknownBusinessQuestion(analysis: SemanticAnalysisV2) {
+  return analysis.questions.some(
+    (question) =>
+      question.confidence >= 0.75 &&
+      (!question.topicId ||
+        question.topicId === "other" ||
+        question.topicId === "unknown_service_request" ||
+        question.topicId === "unknown_business_question"),
+  );
+}
+
 function hasHighConfidenceObjection(analysis: SemanticAnalysisV2) {
   return analysis.objections.some((objection) => objection.confidence >= 0.75);
 }
@@ -261,6 +272,18 @@ export function selectWeddingSalesActionPlan(args: {
         action({
           type: "recommend_owner_handoff",
           reason: "message_is_not_a_new_lead_sales_question",
+        }),
+      ],
+    });
+  }
+
+  if (hasUnknownBusinessQuestion(analysis) && !isActiveSalesContinuationQuestion(state, analysis)) {
+    return buildPlan({
+      responseGoal: "handoff",
+      actions: [
+        action({
+          type: "recommend_owner_handoff",
+          reason: "unknown_business_question_requires_owner",
         }),
       ],
     });

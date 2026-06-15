@@ -87,8 +87,21 @@ export function canCheckConsultationCalendar(args: {
     return { allowed: false, reason: "missing_explicit_call_time" };
   }
 
+  const hasKnownCalendarStatus = state.calendarStatus === "available" || state.calendarStatus === "busy";
+  const hasCheckedSlot = Boolean(state.checkedCallDate && state.checkedCallTime);
+
   if (
-    (state.calendarStatus === "available" || state.calendarStatus === "busy") &&
+    hasKnownCalendarStatus &&
+    !hasCheckedSlot &&
+    !state.customerEmail &&
+    !wasSemanticFieldCommittedThisTurn(state, "callTime")
+  ) {
+    return { allowed: false, reason: "calendar_status_known_but_checked_slot_missing" };
+  }
+
+  if (
+    hasKnownCalendarStatus &&
+    hasCheckedSlot &&
     !wasSemanticFieldCommittedThisTurn(state, "callTime")
   ) {
     return { allowed: false, reason: "calendar_status_already_known" };
@@ -129,6 +142,10 @@ export function canBookConsultation(args: {
 
   if (!state.proposedCallTime) {
     return { allowed: false, reason: "missing_committed_call_time" };
+  }
+
+  if (!state.checkedCallDate || !state.checkedCallTime) {
+    return { allowed: false, reason: "missing_checked_calendar_slot" };
   }
 
   return { allowed: true, reason: "requirements_satisfied" };

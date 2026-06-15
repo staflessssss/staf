@@ -47,10 +47,15 @@ export type WeddingSalesState = {
   venue?: string;
   customerEmail?: string;
   availability?: "available" | "unavailable";
+  availabilityRegion?: string;
   guideSent: boolean;
   callProposed: boolean;
   proposedCallTime?: string;
   calendarStatus?: "available" | "busy";
+  checkedCallDate?: string;
+  checkedCallTime?: string;
+  checkedCallStartTime?: string;
+  checkedCallEndTime?: string;
   bookingConfirmed: boolean;
   bookedEventId?: string;
   toolObservations: Array<{
@@ -111,10 +116,15 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   venue: Annotation<string | undefined>(),
   customerEmail: Annotation<string | undefined>(),
   availability: Annotation<"available" | "unavailable" | undefined>(),
+  availabilityRegion: Annotation<string | undefined>(),
   guideSent: Annotation<boolean>(),
   callProposed: Annotation<boolean>(),
   proposedCallTime: Annotation<string | undefined>(),
   calendarStatus: Annotation<"available" | "busy" | undefined>(),
+  checkedCallDate: Annotation<string | undefined>(),
+  checkedCallTime: Annotation<string | undefined>(),
+  checkedCallStartTime: Annotation<string | undefined>(),
+  checkedCallEndTime: Annotation<string | undefined>(),
   bookingConfirmed: Annotation<boolean>(),
   bookedEventId: Annotation<string | undefined>(),
   toolObservations: Annotation<Array<{ toolName: string; result: string }>>({
@@ -185,10 +195,15 @@ export function createInitialWeddingSalesState(args: {
     venue: args.previousState?.venue,
     customerEmail: args.previousState?.customerEmail ?? args.customerEmail,
     availability: args.previousState?.availability,
+    availabilityRegion: args.previousState?.availabilityRegion,
     guideSent: args.previousState?.guideSent ?? false,
     callProposed: args.previousState?.callProposed ?? false,
     proposedCallTime: args.previousState?.proposedCallTime,
     calendarStatus: args.previousState?.calendarStatus,
+    checkedCallDate: args.previousState?.checkedCallDate,
+    checkedCallTime: args.previousState?.checkedCallTime,
+    checkedCallStartTime: args.previousState?.checkedCallStartTime,
+    checkedCallEndTime: args.previousState?.checkedCallEndTime,
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
     bookedEventId: args.previousState?.bookedEventId,
     toolObservations: [],

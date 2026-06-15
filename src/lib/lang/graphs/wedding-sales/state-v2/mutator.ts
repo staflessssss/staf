@@ -38,6 +38,30 @@ function clearPendingChange() {
   } satisfies Partial<WeddingSalesState>;
 }
 
+function clearAvailabilityResult() {
+  return {
+    availability: undefined,
+    availabilityRegion: undefined,
+  } satisfies Partial<WeddingSalesState>;
+}
+
+function clearCheckedCallSlot() {
+  return {
+    calendarStatus: undefined,
+    checkedCallDate: undefined,
+    checkedCallTime: undefined,
+    checkedCallStartTime: undefined,
+    checkedCallEndTime: undefined,
+  } satisfies Partial<WeddingSalesState>;
+}
+
+function clearBookingResult() {
+  return {
+    bookingConfirmed: false,
+    bookedEventId: undefined,
+  } satisfies Partial<WeddingSalesState>;
+}
+
 function isHighConfidenceClientType(analysis: SemanticAnalysisV2) {
   return analysis.clientType && analysis.clientType.confidence >= 0.8
     ? analysis.clientType.value
@@ -292,21 +316,19 @@ export function applySemanticV2StateMutation(args: {
           weddingDate: state.pendingChangeValue,
           weddingYear: state.pendingChangeValue.slice(0, 4),
           weddingYearKnown: true,
-          availability: undefined,
-          calendarStatus: undefined,
+          ...clearAvailabilityResult(),
+          ...clearCheckedCallSlot(),
           callProposed: false,
-          bookingConfirmed: false,
-          bookedEventId: undefined,
+          ...clearBookingResult(),
         });
       } else {
         Object.assign(update, clearPendingChange(), {
           location: state.pendingChangeValue,
           venue: undefined,
-          availability: undefined,
-          calendarStatus: undefined,
+          ...clearAvailabilityResult(),
+          ...clearCheckedCallSlot(),
           callProposed: false,
-          bookingConfirmed: false,
-          bookedEventId: undefined,
+          ...clearBookingResult(),
         });
       }
       acceptedFields.add(state.pendingChangeField);
@@ -381,11 +403,9 @@ export function applySemanticV2StateMutation(args: {
         update.weddingYear = entry.value.slice(0, 4);
         update.weddingYearKnown = true;
         if (state.weddingDate && normalizeForComparison(state.weddingDate) !== normalizeForComparison(entry.value)) {
-          update.availability = undefined;
-          update.calendarStatus = undefined;
+          Object.assign(update, clearAvailabilityResult(), clearCheckedCallSlot());
           update.callProposed = false;
-          update.bookingConfirmed = false;
-          update.bookedEventId = undefined;
+          Object.assign(update, clearBookingResult());
         }
         Object.assign(update, clearPendingChange());
         break;
@@ -397,11 +417,9 @@ export function applySemanticV2StateMutation(args: {
         update.location = entry.value;
         if (state.location && normalizeForComparison(state.location) !== normalizeForComparison(entry.value)) {
           update.venue = undefined;
-          update.availability = undefined;
-          update.calendarStatus = undefined;
+          Object.assign(update, clearAvailabilityResult(), clearCheckedCallSlot());
           update.callProposed = false;
-          update.bookingConfirmed = false;
-          update.bookedEventId = undefined;
+          Object.assign(update, clearBookingResult());
         }
         Object.assign(update, clearPendingChange());
         break;
@@ -416,9 +434,7 @@ export function applySemanticV2StateMutation(args: {
           const callTimeValue = entry.value;
 
           if (state.proposedCallTime && normalizeForComparison(state.proposedCallTime) !== normalizeForComparison(callTimeValue)) {
-            update.calendarStatus = undefined;
-            update.bookingConfirmed = false;
-            update.bookedEventId = undefined;
+            Object.assign(update, clearCheckedCallSlot(), clearBookingResult());
           }
           update.proposedCallTime = callTimeValue;
         }

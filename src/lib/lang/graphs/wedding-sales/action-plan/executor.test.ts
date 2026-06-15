@@ -167,7 +167,9 @@ test("action executor books only when booking requirements are already committed
         venue: "Evergreen Park",
         availability: "available",
         calendarStatus: "available",
-        proposedCallTime: "Monday at 11am",
+        checkedCallDate: "2026-06-24",
+        checkedCallTime: "11:00",
+        proposedCallTime: "Wednesday June 24 at 11am",
         customerEmail: "sarah@example.com",
         lastActionPlan: plan([
           {

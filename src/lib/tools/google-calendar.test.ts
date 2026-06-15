@@ -190,6 +190,54 @@ test("parseSchedulingRequest prefers structured timeText over the raw request wh
   assert.equal(parsed?.time, "10:30");
 });
 
+test("parseSchedulingRequest prefers an explicit month-day date over a weekday label", () => {
+  const parsed = calendarSchedulingTestHelpers.parseSchedulingRequest({
+    request: "Wednesday June 24 at 12:30 works",
+    timeZone: "America/New_York",
+    slotDurationMinutes: 30,
+    referenceDate: new Date("2026-06-14T15:00:00Z"),
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed?.date, "2026-06-24");
+  assert.equal(parsed?.time, "12:30");
+});
+
+test("parseSchedulingRequest rejects conflicting weekday and explicit date", () => {
+  const parsed = calendarSchedulingTestHelpers.parseSchedulingRequest({
+    request: "Tuesday June 24 at 12:30 works",
+    timeZone: "America/New_York",
+    slotDurationMinutes: 30,
+    referenceDate: new Date("2026-06-14T15:00:00Z"),
+  });
+
+  assert.ok(parsed);
+  assert.equal("status" in parsed ? parsed.status : null, "date_weekday_mismatch");
+  assert.equal(parsed.date, "2026-06-24");
+  assert.match("summary" in parsed ? parsed.summary : "", /Wednesday, not Tuesday/i);
+});
+
+test("executeGoogleCalendarStep does not check or book a mismatched weekday and date", async () => {
+  const result = await executeGoogleCalendarStep({
+    tenantId: "tenant-1",
+    action: "check_calendar",
+    request: "Tuesday June 24 at 12:30 works",
+    timeText: "Tuesday June 24 at 12:30",
+    params: {
+      calendarId: "primary",
+      businessDays: [1, 2, 3, 4, 5],
+      businessWindowStartHour: 9,
+      businessWindowEndHour: 14,
+      slotDurationMinutes: 30,
+    },
+    credentialsEnc: encrypt(JSON.stringify({ access_token: "test-token" })),
+  });
+
+  assert.equal(result.status, "date_weekday_mismatch");
+  assert.equal(result.date, "2026-06-24");
+  assert.match(String(result.summary), /Wednesday, not Tuesday/i);
+});
+
 test("executeGoogleCalendarStep rejects an invalid fixed availability date before runtime fallback", async () => {
   const result = await executeGoogleCalendarStep({
     tenantId: "tenant-1",

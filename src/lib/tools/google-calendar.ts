@@ -73,6 +73,14 @@ type ParsedSchedulingRequest = {
   endTime: string;
 };
 
+type ParsedSchedulingRequestFailure = {
+  status: "date_weekday_mismatch";
+  date: string;
+  requestedWeekday: string;
+  actualWeekday: string;
+  summary: string;
+};
+
 type CalendarEventSummary = {
   start: number;
   end: number;
@@ -334,6 +342,16 @@ const weekdayMap: Record<string, number> = {
   saturday: 6,
 };
 
+const weekdayLabels = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
 const monthMap: Record<string, number> = {
   january: 1,
   jan: 1,
@@ -407,6 +425,68 @@ function inferRequestedDate(request: string, explicitDate?: string) {
   }
 
   return null;
+}
+
+function inferSchedulingExplicitDateFromText(args: {
+  source: string;
+  baseYear: number;
+  baseMonth: number;
+  baseDay: number;
+}) {
+  const isoMatch = args.source.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+
+  if (isoMatch) {
+    return new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+  }
+
+  const monthDayMatch = args.source.match(
+    /\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/u,
+  );
+
+  if (monthDayMatch) {
+    const month = monthMap[monthDayMatch[1]];
+    const day = Number(monthDayMatch[2]);
+    const year = monthDayMatch[3] ? Number(monthDayMatch[3]) : args.baseYear;
+    let targetDate = new Date(Date.UTC(year, month - 1, day));
+
+    if (!monthDayMatch[3] && targetDate < new Date(Date.UTC(args.baseYear, args.baseMonth - 1, args.baseDay))) {
+      targetDate = new Date(Date.UTC(year + 1, month - 1, day));
+    }
+
+    return targetDate;
+  }
+
+  const dayMonthMatch = args.source.match(
+    /\b(\d{1,2})\s+(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)(?:\s+(\d{4}))?\b/u,
+  );
+
+  if (dayMonthMatch) {
+    const day = Number(dayMonthMatch[1]);
+    const month = monthMap[dayMonthMatch[2]];
+    const year = dayMonthMatch[3] ? Number(dayMonthMatch[3]) : args.baseYear;
+    let targetDate = new Date(Date.UTC(year, month - 1, day));
+
+    if (!dayMonthMatch[3] && targetDate < new Date(Date.UTC(args.baseYear, args.baseMonth - 1, args.baseDay))) {
+      targetDate = new Date(Date.UTC(year + 1, month - 1, day));
+    }
+
+    return targetDate;
+  }
+
+  return null;
+}
+
+function getMentionedWeekday(source: string) {
+  const entry = Object.entries(weekdayMap).find(([label]) => source.includes(label));
+
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    label: weekdayLabels[entry[1]],
+    value: entry[1],
+  };
 }
 
 function parseTimeFromText(text: string) {
@@ -494,6 +574,7 @@ function parseSchedulingRequest(args: {
   const reference = args.referenceDate ?? new Date();
   const base = getTimeZoneParts(reference, args.timeZone);
   const time = parseTimeFromText(source);
+  const mentionedWeekday = getMentionedWeekday(source);
   let matchedWeekdayWithoutExplicitDate = false;
 
   if (!time) {
@@ -513,36 +594,50 @@ function parseSchedulingRequest(args: {
     } else if (source.includes("today")) {
       targetDate = targetDate;
     } else {
-      const foundWeekday = Object.entries(weekdayMap).find(([label]) => source.includes(label));
+      const explicitTextDate = inferSchedulingExplicitDateFromText({
+        source,
+        baseYear: base.year,
+        baseMonth: base.month,
+        baseDay: base.day,
+      });
 
-      if (foundWeekday) {
-        matchedWeekdayWithoutExplicitDate = true;
-        let diff = foundWeekday[1] - targetDate.getUTCDay();
-        if (diff < 0) {
-          diff += 7;
-        }
-        targetDate = addUtcDays(targetDate, diff);
+      if (explicitTextDate) {
+        targetDate = explicitTextDate;
       } else {
-        const namedMonthMatch = source.match(
-          /\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:,\s*(\d{4}))?\b/u,
-        );
-        const isoMatch = source.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-
-        if (namedMonthMatch) {
-          const month = monthMap[namedMonthMatch[1]];
-          const day = Number(namedMonthMatch[2]);
-          const year = namedMonthMatch[3] ? Number(namedMonthMatch[3]) : base.year;
-          targetDate = new Date(Date.UTC(year, month - 1, day));
-          if (!namedMonthMatch[3] && targetDate < new Date(Date.UTC(base.year, base.month - 1, base.day))) {
-            targetDate = new Date(Date.UTC(year + 1, month - 1, day));
+        if (mentionedWeekday) {
+          matchedWeekdayWithoutExplicitDate = true;
+          let diff = mentionedWeekday.value - targetDate.getUTCDay();
+          if (diff < 0) {
+            diff += 7;
           }
-        } else if (isoMatch) {
-          targetDate = new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+          targetDate = addUtcDays(targetDate, diff);
         } else {
           return null;
         }
       }
     }
+  }
+
+  if (
+    mentionedWeekday &&
+    (hasExplicitDate || inferSchedulingExplicitDateFromText({
+      source,
+      baseYear: base.year,
+      baseMonth: base.month,
+      baseDay: base.day,
+    })) &&
+    mentionedWeekday.value !== targetDate.getUTCDay()
+  ) {
+    const dateIso = targetDate.toISOString().slice(0, 10);
+    const actualWeekday = weekdayLabels[targetDate.getUTCDay()];
+
+    return {
+      status: "date_weekday_mismatch",
+      date: dateIso,
+      requestedWeekday: mentionedWeekday.label,
+      actualWeekday,
+      summary: `${formatHumanDate(dateIso, args.timeZone)} falls on ${actualWeekday}, not ${mentionedWeekday.label}.`,
+    } satisfies ParsedSchedulingRequestFailure;
   }
 
   let dateIso = targetDate.toISOString().slice(0, 10);
@@ -605,6 +700,12 @@ function validateSchedulingWindow(parsed: ParsedSchedulingRequest, config: Sched
   }
 
   return { ok: true } as const;
+}
+
+function isParsedSchedulingFailure(
+  parsed: ParsedSchedulingRequest | ParsedSchedulingRequestFailure,
+): parsed is ParsedSchedulingRequestFailure {
+  return "status" in parsed;
 }
 
 function validateBusinessDate(dateIso: string, config: SchedulingConfig) {
@@ -698,6 +799,10 @@ function resolveAvailabilityDate(args: CalendarExecutionArgs, config: Scheduling
 }
 
 function resolveBookingDate(args: CalendarExecutionArgs, config: SchedulingConfig) {
+  if (args.date && /^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
+    return args.date;
+  }
+
   if (config.bookingDateSource === "literal" && /^\d{4}-\d{2}-\d{2}$/.test(config.bookingDateValue)) {
     return config.bookingDateValue;
   }
@@ -971,6 +1076,21 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
     slotDurationMinutes: config.slotDurationMinutes,
   });
 
+  if (parsed && isParsedSchedulingFailure(parsed)) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: parsed.status,
+      action: args.action,
+      date: parsed.date,
+      requestedWeekday: parsed.requestedWeekday,
+      actualWeekday: parsed.actualWeekday,
+      summary: parsed.summary,
+      request: args.request,
+      params: args.params,
+    };
+  }
+
   if (!parsed) {
     if (requestedDate) {
       return runDateAvailabilityLookup(
@@ -1024,6 +1144,8 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
       action: args.action,
       date: parsed.date,
       time: parsed.time,
+      startTime: parsed.startTime,
+      endTime: parsed.endTime,
       message: `${parsed.time} on ${parsed.date} is available.`,
       summary: `Consultation slot ${parsed.time} on ${formatHumanDate(parsed.date, config.timeZone)} is available.`,
       request: args.request,
@@ -1199,6 +1321,21 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
     timeZone: config.timeZone,
     slotDurationMinutes: config.slotDurationMinutes,
   });
+
+  if (parsed && isParsedSchedulingFailure(parsed)) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: parsed.status,
+      action: args.action,
+      date: parsed.date,
+      requestedWeekday: parsed.requestedWeekday,
+      actualWeekday: parsed.actualWeekday,
+      summary: parsed.summary,
+      request: args.request,
+      params: args.params,
+    };
+  }
 
   if (!parsed) {
     return {
