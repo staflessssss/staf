@@ -368,6 +368,69 @@ test("wedding sales human composer sanitizes fallback questions when v2 plan has
   }
 });
 
+test("wedding sales human composer keeps required calendar busy follow-up under v2 action authority", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "calendar_busy",
+      config,
+      summary: "Consultation slot 12:30 is busy. Nearby openings: 11:30, 12:00, 13:00.",
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 2,
+        leadStage: "checking_calendar",
+        names: "Samantha and Collin",
+        customerName: "Samantha",
+        partnerName: "Collin",
+        weddingDate: "2027-03-06",
+        weddingYear: "2027",
+        weddingYearKnown: true,
+        location: "Fort Lauderdale",
+        venue: "The Ritz",
+        availability: "available",
+        proposedCallTime: "Wednesday June 24 at 12:30",
+        calendarStatus: "busy",
+        latestCustomerMessage: "Wednesday June 24 at 12:30",
+        assistantReplyCount: 5,
+        hasGreeted: true,
+        askedForCallTime: true,
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "run_tools_then_reply",
+          actions: [
+            {
+              type: "check_consultation_calendar",
+              field: null,
+              topicId: null,
+              reason: "call_time_is_ready_and_wedding_date_is_available",
+            },
+          ],
+          guardrailTrace: [
+            {
+              action: "check_consultation_calendar",
+              allowed: true,
+              reason: "requirements_satisfied",
+            },
+          ],
+        },
+      },
+    });
+
+    assert.notEqual(response, "");
+    assert.match(response, /taken|available|other time|works/i);
+    assert.match(response, /\?/);
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
 
 test("wedding sales composer uses plain links for instagram", () => {
   const response = composeWeddingSalesResponse({

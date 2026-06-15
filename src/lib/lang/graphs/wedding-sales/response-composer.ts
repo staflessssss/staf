@@ -1462,11 +1462,26 @@ function sanitizeActionPlanFallback(args: ComposeWeddingSalesResponseArgs, fallb
     return fallback.trim();
   }
 
+  if (isSchedulingQuestionIntent(args.intent)) {
+    return fallback.trim();
+  }
+
   return fallback
     .split(/\n\s*\n/)
     .filter((paragraph) => !paragraph.includes("?"))
     .join("\n\n")
     .trim();
+}
+
+function isSchedulingQuestionIntent(intent: WeddingSalesResponseIntent) {
+  return (
+    intent === "calendar_time_missing" ||
+    intent === "calendar_date_mismatch" ||
+    intent === "calendar_available" ||
+    intent === "calendar_busy" ||
+    intent === "calendar_outside_window" ||
+    intent === "booking_failed"
+  );
 }
 
 export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { text: string }) {

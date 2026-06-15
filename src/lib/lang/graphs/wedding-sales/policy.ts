@@ -196,7 +196,11 @@ export function getWeddingSalesBehavioralStateUpdate(args: {
       state.askedForCallTime ||
         (intent === "availability_available" && (state.channel !== "instagram" || Boolean(state.venue))) ||
         intent === "ask_call_time" ||
-        intent === "calendar_time_missing",
+        intent === "calendar_time_missing" ||
+        intent === "calendar_date_mismatch" ||
+        intent === "calendar_busy" ||
+        intent === "calendar_outside_window" ||
+        intent === "booking_failed",
     ),
     askedForEmail: Boolean(state.askedForEmail || intent === "ask_email"),
     askedFieldCounts,
