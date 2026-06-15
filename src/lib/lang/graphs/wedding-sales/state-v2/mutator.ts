@@ -3,6 +3,8 @@ import { calculateEffectiveEntityConfidence } from "../semantic-v2/effective-con
 import type { SemanticAnalysisV2, SemanticProvidedValueV2, WeddingSalesField } from "../semantic-v2/schema";
 import {
   hasStructuredCoupleNames,
+  inferCoupleNamesFromRequestedAnswer,
+  mergeKnownCoupleNames,
   mergeNameRoleFromSemanticV2,
   migrateWeddingSalesNames,
 } from "./names";
@@ -131,6 +133,45 @@ function isAcceptedProvidedInfo(provided: SemanticProvidedValueV2, message: stri
       provided.confidence >= ACCEPT_ENTITY_THRESHOLD &&
       evidenceIsPresent(message, provided.evidence),
   );
+}
+
+function wasNameFieldRequested(state: WeddingSalesState) {
+  return Boolean(
+    state.askedForNames ||
+      state.lastActionPlan?.actions.some(
+        (action) =>
+          action.type === "ask_missing_field" &&
+          (action.field === "names" ||
+            action.field === "customerName" ||
+            action.field === "partnerName"),
+      ),
+  );
+}
+
+function collectRequestedCoupleNames(args: {
+  state: WeddingSalesState;
+  analysis: SemanticAnalysisV2;
+}) {
+  if (!wasNameFieldRequested(args.state)) {
+    return [];
+  }
+
+  for (const entity of args.analysis.entities) {
+    if (entity.field !== "names" || entity.confidence < PENDING_ENTITY_THRESHOLD) {
+      continue;
+    }
+
+    const names =
+      inferCoupleNamesFromRequestedAnswer(entity.value).length >= 2
+        ? inferCoupleNamesFromRequestedAnswer(entity.value)
+        : inferCoupleNamesFromRequestedAnswer(entity.evidence);
+
+    if (names.length >= 2) {
+      return names;
+    }
+  }
+
+  return inferCoupleNamesFromRequestedAnswer(args.state.latestCustomerMessage);
 }
 
 function workingState(state: WeddingSalesState, update: Partial<WeddingSalesState>): WeddingSalesState {
@@ -290,6 +331,29 @@ export function applySemanticV2StateMutation(args: {
       field: role,
       value: provided.value,
       reason: "semantic_v2_structured_name_role",
+    });
+  }
+
+  const requestedCoupleNames = collectRequestedCoupleNames({ state, analysis });
+
+  if (
+    requestedCoupleNames.length >= 2 &&
+    !hasStructuredCoupleNames(workingState(state, update))
+  ) {
+    Object.assign(
+      update,
+      mergeKnownCoupleNames({
+        state: workingState(state, update),
+        names: requestedCoupleNames,
+        rolesUncertain: true,
+      }),
+    );
+    acceptedFields.add("names");
+    trace.push({
+      action: "accepted",
+      field: "names",
+      value: requestedCoupleNames.join(" and "),
+      reason: "requested_names_answer_grounded_as_known_couple_names",
     });
   }
 

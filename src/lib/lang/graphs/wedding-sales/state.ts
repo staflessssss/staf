@@ -35,6 +35,9 @@ export type WeddingSalesState = {
   channel: WeddingSalesChannel;
   leadStage: WeddingSalesLeadStage;
   names?: string;
+  knownNames?: string[];
+  nameCount?: number;
+  nameRolesUncertain?: boolean;
   customerName?: string;
   partnerName?: string;
   coupleDisplayName?: string;
@@ -104,6 +107,9 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   channel: Annotation<WeddingSalesChannel>(),
   leadStage: Annotation<WeddingSalesLeadStage>(),
   names: Annotation<string | undefined>(),
+  knownNames: Annotation<string[] | undefined>(),
+  nameCount: Annotation<number | undefined>(),
+  nameRolesUncertain: Annotation<boolean | undefined>(),
   customerName: Annotation<string | undefined>(),
   partnerName: Annotation<string | undefined>(),
   coupleDisplayName: Annotation<string | undefined>(),
@@ -183,6 +189,9 @@ export function createInitialWeddingSalesState(args: {
     channel: args.channel,
     leadStage: args.previousState?.leadStage ?? "new",
     names: args.previousState?.names,
+    knownNames: args.previousState?.knownNames,
+    nameCount: args.previousState?.nameCount,
+    nameRolesUncertain: args.previousState?.nameRolesUncertain,
     customerName: args.previousState?.customerName,
     partnerName: args.previousState?.partnerName,
     coupleDisplayName: args.previousState?.coupleDisplayName,

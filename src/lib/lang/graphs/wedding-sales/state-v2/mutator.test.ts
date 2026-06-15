@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { selectWeddingSalesActionPlan } from "../action-plan/selector";
 import { createInitialWeddingSalesState } from "../state";
 import type { SemanticAnalysisV2 } from "../semantic-v2/schema";
 import { applySemanticV2StateMutation, isSemanticV2ExecutionEnabled } from "./mutator";
@@ -659,6 +660,65 @@ test("semantic v2 mutator does not infer a name role from a generic single-name 
   assert.equal(result.partnerName, undefined);
   assert.equal(result.names, "Bob");
   assert.match(JSON.stringify(result.lastStateMutationTrace), /generic_names_entity_is_not_structured_name_authority/);
+});
+
+test("semantic v2 mutator grounds a requested two-name answer even when roles are generic", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Hi, Samantha and Collin",
+    previousState: {
+      leadStage: "missing_names_or_date",
+      askedForNames: true,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "customerName",
+            topicId: null,
+            reason: "next_required_qualification_field_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "names",
+          value: "Samantha and Collin",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "Samantha and Collin",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.customerName, "Samantha");
+  assert.equal(result.partnerName, "Collin");
+  assert.deepEqual(result.knownNames, ["Samantha", "Collin"]);
+  assert.equal(result.nameCount, 2);
+  assert.equal(result.nameRolesUncertain, true);
+  assert.equal(result.nameCollectionStatus, "both");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /requested_names_answer_grounded_as_known_couple_names/);
+
+  const plan = selectWeddingSalesActionPlan({
+    state: {
+      ...state,
+      ...result,
+    },
+    analysis: analysis(),
+  });
+
+  assert.equal(plan.actions[0]?.type, "ask_missing_field");
+  assert.equal(plan.actions[0]?.field, "weddingDate");
 });
 
 test("semantic v2 mutator does not derive structured roles from a generic couple display entity", () => {

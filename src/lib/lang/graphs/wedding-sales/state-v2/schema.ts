@@ -43,6 +43,9 @@ export type WeddingSalesSemanticStateFields = {
   clientType?: WeddingSalesClientType;
   customerName?: string;
   partnerName?: string;
+  knownNames?: string[];
+  nameCount?: number;
+  nameRolesUncertain?: boolean;
   coupleDisplayName?: string;
   nameCollectionStatus?: WeddingSalesNameCollectionStatus;
   pendingConfirmations?: WeddingSalesPendingConfirmation[];
