@@ -105,7 +105,7 @@ test("semantic v2 schema supports structured customer and partner name roles", (
   assert.equal(parsed.providedInfo?.partnerName?.value, "Marie");
 });
 
-test("semantic v2 eval baseline contains Cases A-H", () => {
+test("semantic v2 eval baseline contains Cases A-I", () => {
   assert.deepEqual(
     semanticV2EvalCases.map((testCase) => testCase.id),
     [
@@ -117,6 +117,7 @@ test("semantic v2 eval baseline contains Cases A-H", () => {
       "F-question-before-missing-info",
       "G-address-is-venue",
       "H-multi-goal-question-and-uncertain-date",
+      "I-complete-venue-location-date-and-names",
     ],
   );
 });
@@ -437,7 +438,17 @@ test("semantic v2 prompt explicitly protects tool and response boundaries", () =
   assert.match(semanticV2SystemPrompt, /never.*choose tools/i);
   assert.match(semanticV2SystemPrompt, /providedInfo\.customerName/i);
   assert.match(semanticV2SystemPrompt, /providedInfo\.partnerName/i);
-  assert.match(buildSemanticV2Prompt(state), /final film/);
+  assert.match(semanticV2SystemPrompt, /preserve the customer's exact scheduling phrase/i);
+  assert.match(semanticV2SystemPrompt, /exact evidence in the latest customer message/i);
+  const prompt = buildSemanticV2Prompt(state);
+  assert.match(prompt, /final film/);
+  assert.match(prompt, /availableFields/);
+  assert.match(prompt, /customerName/);
+  assert.match(prompt, /partnerName/);
+  assert.match(prompt, /weddingDate/);
+  assert.match(prompt, /location/);
+  assert.match(prompt, /venue/);
+  assert.match(prompt, /callTime/);
 });
 
 test("semantic v2 shadow is disabled unless explicitly enabled with an API key", () => {

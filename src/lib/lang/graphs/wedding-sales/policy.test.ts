@@ -92,3 +92,65 @@ test("wedding sales behavioral memory records sent assets and asked questions", 
   assert.equal(update.askedForCallTime, true);
   assert.equal(update.lastAssistantIntent, "availability_available");
 });
+
+test("wedding sales behavioral memory counts v2 planned missing-field questions", () => {
+  const policy = buildWeddingSalesDialogPolicy({
+    intent: "answer_question",
+    config: defaultWeddingSalesConfig,
+    state: {
+      ...baseState,
+      semanticStateVersion: 2,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "pricing",
+            reason: "customer_asked_pricing",
+          },
+          {
+            type: "ask_missing_field",
+            field: "callTime",
+            topicId: null,
+            reason: "call_time_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+  const update = getWeddingSalesBehavioralStateUpdate({
+    intent: "answer_question",
+    policy,
+    state: {
+      ...baseState,
+      semanticStateVersion: 2,
+      askedFieldCounts: {
+        callTime: 1,
+      },
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "pricing",
+            reason: "customer_asked_pricing",
+          },
+          {
+            type: "ask_missing_field",
+            field: "callTime",
+            topicId: null,
+            reason: "call_time_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  assert.equal(update.askedFieldCounts?.callTime, 2);
+});

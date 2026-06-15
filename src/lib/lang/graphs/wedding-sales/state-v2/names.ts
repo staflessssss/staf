@@ -7,11 +7,6 @@ type StructuredNameState = Pick<
   "customerName" | "partnerName" | "coupleDisplayName" | "nameCollectionStatus" | "names"
 >;
 
-const PARTNER_EVIDENCE_PATTERN =
-  /\b(?:fianc|fiance|partner|groom|bride|his name|her name|their name)\b/i;
-const CUSTOMER_EVIDENCE_PATTERN =
-  /\b(?:i am|i'm|im|my name is|this is|here)\b/i;
-
 function cleanNamePart(value: string | undefined) {
   const normalized = value
     ?.trim()
@@ -91,52 +86,6 @@ export function migrateWeddingSalesNames(state: Partial<WeddingSalesState>): Str
     partnerName,
     coupleDisplayName,
     nameCollectionStatus: state.nameCollectionStatus ?? statusFor(customerName, partnerName),
-    names: coupleDisplayName,
-  };
-}
-
-export function mergeNamesFromSemanticV2(args: {
-  state: WeddingSalesState;
-  candidate: string;
-  evidence?: string;
-}): StructuredNameState {
-  const current = migrateWeddingSalesNames(args.state);
-  const [first, second] = splitCoupleNames(args.candidate);
-  const single = first;
-  const evidence = args.evidence ?? "";
-  let customerName = current.customerName;
-  let partnerName = current.partnerName;
-
-  if (first && second) {
-    customerName = customerName ?? first;
-    partnerName = partnerName ?? second;
-
-    if (
-      current.nameCollectionStatus !== "both" &&
-      (!current.customerName || current.customerName.toLowerCase() === first.toLowerCase())
-    ) {
-      customerName = first;
-      partnerName = second;
-    }
-  } else if (single) {
-    if (PARTNER_EVIDENCE_PATTERN.test(evidence)) {
-      partnerName = partnerName ?? single;
-    } else if (CUSTOMER_EVIDENCE_PATTERN.test(evidence)) {
-      customerName = customerName ?? single;
-    } else if (!customerName) {
-      customerName = single;
-    } else if (!partnerName && customerName.toLowerCase() !== single.toLowerCase()) {
-      partnerName = single;
-    }
-  }
-
-  const coupleDisplayName = displayName(customerName, partnerName);
-
-  return {
-    customerName,
-    partnerName,
-    coupleDisplayName,
-    nameCollectionStatus: statusFor(customerName, partnerName),
     names: coupleDisplayName,
   };
 }

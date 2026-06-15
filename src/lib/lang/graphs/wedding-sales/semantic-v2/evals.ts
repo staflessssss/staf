@@ -16,6 +16,7 @@ export type SemanticV2EvalCase = {
     pendingResolutionType?: NonNullable<SemanticAnalysisV2["pendingResolution"]>["type"];
     pendingResolutionField?: WeddingSalesField;
     clientType?: NonNullable<SemanticAnalysisV2["clientType"]>["value"];
+    providedNameRolesInclude?: Array<"customerName" | "partnerName">;
   };
 };
 
@@ -65,6 +66,7 @@ export const semanticV2EvalCases: SemanticV2EvalCase[] = [
     expected: {
       intentIncludes: ["provide_info"],
       entityFieldsInclude: ["names", "weddingDate", "location"],
+      providedNameRolesInclude: ["customerName", "partnerName"],
     },
   },
   {
@@ -145,7 +147,7 @@ export const semanticV2EvalCases: SemanticV2EvalCase[] = [
     }),
     expected: {
       intentIncludes: ["provide_info"],
-      entityFieldsInclude: ["venue"],
+      entityFieldsInclude: ["venue", "location"],
       entityFieldsExclude: ["weddingDate", "callTime"],
     },
   },
@@ -168,6 +170,18 @@ export const semanticV2EvalCases: SemanticV2EvalCase[] = [
       questionTopicsInclude: ["film_length"],
       pendingResolutionType: "ambiguous",
       pendingResolutionField: "weddingDate",
+    },
+  },
+  {
+    id: "I-complete-venue-location-date-and-names",
+    state: state({
+      message:
+        "It is 10/18/26 at Harborside Chapel in Safety Harbor FL. Cindy and Paul.",
+    }),
+    expected: {
+      intentIncludes: ["provide_info"],
+      entityFieldsInclude: ["weddingDate", "venue", "location"],
+      providedNameRolesInclude: ["customerName", "partnerName"],
     },
   },
 ];
@@ -213,6 +227,12 @@ export function evaluateSemanticV2Case(args: {
   for (const objection of args.testCase.expected.objectionTypesInclude ?? []) {
     if (!objectionTypes.has(objection)) {
       failures.push(`missing objection: ${objection}`);
+    }
+  }
+
+  for (const role of args.testCase.expected.providedNameRolesInclude ?? []) {
+    if (!args.analysis.providedInfo[role]) {
+      failures.push(`missing provided name role: ${role}`);
     }
   }
 

@@ -313,6 +313,12 @@ function shouldUseActionPlanQuestionAuthority(state: WeddingSalesState) {
   return buildWeddingSalesResponseContext(state).hasActionPlanAuthority;
 }
 
+function hasActionPlanQuestionAuthorityWithoutPlannedQuestion(state: WeddingSalesState) {
+  const responseContext = buildWeddingSalesResponseContext(state);
+
+  return responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField === null;
+}
+
 function questionForPlannedField(state: WeddingSalesState, field: WeddingSalesField | null) {
   switch (field) {
     case "customerName":
@@ -685,6 +691,8 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
                 .filter(Boolean)
                 .join("\n\n");
             }
+
+            return policy.allowGreeting ? INSTAGRAM_FIRST_CONTACT_OPENING : "";
           }
 
           const missingDate = !state.weddingDate && !state.weddingDateText;
@@ -720,6 +728,12 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           "Could you share both of your names and the date you are planning to get married? Once I have that, I can check availability and send the most helpful details.",
         ].join("\n\n");
       case "ask_location_or_venue":
+        if (shouldUseActionPlanQuestionAuthority(state)) {
+          const plannedQuestion = questionForPlannedField(state, plannedAskField(state));
+
+          return plannedQuestion || "";
+        }
+
         if (isInstagram(state)) {
           return state.location
             ? `What’s the exact venue in ${state.location}?`
@@ -730,6 +744,12 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           ? `Could you share the venue in ${state.location}? I want to double-check the travel details before we move forward.`
           : "Could you share the city, venue, or location for the wedding? I can check availability once I have that.";
       case "ask_wedding_year":
+        if (shouldUseActionPlanQuestionAuthority(state)) {
+          const plannedQuestion = questionForPlannedField(state, plannedAskField(state));
+
+          return plannedQuestion || "";
+        }
+
         if (isInstagram(state)) {
           return state.askedForWeddingYear && state.names
             ? `Got it — ${state.names}. What year is ${state.weddingDateText || "the wedding date"}?`
@@ -877,6 +897,23 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         ].join("\n\n");
       }
       case "ask_call_time":
+        if (shouldUseActionPlanQuestionAuthority(state)) {
+          const plannedQuestion = questionForPlannedField(state, plannedAskField(state));
+
+          if (!plannedQuestion) {
+            return "";
+          }
+
+          if (isInstagram(state)) {
+            return [
+              formatVenueAcknowledgement(state),
+              plannedQuestion,
+            ].filter(Boolean).join("\n\n");
+          }
+
+          return plannedQuestion;
+        }
+
         if (isInstagram(state)) {
           return [
             formatVenueAcknowledgement(state),
@@ -892,6 +929,26 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         ].join("\n\n");
       case "ask_email": {
         const callTime = formatCallTimeForReply(state.proposedCallTime);
+
+        if (shouldUseActionPlanQuestionAuthority(state)) {
+          const plannedQuestion = questionForPlannedField(state, plannedAskField(state));
+
+          if (!plannedQuestion) {
+            return "";
+          }
+
+          if (isInstagram(state)) {
+            return [
+              `Perfect, ${callTime} works great!`,
+              plannedQuestion,
+            ].join("\n\n");
+          }
+
+          return [
+            `That time works great: ${callTime}.`,
+            plannedQuestion,
+          ].join("\n\n");
+        }
 
         if (isInstagram(state)) {
           return [
@@ -1108,7 +1165,9 @@ function buildComposerSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     : "Do not include an email signature or sign-off.";
   const greetingInstruction = policy.allowGreeting
     ? args.state.channel === "instagram"
-      ? `Start with this exact introduction, verbatim, and then ask only the next missing question:\n${INSTAGRAM_FIRST_CONTACT_OPENING}`
+      ? responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField === null
+        ? `Start with this exact introduction, verbatim, then answer only the allowed topic IDs. Do not add a qualification question:\n${INSTAGRAM_FIRST_CONTACT_OPENING}`
+        : `Start with this exact introduction, verbatim, and then ask only the next missing question:\n${INSTAGRAM_FIRST_CONTACT_OPENING}`
       : "A short natural greeting is allowed."
     : "Do not start with a greeting like Hi, Hello, Hey, or Hi Anna and Mark. Continue the existing thread naturally.";
   const modeInstruction = policy.replyMode === "scheduling_reply"
@@ -1393,6 +1452,18 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
     : text.trim();
 }
 
+function sanitizeActionPlanFallback(args: ComposeWeddingSalesResponseArgs, fallback: string) {
+  if (!hasActionPlanQuestionAuthorityWithoutPlannedQuestion(args.state)) {
+    return fallback.trim();
+  }
+
+  return fallback
+    .split(/\n\s*\n/)
+    .filter((paragraph) => !paragraph.includes("?"))
+    .join("\n\n")
+    .trim();
+}
+
 export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { text: string }) {
   const formatting = getChannelFormatting(args.config, args.state);
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
@@ -1519,7 +1590,10 @@ async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs
 
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
   const fallback = normalizeCustomerFacingPunctuation(
-    ensureInstagramFirstContactOpening(args, composeWeddingSalesResponse(args)),
+    sanitizeActionPlanFallback(
+      args,
+      ensureInstagramFirstContactOpening(args, composeWeddingSalesResponse(args)),
+    ),
   );
 
   if (args.testMode && args.intent === "booking_confirmed") {

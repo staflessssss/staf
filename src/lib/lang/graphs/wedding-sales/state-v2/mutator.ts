@@ -4,7 +4,6 @@ import type { SemanticAnalysisV2, SemanticProvidedValueV2, WeddingSalesField } f
 import {
   hasStructuredCoupleNames,
   mergeNameRoleFromSemanticV2,
-  mergeNamesFromSemanticV2,
   migrateWeddingSalesNames,
 } from "./names";
 import type { WeddingSalesStateMutationTrace, WeddingSalesClientType } from "./schema";
@@ -79,8 +78,7 @@ function selectBestValue(args: {
 }) {
   const effective = calculateEffectiveEntityConfidence(args).filter((entry) => entry.field === args.field);
   return effective
-    .filter((entry) => entry.valid)
-    .sort((a, b) => b.effectiveConfidence - a.effectiveConfidence)[0];
+    .sort((a, b) => Number(b.valid) - Number(a.valid) || b.effectiveConfidence - a.effectiveConfidence)[0];
 }
 
 function isAccepted(entry: ReturnType<typeof selectBestValue>) {
@@ -88,7 +86,11 @@ function isAccepted(entry: ReturnType<typeof selectBestValue>) {
 }
 
 function isPendingCandidate(entry: ReturnType<typeof selectBestValue>) {
-  return Boolean(entry && entry.effectiveConfidence >= PENDING_ENTITY_THRESHOLD);
+  return Boolean(
+    entry &&
+      entry.evidencePresent &&
+      entry.effectiveConfidence >= PENDING_ENTITY_THRESHOLD,
+  );
 }
 
 function evidenceIsPresent(message: string | undefined, evidence: string) {
@@ -112,36 +114,6 @@ function workingState(state: WeddingSalesState, update: Partial<WeddingSalesStat
     ...state,
     ...update,
   };
-}
-
-function extractRelativeOrWeekdayCallTime(text?: string) {
-  if (!text) {
-    return undefined;
-  }
-
-  const dayFirst = text.match(
-    /\b((?:day after tomorrow|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*(?:eastern|et|est|edt))?)\b/i,
-  );
-
-  if (dayFirst?.[1]) {
-    return dayFirst[1].trim();
-  }
-
-  const timeFirst = text.match(
-    /\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)(?:\s*(?:eastern|et|est|edt))?\s+(?:today|tomorrow|day after tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i,
-  );
-
-  return timeFirst?.[1]?.trim();
-}
-
-function callTimeValueForState(state: WeddingSalesState, semanticValue: string) {
-  const latestMessageCallTime = extractRelativeOrWeekdayCallTime(state.latestCustomerMessage);
-
-  if (latestMessageCallTime) {
-    return latestMessageCallTime;
-  }
-
-  return semanticValue;
 }
 
 function deriveLeadStage(args: {
@@ -347,7 +319,22 @@ export function applySemanticV2StateMutation(args: {
     }
   }
 
-  for (const field of ["names", "weddingDate", "weddingYear", "location", "venue", "email", "callTime"] as const) {
+  const genericNames = selectBestValue({
+    analysis,
+    state: workingState(state, update),
+    field: "names",
+  });
+
+  if (genericNames) {
+    trace.push({
+      action: "rejected",
+      field: "names",
+      value: genericNames.value,
+      reason: "generic_names_entity_is_not_structured_name_authority",
+    });
+  }
+
+  for (const field of ["weddingDate", "weddingYear", "location", "venue", "email", "callTime"] as const) {
     const entry = selectBestValue({
       analysis,
       state: workingState(state, update),
@@ -389,16 +376,6 @@ export function applySemanticV2StateMutation(args: {
     }
 
     switch (field) {
-      case "names":
-        Object.assign(
-          update,
-          mergeNamesFromSemanticV2({
-            state: workingState(state, update),
-            candidate: entry.value,
-            evidence: entry.evidence,
-          }),
-        );
-        break;
       case "weddingDate":
         update.weddingDate = entry.value;
         update.weddingYear = entry.value.slice(0, 4);
@@ -436,7 +413,7 @@ export function applySemanticV2StateMutation(args: {
         break;
       case "callTime":
         {
-          const callTimeValue = callTimeValueForState(state, entry.value);
+          const callTimeValue = entry.value;
 
           if (state.proposedCallTime && normalizeForComparison(state.proposedCallTime) !== normalizeForComparison(callTimeValue)) {
             update.calendarStatus = undefined;

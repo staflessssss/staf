@@ -1,5 +1,6 @@
 import { selectWeddingSalesPricing, type WeddingSalesConfig } from "./config";
 import type { WeddingSalesResponseIntent } from "./response-composer";
+import { buildWeddingSalesResponseContext } from "./action-plan/response-context";
 import type { WeddingSalesState } from "./state";
 
 export type WeddingSalesReplyMode = "full_email" | "thread_reply" | "scheduling_reply";
@@ -169,6 +170,14 @@ export function getWeddingSalesBehavioralStateUpdate(args: {
   state: WeddingSalesState;
 }): Partial<WeddingSalesState> {
   const { intent, policy, state } = args;
+  const responseContext = buildWeddingSalesResponseContext(state);
+  const plannedQuestionField = responseContext.plannedQuestionField;
+  const askedFieldCounts = plannedQuestionField
+    ? {
+        ...(state.askedFieldCounts ?? {}),
+        [plannedQuestionField]: (state.askedFieldCounts?.[plannedQuestionField] ?? 0) + 1,
+      }
+    : state.askedFieldCounts;
 
   return {
     assistantReplyCount: (state.assistantReplyCount ?? 0) + 1,
@@ -187,6 +196,7 @@ export function getWeddingSalesBehavioralStateUpdate(args: {
         intent === "calendar_time_missing",
     ),
     askedForEmail: Boolean(state.askedForEmail || intent === "ask_email"),
+    askedFieldCounts,
     lastAssistantIntent: intent,
   };
 }

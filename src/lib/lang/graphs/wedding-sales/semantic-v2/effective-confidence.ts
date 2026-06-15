@@ -1,5 +1,6 @@
 import type { WeddingSalesState } from "../state";
-import type { SemanticAnalysisV2, SemanticEntityV2, WeddingSalesField } from "./schema";
+import { isValidSemanticFieldValue } from "../state-v2/validators";
+import type { SemanticAnalysisV2, WeddingSalesField } from "./schema";
 
 export type EffectiveEntityConfidence = {
   field: WeddingSalesField;
@@ -17,72 +18,8 @@ function normalize(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function hasCoupleNames(value?: string) {
-  return Boolean(value && /\s+(?:and|&)\s+/i.test(value));
-}
-
-function evidenceAddsPartnerName(args: {
-  field: WeddingSalesField;
-  currentValue?: string;
-  candidateValue: string;
-  evidence: string;
-}) {
-  const evidence = args.evidence.toLowerCase();
-
-  return (
-    args.field === "names" &&
-    Boolean(args.currentValue) &&
-    !hasCoupleNames(args.currentValue) &&
-    !hasCoupleNames(args.candidateValue) &&
-    (
-      evidence.includes("fianc") ||
-      evidence.includes("partner") ||
-      evidence.includes("groom") ||
-      evidence.includes("bride") ||
-      evidence.includes("his name") ||
-      evidence.includes("her name") ||
-      evidence.includes("their name")
-    )
-  );
-}
-
 function evidenceIsPresent(message: string, evidence: string) {
   return Boolean(evidence.trim()) && normalize(message).includes(normalize(evidence));
-}
-
-function isValidIsoDate(value: string) {
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return false;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return (
-    !Number.isNaN(date.getTime()) &&
-    date.getUTCFullYear() === Number(match[1]) &&
-    date.getUTCMonth() + 1 === Number(match[2]) &&
-    date.getUTCDate() === Number(match[3])
-  );
-}
-
-function isValidEntity(entity: SemanticEntityV2) {
-  const value = entity.normalizedValue ?? entity.value;
-
-  switch (entity.field) {
-    case "email":
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-    case "weddingDate":
-      return isValidIsoDate(value);
-    case "weddingYear":
-      return /^(?:19|20)\d{2}$/.test(value);
-    case "names":
-      return (
-        value.length >= 2 &&
-        !/\b(?:not ready|schedule|call|question|price|wedding date|venue|location)\b/i.test(value)
-      );
-    default:
-      return value.trim().length >= 2;
-  }
 }
 
 function committedValue(state: WeddingSalesState, field: WeddingSalesField) {
@@ -157,18 +94,15 @@ export function calculateEffectiveEntityConfidence(args: {
   return args.analysis.entities.map((entity) => {
     const reasons: string[] = [];
     const evidencePresent = evidenceIsPresent(message, entity.evidence);
-    const valid = isValidEntity(entity);
+    const valid = isValidSemanticFieldValue(entity);
     const currentValue = committedValue(args.state, entity.field);
-    const candidateValue = entity.normalizedValue ?? entity.value;
+    const candidateValue =
+      entity.field === "callTime"
+        ? entity.value.trim()
+        : entity.normalizedValue ?? entity.value;
     const conflictsWithCommittedState = Boolean(
       currentValue &&
-        normalize(currentValue) !== normalize(candidateValue) &&
-        !evidenceAddsPartnerName({
-          field: entity.field,
-          currentValue,
-          candidateValue,
-          evidence: entity.evidence,
-        }),
+        normalize(currentValue) !== normalize(candidateValue),
     );
     let effectiveConfidence = entity.confidence;
 

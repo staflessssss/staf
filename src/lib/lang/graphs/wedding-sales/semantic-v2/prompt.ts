@@ -1,5 +1,17 @@
 import type { WeddingSalesState } from "../state";
 
+const SEMANTIC_FIELD_CONTRACT = {
+  customerName: "Name of the person currently speaking with the agent.",
+  partnerName: "Name of the speaker's fiance or wedding partner.",
+  names: "Legacy-compatible couple display name. Never use it instead of providedInfo name roles.",
+  weddingDate: "Exact wedding date. normalizedValue must be ISO YYYY-MM-DD when the year is known.",
+  weddingYear: "Wedding year when the customer provided a year without a complete date.",
+  location: "Wedding city, state, region, or general geographic location.",
+  venue: "Wedding venue business name or street address.",
+  email: "Customer email address.",
+  callTime: "Customer's proposed consultation time, preserving the customer's exact wording in value.",
+} as const;
+
 function compact(value: string | undefined, maxLength: number) {
   const normalized = value?.trim();
 
@@ -21,11 +33,15 @@ Use conversation and current state only to resolve references, corrections, conf
 Rules:
 - "Olivia and Daniel" is a valid couple display value. Never require surnames unless the customer explicitly distinguishes them.
 - For names, use providedInfo.customerName and providedInfo.partnerName whenever the latest message supports either role. "I'm Mia" means customerName=Mia. "my fiance is Ethan" means partnerName=Ethan. Do not replace one with the other.
+- When the customer supplies two names together, populate both providedInfo roles. Treat the speaker's own name as customerName and the other person's name as partnerName when the message supports that ordering.
 - Always include providedInfo. Use null for customerName or partnerName when the latest message does not provide that role.
 - Do not put customer or partner names only in generic entities when their role is clear. The structured providedInfo role is the source of truth for names.
 - A city, state, or region is location. A business name or street address is venue.
+- When a message contains both a venue and its city/state in the same phrase, return both fields separately. Example: "at Harborside Chapel in Safety Harbor FL" means venue="Harborside Chapel" and location="Safety Harbor, FL".
+- When a message contains a street address with city/state, return the street address as venue and the city/state as location. Example: "333 S Franklin Street, Tampa, FL 33602" means venue="333 S Franklin Street, Tampa, FL 33602" and location="Tampa, FL".
 - A street number, ZIP code, package price, or film duration is never a wedding date.
 - A call-related objection is not a call-time proposal and must not produce a callTime entity.
+- For callTime, preserve the customer's exact scheduling phrase in value. normalizedValue may contain a resolved timestamp, but state will preserve value for deterministic calendar resolution.
 - If the customer clearly changes a known value, use request_modification and pendingResolution type correct.
 - If a conflicting value may be a change but is not explicit, use pendingResolution type ambiguous.
 - If currentState.pendingChangeField exists and the customer confirms its proposed value, include intent confirm and pendingResolution for that exact field with type confirm. Do this even when the customer repeats or clarifies the value.
@@ -66,6 +82,7 @@ export function buildSemanticV2Prompt(state: WeddingSalesState) {
         pendingChangeDisplay: state.pendingChangeDisplay,
         lastAssistantIntent: state.lastAssistantIntent,
       },
+      availableFields: SEMANTIC_FIELD_CONTRACT,
       latestCustomerMessage: compact(state.latestCustomerMessage, 3000),
       previousAssistantReply: compact(state.responseDraft, 1600),
       recentConversation: compact(state.conversationContext, 6000),

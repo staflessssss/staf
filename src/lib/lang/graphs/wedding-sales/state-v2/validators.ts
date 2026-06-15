@@ -1,5 +1,19 @@
 import type { SemanticEntityV2 } from "../semantic-v2/schema";
 
+const NON_INFORMATIVE_VALUES = new Set([
+  "a",
+  "an",
+  "and",
+  "at",
+  "in",
+  "location",
+  "n/a",
+  "none",
+  "the",
+  "unknown",
+  "venue",
+]);
+
 export function normalizeSemanticValue(entity: SemanticEntityV2) {
   return (entity.normalizedValue ?? entity.value).trim();
 }
@@ -27,6 +41,11 @@ export function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isInformativeText(value: string) {
+  const normalized = normalizeForComparison(value);
+  return normalized.length >= 2 && !NON_INFORMATIVE_VALUES.has(normalized);
+}
+
 export function isValidSemanticFieldValue(entity: SemanticEntityV2) {
   const value = normalizeSemanticValue(entity);
 
@@ -41,10 +60,10 @@ export function isValidSemanticFieldValue(entity: SemanticEntityV2) {
     case "customerName":
     case "partnerName":
       return (
-        value.length >= 2 &&
+        isInformativeText(value) &&
         !/\b(?:not ready|schedule|call|question|price|wedding date|venue|location)\b/i.test(value)
       );
     default:
-      return value.length >= 2;
+      return isInformativeText(value);
   }
 }

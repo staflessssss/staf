@@ -544,7 +544,7 @@ function collectAutoAttachments(args: {
     dedupe.set(attachment.fileId, attachment);
   }
 
-  if (isPricingReply(args.text)) {
+  if (isPricingReply(args.text) && dedupe.size === 0) {
     const fileId = config.priceAttachmentFileId ?? DEFAULT_PRICING_ATTACHMENT_FILE_ID;
 
     dedupe.set(fileId, {

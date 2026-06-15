@@ -1,5 +1,6 @@
 import type { WeddingSalesState } from "../state";
 import type { SemanticAnalysisV2 } from "../semantic-v2/schema";
+import { wasSemanticFieldCommittedThisTurn } from "../state-v2/trace";
 import type {
   WeddingSalesActionGuardrailTrace,
   WeddingSalesActionType,
@@ -31,12 +32,6 @@ function hasSchedulingObjection(analysis: SemanticAnalysisV2) {
       (objection.type === "not_ready_to_schedule" ||
         objection.type === "needs_more_information" ||
         objection.type === "wants_to_think"),
-  );
-}
-
-function hasFreshCallTime(analysis: SemanticAnalysisV2) {
-  return analysis.entities.some(
-    (entity) => entity.field === "callTime" && entity.confidence >= 0.75,
   );
 }
 
@@ -94,7 +89,7 @@ export function canCheckConsultationCalendar(args: {
 
   if (
     (state.calendarStatus === "available" || state.calendarStatus === "busy") &&
-    !hasFreshCallTime(analysis)
+    !wasSemanticFieldCommittedThisTurn(state, "callTime")
   ) {
     return { allowed: false, reason: "calendar_status_already_known" };
   }

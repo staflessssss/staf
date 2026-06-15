@@ -121,6 +121,173 @@ test("semantic v2 mutator commits alternate date confirmation and preserves call
   );
 });
 
+test("semantic v2 mutator keeps an ambiguous date pending until the customer confirms it", () => {
+  const firstState = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Maybe October 17, 2026 instead.",
+    previousState: {
+      leadStage: "availability_checked",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      names: "Cindy and Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor, FL",
+      venue: "Harborside Chapel",
+      availability: "available",
+    },
+  });
+
+  const firstResult = applySemanticV2StateMutation({
+    state: firstState,
+    analysis: analysis({
+      entities: [
+        {
+          field: "weddingDate",
+          value: "October 17, 2026",
+          normalizedValue: "2026-10-17",
+          confidence: 0.6,
+          evidence: "October 17, 2026",
+          alternatives: [],
+        },
+      ],
+      pendingResolution: {
+        field: "weddingDate",
+        type: "ambiguous",
+        proposedValue: "2026-10-17",
+        confidence: 0.6,
+        evidence: "Maybe October 17, 2026 instead",
+      },
+    }),
+  });
+
+  assert.equal(firstResult.weddingDate, undefined);
+  assert.equal(firstResult.pendingChangeField, "weddingDate");
+  assert.equal(firstResult.pendingChangeValue, "2026-10-17");
+  assert.equal(firstResult.leadStage, "confirming_change");
+  assert.match(JSON.stringify(firstResult.lastStateMutationTrace), /"action":"pending"/);
+
+  const confirmedState = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Yes, October 17 is our new date.",
+    previousState: {
+      ...firstState,
+      ...firstResult,
+    },
+  });
+  const confirmedResult = applySemanticV2StateMutation({
+    state: confirmedState,
+    analysis: analysis({
+      intents: [
+        {
+          category: "confirm",
+          confidence: 0.98,
+          targetField: "weddingDate",
+          evidence: "Yes, October 17 is our new date",
+        },
+      ],
+      primaryIntent: "confirm",
+      pendingResolution: {
+        field: "weddingDate",
+        type: "confirm",
+        proposedValue: "2026-10-17",
+        confidence: 0.98,
+        evidence: "Yes, October 17 is our new date",
+      },
+    }),
+  });
+
+  assert.equal(confirmedResult.weddingDate, "2026-10-17");
+  assert.equal(confirmedResult.pendingChangeField, undefined);
+  assert.equal(confirmedResult.availability, undefined);
+  assert.equal(confirmedResult.leadStage, "ready_for_availability");
+  assert.match(JSON.stringify(confirmedResult.lastStateMutationTrace), /pending_change_confirmed/);
+});
+
+test("semantic v2 mutator rejects entities grounded only in conversation history", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "That sounds good.",
+    previousState: {
+      leadStage: "availability_checked",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      names: "Cindy and Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor, FL",
+      availability: "available",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "weddingDate",
+          value: "October 17, 2026",
+          normalizedValue: "2026-10-17",
+          confidence: 0.99,
+          evidence: "October 17, 2026",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.weddingDate, undefined);
+  assert.equal(result.pendingChangeField, undefined);
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /evidence_missing/);
+});
+
+test("semantic v2 mutator rejects non-informative location and venue entities", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "The venue and location are still unknown.",
+    previousState: {
+      leadStage: "missing_location_or_venue",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      names: "Cindy and Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "venue",
+          value: "the",
+          normalizedValue: null,
+          confidence: 0.99,
+          evidence: "The",
+          alternatives: [],
+        },
+        {
+          field: "location",
+          value: "unknown",
+          normalizedValue: null,
+          confidence: 0.99,
+          evidence: "unknown",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.venue, undefined);
+  assert.equal(result.location, undefined);
+  assert.equal(result.leadStage, "missing_location_or_venue");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /deterministic_validation_failed/);
+});
+
 test("semantic v2 mutator routes accepted call time to calendar check when availability is known", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
@@ -198,7 +365,7 @@ test("semantic v2 mutator preserves customer relative call time over normalized 
       entities: [
         {
           field: "callTime",
-          value: "2024-06-14T11:00:00-04:00",
+          value: "tomorrow at 11am",
           normalizedValue: "2024-06-14T11:00:00-04:00",
           confidence: 0.95,
           evidence: "tomorrow at 11am",
@@ -210,6 +377,43 @@ test("semantic v2 mutator preserves customer relative call time over normalized 
   });
 
   assert.equal(result.proposedCallTime, "tomorrow at 11am");
+  assert.equal(result.leadStage, "checking_calendar");
+});
+
+test("semantic v2 mutator preserves the semantic call-time value without reparsing raw text", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Would Monday morning at ten work?",
+    previousState: {
+      leadStage: "asking_call_time",
+      names: "Bob and Marie",
+      weddingDate: "2026-10-23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh",
+      venue: "Evergreen Park",
+      availability: "available",
+      callProposed: true,
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "callTime",
+          value: "Monday morning at ten",
+          normalizedValue: "2026-06-15T10:00:00-04:00",
+          confidence: 0.95,
+          evidence: "Monday morning at ten",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.proposedCallTime, "Monday morning at ten");
   assert.equal(result.leadStage, "checking_calendar");
 });
 
@@ -263,7 +467,7 @@ test("semantic v2 mutator replaces a previously rejected call time with a fresh 
   assert.equal(result.leadStage, "checking_calendar");
 });
 
-test("semantic v2 mutator merges fiance name into existing customer name", () => {
+test("semantic v2 mutator merges structured partner name into existing customer name", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
     message: "My fiancé is Ethan, wedding is October 17 2026 in Miami",
@@ -280,20 +484,20 @@ test("semantic v2 mutator merges fiance name into existing customer name", () =>
         {
           category: "provide_info",
           confidence: 0.95,
-          targetField: "names",
+          targetField: "partnerName",
           evidence: "My fiancé is Ethan",
         },
       ],
-      entities: [
-        {
-          field: "names",
+      providedInfo: {
+        customerName: null,
+        partnerName: {
           value: "Ethan",
           normalizedValue: null,
           confidence: 0.95,
           evidence: "My fiancé is Ethan",
           alternatives: [],
         },
-      ],
+      },
     }),
     fallbackLeadStage: "missing_names_or_date",
   });
@@ -423,6 +627,68 @@ test("semantic v2 mutator captures partner reminder after the partner name was m
   assert.match(JSON.stringify(result.lastStateMutationTrace), /semantic_v2_structured_name_role/);
 });
 
+test("semantic v2 mutator does not infer a name role from a generic single-name entity", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "My fiance is Marie",
+    previousState: {
+      leadStage: "missing_names_or_date",
+      names: "Bob",
+      customerName: "Bob",
+      nameCollectionStatus: "customer_only",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "names",
+          value: "Marie",
+          normalizedValue: null,
+          confidence: 0.98,
+          evidence: "My fiance is Marie",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.customerName, "Bob");
+  assert.equal(result.partnerName, undefined);
+  assert.equal(result.names, "Bob");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /generic_names_entity_is_not_structured_name_authority/);
+});
+
+test("semantic v2 mutator does not derive structured roles from a generic couple display entity", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Cindy and Paul",
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "names",
+          value: "Cindy and Paul",
+          normalizedValue: null,
+          confidence: 0.99,
+          evidence: "Cindy and Paul",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.customerName, undefined);
+  assert.equal(result.partnerName, undefined);
+  assert.equal(result.names, undefined);
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /generic_names_entity_is_not_structured_name_authority/);
+});
+
 test("semantic v2 mutator treats street address as venue without changing wedding date", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
@@ -467,4 +733,58 @@ test("semantic v2 mutator treats street address as venue without changing weddin
   assert.equal("weddingDate" in result, false);
   assert.equal("weddingYear" in result, false);
   assert.equal(result.leadStage, "asking_call_time");
+});
+
+test("semantic v2 mutator commits separately extracted venue and location", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "gmail",
+    message: "Sorry about that! It’s 10/18/26 at Harborside Chapel in Safety Harbor FL.\n\nCindy & Paul",
+    previousState: {
+      leadStage: "missing_location_or_venue",
+      names: "Cindy and Paul",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "provide_info",
+          confidence: 0.95,
+          targetField: "venue",
+          evidence: "at Harborside Chapel in Safety Harbor FL",
+        },
+      ],
+      entities: [
+        {
+          field: "venue",
+          value: "Harborside Chapel",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "Harborside Chapel",
+          alternatives: [],
+        },
+        {
+          field: "location",
+          value: "Safety Harbor FL",
+          normalizedValue: "Safety Harbor, FL",
+          confidence: 0.95,
+          evidence: "Safety Harbor FL",
+          alternatives: [],
+        },
+      ],
+    }),
+    fallbackLeadStage: "missing_location_or_venue",
+  });
+
+  assert.equal(result.venue, "Harborside Chapel");
+  assert.equal(result.location, "Safety Harbor, FL");
+  assert.equal(result.leadStage, "ready_for_availability");
+  assert.doesNotMatch(JSON.stringify(result.lastStateMutationTrace), /grounding_derived_location_from_current_message/);
 });

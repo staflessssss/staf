@@ -284,6 +284,90 @@ test("wedding sales composer asks the action-plan partnerName field without reco
   assert.doesNotMatch(response, /both of your names/i);
 });
 
+test("wedding sales composer does not ask legacy missing-info questions when v2 plan has no planned field", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 2,
+      names: undefined,
+      customerName: undefined,
+      partnerName: undefined,
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      assistantReplyCount: 1,
+      hasGreeted: true,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "continue",
+        actions: [
+          {
+            type: "continue_conversation",
+            field: null,
+            topicId: null,
+            reason: "no_customer_facing_question_planned",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  assert.equal(response, "");
+});
+
+test("wedding sales human composer sanitizes fallback questions when v2 plan has no planned field", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "answer_question",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 2,
+        leadStage: "answering_question",
+        names: undefined,
+        customerName: undefined,
+        partnerName: undefined,
+        weddingDate: undefined,
+        weddingDateText: undefined,
+        location: undefined,
+        latestCustomerMessage: "What is your style?",
+        assistantReplyCount: 1,
+        hasGreeted: true,
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "answer_and_qualify",
+          actions: [
+            {
+              type: "answer_question",
+              field: null,
+              topicId: "style",
+              reason: "customer_asked_current_business_question",
+            },
+          ],
+          guardrailTrace: [],
+        },
+      },
+    });
+
+    assert.match(response, /cinematic documentary/i);
+    assert.doesNotMatch(response, /\?/);
+    assert.doesNotMatch(response, /fianc|both of your names|wedding date|venue|location/i);
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
 
 test("wedding sales composer uses plain links for instagram", () => {
   const response = composeWeddingSalesResponse({

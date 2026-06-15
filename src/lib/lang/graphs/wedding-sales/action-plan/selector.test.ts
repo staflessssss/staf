@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { SemanticAnalysisV2 } from "../semantic-v2/schema";
+import type { SemanticAnalysisV2, WeddingSalesField } from "../semantic-v2/schema";
 import { createInitialWeddingSalesState } from "../state";
 import { selectWeddingSalesActionPlan } from "./selector";
 import { weddingSalesActionPlanSchema } from "./schema";
@@ -45,6 +45,14 @@ test("action selector plans availability then calendar for alternate date plus c
       location: "Charlotte",
       venue: "Evergreen Park",
       proposedCallTime: "tomorrow at 11am",
+      lastStateMutationTrace: [
+        {
+          action: "accepted",
+          field: "callTime",
+          value: "tomorrow at 11am",
+          reason: "semantic_v2_committed_call_time",
+        },
+      ],
     },
   });
   const plan = selectWeddingSalesActionPlan({
@@ -274,6 +282,90 @@ test("action selector does not authorize availability without location", () => {
   );
 });
 
+test("action selector does not authorize availability from a rejected semantic location", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "The location is unknown.",
+    previousState: {
+      leadStage: "ready_for_availability",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      names: "Cindy and Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      lastStateMutationTrace: [
+        {
+          action: "rejected",
+          field: "location",
+          value: "unknown",
+          reason: "deterministic_validation_failed",
+        },
+      ],
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "location",
+          value: "unknown",
+          normalizedValue: null,
+          confidence: 0.99,
+          evidence: "unknown",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(plan.actions[0]?.type, "ask_missing_field");
+  assert.equal(plan.actions[0]?.field, "location");
+  assert.equal(
+    plan.guardrailTrace.find((entry) => entry.action === "check_wedding_availability")?.allowed,
+    false,
+  );
+});
+
+test("action selector requests confirmation instead of running tools for a pending date change", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Maybe October 17 instead.",
+    previousState: {
+      leadStage: "confirming_change",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      names: "Cindy and Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor, FL",
+      pendingChangeField: "weddingDate",
+      pendingChangeValue: "2026-10-17",
+      lastStateMutationTrace: [
+        {
+          action: "pending",
+          field: "weddingDate",
+          value: "2026-10-17",
+          reason: "conflicts_without_explicit_correction",
+        },
+      ],
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis(),
+  });
+
+  assert.deepEqual(
+    plan.actions.map((item) => item.type),
+    ["request_confirmation"],
+  );
+  assert.equal(plan.actions[0]?.field, "weddingDate");
+  assert.ok(!plan.actions.some((item) => item.type === "check_wedding_availability"));
+});
+
 test("action selector plans booking when email arrives after available calendar", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
@@ -386,6 +478,14 @@ test("action selector rechecks calendar when customer provides a new call time a
       availability: "available",
       proposedCallTime: "tomorrow at 11",
       calendarStatus: "available",
+      lastStateMutationTrace: [
+        {
+          action: "accepted",
+          field: "callTime",
+          value: "Friday at 10am",
+          reason: "semantic_v2_committed_call_time",
+        },
+      ],
     },
   });
   const plan = selectWeddingSalesActionPlan({
@@ -416,6 +516,56 @@ test("action selector rechecks calendar when customer provides a new call time a
   assert.deepEqual(
     plan.actions.map((item) => item.type),
     ["check_consultation_calendar"],
+  );
+});
+
+test("action selector does not recheck calendar for a call-time entity rejected by state mutation", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Maybe Friday at 10am, I am not sure",
+    previousState: {
+      leadStage: "waiting_customer_email",
+      names: "Mia and Ethan",
+      customerName: "Mia",
+      partnerName: "Ethan",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      proposedCallTime: "tomorrow at 11",
+      calendarStatus: "available",
+      lastStateMutationTrace: [
+        {
+          action: "rejected",
+          field: "callTime",
+          value: "Friday at 10am",
+          reason: "semantic_value_not_committed",
+        },
+      ],
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "callTime",
+          value: "Friday at 10am",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "Friday at 10am",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.doesNotMatch(JSON.stringify(plan.actions), /check_consultation_calendar/);
+  assert.deepEqual(
+    plan.actions.map((item) => [item.type, item.field]),
+    [["ask_missing_field", "email"]],
   );
 });
 
@@ -502,4 +652,316 @@ test("action selector asks specifically for partner name when customer name is a
   const missingAction = plan.actions.find((item) => item.type === "ask_missing_field");
 
   assert.equal(missingAction?.field, "partnerName");
+});
+
+test("action selector does not repeat partner-name pressure after it was already asked and customer asks pricing", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "What are your fees?",
+    previousState: {
+      leadStage: "answering_question",
+      names: "Bob",
+      customerName: "Bob",
+      nameCollectionStatus: "customer_only",
+      askedFieldCounts: {
+        partnerName: 1,
+      },
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "partnerName",
+            topicId: null,
+            reason: "partner_name_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "ask_question",
+          confidence: 0.95,
+          targetField: null,
+          evidence: "fees",
+        },
+      ],
+      questions: [
+        {
+          topicId: "pricing",
+          normalizedQuestion: "What are your fees?",
+          confidence: 0.95,
+          evidence: "fees",
+        },
+      ],
+    }),
+  });
+
+  assert.deepEqual(
+    plan.actions.map((item) => item.type),
+    ["answer_question"],
+  );
+});
+
+test("action selector does not repeat call-time pressure after answering another question", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Any travel fees?",
+    previousState: {
+      leadStage: "availability_checked",
+      names: "Bob and Marie",
+      customerName: "Bob",
+      partnerName: "Marie",
+      coupleDisplayName: "Bob and Marie",
+      nameCollectionStatus: "both",
+      weddingDate: "2026-10-23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      askedForCallTime: true,
+      askedFieldCounts: {
+        callTime: 1,
+      },
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "callTime",
+            topicId: null,
+            reason: "call_time_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "ask_question",
+          confidence: 0.95,
+          targetField: null,
+          evidence: "travel fees",
+        },
+      ],
+      questions: [
+        {
+          topicId: "travel_fees",
+          normalizedQuestion: "Any travel fees?",
+          confidence: 0.95,
+          evidence: "travel fees",
+        },
+      ],
+    }),
+  });
+
+  assert.deepEqual(
+    plan.actions.map((item) => item.type),
+    ["answer_question"],
+  );
+});
+
+test("action selector suppresses repeated missing-field pressure across qualification fields", () => {
+  const cases: Array<{
+    label: string;
+    field: Exclude<WeddingSalesField, "names">;
+    previousState: Parameters<typeof createInitialWeddingSalesState>[0]["previousState"];
+    message: string;
+    topicId: string;
+  }> = [
+    {
+      label: "customer name",
+      field: "customerName",
+      previousState: {
+        leadStage: "new",
+      },
+      message: "Do you travel?",
+      topicId: "travel_fees",
+    },
+    {
+      label: "partner name",
+      field: "partnerName",
+      previousState: {
+        leadStage: "answering_question",
+        names: "Bob",
+        customerName: "Bob",
+        nameCollectionStatus: "customer_only",
+      },
+      message: "What does the package include?",
+      topicId: "package_inclusions",
+    },
+    {
+      label: "wedding date",
+      field: "weddingDate",
+      previousState: {
+        leadStage: "missing_names_or_date",
+        names: "Bob and Marie",
+        customerName: "Bob",
+        partnerName: "Marie",
+        coupleDisplayName: "Bob and Marie",
+        nameCollectionStatus: "both",
+      },
+      message: "Can we see your portfolio?",
+      topicId: "portfolio",
+    },
+    {
+      label: "wedding year",
+      field: "weddingYear",
+      previousState: {
+        leadStage: "waiting_wedding_year",
+        names: "Bob and Marie",
+        customerName: "Bob",
+        partnerName: "Marie",
+        coupleDisplayName: "Bob and Marie",
+        nameCollectionStatus: "both",
+        weddingDate: "10-23",
+        weddingYearKnown: false,
+      },
+      message: "Do you send raw footage?",
+      topicId: "package_inclusions",
+    },
+    {
+      label: "location",
+      field: "location",
+      previousState: {
+        leadStage: "missing_location_or_venue",
+        names: "Bob and Marie",
+        customerName: "Bob",
+        partnerName: "Marie",
+        coupleDisplayName: "Bob and Marie",
+        nameCollectionStatus: "both",
+        weddingDate: "2026-10-23",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+      },
+      message: "Can I see your reviews?",
+      topicId: "reviews",
+    },
+    {
+      label: "venue",
+      field: "venue",
+      previousState: {
+        leadStage: "availability_checked",
+        names: "Bob and Marie",
+        customerName: "Bob",
+        partnerName: "Marie",
+        coupleDisplayName: "Bob and Marie",
+        nameCollectionStatus: "both",
+        weddingDate: "2026-10-23",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Raleigh, NC",
+        availability: "available",
+      },
+      message: "Who will be the shooter?",
+      topicId: "team_nc_sc_ga",
+    },
+    {
+      label: "call time",
+      field: "callTime",
+      previousState: {
+        leadStage: "availability_checked",
+        names: "Bob and Marie",
+        customerName: "Bob",
+        partnerName: "Marie",
+        coupleDisplayName: "Bob and Marie",
+        nameCollectionStatus: "both",
+        weddingDate: "2026-10-23",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Raleigh, NC",
+        venue: "Evergreen Park",
+        availability: "available",
+      },
+      message: "Do you have insurance?",
+      topicId: "insurance",
+    },
+    {
+      label: "email",
+      field: "email",
+      previousState: {
+        leadStage: "waiting_customer_email",
+        names: "Bob and Marie",
+        customerName: "Bob",
+        partnerName: "Marie",
+        coupleDisplayName: "Bob and Marie",
+        nameCollectionStatus: "both",
+        weddingDate: "2026-10-23",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Raleigh, NC",
+        venue: "Evergreen Park",
+        availability: "available",
+        proposedCallTime: "Friday 10 AM",
+        calendarStatus: "available",
+      },
+      message: "How long does the final film take?",
+      topicId: "final_film_delivery",
+    },
+  ];
+
+  for (const item of cases) {
+    const state = createInitialWeddingSalesState({
+      channel: "instagram",
+      message: item.message,
+      previousState: {
+        ...item.previousState,
+        askedFieldCounts: {
+          [item.field]: 1,
+        },
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "clarify",
+          actions: [
+            {
+              type: "ask_missing_field",
+              field: item.field,
+              topicId: null,
+              reason: `${item.field}_missing`,
+            },
+          ],
+          guardrailTrace: [],
+        },
+      },
+    });
+    const plan = selectWeddingSalesActionPlan({
+      state,
+      analysis: analysis({
+        intents: [
+          {
+            category: "ask_question",
+            confidence: 0.95,
+            targetField: null,
+            evidence: item.message,
+          },
+        ],
+        questions: [
+          {
+            topicId: item.topicId,
+            normalizedQuestion: item.message,
+            confidence: 0.95,
+            evidence: item.message,
+          },
+        ],
+      }),
+    });
+
+    assert.deepEqual(
+      plan.actions.map((actionItem) => actionItem.type),
+      ["answer_question"],
+      item.label,
+    );
+  }
 });

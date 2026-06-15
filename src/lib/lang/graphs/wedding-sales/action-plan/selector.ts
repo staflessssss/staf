@@ -1,6 +1,7 @@
 import type { SemanticAnalysisV2, WeddingSalesField } from "../semantic-v2/schema";
 import type { WeddingSalesState } from "../state";
 import { hasStructuredCoupleNames, migrateWeddingSalesNames } from "../state-v2/names";
+import { wasSemanticFieldCommittedThisTurn } from "../state-v2/trace";
 import {
   buildGuardrailTraceEntry,
   canBookConsultation,
@@ -50,10 +51,16 @@ function hasHighConfidenceQuestion(analysis: SemanticAnalysisV2) {
   return analysis.questions.some((question) => question.confidence >= 0.75);
 }
 
-function hasHighConfidenceEntity(analysis: SemanticAnalysisV2, field: WeddingSalesField) {
-  return analysis.entities.some(
-    (entity) => entity.field === field && entity.confidence >= 0.75,
-  );
+function hasProvidedFieldInCurrentTurn(state: WeddingSalesState, field: WeddingSalesField) {
+  if (field === "names") {
+    return (
+      wasSemanticFieldCommittedThisTurn(state, "customerName") ||
+      wasSemanticFieldCommittedThisTurn(state, "partnerName") ||
+      wasSemanticFieldCommittedThisTurn(state, "names")
+    );
+  }
+
+  return wasSemanticFieldCommittedThisTurn(state, field);
 }
 
 function bestQuestionTopic(analysis: SemanticAnalysisV2) {
@@ -84,6 +91,55 @@ function isActiveSalesContinuationQuestion(state: WeddingSalesState, analysis: S
       topic &&
       ACTIVE_SALES_CONTINUATION_TOPICS.has(topic),
   );
+}
+
+function fieldWasAskedByPreviousPlan(state: WeddingSalesState, field: WeddingSalesField) {
+  return state.lastActionPlan?.actions.some(
+    (action) => action.type === "ask_missing_field" && action.field === field,
+  ) ?? false;
+}
+
+function legacyAskedForField(state: WeddingSalesState, field: WeddingSalesField) {
+  switch (field) {
+    case "customerName":
+    case "partnerName":
+    case "names":
+      return state.askedForNames;
+    case "weddingYear":
+      return state.askedForWeddingYear;
+    case "location":
+    case "venue":
+      return state.askedForVenue;
+    case "callTime":
+      return state.askedForCallTime;
+    case "email":
+      return state.askedForEmail;
+    default:
+      return false;
+  }
+}
+
+function askedCountForField(state: WeddingSalesState, field: WeddingSalesField) {
+  return state.askedFieldCounts?.[field] ?? (legacyAskedForField(state, field) ? 1 : 0);
+}
+
+function shouldSuppressRepeatedMissingField(args: {
+  state: WeddingSalesState;
+  analysis: SemanticAnalysisV2;
+  field: WeddingSalesField;
+}) {
+  if (hasProvidedFieldInCurrentTurn(args.state, args.field)) {
+    return false;
+  }
+
+  const askedBefore = askedCountForField(args.state, args.field) > 0;
+  const askedInPreviousPlan = fieldWasAskedByPreviousPlan(args.state, args.field);
+
+  if (!askedBefore && !askedInPreviousPlan) {
+    return false;
+  }
+
+  return askedInPreviousPlan || hasHighConfidenceQuestion(args.analysis) || hasHighConfidenceObjection(args.analysis);
 }
 
 function firstMissingField(state: WeddingSalesState): WeddingSalesField | null {
@@ -129,6 +185,26 @@ function firstMissingField(state: WeddingSalesState): WeddingSalesField | null {
   }
 
   return null;
+}
+
+function firstAllowedMissingField(args: {
+  state: WeddingSalesState;
+  analysis: SemanticAnalysisV2;
+}) {
+  const missingField = firstMissingField(args.state);
+
+  if (
+    missingField &&
+    shouldSuppressRepeatedMissingField({
+      state: args.state,
+      analysis: args.analysis,
+      field: missingField,
+    })
+  ) {
+    return null;
+  }
+
+  return missingField;
 }
 
 function action(args: {
@@ -237,7 +313,7 @@ export function selectWeddingSalesActionPlan(args: {
       }),
     ];
 
-    if (hasHighConfidenceEntity(analysis, "callTime")) {
+    if (wasSemanticFieldCommittedThisTurn(state, "callTime")) {
       actions.push(
         action({
           type: "check_consultation_calendar",
@@ -266,7 +342,7 @@ export function selectWeddingSalesActionPlan(args: {
   }
 
   if (hasHighConfidenceQuestion(analysis)) {
-    const missingField = firstMissingField(state);
+    const missingField = firstAllowedMissingField({ state, analysis });
     return buildPlan({
       responseGoal: "answer_and_qualify",
       guardrailTrace,
@@ -289,7 +365,7 @@ export function selectWeddingSalesActionPlan(args: {
     });
   }
 
-  const missingField = firstMissingField(state);
+  const missingField = firstAllowedMissingField({ state, analysis });
   if (missingField) {
     return buildPlan({
       responseGoal: "clarify",

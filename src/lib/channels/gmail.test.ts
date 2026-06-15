@@ -100,6 +100,28 @@ test("gmail helper auto-adds pricing attachment when pricing is mentioned", () =
   assert.equal(attachments[0]?.fileId, "1m3EBiPTnIVq-8i2qD-3CMMKJ6UfYgZxi");
 });
 
+test("gmail helper does not add default pricing attachment when graph supplied a regional guide", () => {
+  const attachments = gmailAdapterTestHelpers.collectAutoAttachments({
+    text: "Our collections start at $2,950 and I can send over the collections guide.",
+    attachments: [
+      {
+        source: "google_drive",
+        fileId: "fl-guide",
+        fileName: "price-fl.png",
+        mimeType: "image/png",
+      },
+    ],
+    channelConfig: {
+      priceAttachmentFileId: "legacy-price",
+      priceAttachmentFileName: "price.png",
+    },
+  });
+
+  assert.equal(attachments.length, 1);
+  assert.equal(attachments[0]?.fileId, "fl-guide");
+  assert.equal(attachments[0]?.fileName, "price-fl.png");
+});
+
 test("gmail delivery attachments respect message-layer attachment permission", () => {
   const blocked = gmailAdapterTestHelpers.collectDeliveryAttachments({
     text: "Our pricing starts at $2,750 and I just sent over details.",
