@@ -13,6 +13,18 @@ const OWNER_CONTEXT_TYPES = new Set([
   "vendor",
 ]);
 
+const SALES_FLOW_FIELDS = [
+  "customerName",
+  "partnerName",
+  "names",
+  "weddingDate",
+  "weddingYear",
+  "location",
+  "venue",
+  "callTime",
+  "email",
+] as const;
+
 function hasPendingChange(state: WeddingSalesState) {
   return Boolean(state.pendingChangeField && state.pendingChangeValue);
 }
@@ -36,6 +48,10 @@ function hasSchedulingObjection(analysis: SemanticAnalysisV2) {
 }
 
 export function isOwnerContext(state: WeddingSalesState, analysis: SemanticAnalysisV2) {
+  if (SALES_FLOW_FIELDS.some((field) => wasSemanticFieldCommittedThisTurn(state, field))) {
+    return false;
+  }
+
   const clientType = state.clientType ?? analysis.clientType?.value;
   return Boolean(clientType && OWNER_CONTEXT_TYPES.has(clientType));
 }

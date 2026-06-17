@@ -16,6 +16,7 @@ import {
   createInitialWeddingSalesState,
   WeddingSalesStateAnnotation,
   type WeddingSalesChannel,
+  type WeddingSalesRuntimeMode,
   type WeddingSalesState,
 } from "./state";
 
@@ -41,6 +42,7 @@ export type InvokeWeddingSalesGraphInput = {
   tenantId?: string;
   agentId?: string;
   contactId?: string;
+  runtimeMode?: WeddingSalesRuntimeMode;
   customerEmail?: string;
   conversationContext?: string;
   previousState?: Partial<WeddingSalesState>;
@@ -50,7 +52,7 @@ export type InvokeWeddingSalesGraphInput = {
 };
 
 export function routeWeddingSalesState(state: WeddingSalesState): WeddingSalesRoute {
-  if (isWeddingSalesActionRuntimeV2Enabled(state.agentId) && state.lastActionPlan) {
+  if (isWeddingSalesActionRuntimeV2Enabled(state.agentId, state.runtimeMode) && state.lastActionPlan) {
     return "execute_action_plan";
   }
 
@@ -205,6 +207,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
     tenantId: input.tenantId,
     agentId: input.agentId,
     contactId: input.contactId,
+    runtimeMode: input.runtimeMode,
     channel: input.channel,
     message: input.message,
     customerEmail: input.customerEmail,

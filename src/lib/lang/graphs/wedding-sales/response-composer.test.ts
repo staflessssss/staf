@@ -631,6 +631,7 @@ test("instagram team follow-up answers shooter question without repeating venue 
           {
             type: "ask_missing_field",
             field: "venue",
+            topicId: null,
             reason: "venue_is_the_next_missing_field",
           },
         ],
@@ -835,9 +836,9 @@ test("unavailable-date follow-up answers pricing without repeating availability 
     },
   });
 
-  assert.match(response, /unavailable/i);
   assert.match(response, /\$3,490/);
   assert.match(response, /travel/i);
+  assert.doesNotMatch(response, /unavailable/i);
   assert.doesNotMatch(response, /I checked/i);
 });
 

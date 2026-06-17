@@ -35,6 +35,7 @@ Rules:
 - For names, use providedInfo.customerName and providedInfo.partnerName whenever the latest message supports either role. "I'm Mia" means customerName=Mia. "my fiance is Ethan" means partnerName=Ethan. Do not replace one with the other.
 - When the customer supplies two names together, populate both providedInfo roles. Treat the speaker's own name as customerName and the other person's name as partnerName when the message supports that ordering.
 - If the assistant just asked for names and the customer replies with "X and Y", "X & Y", or a greeting followed by two names, treat the first name as customerName and the second name as partnerName with confidence at least 0.85. Do not return only a generic names entity for this case.
+- If the assistant just asked for names and wedding date, and the customer replies with "X and Y, August 8 in Raleigh NC" or similar, extract all supported fields: customerName, partnerName, weddingDate as the partial date evidence, and location. Do not ignore the date just because the year is missing.
 - Always include providedInfo. Use null for customerName or partnerName when the latest message does not provide that role.
 - Do not put customer or partner names only in generic entities when their role is clear. The structured providedInfo role is the source of truth for names.
 - A city, state, or region is location. A business name or street address is venue.
@@ -43,6 +44,9 @@ Rules:
 - A street number, ZIP code, package price, or film duration is never a wedding date.
 - A call-related objection is not a call-time proposal and must not produce a callTime entity.
 - For callTime, preserve the customer's exact scheduling phrase in value. normalizedValue may contain a resolved timestamp, but state will preserve value for deterministic calendar resolution.
+- If the customer asks to book, schedule, or do a consultation/call and includes a date, weekday, time, or time window, extract that phrase as callTime and use topicId booking. Do not classify scheduling requests as unknown_service_request.
+- If the customer asks to book, schedule, or do a consultation/call without a usable date/time, use topicId booking and do not invent callTime.
+- Questions about keeping, confirming, changing, rescheduling, or still doing an already discussed call, consultation, meeting, or appointment are topicId booking, even when no new time is provided.
 - If the customer clearly changes a known value, use request_modification and pendingResolution type correct.
 - If a conflicting value may be a change but is not explicit, use pendingResolution type ambiguous.
 - If currentState.pendingChangeField exists and the customer confirms its proposed value, include intent confirm and pendingResolution for that exact field with type confirm. Do this even when the customer repeats or clarifies the value.

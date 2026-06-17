@@ -323,6 +323,10 @@ function hasActionPlanQuestionAuthorityWithoutPlannedQuestion(state: WeddingSale
 function questionForPlannedField(state: WeddingSalesState, field: WeddingSalesField | null) {
   switch (field) {
     case "customerName":
+      if (!hasCoupleNamesForState(state) && !state.weddingDate && !state.weddingDateText) {
+        return "What are both of your names, and what's your wedding date?";
+      }
+
       return "What are both of your names?";
     case "partnerName":
       return "What’s your fiancé’s name?";
@@ -816,6 +820,16 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           .join("\n\n");
       }
       case "answer_question": {
+        const faqAnswer = formatFaqAnswer({ config, state });
+        const answerTopicIds = buildWeddingSalesResponseContext(state).answerTopicIds;
+        const asksAvailabilityOrBooking = answerTopicIds.some(
+          (topicId) => topicId === "availability" || topicId === "booking",
+        );
+
+        if (state.availability === "unavailable" && faqAnswer && !asksAvailabilityOrBooking) {
+          return faqAnswer;
+        }
+
         if (state.availability === "unavailable") {
           const asksPricingOrTravel = /\b(?:pricing|price|cost|package|packages|collection|collections|travel)\b/i.test(
             state.latestCustomerMessage ?? "",
@@ -843,8 +857,6 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
 
           return [`${weddingDate}${location} is still showing unavailable on my end.`, followUp].join("\n\n");
         }
-
-        const faqAnswer = formatFaqAnswer({ config, state });
 
         if (faqAnswer) {
           return faqAnswer;

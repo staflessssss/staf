@@ -480,8 +480,8 @@ test("executeGoogleCalendarStep keeps booking successful when lead logging fails
     const result = await executeGoogleCalendarStep({
       tenantId: "tenant-1",
       action: "book_call",
-      request: "Book consultation call for June 15, 2026 at 10:30 with Alex and Sam at alex@example.com",
-      timeText: "June 15, 2026 at 10:30",
+      request: "Book consultation call for July 15, 2026 at 10:30 with Alex and Sam at alex@example.com",
+      timeText: "July 15, 2026 at 10:30",
       coupleName: "Alex and Sam",
       weddingDate: "2026-07-20",
       location: "Charlotte",
@@ -593,8 +593,8 @@ test("executeGoogleCalendarStep sends booking notifications to the linked tenant
     const result = await executeGoogleCalendarStep({
       tenantId,
       action: "book_call",
-      request: "Book consultation call for June 15, 2026 at 10:30 with Alex and Sam at alex@example.com",
-      timeText: "June 15, 2026 at 10:30",
+      request: "Book consultation call for July 15, 2026 at 10:30 with Alex and Sam at alex@example.com",
+      timeText: "July 15, 2026 at 10:30",
       coupleName: "Alex and Sam",
       weddingDate: "2026-07-20",
       location: "Charlotte",

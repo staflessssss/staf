@@ -32,7 +32,7 @@ function analysis(update: Partial<SemanticAnalysisV2> = {}): SemanticAnalysisV2 
   };
 }
 
-test("semantic v2 execution is scoped by agent allowlist", () => {
+test("semantic v2 execution keeps legacy allowlist behavior without explicit runtime mode", () => {
   const originalAgentIds = process.env.WEDDING_SALES_SEMANTIC_V2_EXECUTION_AGENT_IDS;
 
   try {
@@ -47,6 +47,25 @@ test("semantic v2 execution is scoped by agent allowlist", () => {
       delete process.env.WEDDING_SALES_SEMANTIC_V2_EXECUTION_AGENT_IDS;
     } else {
       process.env.WEDDING_SALES_SEMANTIC_V2_EXECUTION_AGENT_IDS = originalAgentIds;
+    }
+  }
+});
+
+test("semantic v2 execution follows explicit unified runtime mode with per-agent kill switch", () => {
+  const originalDisabledAgentIds = process.env.WEDDING_SALES_SEMANTIC_V2_DISABLED_AGENT_IDS;
+
+  try {
+    delete process.env.WEDDING_SALES_SEMANTIC_V2_DISABLED_AGENT_IDS;
+    assert.equal(isSemanticV2ExecutionEnabled("agent-1", "unified_v2"), true);
+
+    process.env.WEDDING_SALES_SEMANTIC_V2_DISABLED_AGENT_IDS = "agent-2, agent-1";
+    assert.equal(isSemanticV2ExecutionEnabled("agent-1", "unified_v2"), false);
+    assert.equal(isSemanticV2ExecutionEnabled("agent-3", "unified_v2"), true);
+  } finally {
+    if (originalDisabledAgentIds === undefined) {
+      delete process.env.WEDDING_SALES_SEMANTIC_V2_DISABLED_AGENT_IDS;
+    } else {
+      process.env.WEDDING_SALES_SEMANTIC_V2_DISABLED_AGENT_IDS = originalDisabledAgentIds;
     }
   }
 });
@@ -120,6 +139,342 @@ test("semantic v2 mutator commits alternate date confirmation and preserves call
     JSON.stringify(result.lastStateMutationTrace),
     /semantic_v2_state_mutator/,
   );
+});
+
+test("semantic v2 mutator treats normalized dates without explicit year as partial dates", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "We are Anna and Mark. Our wedding is June 14 in Charlotte.",
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      entities: [
+        {
+          field: "weddingDate",
+          value: "2026-06-14",
+          normalizedValue: "2026-06-14",
+          confidence: 0.95,
+          evidence: "June 14",
+          alternatives: [],
+        },
+        {
+          field: "location",
+          value: "Charlotte",
+          normalizedValue: "Charlotte",
+          confidence: 0.95,
+          evidence: "Charlotte",
+          alternatives: [],
+        },
+      ],
+      providedInfo: {
+        customerName: {
+          value: "Anna",
+          normalizedValue: "Anna",
+          confidence: 0.95,
+          evidence: "Anna",
+          alternatives: [],
+        },
+        partnerName: {
+          value: "Mark",
+          normalizedValue: "Mark",
+          confidence: 0.95,
+          evidence: "Mark",
+          alternatives: [],
+        },
+      },
+    }),
+  });
+
+  assert.equal(result.weddingDate, undefined);
+  assert.equal(result.weddingDateText, "June 14");
+  assert.equal(result.weddingYearKnown, false);
+  assert.equal(result.leadStage, "waiting_wedding_year");
+
+  const plan = selectWeddingSalesActionPlan({
+    state: {
+      ...state,
+      ...result,
+    },
+    analysis: analysis(),
+  });
+
+  assert.equal(plan.actions[0]?.type, "ask_missing_field");
+  assert.equal(plan.actions[0]?.field, "weddingYear");
+});
+
+test("semantic v2 mutator combines a later year with a partial wedding date", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "2026",
+    previousState: {
+      leadStage: "waiting_wedding_year",
+      names: "Bob and Sara",
+      customerName: "Bob",
+      partnerName: "Sara",
+      coupleDisplayName: "Bob and Sara",
+      nameCollectionStatus: "both",
+      weddingDateText: "August 8",
+      weddingYearKnown: false,
+      location: "Raleigh, NC",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "provide_info",
+          confidence: 0.99,
+          targetField: "weddingYear",
+          evidence: "2026",
+        },
+      ],
+      entities: [
+        {
+          field: "weddingYear",
+          value: "2026",
+          normalizedValue: "2026",
+          confidence: 0.99,
+          evidence: "2026",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.weddingDate, "2026-08-08");
+  assert.equal(result.weddingDateText, undefined);
+  assert.equal(result.weddingYear, "2026");
+  assert.equal(result.weddingYearKnown, true);
+  assert.equal(result.leadStage, "ready_for_availability");
+});
+
+test("semantic v2 mutator grounds a missed partial date after asking for wedding date", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Bob and Sara, August 8 in Raleigh NC",
+    previousState: {
+      leadStage: "missing_names_or_date",
+      askedFieldCounts: {
+        weddingDate: 1,
+      },
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "weddingDate",
+            topicId: null,
+            reason: "next_required_qualification_field_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      providedInfo: {
+        customerName: {
+          value: "Bob",
+          normalizedValue: null,
+          confidence: 0.99,
+          evidence: "Bob and Sara",
+          alternatives: [],
+        },
+        partnerName: {
+          value: "Sara",
+          normalizedValue: null,
+          confidence: 0.99,
+          evidence: "Bob and Sara",
+          alternatives: [],
+        },
+      },
+      entities: [
+        {
+          field: "location",
+          value: "Raleigh, NC",
+          normalizedValue: "Raleigh, NC",
+          confidence: 0.95,
+          evidence: "Raleigh NC",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.weddingDateText, "August 8");
+  assert.equal(result.weddingYearKnown, false);
+  assert.equal(result.location, "Raleigh, NC");
+  assert.equal(result.leadStage, "waiting_wedding_year");
+});
+
+test("semantic v2 mutator grounds a missed partial date in a first wedding message", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "We are Anna and Mark. Our wedding is June 14 in Charlotte.",
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      providedInfo: {
+        customerName: {
+          value: "Anna",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "Anna",
+          alternatives: [],
+        },
+        partnerName: {
+          value: "Mark",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "Mark",
+          alternatives: [],
+        },
+      },
+      entities: [
+        {
+          field: "location",
+          value: "Charlotte",
+          normalizedValue: "Charlotte",
+          confidence: 0.95,
+          evidence: "Charlotte",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.weddingDateText, "June 14");
+  assert.equal(result.weddingYearKnown, false);
+  assert.equal(result.leadStage, "waiting_wedding_year");
+});
+
+test("semantic v2 mutator does not ground a call date as the wedding date", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Friday June 26 10am for the call",
+    previousState: {
+      leadStage: "missing_names_or_date",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, NC",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "weddingDate",
+            topicId: null,
+            reason: "next_required_qualification_field_missing",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "request_modification",
+          confidence: 0.95,
+          targetField: "callTime",
+          evidence: "Friday June 26 10am for the call",
+        },
+      ],
+      entities: [
+        {
+          field: "callTime",
+          value: "Friday June 26 10am for the call",
+          normalizedValue: null,
+          confidence: 0.95,
+          evidence: "Friday June 26 10am for the call",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.weddingDate, undefined);
+  assert.equal(result.weddingDateText, undefined);
+  assert.equal(result.proposedCallTime, "Friday June 26 10am for the call");
+});
+
+test("semantic v2 mutator accepts explicit location corrections without confirmation", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Actually not Miami, it will be in Charleston SC at The Cedar Room",
+    previousState: {
+      leadStage: "availability_checked",
+      names: "Olivia and Daniel",
+      customerName: "Olivia",
+      partnerName: "Daniel",
+      coupleDisplayName: "Olivia and Daniel",
+      nameCollectionStatus: "both",
+      weddingDate: "2026-10-17",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Miami, FL",
+      venue: "Villa Woodbine",
+      availability: "available",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "request_modification",
+          confidence: 0.95,
+          targetField: "location",
+          evidence: "Actually not Miami, it will be in Charleston SC",
+        },
+        {
+          category: "request_modification",
+          confidence: 0.9,
+          targetField: "venue",
+          evidence: "at The Cedar Room",
+        },
+      ],
+      entities: [
+        {
+          field: "location",
+          value: "Charleston, SC",
+          normalizedValue: "Charleston, SC",
+          confidence: 0.95,
+          evidence: "Charleston SC",
+          alternatives: [],
+        },
+        {
+          field: "venue",
+          value: "The Cedar Room",
+          normalizedValue: null,
+          confidence: 0.9,
+          evidence: "The Cedar Room",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.pendingChangeField, undefined);
+  assert.equal(result.location, "Charleston, SC");
+  assert.equal(result.venue, "The Cedar Room");
+  assert.equal(result.availability, undefined);
+  assert.equal(result.leadStage, "ready_for_availability");
 });
 
 test("semantic v2 mutator keeps an ambiguous date pending until the customer confirms it", () => {
@@ -524,6 +879,101 @@ test("semantic v2 mutator resolves a bare alternative time against the busy cale
   assert.equal(plan.actions[0]?.type, "check_consultation_calendar");
 });
 
+test("semantic v2 mutator accepts corrected call time from pending resolution as state input", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Okay, no worries. Can we book a call Wednesday June 24 at 12:30?",
+    previousState: {
+      leadStage: "asking_call_time",
+      names: "Cindy and Paul",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor, FL",
+      venue: "Harborside Chapel",
+      availability: "available",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      primaryIntent: "request_modification",
+      intents: [
+        {
+          category: "request_modification",
+          confidence: 0.95,
+          targetField: "callTime",
+          evidence: "Can we book a call Wednesday June 24 at 12:30?",
+        },
+      ],
+      pendingResolution: {
+        field: "callTime",
+        type: "correct",
+        proposedValue: "Wednesday June 24 at 12:30",
+        confidence: 0.95,
+        evidence: "Can we book a call Wednesday June 24 at 12:30?",
+      },
+    }),
+    fallbackLeadStage: "checking_calendar",
+  });
+
+  assert.equal(result.proposedCallTime, "Wednesday June 24 at 12:30");
+  assert.equal(result.leadStage, "checking_calendar");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /accepted/);
+});
+
+test("semantic v2 mutator lets explicit sales updates override stale owner-context classification", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Actually our date is October 19 2026",
+    previousState: {
+      leadStage: "booked",
+      clientType: "existing_client",
+      names: "Cindy and Paul",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor, FL",
+      venue: "Harborside Chapel",
+      availability: "available",
+      bookingConfirmed: true,
+      bookedEventId: "event-1",
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      primaryIntent: "request_modification",
+      intents: [
+        {
+          category: "request_modification",
+          confidence: 0.99,
+          targetField: "weddingDate",
+          evidence: "Actually our date is October 19 2026",
+        },
+      ],
+      pendingResolution: {
+        field: "weddingDate",
+        type: "correct",
+        proposedValue: "2026-10-19",
+        confidence: 0.99,
+        evidence: "Actually our date is October 19 2026",
+      },
+    }),
+  });
+
+  assert.equal(result.weddingDate, "2026-10-19");
+  assert.equal(result.leadStage, "ready_for_availability");
+  assert.equal(result.bookingConfirmed, false);
+  assert.equal(result.availability, undefined);
+});
+
 test("semantic v2 mutator merges structured partner name into existing customer name", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
@@ -810,7 +1260,7 @@ test("semantic v2 mutator treats street address as venue without changing weddin
     channel: "instagram",
     message: "The venue is 333 S Franklin Street, Tampa, FL 33602.",
     previousState: {
-      leadStage: "asking_venue",
+      leadStage: "missing_location_or_venue",
       names: "Suzie and Rick",
       weddingDate: "2026-10-11",
       weddingYear: "2026",
@@ -842,7 +1292,7 @@ test("semantic v2 mutator treats street address as venue without changing weddin
         },
       ],
     }),
-    fallbackLeadStage: "asking_venue",
+    fallbackLeadStage: "missing_location_or_venue",
   });
 
   assert.equal(result.venue, "333 S Franklin Street, Tampa, FL 33602");

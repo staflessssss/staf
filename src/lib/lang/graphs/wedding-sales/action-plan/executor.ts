@@ -3,7 +3,7 @@ import type { WeddingSalesToolContext } from "@/lib/lang/tools/wedding-sales";
 import type { WeddingSalesConfig } from "../config";
 import { createWeddingSalesReplyNodes } from "../nodes/reply";
 import { createWeddingSalesToolNodes } from "../nodes/tools";
-import type { WeddingSalesState } from "../state";
+import type { WeddingSalesRuntimeMode, WeddingSalesState } from "../state";
 import type { WeddingSalesAction } from "./schema";
 import { replyActionForMissingField } from "./response-context";
 
@@ -22,8 +22,22 @@ function parseAgentAllowlist(value: string | undefined) {
   );
 }
 
-export function isWeddingSalesActionRuntimeV2Enabled(agentId?: string) {
+function isAgentDisabledForActionRuntimeV2(agentId?: string) {
+  return Boolean(
+    agentId &&
+      parseAgentAllowlist(process.env.WEDDING_SALES_ACTION_RUNTIME_V2_DISABLED_AGENT_IDS).has(agentId),
+  );
+}
+
+export function isWeddingSalesActionRuntimeV2Enabled(
+  agentId?: string,
+  runtimeMode?: WeddingSalesRuntimeMode,
+) {
   if (!agentId) return false;
+
+  if (runtimeMode === "unified_v2") {
+    return !isAgentDisabledForActionRuntimeV2(agentId);
+  }
 
   const flag = process.env.WEDDING_SALES_ACTION_RUNTIME_V2?.trim().toLowerCase();
   if (flag && ACTION_RUNTIME_DISABLED_VALUES.has(flag)) return false;

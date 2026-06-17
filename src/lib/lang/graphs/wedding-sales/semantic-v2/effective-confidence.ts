@@ -40,6 +40,17 @@ function hasAuthorizedConflict(args: {
   candidateValue: string;
 }) {
   if (
+    args.analysis.intents.some(
+      (intent) =>
+        intent.category === "request_modification" &&
+        intent.targetField === args.field &&
+        intent.confidence >= 0.85,
+    )
+  ) {
+    return true;
+  }
+
+  if (
     args.analysis.pendingResolution?.field === args.field &&
     args.analysis.pendingResolution.type === "correct" &&
     args.analysis.pendingResolution.confidence >= 0.7

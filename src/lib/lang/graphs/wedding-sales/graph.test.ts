@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { encrypt } from "@/lib/crypto";
 
-import { invokeWeddingSalesGraph, routeAfterWeddingAvailability } from "./graph";
+import { invokeWeddingSalesGraph, routeAfterWeddingAvailability, routeWeddingSalesState } from "./graph";
 import { weddingSalesAnalyzeTestHelpers } from "./nodes/analyze";
 import type { WeddingSalesSemanticAnalysis } from "./semantic-analyzer";
 import { createInitialWeddingSalesState } from "./state";
@@ -100,6 +100,33 @@ test("wedding sales graph chains availability to calendar only when a call time 
     ),
     "done",
   );
+});
+
+test("wedding sales graph routes explicit unified v2 states through the action plan executor", () => {
+  const state = createInitialWeddingSalesState({
+    agentId: "agent-unified",
+    runtimeMode: "unified_v2",
+    channel: "instagram",
+    message: "test",
+    previousState: {
+      leadStage: "missing_names_or_date",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "continue",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "customerName",
+            topicId: null,
+            reason: "Need the customer's name.",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(routeWeddingSalesState(state), "execute_action_plan");
 });
 
 test("wedding sales graph preserves chained tool calls in the same turn", async () => {
@@ -428,8 +455,8 @@ test("wedding sales graph answers after an unavailable date without rechecking t
   assert.equal(result.weddingDate, "2026-09-19");
   assert.equal(result.toolObservations.length, 0);
   assert.match(result.responseDraft ?? "", /\$3,490/);
-  assert.match(result.responseDraft ?? "", /unavailable/i);
   assert.match(result.responseDraft ?? "", /travel/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /unavailable/i);
 });
 
 test("wedding sales graph softly declines a booked wedding date without deferring confirmation", async () => {

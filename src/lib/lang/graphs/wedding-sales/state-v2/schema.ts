@@ -28,6 +28,7 @@ export type WeddingSalesStateMutationTraceEntry = {
   action:
     | "accepted"
     | "rejected"
+    | "partial"
     | "pending"
     | "resolved"
     | "cleared"

@@ -28,10 +28,13 @@ export type WeddingSalesLeadStage =
   | "booked"
   | "ignored";
 
+export type WeddingSalesRuntimeMode = "legacy" | "unified_v2";
+
 export type WeddingSalesState = {
   tenantId?: string;
   agentId?: string;
   contactId?: string;
+  runtimeMode?: WeddingSalesRuntimeMode;
   channel: WeddingSalesChannel;
   leadStage: WeddingSalesLeadStage;
   names?: string;
@@ -106,6 +109,7 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   tenantId: Annotation<string | undefined>(),
   agentId: Annotation<string | undefined>(),
   contactId: Annotation<string | undefined>(),
+  runtimeMode: Annotation<WeddingSalesRuntimeMode | undefined>(),
   channel: Annotation<WeddingSalesChannel>(),
   leadStage: Annotation<WeddingSalesLeadStage>(),
   names: Annotation<string | undefined>(),
@@ -180,6 +184,7 @@ export function createInitialWeddingSalesState(args: {
   tenantId?: string;
   agentId?: string;
   contactId?: string;
+  runtimeMode?: WeddingSalesRuntimeMode;
   channel: WeddingSalesChannel;
   message: string;
   customerEmail?: string;
@@ -190,6 +195,7 @@ export function createInitialWeddingSalesState(args: {
     tenantId: args.tenantId ?? args.previousState?.tenantId,
     agentId: args.agentId ?? args.previousState?.agentId,
     contactId: args.contactId ?? args.previousState?.contactId,
+    runtimeMode: args.runtimeMode ?? args.previousState?.runtimeMode,
     channel: args.channel,
     leadStage: args.previousState?.leadStage ?? "new",
     names: args.previousState?.names,

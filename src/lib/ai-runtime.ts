@@ -1104,6 +1104,7 @@ async function runWeddingSalesTestRuntime(args: {
     tenantId: args.agent.tenantId,
     agentId: args.agent.id,
     contactId: args.input.contactId,
+    runtimeMode: "unified_v2",
     channel: getWeddingSalesGraphChannel(args.agent.channel.type),
     message: args.input.message,
     customerEmail: defaultEmail,
@@ -1412,6 +1413,7 @@ async function runWeddingSalesRuntime(args: {
     tenantId: args.agent.tenantId,
     agentId: args.agent.id,
     contactId: args.incoming.contactId,
+    runtimeMode: "unified_v2",
     channel: getWeddingSalesGraphChannel(args.channel),
     message: args.incoming.message,
     customerEmail: defaultEmail,
@@ -1421,10 +1423,9 @@ async function runWeddingSalesRuntime(args: {
     checkpoint: args.database === db,
   });
   const message = graphResult.responseDraft ?? "";
+  const ownerHandoffReason = getWeddingSalesOwnerHandoffReason(graphResult);
 
   if (!message) {
-    const ownerHandoffReason = getWeddingSalesOwnerHandoffReason(graphResult);
-
     if (ownerHandoffReason) {
       const handoff = await requestOwnerHandoffWithDb({
         database: args.database,
@@ -1471,10 +1472,26 @@ async function runWeddingSalesRuntime(args: {
     },
   });
 
+  const usedTooling = graphResult.toolObservations.map((observation) => observation.toolName);
+
+  if (ownerHandoffReason) {
+    const handoff = await requestOwnerHandoffWithDb({
+      database: args.database,
+      agent: args.agent,
+      conversationId: conversation.id,
+      customerMessage: args.incoming.message,
+      reason: ownerHandoffReason,
+    });
+
+    if (handoff.status === "owner_handoff_requested") {
+      usedTooling.push(OWNER_HANDOFF_REQUEST_TOOL_NAME);
+    }
+  }
+
   return {
     message,
     promptPreview: "langgraph_wedding_sales",
-    usedTooling: graphResult.toolObservations.map((observation) => observation.toolName),
+    usedTooling,
     conversationId: conversation.id,
     model: "langgraph_wedding_sales",
     attachments: getWeddingSalesGuideAttachment({

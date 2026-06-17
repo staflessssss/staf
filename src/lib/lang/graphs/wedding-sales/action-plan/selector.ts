@@ -96,11 +96,22 @@ function isActiveSalesContinuationQuestion(state: WeddingSalesState, analysis: S
       state.proposedCallTime ||
       state.calendarStatus,
   );
+  const hasCallContext = Boolean(state.proposedCallTime || state.calendarStatus || state.checkedCallDate);
+  const asksAboutExistingCall = analysis.questions.some((question) => {
+    if (question.confidence < 0.75) {
+      return false;
+    }
+
+    const text = `${question.normalizedQuestion} ${question.evidence}`.toLowerCase();
+    return (
+      hasCallContext &&
+      /\b(call|consultation|meeting|appointment|schedule|booking|book|reschedule)\b/.test(text)
+    );
+  });
 
   return Boolean(
     activeSalesStage &&
-      topic &&
-      ACTIVE_SALES_CONTINUATION_TOPICS.has(topic),
+      ((topic && ACTIVE_SALES_CONTINUATION_TOPICS.has(topic)) || asksAboutExistingCall),
   );
 }
 
@@ -169,7 +180,7 @@ function firstMissingField(state: WeddingSalesState): WeddingSalesField | null {
         if (!effectiveState.partnerName && !hasStructuredCoupleNames(effectiveState)) return field;
         break;
       case "weddingDate":
-        if (!state.weddingDate) return field;
+        if (!state.weddingDate && !state.weddingDateText) return field;
         break;
       case "weddingYear":
         if (!state.weddingYearKnown) return field;

@@ -807,7 +807,7 @@ export function analyzeWeddingSalesMessageWithSemantics(
 export async function analyzeWeddingSalesMessage(
   state: WeddingSalesState,
 ): Promise<Partial<WeddingSalesState>> {
-  if (isSemanticV2ExecutionEnabled(state.agentId)) {
+  if (isSemanticV2ExecutionEnabled(state.agentId, state.runtimeMode)) {
     return analyzeWeddingSalesMessageWithSemanticV2(state);
   }
 

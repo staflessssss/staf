@@ -53,7 +53,7 @@ function testToolContext() {
   };
 }
 
-test("action runtime is enabled only for explicitly allowlisted agents", () => {
+test("action runtime keeps legacy allowlist behavior without explicit runtime mode", () => {
   const previousFlag = process.env.WEDDING_SALES_ACTION_RUNTIME_V2;
   const previousAllowlist = process.env.WEDDING_SALES_ACTION_RUNTIME_V2_AGENT_IDS;
 
@@ -68,6 +68,25 @@ test("action runtime is enabled only for explicitly allowlisted agents", () => {
 
   process.env.WEDDING_SALES_ACTION_RUNTIME_V2 = previousFlag;
   process.env.WEDDING_SALES_ACTION_RUNTIME_V2_AGENT_IDS = previousAllowlist;
+});
+
+test("action runtime follows explicit unified runtime mode with per-agent kill switch", () => {
+  const previousDisabledAgentIds = process.env.WEDDING_SALES_ACTION_RUNTIME_V2_DISABLED_AGENT_IDS;
+
+  try {
+    delete process.env.WEDDING_SALES_ACTION_RUNTIME_V2_DISABLED_AGENT_IDS;
+    assert.equal(isWeddingSalesActionRuntimeV2Enabled("agent-a", "unified_v2"), true);
+
+    process.env.WEDDING_SALES_ACTION_RUNTIME_V2_DISABLED_AGENT_IDS = "agent-b, agent-a";
+    assert.equal(isWeddingSalesActionRuntimeV2Enabled("agent-a", "unified_v2"), false);
+    assert.equal(isWeddingSalesActionRuntimeV2Enabled("agent-c", "unified_v2"), true);
+  } finally {
+    if (previousDisabledAgentIds === undefined) {
+      delete process.env.WEDDING_SALES_ACTION_RUNTIME_V2_DISABLED_AGENT_IDS;
+    } else {
+      process.env.WEDDING_SALES_ACTION_RUNTIME_V2_DISABLED_AGENT_IDS = previousDisabledAgentIds;
+    }
+  }
 });
 
 test("tool request builders use validated state instead of the latest raw customer text", () => {
@@ -300,4 +319,37 @@ test("action executor returns safe clarification for semantic v2 failures", asyn
   assert.equal(result.assistantReplyCount, 1);
   assert.match(result.responseDraft ?? "", /understand you correctly/i);
   assert.equal(result.toolObservations, undefined);
+});
+
+test("action executor keeps owner handoff customer-silent", async () => {
+  const execute = createWeddingSalesActionPlanExecutor({
+    config: defaultWeddingSalesConfig,
+    toolContext: testToolContext(),
+  });
+  const result = await execute(
+    createInitialWeddingSalesState({
+      channel: "instagram",
+      message: "Do you also do photography for rehearsal dinner?",
+      previousState: {
+        leadStage: "asking_call_time",
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "handoff",
+          actions: [
+            {
+              type: "recommend_owner_handoff",
+              field: null,
+              topicId: null,
+              reason: "unknown_business_question_requires_owner",
+            },
+          ],
+          guardrailTrace: [],
+        },
+      },
+    }),
+  );
+
+  assert.equal(result.responseDraft, "");
+  assert.equal(result.assistantReplyCount, undefined);
+  assert.equal(result.lastAssistantIntent, undefined);
 });

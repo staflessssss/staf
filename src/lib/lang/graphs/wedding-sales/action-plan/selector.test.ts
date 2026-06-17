@@ -139,6 +139,57 @@ test("action selector does not reuse an old call time when the current turn only
   );
 });
 
+test("action selector keeps existing call questions in booking flow without a topic", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Can we still keep the call?",
+    previousState: {
+      leadStage: "checking_calendar",
+      names: "Cindy and Paul",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      coupleDisplayName: "Cindy and Paul",
+      nameCollectionStatus: "both",
+      weddingDate: "2026-10-19",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor, FL",
+      venue: "Harborside Chapel",
+      availability: "available",
+      proposedCallTime: "Wednesday June 24 at 12:30",
+      customerEmail: "cindy@example.com",
+      bookingConfirmed: false,
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "ask_question",
+          confidence: 0.95,
+          targetField: null,
+          evidence: "Can we still keep the call?",
+        },
+      ],
+      questions: [
+        {
+          topicId: null,
+          normalizedQuestion: "Can we still keep the call?",
+          confidence: 0.95,
+          evidence: "Can we still keep the call?",
+        },
+      ],
+    }),
+  });
+
+  assert.deepEqual(
+    plan.actions.map((item) => item.type),
+    ["check_consultation_calendar"],
+  );
+  assert.equal(weddingSalesActionPlanSchema.safeParse(plan).success, true);
+});
+
 test("action selector recommends owner handoff for existing client questions", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
@@ -210,6 +261,49 @@ test("action selector keeps active sales booking questions in the sales flow", (
 
   assert.notEqual(plan.responseGoal, "handoff");
   assert.notEqual(plan.actions[0]?.type, "recommend_owner_handoff");
+});
+
+test("action selector lets committed sales fields override stale owner context", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Actually our date is October 19 2026",
+    previousState: {
+      leadStage: "ready_for_availability",
+      clientType: "existing_client",
+      names: "Cindy and Paul",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      weddingDate: "2026-10-19",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor, FL",
+      venue: "Harborside Chapel",
+      lastStateMutationTrace: [
+        {
+          action: "accepted",
+          field: "weddingDate",
+          value: "2026-10-19",
+          reason: "test",
+        },
+      ],
+    },
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "request_modification",
+          confidence: 0.95,
+          targetField: "weddingDate",
+          evidence: "Actually our date is October 19 2026",
+        },
+      ],
+    }),
+  });
+
+  assert.equal(plan.responseGoal, "run_tools_then_reply");
+  assert.equal(plan.actions[0]?.type, "check_wedding_availability");
 });
 
 test("action selector answers known FAQ questions after a consultation is booked", () => {
