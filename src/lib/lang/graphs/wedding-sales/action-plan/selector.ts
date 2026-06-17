@@ -241,6 +241,100 @@ function firstAllowedMissingField(args: {
   return missingField;
 }
 
+export function selectWeddingSalesFollowUpActionPlan(state: WeddingSalesState): WeddingSalesActionPlan {
+  if (state.bookingConfirmed || state.bookedEventId || state.leadStage === "booked") {
+    return buildPlan({
+      responseGoal: "continue",
+      actions: [
+        action({
+          type: "suppress_reply",
+          reason: "consultation_already_booked_no_follow_up_needed",
+        }),
+      ],
+    });
+  }
+
+  if (state.pendingChangeField && state.pendingChangeValue) {
+    return buildPlan({
+      responseGoal: "clarify",
+      actions: [
+        action({
+          type: "request_confirmation",
+          field: state.pendingChangeField,
+          reason: "follow_up_pending_change_confirmation",
+        }),
+      ],
+    });
+  }
+
+  if (state.calendarStatus === "available" && !state.customerEmail) {
+    return buildPlan({
+      responseGoal: "clarify",
+      actions: [
+        action({
+          type: "ask_missing_field",
+          field: "email",
+          reason: "follow_up_continue_current_action_plan_email",
+        }),
+      ],
+    });
+  }
+
+  if (
+    state.availability === "available" &&
+    state.venue &&
+    (!state.proposedCallTime || state.calendarStatus === "busy")
+  ) {
+    return buildPlan({
+      responseGoal: "clarify",
+      actions: [
+        action({
+          type: "ask_missing_field",
+          field: "callTime",
+          reason: "follow_up_continue_current_action_plan_call_time",
+        }),
+      ],
+    });
+  }
+
+  if (state.channel === "instagram" && state.availability === "available" && !state.venue) {
+    return buildPlan({
+      responseGoal: "clarify",
+      actions: [
+        action({
+          type: "ask_missing_field",
+          field: "venue",
+          reason: "follow_up_continue_current_action_plan_venue",
+        }),
+      ],
+    });
+  }
+
+  const missingField = firstMissingField(state);
+  if (missingField) {
+    return buildPlan({
+      responseGoal: "clarify",
+      actions: [
+        action({
+          type: "ask_missing_field",
+          field: missingField,
+          reason: "follow_up_continue_current_action_plan_missing_field",
+        }),
+      ],
+    });
+  }
+
+  return buildPlan({
+    responseGoal: "continue",
+    actions: [
+      action({
+        type: "suppress_reply",
+        reason: "follow_up_has_no_customer_safe_next_action",
+      }),
+    ],
+  });
+}
+
 function action(args: {
   type: WeddingSalesActionType;
   reason: string;

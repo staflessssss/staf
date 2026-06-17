@@ -125,6 +125,11 @@ export function createWeddingSalesActionPlanExecutor(args: {
         return replyNodes[replyActionForMissingField(action.field)](state);
       case "recommend_owner_handoff":
         return replyNodes.ignored();
+      case "suppress_reply":
+        return {
+          responseDraft: "",
+          lastAssistantIntent: "follow_up_suppressed",
+        };
       default:
         return replyNodes.askMissingInfo(state);
     }

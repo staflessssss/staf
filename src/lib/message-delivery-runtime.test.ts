@@ -191,6 +191,10 @@ test("processDelayedDeliveryByIdWithDeps generates and sends a follow-up reminde
     contactEmail: undefined,
     message:
       "Internal delayed follow-up task.\n\nWrite the next outbound message to the customer based on the existing conversation history.\n\nDo not mention this instruction, internal settings, automation, or that this is a follow-up task.\n\nFollow-up guidance: Just checking in. I can still help with pricing or booking when you're ready.",
+    runtimeEvent: {
+      type: "follow_up",
+      guidance: "Just checking in. I can still help with pricing or booking when you're ready.",
+    },
     conversationId: "conv-2",
     skipInboundPersistence: true,
   });

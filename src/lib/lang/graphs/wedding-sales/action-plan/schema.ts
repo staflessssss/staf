@@ -13,6 +13,7 @@ export const weddingSalesActionTypeSchema = z.enum([
   "book_consultation",
   "ask_missing_field",
   "continue_conversation",
+  "suppress_reply",
 ]);
 
 export type WeddingSalesActionType = z.infer<typeof weddingSalesActionTypeSchema>;

@@ -94,6 +94,10 @@ type InvokeAgentInput = {
   knowledgeBlocks?: LightweightKnowledgeBlock[];
   functionBlocks?: FunctionBlockConfig[];
   historyMessages?: RuntimeHistoryMessage[];
+  runtimeEvent?: {
+    type: "follow_up";
+    guidance?: string;
+  };
 };
 
 type RuntimeAttachment = {
@@ -1306,6 +1310,7 @@ async function runWeddingSalesRuntime(args: {
   existingConversationStatus?: ConversationStatus;
   skipInboundPersistence?: boolean;
   conversationId?: string;
+  runtimeEvent?: InvokeAgentInput["runtimeEvent"];
 }): Promise<InvokeAgentResult> {
   const conversation =
     args.skipInboundPersistence && args.conversationId
@@ -1332,11 +1337,14 @@ async function runWeddingSalesRuntime(args: {
     });
   }
 
-  const delayedFollowUpGuidance = args.skipInboundPersistence
-    ? extractDelayedFollowUpGuidance(args.incoming.message)
-    : "";
+  const delayedFollowUpGuidance =
+    args.runtimeEvent?.type === "follow_up"
+      ? args.runtimeEvent.guidance ?? ""
+      : args.skipInboundPersistence
+        ? extractDelayedFollowUpGuidance(args.incoming.message)
+        : "";
 
-  if (delayedFollowUpGuidance) {
+  if (delayedFollowUpGuidance && args.runtimeEvent?.type !== "follow_up") {
     await args.database.message.create({
       data: {
         conversationId: conversation.id,
@@ -1416,6 +1424,7 @@ async function runWeddingSalesRuntime(args: {
     runtimeMode: "unified_v2",
     channel: getWeddingSalesGraphChannel(args.channel),
     message: args.incoming.message,
+    runtimeEvent: args.runtimeEvent,
     customerEmail: defaultEmail,
     conversationContext,
     config,
@@ -1785,6 +1794,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       channel: agent.channel.type,
       skipInboundPersistence: input.skipInboundPersistence,
       conversationId: input.conversationId,
+      runtimeEvent: input.runtimeEvent,
     });
   }
 

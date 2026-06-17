@@ -16,6 +16,7 @@ import {
   createInitialWeddingSalesState,
   WeddingSalesStateAnnotation,
   type WeddingSalesChannel,
+  type WeddingSalesRuntimeEvent,
   type WeddingSalesRuntimeMode,
   type WeddingSalesState,
 } from "./state";
@@ -43,6 +44,7 @@ export type InvokeWeddingSalesGraphInput = {
   agentId?: string;
   contactId?: string;
   runtimeMode?: WeddingSalesRuntimeMode;
+  runtimeEvent?: { type: WeddingSalesRuntimeEvent; guidance?: string };
   customerEmail?: string;
   conversationContext?: string;
   previousState?: Partial<WeddingSalesState>;
@@ -208,6 +210,7 @@ export async function invokeWeddingSalesGraph(input: InvokeWeddingSalesGraphInpu
     agentId: input.agentId,
     contactId: input.contactId,
     runtimeMode: input.runtimeMode,
+    runtimeEvent: input.runtimeEvent?.type,
     channel: input.channel,
     message: input.message,
     customerEmail: input.customerEmail,

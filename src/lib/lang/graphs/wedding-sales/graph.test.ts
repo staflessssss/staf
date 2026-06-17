@@ -1395,7 +1395,8 @@ test("instagram wedding sales answers travel fees using the known venue", async 
   assert.match(result.responseDraft ?? "", /Premium Collection/i);
   assert.match(result.responseDraft ?? "", /Exclusive Collection/i);
   assert.match(result.responseDraft ?? "", /exact travel details/i);
-  assert.match(result.responseDraft ?? "", /What time works best/i);
+  assert.match(result.responseDraft ?? "", /(?:What time works best|When would be a good time)/i);
+  assert.match(result.responseDraft ?? "", /quick call/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Evergreen Park/i);
   assert.doesNotMatch(result.responseDraft ?? "", /once I know the venue/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Could you tell me a little more/i);
@@ -1430,10 +1431,114 @@ test("instagram wedding sales answers multiple package questions and keeps the c
   assert.match(result.responseDraft ?? "", /raw footage/i);
   assert.match(result.responseDraft ?? "", /roundtrip travel coverage/i);
   assert.match(result.responseDraft ?? "", /Classic Collection/i);
-  assert.match(result.responseDraft ?? "", /What time works best/i);
+  assert.match(result.responseDraft ?? "", /(?:What time works best|When would be a good time)/i);
+  assert.match(result.responseDraft ?? "", /quick call/i);
   assert.equal(result.turnToolObservations.length, 0);
   assert.doesNotMatch(result.responseDraft ?? "", /once I know the venue/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Could you tell me a little more/i);
+});
+
+test("instagram wedding sales follow-up continues by asking for call time from state", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    agentId: "agent-unified-v2",
+    runtimeMode: "unified_v2",
+    runtimeEvent: { type: "follow_up" },
+    message: "Internal delayed follow-up task.",
+    previousState: {
+      names: "Olivia and Daniel",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charleston, SC",
+      venue: "The Cedar Room",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      assistantReplyCount: 4,
+      hasGreeted: true,
+      leadStage: "asking_call_time",
+      askedForCallTime: true,
+    },
+  });
+
+  assert.equal(result.runtimeEvent, "follow_up");
+  assert.match(result.responseDraft ?? "", /(?:What time works best|When would be a good time)/i);
+  assert.match(result.responseDraft ?? "", /quick call/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Internal delayed follow-up/i);
+  assert.equal(result.turnToolObservations.length, 0);
+});
+
+test("instagram wedding sales follow-up asks for email after an available consultation slot", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    agentId: "agent-unified-v2",
+    runtimeMode: "unified_v2",
+    runtimeEvent: { type: "follow_up" },
+    message: "Internal delayed follow-up task.",
+    previousState: {
+      names: "Olivia and Daniel",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charleston, SC",
+      venue: "The Cedar Room",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "2026-06-24T12:30:00",
+      calendarStatus: "available",
+      checkedCallDate: "2026-06-24",
+      checkedCallTime: "12:30",
+      checkedCallStartTime: "2026-06-24T12:30:00",
+      checkedCallEndTime: "2026-06-24T13:00:00",
+      assistantReplyCount: 5,
+      hasGreeted: true,
+      leadStage: "waiting_customer_email",
+      askedForEmail: true,
+    },
+  });
+
+  assert.match(result.responseDraft ?? "", /email/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /What time works/i);
+  assert.equal(result.turnToolObservations.length, 0);
+});
+
+test("instagram wedding sales follow-up suppresses after consultation booking", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    agentId: "agent-unified-v2",
+    runtimeMode: "unified_v2",
+    runtimeEvent: { type: "follow_up" },
+    message: "Internal delayed follow-up task.",
+    previousState: {
+      names: "Olivia and Daniel",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charleston, SC",
+      venue: "The Cedar Room",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      proposedCallTime: "2026-06-24T12:30:00",
+      calendarStatus: "available",
+      checkedCallDate: "2026-06-24",
+      checkedCallTime: "12:30",
+      checkedCallStartTime: "2026-06-24T12:30:00",
+      checkedCallEndTime: "2026-06-24T13:00:00",
+      customerEmail: "olivia@example.com",
+      bookingConfirmed: true,
+      bookedEventId: "event-1",
+      assistantReplyCount: 6,
+      hasGreeted: true,
+      leadStage: "booked",
+    },
+  });
+
+  assert.equal(result.responseDraft, "");
+  assert.equal(result.lastAssistantIntent, "follow_up_suppressed");
+  assert.equal(result.turnToolObservations.length, 0);
 });
 
 test("instagram wedding sales acknowledges a repeated venue instead of falling back", async () => {

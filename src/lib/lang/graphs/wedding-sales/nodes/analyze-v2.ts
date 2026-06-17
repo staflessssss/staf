@@ -1,4 +1,7 @@
-import { selectWeddingSalesActionPlan } from "../action-plan/selector";
+import {
+  selectWeddingSalesActionPlan,
+  selectWeddingSalesFollowUpActionPlan,
+} from "../action-plan/selector";
 import { analyzeWeddingSalesSemanticsV2 } from "../semantic-v2/analyzer";
 import type { WeddingSalesState } from "../state";
 import {
@@ -9,6 +12,12 @@ import {
 export async function analyzeWeddingSalesMessageWithSemanticV2(
   state: WeddingSalesState,
 ): Promise<Partial<WeddingSalesState>> {
+  if (state.runtimeEvent === "follow_up") {
+    return {
+      lastActionPlan: selectWeddingSalesFollowUpActionPlan(state),
+    };
+  }
+
   try {
     const semanticV2 = await analyzeWeddingSalesSemanticsV2(state);
     const mutation = applySemanticV2StateMutation({

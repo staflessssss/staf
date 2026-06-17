@@ -916,6 +916,10 @@ async function processFollowUp(args: {
     contactId: payload.replyContext.contactId,
     contactEmail: payload.replyContext.contactEmail,
     message: buildFollowUpGenerationMessage(payload.instruction),
+    runtimeEvent: {
+      type: "follow_up",
+      guidance: payload.instruction,
+    },
     conversationId: args.delivery.conversationId,
     skipInboundPersistence: true,
   });
