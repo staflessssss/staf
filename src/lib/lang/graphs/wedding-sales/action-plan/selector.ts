@@ -71,6 +71,18 @@ function bestQuestionTopic(analysis: SemanticAnalysisV2) {
   );
 }
 
+function highConfidenceQuestionTopics(analysis: SemanticAnalysisV2) {
+  const topics: string[] = [];
+
+  for (const question of analysis.questions.filter((item) => item.confidence >= 0.75)) {
+    if (question.topicId && !topics.includes(question.topicId)) {
+      topics.push(question.topicId);
+    }
+  }
+
+  return topics;
+}
+
 function hasUnknownBusinessQuestion(analysis: SemanticAnalysisV2) {
   return analysis.questions.some(
     (question) =>
@@ -377,15 +389,26 @@ export function selectWeddingSalesActionPlan(args: {
 
   if (hasHighConfidenceQuestion(analysis)) {
     const missingField = firstAllowedMissingField({ state, analysis });
+    const questionTopics = highConfidenceQuestionTopics(analysis);
     return buildPlan({
       responseGoal: "answer_and_qualify",
       guardrailTrace,
       actions: [
-        action({
-          type: "answer_question",
-          topicId: bestQuestionTopic(analysis),
-          reason: "customer_asked_current_business_question",
-        }),
+        ...(questionTopics.length > 0
+          ? questionTopics.map((topicId) =>
+              action({
+                type: "answer_question",
+                topicId,
+                reason: "customer_asked_current_business_question",
+              }),
+            )
+          : [
+              action({
+                type: "answer_question",
+                topicId: null,
+                reason: "customer_asked_current_business_question",
+              }),
+            ]),
         ...(missingField
           ? [
               action({

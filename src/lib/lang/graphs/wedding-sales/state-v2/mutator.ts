@@ -110,6 +110,32 @@ function clearBookingResult() {
   } satisfies Partial<WeddingSalesState>;
 }
 
+function hasBookedConsultation(state: WeddingSalesState) {
+  return Boolean(state.bookingConfirmed || state.bookedEventId);
+}
+
+function clearSchedulingProgressUnlessBooked(state: WeddingSalesState) {
+  if (hasBookedConsultation(state)) {
+    return {
+      callProposed: state.callProposed,
+      proposedCallTime: state.proposedCallTime,
+      calendarStatus: state.calendarStatus,
+      checkedCallDate: state.checkedCallDate,
+      checkedCallTime: state.checkedCallTime,
+      checkedCallStartTime: state.checkedCallStartTime,
+      checkedCallEndTime: state.checkedCallEndTime,
+      bookingConfirmed: state.bookingConfirmed,
+      bookedEventId: state.bookedEventId,
+    } satisfies Partial<WeddingSalesState>;
+  }
+
+  return {
+    ...clearCheckedCallSlot(),
+    callProposed: false,
+    ...clearBookingResult(),
+  } satisfies Partial<WeddingSalesState>;
+}
+
 function isHighConfidenceClientType(analysis: SemanticAnalysisV2) {
   return analysis.clientType && analysis.clientType.confidence >= 0.8
     ? analysis.clientType.value
@@ -639,18 +665,14 @@ export function applySemanticV2StateMutation(args: {
           weddingYear: state.pendingChangeValue.slice(0, 4),
           weddingYearKnown: true,
           ...clearAvailabilityResult(),
-          ...clearCheckedCallSlot(),
-          callProposed: false,
-          ...clearBookingResult(),
+          ...clearSchedulingProgressUnlessBooked(state),
         });
       } else {
         Object.assign(update, clearPendingChange(), {
           location: state.pendingChangeValue,
           venue: undefined,
           ...clearAvailabilityResult(),
-          ...clearCheckedCallSlot(),
-          callProposed: false,
-          ...clearBookingResult(),
+          ...clearSchedulingProgressUnlessBooked(state),
         });
       }
       acceptedFields.add(state.pendingChangeField);
@@ -674,9 +696,7 @@ export function applySemanticV2StateMutation(args: {
       weddingYear: selectedSuggestedWeddingDate.slice(0, 4),
       weddingYearKnown: true,
       ...clearAvailabilityResult(),
-      ...clearCheckedCallSlot(),
-      callProposed: false,
-      ...clearBookingResult(),
+      ...clearSchedulingProgressUnlessBooked(state),
     });
     acceptedFields.add("weddingDate");
     trace.push({
@@ -765,9 +785,7 @@ export function applySemanticV2StateMutation(args: {
         update.weddingYear = entry.value.slice(0, 4);
         update.weddingYearKnown = true;
         if (state.weddingDate && normalizeForComparison(state.weddingDate) !== normalizeForComparison(entry.value)) {
-          Object.assign(update, clearAvailabilityResult(), clearCheckedCallSlot());
-          update.callProposed = false;
-          Object.assign(update, clearBookingResult());
+          Object.assign(update, clearAvailabilityResult(), clearSchedulingProgressUnlessBooked(state));
         }
         Object.assign(update, clearPendingChange());
         break;
@@ -791,9 +809,7 @@ export function applySemanticV2StateMutation(args: {
         update.location = entry.value;
         if (state.location && normalizeForComparison(state.location) !== normalizeForComparison(entry.value)) {
           update.venue = undefined;
-          Object.assign(update, clearAvailabilityResult(), clearCheckedCallSlot());
-          update.callProposed = false;
-          Object.assign(update, clearBookingResult());
+          Object.assign(update, clearAvailabilityResult(), clearSchedulingProgressUnlessBooked(state));
         }
         Object.assign(update, clearPendingChange());
         break;

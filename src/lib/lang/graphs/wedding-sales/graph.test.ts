@@ -1401,6 +1401,41 @@ test("instagram wedding sales answers travel fees using the known venue", async 
   assert.doesNotMatch(result.responseDraft ?? "", /Could you tell me a little more/i);
 });
 
+test("instagram wedding sales answers multiple package questions and keeps the call next step", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    agentId: "agent-unified-v2",
+    runtimeMode: "unified_v2",
+    message: "Do you include raw footage? And any travel fees?",
+    previousState: {
+      names: "Olivia and Daniel",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charleston, SC",
+      venue: "The Cedar Room",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      assistantReplyCount: 4,
+      hasGreeted: true,
+      calendarStatus: undefined,
+      bookingConfirmed: false,
+      leadStage: "asking_call_time",
+      askedForCallTime: true,
+    },
+  });
+
+  assert.equal(result.leadStage, "answering_question");
+  assert.match(result.responseDraft ?? "", /raw footage/i);
+  assert.match(result.responseDraft ?? "", /roundtrip travel coverage/i);
+  assert.match(result.responseDraft ?? "", /Classic Collection/i);
+  assert.match(result.responseDraft ?? "", /What time works best/i);
+  assert.equal(result.turnToolObservations.length, 0);
+  assert.doesNotMatch(result.responseDraft ?? "", /once I know the venue/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Could you tell me a little more/i);
+});
+
 test("instagram wedding sales acknowledges a repeated venue instead of falling back", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",
@@ -1675,6 +1710,8 @@ test("instagram wedding sales does not recheck availability when customer says t
 test("instagram wedding sales can reopen availability when booked lead corrects the wedding date", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",
+    agentId: "agent-unified-v2",
+    runtimeMode: "unified_v2",
     message: "Sorry, the wedding date is actually October 17, 2026",
     previousState: {
       names: "Valerie and Krisitna",
@@ -1686,18 +1723,51 @@ test("instagram wedding sales can reopen availability when booked lead corrects 
       guideOffered: true,
       guideSent: true,
       callProposed: true,
-      proposedCallTime: "Monday at 10 AM Eastern",
+      proposedCallTime: "2026-06-24T12:30:00",
       calendarStatus: "available",
+      checkedCallDate: "2026-06-24",
+      checkedCallTime: "12:30",
+      checkedCallStartTime: "2026-06-24T12:30:00",
+      checkedCallEndTime: "2026-06-24T13:00:00",
       customerEmail: "lalala@gmail.com",
       bookingConfirmed: true,
+      bookedEventId: "event-1",
       leadStage: "booked",
       lastAssistantIntent: "booking_confirmed",
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+      consultationCalendar: {
+        action: "check calendar",
+        params: {},
+      },
+      bookConsultation: {
+        action: "book call",
+        params: {},
+      },
     },
   });
 
   assert.equal(result.weddingDate, "2026-10-17");
-  assert.equal(result.bookingConfirmed, false);
-  assert.equal(result.leadStage, "ready_for_availability");
+  assert.equal(result.availability, "available");
+  assert.equal(result.bookingConfirmed, true);
+  assert.equal(result.bookedEventId, "event-1");
+  assert.equal(result.checkedCallDate, "2026-06-24");
+  assert.equal(result.checkedCallTime, "12:30");
+  assert.equal(result.leadStage, "booked");
+  assert.deepEqual(
+    result.turnToolObservations.map((observation) => observation.toolName),
+    ["check_wedding_availability"],
+  );
+  assert.match(result.responseDraft ?? "", /updated wedding date noted/i);
+  assert.match(result.responseDraft ?? "", /consultation call you already booked/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /When would be a good time/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /What time works/i);
 });
 
 test("semantic analysis accepts a naturally phrased pair of names without asking again", () => {

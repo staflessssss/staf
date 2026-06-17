@@ -364,7 +364,17 @@ function questionForPlannedField(state: WeddingSalesState, field: WeddingSalesFi
 
 function nextStepAfterFaq(state: WeddingSalesState) {
   if (shouldUseActionPlanQuestionAuthority(state)) {
-    return questionForPlannedField(state, plannedAskField(state));
+    const plannedQuestion = questionForPlannedField(state, plannedAskField(state));
+
+    if (plannedQuestion) {
+      return plannedQuestion;
+    }
+
+    if (isInstagram(state) && state.callProposed && !isBookedConversation(state)) {
+      return "What time works best for the quick call? I'm free Mon-Fri, 9 AM to 2 PM Eastern.";
+    }
+
+    return "";
   }
 
   if (!isInstagram(state)) {
@@ -470,16 +480,22 @@ function formatFaqAnswer(args: {
   const asksTravel = responseContext.hasActionPlanAuthority
     ? hasTopic("travel_fees")
     : /\b(?:travel|travel fee|distance|mileage|venue fee)\b/i.test(message);
+  const asksPackageInclusions = responseContext.hasActionPlanAuthority
+    ? hasTopic("package_inclusions")
+    : /\b(?:include|included|what comes with|what's included|whats included|raw footage)\b/i.test(message);
   const topicIs = (topicId: string, pattern: RegExp) =>
     responseContext.hasActionPlanAuthority ? hasTopic(topicId) : pattern.test(message);
 
-  if (asksPricing || asksTravel) {
+  if (asksPricing || asksTravel || asksPackageInclusions) {
     return [
       asksPricing && canShareRegionalPricing(args.state)
         ? formatStartingPriceLine(args.config, args.state)
         : asksPricing
           ? formatRegionalPricingLine(args.config)
           : "",
+      asksPackageInclusions
+        ? "All collections include the full ceremony and speeches, a cinematic clip, a wedding film, drone footage, raw footage, and digital delivery."
+        : "",
       asksTravel ? formatTravelAnswer(args.state) : "",
       nextStep,
     ].filter(Boolean).join("\n\n");
@@ -781,6 +797,13 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         return formatUnavailableWeddingReply({ state, summary, weddingDate, location });
       case "availability_available": {
         if (isInstagram(state)) {
+          if (isBookedConversation(state)) {
+            return [
+              formatInstagramAvailabilityLine(state),
+              "I have the updated wedding date noted, and we'll keep the consultation call you already booked.",
+            ].join("\n\n");
+          }
+
           const lines = [
             formatInstagramAvailabilityLine(state),
             `${formatStartingPriceLine(config, state).replace(/\.$/, "")} — let me send you the guide so you can see everything ✨`,
@@ -801,6 +824,13 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
           return lines.join("\n\n");
         }
         const intro = `Amazing, thank you so much${state.names ? `, ${state.names}` : ""}. ${weddingDate}${location} is available for Myndful, so you reached out at a great time 🤍`;
+
+        if (isBookedConversation(state)) {
+          return [
+            intro,
+            "I have the updated wedding date noted, and we'll keep the consultation call you already booked.",
+          ].join("\n\n");
+        }
 
         if (state.guideSent) {
           return [
@@ -1507,6 +1537,10 @@ function sanitizeActionPlanFallback(args: ComposeWeddingSalesResponseArgs, fallb
   }
 
   if (isSchedulingQuestionIntent(args.intent)) {
+    return fallback.trim();
+  }
+
+  if (args.intent === "answer_question" && args.state.callProposed && !isBookedConversation(args.state)) {
     return fallback.trim();
   }
 

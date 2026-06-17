@@ -332,6 +332,9 @@ export function createWeddingSalesToolNodes(args: {
       }
 
       const askVenueBeforeCall = state.channel === "instagram" && !state.venue;
+      const bookedConsultation = Boolean(state.bookingConfirmed || state.bookedEventId || state.leadStage === "booked");
+      const nextCallProposed = bookedConsultation ? state.callProposed : !askVenueBeforeCall;
+      const nextLeadStage = bookedConsultation ? "booked" : "availability_checked";
 
       return {
         availability: "available",
@@ -339,8 +342,8 @@ export function createWeddingSalesToolNodes(args: {
         availabilityRegion,
         suggestedWeddingDates: undefined,
         guideSent: true,
-        callProposed: !askVenueBeforeCall,
-        leadStage: "availability_checked",
+        callProposed: nextCallProposed,
+        leadStage: nextLeadStage,
         ...(await composeReplyUpdate({
           intent: "availability_available",
           config,
@@ -350,7 +353,7 @@ export function createWeddingSalesToolNodes(args: {
             availabilityContextDate: undefined,
             availabilityRegion,
             suggestedWeddingDates: undefined,
-            leadStage: "availability_checked",
+            leadStage: nextLeadStage,
           },
           summaryStatePatch: {
             availability: "available",
@@ -358,8 +361,8 @@ export function createWeddingSalesToolNodes(args: {
             availabilityRegion,
             suggestedWeddingDates: undefined,
             guideSent: true,
-            callProposed: !askVenueBeforeCall,
-            leadStage: "availability_checked",
+            callProposed: nextCallProposed,
+            leadStage: nextLeadStage,
           },
         })),
         ...buildToolObservationUpdate(state, { toolName: "check_wedding_availability", result }),

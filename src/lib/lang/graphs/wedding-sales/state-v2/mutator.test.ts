@@ -1020,7 +1020,8 @@ test("semantic v2 mutator lets explicit sales updates override stale owner-conte
 
   assert.equal(result.weddingDate, "2026-10-19");
   assert.equal(result.leadStage, "ready_for_availability");
-  assert.equal(result.bookingConfirmed, false);
+  assert.equal(result.bookingConfirmed, true);
+  assert.equal(result.bookedEventId, "event-1");
   assert.equal(result.availability, undefined);
 });
 
