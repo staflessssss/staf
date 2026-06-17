@@ -216,6 +216,49 @@ test("wedding sales graph rechecks a selected suggested date after unavailable a
   assert.doesNotMatch(result.responseDraft ?? "", /October 17, 2026.*unavailable/i);
 });
 
+test("wedding sales graph softly closes when suggested wedding dates do not work", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    agentId: "agent-1",
+    runtimeMode: "unified_v2",
+    message: "none of those work",
+    previousState: {
+      leadStage: "availability_checked",
+      names: "Olivia and Daniel",
+      customerName: "Olivia",
+      partnerName: "Daniel",
+      weddingDate: "2026-10-17",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charleston, SC",
+      venue: "The Cedar Room",
+      availability: "unavailable",
+      availabilityContextDate: "2026-10-17",
+      availabilityRegion: "NC/SC/GA",
+      suggestedWeddingDates: ["2026-10-16", "2026-10-18"],
+      assistantReplyCount: 2,
+      callProposed: false,
+      bookingConfirmed: false,
+    },
+    toolContext: {
+      tenantId: "tenant-1",
+      testMode: true,
+      weddingAvailability: {
+        action: "capacity availability",
+        params: {},
+      },
+    },
+  });
+
+  assert.deepEqual(result.turnToolObservations, []);
+  assert.equal(result.weddingDate, "2026-10-17");
+  assert.equal(result.availability, "unavailable");
+  assert.match(result.responseDraft ?? "", /sorry those dates don't work out/i);
+  assert.match(result.responseDraft ?? "", /If anything changes/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /October 17, 2026.*unavailable/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Do you have another date/i);
+});
+
 test("instagram wedding sales treats get in touch as a fresh inquiry starter", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",

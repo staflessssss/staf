@@ -302,6 +302,17 @@ function asksAboutKnownWeddingAvailability(message?: string) {
   return /\b(?:available|availability|still open|still available|our date|the date|wedding date)\b/i.test(message);
 }
 
+function declinesSuggestedWeddingDates(state: WeddingSalesState) {
+  const message = state.latestCustomerMessage ?? "";
+
+  return Boolean(
+    state.availability === "unavailable" &&
+      state.suggestedWeddingDates?.length &&
+      /\b(?:none|neither|no|not|doesn'?t|do not|don'?t|won'?t)\b/i.test(message) &&
+      /\b(?:work|works|fit|fits|available|date|dates|those|either)\b/i.test(message),
+  );
+}
+
 function isBookedConversation(state: WeddingSalesState) {
   return Boolean(state.bookingConfirmed || state.leadStage === "booked");
 }
@@ -831,6 +842,12 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
         }
 
         if (state.availability === "unavailable") {
+          if (declinesSuggestedWeddingDates(state)) {
+            return isInstagram(state)
+              ? "I'm so sorry those dates don't work out 🤍 If anything changes, please let me know. Wishing you both such a beautiful wedding day."
+              : "I'm so sorry those dates don't work out. If anything changes, please let me know. Wishing you both such a beautiful wedding day.";
+          }
+
           const asksPricingOrTravel = /\b(?:pricing|price|cost|package|packages|collection|collections|travel)\b/i.test(
             state.latestCustomerMessage ?? "",
           );

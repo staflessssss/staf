@@ -703,6 +703,10 @@ export function applySemanticV2StateMutation(args: {
   }
 
   for (const field of ["weddingDate", "weddingYear", "location", "venue", "email", "callTime"] as const) {
+    if (field === "weddingDate" && acceptedFields.has("weddingDate")) {
+      continue;
+    }
+
     const entry = selectBestValue({
       analysis,
       state: workingState(state, update),
