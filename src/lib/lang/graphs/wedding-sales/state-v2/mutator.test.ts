@@ -879,6 +879,56 @@ test("semantic v2 mutator resolves a bare alternative time against the busy cale
   assert.equal(plan.actions[0]?.type, "check_consultation_calendar");
 });
 
+test("semantic v2 mutator resolves selected suggested wedding date after unavailable check", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "October 18 works",
+    previousState: {
+      leadStage: "availability_checked",
+      names: "Olivia and Daniel",
+      customerName: "Olivia",
+      partnerName: "Daniel",
+      weddingDate: "2026-10-17",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charleston, SC",
+      venue: "The Cedar Room",
+      availability: "unavailable",
+      availabilityContextDate: "2026-10-17",
+      availabilityRegion: "NC/SC/GA",
+      suggestedWeddingDates: ["2026-10-16", "2026-10-18"],
+      guideSent: true,
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "confirm",
+          confidence: 0.95,
+          targetField: "weddingDate",
+          evidence: "October 18 works",
+        },
+      ],
+      primaryIntent: "confirm",
+    }),
+  });
+
+  assert.equal(result.weddingDate, "2026-10-18");
+  assert.equal(result.weddingYear, "2026");
+  assert.equal(result.weddingYearKnown, true);
+  assert.equal(result.availability, undefined);
+  assert.equal(result.availabilityContextDate, undefined);
+  assert.equal(result.availabilityRegion, undefined);
+  assert.equal(result.suggestedWeddingDates, undefined);
+  assert.equal(result.callProposed, false);
+  assert.equal(result.bookingConfirmed, false);
+  assert.equal(result.leadStage, "ready_for_availability");
+  assert.match(JSON.stringify(result.lastStateMutationTrace), /selected_suggested_wedding_date/);
+});
+
 test("semantic v2 mutator accepts corrected call time from pending resolution as state input", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

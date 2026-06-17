@@ -53,7 +53,9 @@ export type WeddingSalesState = {
   venue?: string;
   customerEmail?: string;
   availability?: "available" | "unavailable";
+  availabilityContextDate?: string;
   availabilityRegion?: string;
+  suggestedWeddingDates?: string[];
   guideSent: boolean;
   callProposed: boolean;
   proposedCallTime?: string;
@@ -128,7 +130,9 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   venue: Annotation<string | undefined>(),
   customerEmail: Annotation<string | undefined>(),
   availability: Annotation<"available" | "unavailable" | undefined>(),
+  availabilityContextDate: Annotation<string | undefined>(),
   availabilityRegion: Annotation<string | undefined>(),
+  suggestedWeddingDates: Annotation<string[] | undefined>(),
   guideSent: Annotation<boolean>(),
   callProposed: Annotation<boolean>(),
   proposedCallTime: Annotation<string | undefined>(),
@@ -214,7 +218,9 @@ export function createInitialWeddingSalesState(args: {
     venue: args.previousState?.venue,
     customerEmail: args.previousState?.customerEmail ?? args.customerEmail,
     availability: args.previousState?.availability,
+    availabilityContextDate: args.previousState?.availabilityContextDate,
     availabilityRegion: args.previousState?.availabilityRegion,
+    suggestedWeddingDates: args.previousState?.suggestedWeddingDates,
     guideSent: args.previousState?.guideSent ?? false,
     callProposed: args.previousState?.callProposed ?? false,
     proposedCallTime: args.previousState?.proposedCallTime,

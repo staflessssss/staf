@@ -98,6 +98,22 @@ function getAvailabilityRegion(steps: Record<string, unknown>[]) {
   return undefined;
 }
 
+function getAvailabilitySuggestionState(steps: Record<string, unknown>[]) {
+  const unavailableStep = steps.find((step) => step.status === "unavailable");
+  const suggestedDates = unavailableStep
+    ? [
+        ...getStringArray(unavailableStep.suggestedDates),
+        getString((unavailableStep.nearestAvailableDates as Record<string, unknown> | undefined)?.before),
+        getString((unavailableStep.nearestAvailableDates as Record<string, unknown> | undefined)?.after),
+      ].filter((date): date is string => Boolean(date))
+    : [];
+
+  return {
+    availabilityContextDate: getString(unavailableStep?.date),
+    suggestedWeddingDates: [...new Set(suggestedDates)],
+  };
+}
+
 function getBookingOutcome(toolResult: Record<string, unknown>) {
   const steps = getStepResults(toolResult);
   const bookedStep = steps.find((step) => step.status === "booked");
@@ -248,6 +264,8 @@ export function createWeddingSalesToolNodes(args: {
       if (config.coverage.unavailableDates?.includes(state.weddingDate)) {
         return {
           availability: "unavailable",
+          availabilityContextDate: state.weddingDate,
+          suggestedWeddingDates: undefined,
           leadStage: "availability_checked",
           ...(await composeReplyUpdate({
             intent: "availability_unavailable",
@@ -256,6 +274,8 @@ export function createWeddingSalesToolNodes(args: {
             summary: "If you have flexibility, I can help look at alternative dates.",
             statePatch: {
               availability: "unavailable",
+              availabilityContextDate: state.weddingDate,
+              suggestedWeddingDates: undefined,
               leadStage: "availability_checked",
             },
           })),
@@ -283,12 +303,16 @@ export function createWeddingSalesToolNodes(args: {
       const available = steps.some((step) => step.status === "available");
       const unavailable = steps.some((step) => step.status === "unavailable");
       const availabilityRegion = getAvailabilityRegion(steps);
+      const { availabilityContextDate, suggestedWeddingDates } =
+        getAvailabilitySuggestionState(steps);
       const summary = getSummary(parsedResult);
 
       if (unavailable && !available) {
         return {
           availability: "unavailable",
+          availabilityContextDate,
           availabilityRegion,
+          suggestedWeddingDates,
           leadStage: "availability_checked",
           ...(await composeReplyUpdate({
             intent: "availability_unavailable",
@@ -297,7 +321,9 @@ export function createWeddingSalesToolNodes(args: {
             summary,
             statePatch: {
               availability: "unavailable",
+              availabilityContextDate,
               availabilityRegion,
+              suggestedWeddingDates,
               leadStage: "availability_checked",
             },
           })),
@@ -309,7 +335,9 @@ export function createWeddingSalesToolNodes(args: {
 
       return {
         availability: "available",
+        availabilityContextDate: undefined,
         availabilityRegion,
+        suggestedWeddingDates: undefined,
         guideSent: true,
         callProposed: !askVenueBeforeCall,
         leadStage: "availability_checked",
@@ -319,12 +347,16 @@ export function createWeddingSalesToolNodes(args: {
           state,
           statePatch: {
             availability: "available",
+            availabilityContextDate: undefined,
             availabilityRegion,
+            suggestedWeddingDates: undefined,
             leadStage: "availability_checked",
           },
           summaryStatePatch: {
             availability: "available",
+            availabilityContextDate: undefined,
             availabilityRegion,
+            suggestedWeddingDates: undefined,
             guideSent: true,
             callProposed: !askVenueBeforeCall,
             leadStage: "availability_checked",

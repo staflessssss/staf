@@ -57,7 +57,9 @@ function clearPendingChange() {
 function clearAvailabilityResult() {
   return {
     availability: undefined,
+    availabilityContextDate: undefined,
     availabilityRegion: undefined,
+    suggestedWeddingDates: undefined,
   } satisfies Partial<WeddingSalesState>;
 }
 
@@ -309,6 +311,53 @@ function buildIsoDateFromPartial(partialDate: string | undefined, year: string) 
   }
 
   return iso;
+}
+
+function formatMonthDayFromIso(isoDate: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) {
+    return undefined;
+  }
+
+  return {
+    year: match[1],
+    month: match[2],
+    day: match[3],
+    numericDay: String(Number(match[3])),
+  };
+}
+
+function resolveSuggestedWeddingDateSelection(
+  message: string | undefined,
+  state: WeddingSalesState,
+) {
+  const normalizedMessage = normalizeForComparison(message ?? "");
+  const suggestions = (state.suggestedWeddingDates ?? [])
+    .map((date) => ({ date, parts: formatMonthDayFromIso(date) }))
+    .filter((entry): entry is { date: string; parts: NonNullable<ReturnType<typeof formatMonthDayFromIso>> } =>
+      Boolean(entry.parts),
+    );
+
+  if (!normalizedMessage || state.availability !== "unavailable" || suggestions.length === 0) {
+    return undefined;
+  }
+
+  const monthDay = extractMonthDay(message ?? "");
+  if (monthDay) {
+    return suggestions.find(
+      (entry) => entry.parts.month === monthDay.month && entry.parts.day === monthDay.day,
+    )?.date;
+  }
+
+  const dayMatch = /\b(?:the\s*)?(\d{1,2})(?:st|nd|rd|th)?\b/i.exec(message ?? "");
+  if (!dayMatch) {
+    return undefined;
+  }
+
+  const day = String(Number(dayMatch[1]));
+  const matches = suggestions.filter((entry) => entry.parts.numericDay === day);
+
+  return matches.length === 1 ? matches[0].date : undefined;
 }
 
 function isAcceptedProvidedInfo(provided: SemanticProvidedValueV2, message: string | undefined) {
@@ -612,6 +661,30 @@ export function applySemanticV2StateMutation(args: {
         reason: "pending_change_confirmed",
       });
     }
+  }
+
+  const selectedSuggestedWeddingDate = resolveSuggestedWeddingDateSelection(
+    state.latestCustomerMessage,
+    state,
+  );
+
+  if (selectedSuggestedWeddingDate) {
+    Object.assign(update, clearPendingChange(), {
+      weddingDate: selectedSuggestedWeddingDate,
+      weddingYear: selectedSuggestedWeddingDate.slice(0, 4),
+      weddingYearKnown: true,
+      ...clearAvailabilityResult(),
+      ...clearCheckedCallSlot(),
+      callProposed: false,
+      ...clearBookingResult(),
+    });
+    acceptedFields.add("weddingDate");
+    trace.push({
+      action: "accepted",
+      field: "weddingDate",
+      value: selectedSuggestedWeddingDate,
+      reason: "selected_suggested_wedding_date",
+    });
   }
 
   const genericNames = selectBestValue({
