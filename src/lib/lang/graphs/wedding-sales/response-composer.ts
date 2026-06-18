@@ -640,6 +640,13 @@ function formatFaqAnswer(args: {
     ].filter(Boolean).join("\n\n");
   }
 
+  if (topicIs("business_location", /\bwhere\b.*\b(?:located|based|from)\b|\b(?:located|based)\b.*\bwhere\b/i)) {
+    return [
+      "We're based in Tampa, FL, with our Florida lead filmmaker there, and our NC/SC/GA team is based in Charlotte.",
+      withoutRepeatedVenueQuestion(args.state, nextStep),
+    ].filter(Boolean).join("\n\n");
+  }
+
   if (topicIs("team_florida", /\b(?:florida|tampa)\b/i) && /\b(?:filmmaker|team|who|shoot|shooter)\b/i.test(message)) {
     const teamAnswer = asksIfTarasWillShoot(message)
       ? "I personally won’t be the lead shooter in Florida. Jay is our lead filmmaker there, and he shoots in the same Myndful style."

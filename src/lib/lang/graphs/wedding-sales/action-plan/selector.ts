@@ -43,6 +43,7 @@ const ACTIVE_SALES_CONTINUATION_TOPICS = new Set([
   "style",
   "team_florida",
   "team_nc_sc_ga",
+  "business_location",
   "travel_fees",
   "venue_travel_details",
 ]);
@@ -87,11 +88,20 @@ function hasUnknownBusinessQuestion(analysis: SemanticAnalysisV2) {
   return analysis.questions.some(
     (question) =>
       question.confidence >= 0.75 &&
+      !isBusinessLocationQuestion(question) &&
       (!question.topicId ||
         question.topicId === "other" ||
         question.topicId === "unknown_service_request" ||
         question.topicId === "unknown_business_question"),
   );
+}
+
+function isBusinessLocationQuestion(question: SemanticAnalysisV2["questions"][number]) {
+  const text = `${question.normalizedQuestion} ${question.evidence}`.toLowerCase();
+
+  return /\bwhere\b/.test(text) &&
+    /\b(?:located|based|location|from|team)\b/.test(text) &&
+    !/\b(?:wedding|venue|married|get married|getting married)\b/.test(text);
 }
 
 function hasHighConfidenceObjection(analysis: SemanticAnalysisV2) {
@@ -379,6 +389,28 @@ export function selectWeddingSalesActionPlan(args: {
           reason: "pending_change_requires_customer_confirmation",
         }),
       ],
+    });
+  }
+
+  if (analysis.questions.some((question) => question.confidence >= 0.75 && isBusinessLocationQuestion(question))) {
+    const missingField = firstAllowedMissingField({ state, analysis });
+
+    return buildPlan({
+      responseGoal: missingField ? "clarify" : "answer",
+      actions: [
+        action({
+          type: "answer_question",
+          topicId: "business_location",
+          reason: "known_business_location_question",
+        }),
+        missingField
+          ? action({
+              type: "ask_missing_field",
+              field: missingField,
+              reason: "continue_sales_flow_after_known_business_location_answer",
+            })
+          : null,
+      ].filter((item): item is WeddingSalesAction => Boolean(item)),
     });
   }
 

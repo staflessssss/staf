@@ -109,6 +109,49 @@ test("wedding sales composer answers FAQ from Myndful business facts", () => {
   assert.doesNotMatch(response, /we do travel/i);
 });
 
+test("wedding sales composer answers business location and continues with planned year question", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      leadStage: "waiting_wedding_year",
+      latestCustomerMessage: "Where are you located?",
+      weddingDate: undefined,
+      weddingDateText: "November 20",
+      weddingYear: undefined,
+      weddingYearKnown: false,
+      location: undefined,
+      availability: undefined,
+      semanticStateVersion: 2,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "business_location",
+            reason: "known_business_location_question",
+          },
+          {
+            type: "ask_missing_field",
+            field: "weddingYear",
+            topicId: null,
+            reason: "continue_sales_flow_after_known_business_location_answer",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.match(response, /Tampa, FL/i);
+  assert.match(response, /Charlotte/i);
+  assert.match(response, /What year is November 20/i);
+});
+
 test("wedding sales composer gives travel answer without guessing fees", () => {
   const response = composeWeddingSalesResponse({
     intent: "answer_question",

@@ -53,7 +53,8 @@ Rules:
 - If currentState.pendingChangeField exists and the customer rejects it, include intent reject and pendingResolution for that exact field with type reject.
 - Use request_modification for a new correction that is not merely resolving the currently pending change.
 - Questions and provided information can coexist in the same message. Preserve both.
-- Prefer these trusted topic IDs when applicable: pricing, travel_fees, final_film_delivery, film_length, package_inclusions, availability, portfolio, reviews, booking, venue_travel_details, style, music, hidden_fees, insurance, photographers, team_florida, team_nc_sc_ga, unknown_service_request, other.
+- Prefer these trusted topic IDs when applicable: pricing, travel_fees, final_film_delivery, film_length, package_inclusions, availability, portfolio, reviews, booking, venue_travel_details, style, music, hidden_fees, insurance, photographers, team_florida, team_nc_sc_ga, business_location, unknown_service_request, other.
+- Questions like "Where are you located?", "Where are you based?", or "Where is your team located?" are topicId business_location, not unknown_service_request.
 - Questions about an existing booking, past wedding, operators, payments, contracts, insurance, planners, or delivery status can indicate existing_client or past_client.
 - If the customer says their wedding already happened, was last weekend, or otherwise describes it as completed, clientType must be past_client, never new_lead.
 - If the customer asks an operational question about services already booked or delivered, prefer existing_client or past_client over new_lead.

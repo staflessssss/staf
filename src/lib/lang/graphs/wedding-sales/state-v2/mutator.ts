@@ -690,6 +690,8 @@ export function applySemanticV2StateMutation(args: {
     state,
   );
 
+  const selectedSuggestedWeddingDateWasCommitted = Boolean(selectedSuggestedWeddingDate);
+
   if (selectedSuggestedWeddingDate) {
     Object.assign(update, clearPendingChange(), {
       weddingDate: selectedSuggestedWeddingDate,
@@ -727,6 +729,10 @@ export function applySemanticV2StateMutation(args: {
       continue;
     }
 
+    if (field === "callTime" && selectedSuggestedWeddingDateWasCommitted) {
+      continue;
+    }
+
     const entry = selectBestValue({
       analysis,
       state: workingState(state, update),
@@ -756,6 +762,26 @@ export function applySemanticV2StateMutation(args: {
           value: entry.value,
           reason: entry.reasons.join(","),
         });
+      } else if (field === "weddingDate" && !workingState(state, update).weddingDate) {
+        const monthDay = extractMonthDay(entry.evidence || entry.value);
+
+        if (monthDay && !evidenceContainsYear(entry.evidence || entry.value)) {
+          update.weddingDateText = monthDay.display;
+          update.weddingYearKnown = false;
+          trace.push({
+            action: "partial",
+            field,
+            value: monthDay.display,
+            reason: "rejected_semantic_date_preserved_as_partial",
+          });
+        } else {
+          trace.push({
+            action: "rejected",
+            field,
+            value: entry.value,
+            reason: entry.reasons.join(","),
+          });
+        }
       } else {
         trace.push({
           action: "rejected",

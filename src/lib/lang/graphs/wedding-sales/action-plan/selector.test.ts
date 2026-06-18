@@ -92,6 +92,51 @@ test("action selector plans availability then calendar for alternate date plus c
   assert.equal(weddingSalesActionPlanSchema.safeParse(plan).success, true);
 });
 
+test("action selector answers business location questions instead of handing off", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Where are you located?",
+    previousState: {
+      leadStage: "waiting_wedding_year",
+      customerName: "Sofia",
+      partnerName: "Luis",
+      coupleDisplayName: "Sofia and Luis",
+      names: "Sofia and Luis",
+      weddingDateText: "November 20",
+      weddingYearKnown: false,
+    },
+  });
+
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      primaryIntent: "ask_question",
+      intents: [
+        {
+          category: "ask_question",
+          confidence: 0.95,
+          targetField: null,
+          evidence: "Where are you located?",
+        },
+      ],
+      questions: [
+        {
+          topicId: null,
+          normalizedQuestion: "Where are you located?",
+          confidence: 0.95,
+          evidence: "Where are you located?",
+        },
+      ],
+    }),
+  });
+
+  assert.equal(plan.responseGoal, "clarify");
+  assert.equal(plan.actions[0]?.type, "answer_question");
+  assert.equal(plan.actions[0]?.topicId, "business_location");
+  assert.equal(plan.actions[1]?.type, "ask_missing_field");
+  assert.equal(plan.actions[1]?.field, "weddingYear");
+});
+
 test("action selector does not reuse an old call time when the current turn only changes wedding date", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

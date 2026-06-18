@@ -204,6 +204,78 @@ test("semantic v2 mutator treats normalized dates without explicit year as parti
   assert.equal(plan.actions[0]?.field, "weddingYear");
 });
 
+test("semantic v2 mutator preserves rejected month-day evidence as partial wedding date", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "November 20th",
+    previousState: {
+      leadStage: "missing_names_or_date",
+      customerName: "Sofia",
+      partnerName: "Luis",
+      coupleDisplayName: "Sofia and Luis",
+      nameCollectionStatus: "both",
+      names: "Sofia and Luis",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "weddingDate",
+            topicId: null,
+            reason: "next_required_qualification_field_missing",
+          },
+        ],
+      },
+    },
+  });
+
+  const result = applySemanticV2StateMutation({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "provide_info",
+          confidence: 0.99,
+          targetField: "weddingDate",
+          evidence: "November 20th",
+        },
+      ],
+      entities: [
+        {
+          field: "weddingDate",
+          value: "November 20th",
+          normalizedValue: null,
+          confidence: 0.99,
+          evidence: "November 20th",
+          alternatives: [],
+        },
+      ],
+    }),
+  });
+
+  assert.equal(result.weddingDate, undefined);
+  assert.equal(result.weddingDateText, "November 20");
+  assert.equal(result.weddingYearKnown, false);
+  assert.equal(result.leadStage, "waiting_wedding_year");
+  assert.match(
+    JSON.stringify(result.lastStateMutationTrace),
+    /rejected_semantic_date_preserved_as_partial/,
+  );
+
+  const plan = selectWeddingSalesActionPlan({
+    state: {
+      ...state,
+      ...result,
+    },
+    analysis: analysis(),
+  });
+
+  assert.equal(plan.actions[0]?.type, "ask_missing_field");
+  assert.equal(plan.actions[0]?.field, "weddingYear");
+});
+
 test("semantic v2 mutator combines a later year with a partial wedding date", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
