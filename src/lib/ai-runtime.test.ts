@@ -631,6 +631,146 @@ test("handleIncomingEventWithDeps records inbound and does not auto-reply when m
   ]);
 });
 
+test("handleIncomingEventWithDeps keeps Instagram threads with prior Meta history manual-only", async () => {
+  const createdMessages: Array<{ conversationId: string; role: string; content: string }> = [];
+  const createdConversations: Array<Record<string, unknown>> = [];
+  const txConversation = {
+    id: "conv-instagram-prior-history",
+    status: ConversationStatus.ESCALATED,
+  };
+  const fakeDb = {
+    agent: {
+      findFirst: async () => ({
+        id: "agent-1",
+        tenantId: "tenant-1",
+        channelConfig: {
+          agentSettings: {
+            defaultChatEnabled: true,
+            timezone: "UTC",
+            scheduleEnabled: false,
+            weeklySchedule: [],
+          },
+        },
+        channel: {
+          type: "INSTAGRAM",
+          credentialsEnc: "encrypted",
+        },
+      }),
+    },
+    message: {
+      findFirst: async () => null,
+      create: async (args: { data: { conversationId: string; role: string; content: string } }) => {
+        createdMessages.push(args.data);
+        return { id: "message-1" };
+      },
+    },
+    conversation: {
+      findUnique: async () => null,
+      create: async (args: Record<string, unknown>) => {
+        createdConversations.push(args);
+        return txConversation;
+      },
+      update: async () => txConversation,
+    },
+    $transaction: async (
+      callback: (tx: {
+        conversation: {
+          findUnique: () => Promise<null>;
+          create: (args: Record<string, unknown>) => Promise<typeof txConversation>;
+          update: () => Promise<typeof txConversation>;
+        };
+        message: {
+          create: (args: {
+            data: { conversationId: string; role: string; content: string };
+          }) => Promise<{ id: string }>;
+        };
+      }) => Promise<unknown>,
+    ) =>
+      callback({
+        conversation: {
+          findUnique: async () => null,
+          create: async (args) => {
+            createdConversations.push(args);
+            return txConversation;
+          },
+          update: async () => txConversation,
+        },
+        message: {
+          create: async (args) => {
+            createdMessages.push(args.data);
+            return { id: "message-1" };
+          },
+        },
+      }),
+    delayedDelivery: {
+      updateMany: async () => ({ count: 0 }),
+    },
+  } as never;
+  let invokeCalled = false;
+  let sendReplyCalled = false;
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "INSTAGRAM" as never,
+      payload: { text: "Can you send the questionnaire again?" },
+    },
+    {
+      db: fakeDb,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => {
+        invokeCalled = true;
+        throw new Error("invokeAgent should not run for prior Instagram history");
+      },
+      inspectInstagramConversationHistory: async () => ({
+        status: "prior_history_found",
+        conversationId: "ig-conversation-1",
+        priorMessageCount: 12,
+      }),
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "1039137701883094",
+            contactUsername: "tayyhulk13",
+            message: "Can you send the questionnaire again?",
+            messageId: "current-message-id",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async () => {
+            sendReplyCalled = true;
+            return {};
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal("status" in result ? result.status : null, "instagram_prior_history_manual_only");
+  assert.equal("priorMessageCount" in result ? result.priorMessageCount : null, 12);
+  assert.equal(invokeCalled, false);
+  assert.equal(sendReplyCalled, false);
+  assert.deepEqual(createdConversations[0], {
+    data: {
+      agentId: "agent-1",
+      contactId: "1039137701883094",
+      contactUsername: "tayyhulk13",
+      channel: "INSTAGRAM",
+      status: "ESCALATED",
+    },
+  });
+  assert.deepEqual(createdMessages, [
+    {
+      conversationId: "conv-instagram-prior-history",
+      role: "USER",
+      content: "Can you send the questionnaire again?",
+      toolInput: {
+        messageId: "current-message-id",
+      },
+    },
+  ]);
+});
+
 test("handleIncomingEventWithDeps pauses a dialog after a manual business reply", async () => {
   const createdMessages: Array<Record<string, unknown>> = [];
   const conversationUpdates: Array<Record<string, unknown>> = [];

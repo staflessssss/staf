@@ -407,7 +407,7 @@ export function selectWeddingSalesActionPlan(args: {
     const missingField = firstAllowedMissingField({ state, analysis });
 
     return buildPlan({
-      responseGoal: missingField ? "clarify" : "answer",
+      responseGoal: missingField ? "clarify" : "answer_and_qualify",
       actions: [
         action({
           type: "answer_question",

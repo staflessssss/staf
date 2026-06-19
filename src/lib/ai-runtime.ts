@@ -27,6 +27,7 @@ import {
 } from "@/lib/agent-config";
 import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
+import { parseInstagramCredentials } from "@/lib/channels/instagram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { selectWeddingSalesGuide } from "@/lib/lang/graphs/wedding-sales/config";
@@ -213,9 +214,25 @@ type HandleIncomingEventDeps = {
   invokeAgent: typeof invokeAgent;
   decrypt: typeof decrypt;
   sleep: (ms: number) => Promise<void>;
+  inspectInstagramConversationHistory?: (args: {
+    agent: IncomingEventAgent;
+    contactId: string;
+    messageId?: string;
+  }) => Promise<InstagramConversationPreflightResult>;
 };
 
 type IncomingEventAgent = Pick<AgentWithConfigData, "id" | "tenantId" | "channelConfig" | "channel">;
+
+type InstagramConversationPreflightResult =
+  | {
+      status: "prior_history_found";
+      conversationId?: string;
+      priorMessageCount: number;
+    }
+  | {
+      status: "no_prior_history" | "not_checked" | "error";
+      error?: string;
+    };
 
 type LangGraphToolObservation = {
   toolName: string;
@@ -545,6 +562,120 @@ function getInboundConversationPolicy(args: {
   }
 
   return "auto_reply" as const;
+}
+
+type InstagramConversationListPayload = {
+  data?: Array<{
+    id?: string;
+    participants?: {
+      data?: Array<{
+        id?: string;
+        username?: string;
+      }>;
+    };
+  }>;
+};
+
+type InstagramConversationDetailPayload = {
+  messages?: {
+    data?: Array<{
+      id?: string;
+      from?: {
+        id?: string;
+        username?: string;
+      };
+      created_time?: string;
+    }>;
+  };
+};
+
+async function fetchInstagramGraphJson<T>(url: URL, token: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const payload = (await response.json().catch(() => null)) as T | null;
+
+  if (!response.ok || !payload) {
+    throw new Error(`Instagram Graph API request failed with ${response.status}.`);
+  }
+
+  return payload;
+}
+
+async function inspectInstagramConversationHistory(args: {
+  agent: IncomingEventAgent;
+  contactId: string;
+  messageId?: string;
+}): Promise<InstagramConversationPreflightResult> {
+  if (!args.contactId.trim()) {
+    return { status: "not_checked" };
+  }
+
+  try {
+    const credentials = parseInstagramCredentials(decrypt(args.agent.channel.credentialsEnc));
+
+    if (!credentials.pageAccessToken) {
+      return { status: "not_checked" };
+    }
+
+    const graphApiVersion = credentials.graphApiVersion || "v25.0";
+    const conversationsUrl = new URL(
+      `https://graph.instagram.com/${graphApiVersion}/me/conversations`,
+    );
+
+    conversationsUrl.searchParams.set("platform", "instagram");
+    conversationsUrl.searchParams.set("fields", "id,participants");
+    conversationsUrl.searchParams.set("limit", "50");
+
+    const conversations = await fetchInstagramGraphJson<InstagramConversationListPayload>(
+      conversationsUrl,
+      credentials.pageAccessToken,
+    );
+    const conversation = conversations.data?.find((item) =>
+      item.participants?.data?.some((participant) => participant.id === args.contactId),
+    );
+
+    if (!conversation?.id) {
+      return { status: "no_prior_history" };
+    }
+
+    const conversationUrl = new URL(
+      `https://graph.instagram.com/${graphApiVersion}/${encodeURIComponent(conversation.id)}`,
+    );
+
+    conversationUrl.searchParams.set(
+      "fields",
+      "messages.limit(25){id,from,created_time}",
+    );
+
+    const detail = await fetchInstagramGraphJson<InstagramConversationDetailPayload>(
+      conversationUrl,
+      credentials.pageAccessToken,
+    );
+    const currentMessageId = args.messageId?.trim() ?? "";
+    const priorMessages = (detail.messages?.data ?? []).filter((message) => {
+      const messageId = message.id?.trim() ?? "";
+
+      return Boolean(messageId && messageId !== currentMessageId);
+    });
+
+    if (priorMessages.length > 0) {
+      return {
+        status: "prior_history_found",
+        conversationId: conversation.id,
+        priorMessageCount: priorMessages.length,
+      };
+    }
+
+    return { status: "no_prior_history" };
+  } catch (error) {
+    return {
+      status: "error",
+      error: error instanceof Error ? error.message : "Instagram preflight failed.",
+    };
+  }
 }
 
 function applyControlToHistory(args: {
@@ -2123,6 +2254,44 @@ async function handleIncomingEventWithDeps(
     },
   });
 
+  if (
+    args.channel === ChannelType.INSTAGRAM &&
+    !incoming.isBusinessManualReply &&
+    !existingConversation &&
+    deps.inspectInstagramConversationHistory
+  ) {
+    const preflight = await deps.inspectInstagramConversationHistory({
+      agent,
+      contactId: incoming.contactId,
+      messageId: incoming.messageId,
+    });
+
+    if (preflight.status === "prior_history_found") {
+      const conversation = await recordInboundMessageWithDb(deps.db, {
+        agentId: agent.id,
+        contactId: incoming.contactId,
+        contactUsername: incoming.contactUsername,
+        contactDisplayName: incoming.contactDisplayName,
+        channel: agent.channel.type,
+        message: incoming.message,
+        messageId: incoming.messageId,
+        gmailMessageId: incoming.gmailMessageId,
+        threadId: incoming.threadId,
+        subject: incoming.subject,
+        conversationStatus: ConversationStatus.ESCALATED,
+      });
+
+      return {
+        ok: true,
+        agentId: agent.id,
+        conversationId: conversation.id,
+        status: "instagram_prior_history_manual_only",
+        priorMessageCount: preflight.priorMessageCount,
+        instagramConversationId: preflight.conversationId,
+      };
+    }
+  }
+
   if (agent.status === AgentStatus.PAUSED) {
     const conversation = incoming.isBusinessManualReply
       ? await recordBusinessManualMessageWithDb(deps.db, {
@@ -2595,6 +2764,7 @@ export async function handleIncomingEvent(args: {
     invokeAgent,
     decrypt,
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    inspectInstagramConversationHistory,
   });
 }
 
