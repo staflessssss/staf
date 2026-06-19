@@ -57,6 +57,8 @@ type OwnerTelegramResponse = {
 const OPERATIONAL_HANDOFF_PATTERNS = [
   /\b(contract|signed|deposit|payment|paid|invoice|refund|balance|extra hour|additional hour)\b/i,
   /\b(already booked|existing client|wedding already happened|after the wedding|day of the wedding)\b/i,
+  /\b(?:questionnaire|form|link)\b[\s\S]{0,120}\b(?:send|email|sent|again|missed|find|lost|fill out|fill)\b/i,
+  /\b(?:send|email|sent|again|missed|find|lost|fill out|fill)\b[\s\S]{0,120}\b(?:questionnaire|form|link)\b/i,
   /\b(did they|were they able|can you confirm|do you know if|has it been)\b/i,
   /\b(?:send|email|share|upload|provide)\b[\s\S]{0,80}\b(?:coi|certificate|insurance)\b/i,
   /\b(?:coi|certificate|insurance)\b[\s\S]{0,80}\b(?:to|for)\b[\s\S]{0,60}\b(?:venue|planner|coordinator)\b/i,

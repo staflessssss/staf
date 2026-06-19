@@ -17,6 +17,7 @@ describe("owner handoff trigger", () => {
       "Can you send the insurance certificate to our planner?",
       "Has the deposit already been paid?",
       "Do you know if the videographer has dietary restrictions?",
+      "Hello!!! I’m starting to nail down those details for my wedding 9/6/26 and I know there was a questionnaire I needed to fill out for you guys but I cannot find it in my emails? Would you mind sending me the questionnaire email again? Tmholcomb13@gmail.com",
     ];
 
     for (const message of examples) {
