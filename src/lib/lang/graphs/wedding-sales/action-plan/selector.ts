@@ -108,6 +108,17 @@ function hasHighConfidenceObjection(analysis: SemanticAnalysisV2) {
   return analysis.objections.some((objection) => objection.confidence >= 0.75);
 }
 
+function declinesSuggestedWeddingDates(state: WeddingSalesState) {
+  const message = state.latestCustomerMessage ?? "";
+
+  return Boolean(
+    state.availability === "unavailable" &&
+      state.suggestedWeddingDates?.length &&
+      /\b(?:none|neither|no|not|doesn'?t|do not|don'?t|won'?t)\b/i.test(message) &&
+      /\b(?:work|works|fit|fits|available|date|dates|those|either)\b/i.test(message),
+  );
+}
+
 function isActiveSalesContinuationQuestion(state: WeddingSalesState, analysis: SemanticAnalysisV2) {
   const topic = bestQuestionTopic(analysis);
   const activeSalesStage = Boolean(
@@ -411,6 +422,20 @@ export function selectWeddingSalesActionPlan(args: {
             })
           : null,
       ].filter((item): item is WeddingSalesAction => Boolean(item)),
+    });
+  }
+
+  if (declinesSuggestedWeddingDates(state)) {
+    return buildPlan({
+      responseGoal: "answer_and_qualify",
+      guardrailTrace,
+      actions: [
+        action({
+          type: "answer_question",
+          topicId: "availability",
+          reason: "customer_declined_suggested_wedding_dates",
+        }),
+      ],
     });
   }
 

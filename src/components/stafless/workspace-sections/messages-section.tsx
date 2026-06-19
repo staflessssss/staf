@@ -27,13 +27,22 @@ const splitMessageDelayOptions = [0, 1, 2, 3, 4, 5, 6, 7];
 const hourOptions = Array.from({ length: 24 }, (_, option) => String(option).padStart(2, "0"));
 const minuteOptions = ["00", "05", "10", "15", "20", "30", "45", "55"];
 
-const defaultFollowUpInstruction = "Check whether the user still needs help and ask one clear next-step question.";
+const defaultFollowUpInstruction =
+  "Use the current conversation state and action plan. Continue with the single most relevant next step; do not restart the conversation.";
 
-function createDefaultFollowUpRule() {
+function createDefaultFollowUpRule(
+  delayDays: number,
+): ChannelBehaviorConfig["followUpRules"][number] {
   return {
     ...getDefaultFollowUpRuleConfig(),
+    delayDays,
+    delayHours: 0,
     instruction: defaultFollowUpInstruction,
   };
+}
+
+function createDefaultFollowUpSequence() {
+  return [createDefaultFollowUpRule(1), createDefaultFollowUpRule(3), createDefaultFollowUpRule(7)];
 }
 
 function getSplitMessagesEnabled(channelBehavior: ChannelBehaviorConfig) {
@@ -213,7 +222,7 @@ export function WorkspaceMessagesSection({
                   followUpEnabled: checked,
                   followUpRules:
                     checked && channelBehavior.followUpRules.length === 0
-                      ? [createDefaultFollowUpRule()]
+                      ? createDefaultFollowUpSequence()
                       : channelBehavior.followUpRules,
                 })
               }
@@ -382,7 +391,7 @@ export function WorkspaceMessagesSection({
                   disabled={isReadOnlyMode}
                   onClick={() =>
                     onUpdateChannelBehavior({
-                      followUpRules: [...channelBehavior.followUpRules, createDefaultFollowUpRule()],
+                      followUpRules: [...channelBehavior.followUpRules, createDefaultFollowUpRule(1)],
                     })
                   }
                   type="button"

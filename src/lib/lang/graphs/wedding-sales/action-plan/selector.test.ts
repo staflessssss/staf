@@ -137,6 +137,36 @@ test("action selector answers business location questions instead of handing off
   assert.equal(plan.actions[1]?.field, "weddingYear");
 });
 
+test("action selector softly answers when suggested wedding dates do not work", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "none of those work",
+    previousState: {
+      leadStage: "availability_checked",
+      names: "Olivia and Daniel",
+      customerName: "Olivia",
+      partnerName: "Daniel",
+      weddingDate: "2026-10-17",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charleston, SC",
+      venue: "The Cedar Room",
+      availability: "unavailable",
+      availabilityContextDate: "2026-10-17",
+      suggestedWeddingDates: ["2026-10-16", "2026-10-18"],
+    },
+  });
+
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis(),
+  });
+
+  assert.equal(plan.responseGoal, "answer_and_qualify");
+  assert.equal(plan.actions[0]?.type, "answer_question");
+  assert.equal(plan.actions[0]?.topicId, "availability");
+});
+
 test("action selector does not reuse an old call time when the current turn only changes wedding date", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

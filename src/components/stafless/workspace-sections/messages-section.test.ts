@@ -11,7 +11,7 @@ const messagesSectionPath = path.join(
   "src/components/stafless/workspace-sections/messages-section.tsx",
 );
 const defaultFollowUpInstruction =
-  "Check whether the user still needs help and ask one clear next-step question.";
+  "Use the current conversation state and action plan. Continue with the single most relevant next step; do not restart the conversation.";
 
 type ReactNodeLike = {
   type?: unknown;
@@ -121,8 +121,24 @@ test("messages section wires delivery controls without duplicating test chat", a
       followUpEnabled: true,
       followUpRules: [
         {
-          delayDays: 0,
-          delayHours: 4,
+          delayDays: 1,
+          delayHours: 0,
+          delayMinutes: 0,
+          sendLimit: "once_per_dialog",
+          outOfHoursBehavior: "send_immediately_ignore_schedule",
+          instruction: defaultFollowUpInstruction,
+        },
+        {
+          delayDays: 3,
+          delayHours: 0,
+          delayMinutes: 0,
+          sendLimit: "once_per_dialog",
+          outOfHoursBehavior: "send_immediately_ignore_schedule",
+          instruction: defaultFollowUpInstruction,
+        },
+        {
+          delayDays: 7,
+          delayHours: 0,
           delayMinutes: 0,
           sendLimit: "once_per_dialog",
           outOfHoursBehavior: "send_immediately_ignore_schedule",
@@ -205,8 +221,8 @@ test("messages section edits follow-up rules", async () => {
         instruction: "",
       },
       {
-        delayDays: 0,
-        delayHours: 4,
+        delayDays: 1,
+        delayHours: 0,
         delayMinutes: 0,
         sendLimit: "once_per_dialog",
         outOfHoursBehavior: "send_immediately_ignore_schedule",
@@ -233,8 +249,8 @@ test("messages follow-up default is schedulable by runtime", () => {
       followUpEnabled: true,
       followUpRules: [
         {
-          delayDays: 0,
-          delayHours: 4,
+          delayDays: 1,
+          delayHours: 0,
           delayMinutes: 0,
           sendLimit: "once_per_dialog",
           outOfHoursBehavior: "send_immediately_ignore_schedule",
