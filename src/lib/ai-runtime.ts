@@ -564,8 +564,7 @@ function getInboundConversationPolicy(args: {
   return "auto_reply" as const;
 }
 
-type InstagramConversationListPayload = {
-  data?: Array<{
+type InstagramConversationListItem = {
     id?: string;
     participants?: {
       data?: Array<{
@@ -573,7 +572,13 @@ type InstagramConversationListPayload = {
         username?: string;
       }>;
     };
-  }>;
+};
+
+type InstagramConversationListPayload = {
+  data?: InstagramConversationListItem[];
+  paging?: {
+    next?: string;
+  };
 };
 
 type InstagramConversationDetailPayload = {
@@ -629,13 +634,41 @@ async function inspectInstagramConversationHistory(args: {
     conversationsUrl.searchParams.set("fields", "id,participants");
     conversationsUrl.searchParams.set("limit", "50");
 
-    const conversations = await fetchInstagramGraphJson<InstagramConversationListPayload>(
-      conversationsUrl,
-      credentials.pageAccessToken,
-    );
-    const conversation = conversations.data?.find((item) =>
-      item.participants?.data?.some((participant) => participant.id === args.contactId),
-    );
+    let conversation: InstagramConversationListItem | undefined;
+    let nextConversationsUrl: URL | null = conversationsUrl;
+    let pageCount = 0;
+    const maxPages = 5;
+
+    while (nextConversationsUrl && pageCount < maxPages) {
+      pageCount += 1;
+
+      const conversations: InstagramConversationListPayload =
+        await fetchInstagramGraphJson<InstagramConversationListPayload>(
+          nextConversationsUrl,
+          credentials.pageAccessToken,
+        );
+
+      conversation = conversations.data?.find((item) =>
+        item.participants?.data?.some((participant) => participant.id === args.contactId),
+      );
+
+      if (conversation) {
+        break;
+      }
+
+      nextConversationsUrl = conversations.paging?.next
+        ? new URL(conversations.paging.next)
+        : null;
+    }
+
+    if (!conversation && nextConversationsUrl) {
+      console.warn("[instagram-preflight] conversation search page limit reached", {
+        agentId: args.agent.id,
+        tenantId: args.agent.tenantId,
+        contactId: args.contactId,
+        pagesChecked: pageCount,
+      });
+    }
 
     if (!conversation?.id) {
       return { status: "no_prior_history" };
@@ -671,6 +704,13 @@ async function inspectInstagramConversationHistory(args: {
 
     return { status: "no_prior_history" };
   } catch (error) {
+    console.warn("[instagram-preflight] history check failed", {
+      agentId: args.agent.id,
+      tenantId: args.agent.tenantId,
+      contactId: args.contactId,
+      error: error instanceof Error ? error.message : "Instagram preflight failed.",
+    });
+
     return {
       status: "error",
       error: error instanceof Error ? error.message : "Instagram preflight failed.",
@@ -2123,6 +2163,7 @@ export const aiRuntimeTestHelpers = {
   extractDelayedFollowUpGuidance,
   finalizeAssistantText,
   getInboundConversationPolicy,
+  inspectInstagramConversationHistory,
   getWeddingSalesOwnerHandoffReason,
   handleIncomingEventWithDeps,
   isWithinAgentSchedule,

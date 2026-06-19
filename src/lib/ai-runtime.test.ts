@@ -5,6 +5,7 @@ import { AgentStatus, ConversationStatus, MessageRole } from "@prisma/client";
 import { aiRuntimeTestHelpers, invokeAgent } from "@/lib/ai-runtime";
 import { getDefaultControlConfig } from "@/lib/agent-config";
 import { splitOutgoingMessage } from "@/lib/channels/message-behavior";
+import { encrypt } from "@/lib/crypto";
 
 test("gmail classifier mirrors n8n client/other routing rules", () => {
   assert.deepEqual(
@@ -769,6 +770,140 @@ test("handleIncomingEventWithDeps keeps Instagram threads with prior Meta histor
       },
     },
   ]);
+});
+
+test("inspectInstagramConversationHistory follows Instagram conversation pagination", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.CREDENTIALS_ENCRYPTION_KEY;
+  process.env.CREDENTIALS_ENCRYPTION_KEY = "a".repeat(64);
+  const credentialsEnc = encrypt(
+    JSON.stringify({
+      instagramUserAccessToken: "instagram-token",
+      igUserId: "ig-business-1",
+      graphApiVersion: "v25.0",
+    }),
+  );
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    requestedUrls.push(url);
+
+    if (url.includes("/me/conversations") && url.includes("after=page-2")) {
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "ig-conversation-1",
+              participants: { data: [{ id: "contact-1" }] },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    }
+
+    if (url.includes("/me/conversations")) {
+      return new Response(
+        JSON.stringify({
+          data: [],
+          paging: {
+            next: "https://graph.instagram.com/v25.0/me/conversations?after=page-2",
+          },
+        }),
+        { status: 200 },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        messages: {
+          data: [
+            { id: "current-message-id" },
+            { id: "prior-message-id" },
+          ],
+        },
+      }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  try {
+    const result = await aiRuntimeTestHelpers.inspectInstagramConversationHistory({
+      agent: {
+        id: "agent-1",
+        tenantId: "tenant-1",
+        channelConfig: {},
+        channel: {
+          type: "INSTAGRAM",
+          credentialsEnc,
+        },
+      } as never,
+      contactId: "contact-1",
+      messageId: "current-message-id",
+    });
+
+    assert.equal(result.status, "prior_history_found");
+    assert.equal(result.status === "prior_history_found" ? result.conversationId : null, "ig-conversation-1");
+    assert.equal(result.status === "prior_history_found" ? result.priorMessageCount : null, 1);
+    assert.equal(requestedUrls.some((url) => url.includes("after=page-2")), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.CREDENTIALS_ENCRYPTION_KEY = originalKey;
+  }
+});
+
+test("inspectInstagramConversationHistory logs and fails open on Graph API errors", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const originalKey = process.env.CREDENTIALS_ENCRYPTION_KEY;
+  process.env.CREDENTIALS_ENCRYPTION_KEY = "b".repeat(64);
+  const warnings: unknown[][] = [];
+  const credentialsEnc = encrypt(
+    JSON.stringify({
+      instagramUserAccessToken: "instagram-token",
+      igUserId: "ig-business-1",
+      graphApiVersion: "v25.0",
+    }),
+  );
+
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args);
+  };
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ error: { message: "permission denied" } }), {
+      status: 403,
+    })) as typeof fetch;
+
+  try {
+    const result = await aiRuntimeTestHelpers.inspectInstagramConversationHistory({
+      agent: {
+        id: "agent-1",
+        tenantId: "tenant-1",
+        channelConfig: {},
+        channel: {
+          type: "INSTAGRAM",
+          credentialsEnc,
+        },
+      } as never,
+      contactId: "contact-1",
+      messageId: "current-message-id",
+    });
+
+    assert.equal(result.status, "error");
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0]?.[0], "[instagram-preflight] history check failed");
+    assert.deepEqual(warnings[0]?.[1], {
+      agentId: "agent-1",
+      tenantId: "tenant-1",
+      contactId: "contact-1",
+      error: "Instagram Graph API request failed with 403.",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    process.env.CREDENTIALS_ENCRYPTION_KEY = originalKey;
+  }
 });
 
 test("handleIncomingEventWithDeps pauses a dialog after a manual business reply", async () => {
