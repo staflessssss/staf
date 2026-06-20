@@ -39,6 +39,7 @@ Rules:
 - Always include providedInfo. Use null for customerName or partnerName when the latest message does not provide that role.
 - Do not put customer or partner names only in generic entities when their role is clear. The structured providedInfo role is the source of truth for names.
 - A city, state, or region is location. A business name or street address is venue.
+- If the assistant just asked for the wedding city, location, or venue and the customer replies with a short proper-noun place like "Evergreen Park", "Tampa Garden Club", or "Harborside Chapel", treat it as wedding venue/location information for the active new-lead sales flow. Do not classify that reply as a vendor, owner context, or unrelated business message.
 - When a message contains both a venue and its city/state in the same phrase, return both fields separately. Example: "at Harborside Chapel in Safety Harbor FL" means venue="Harborside Chapel" and location="Safety Harbor, FL".
 - When a message contains a street address with city/state, return the street address as venue and the city/state as location. Example: "333 S Franklin Street, Tampa, FL 33602" means venue="333 S Franklin Street, Tampa, FL 33602" and location="Tampa, FL".
 - A street number, ZIP code, package price, or film duration is never a wedding date.

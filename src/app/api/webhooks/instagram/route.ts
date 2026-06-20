@@ -718,6 +718,7 @@ export async function POST(req: NextRequest) {
               ...(eventPayload as Record<string, unknown>),
               contactId: recipientId,
               isBusinessManualReply: true,
+              businessReplyKind: "system_echo",
               fromBusiness: true,
             },
           });

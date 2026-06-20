@@ -163,6 +163,7 @@ type ParsedIncomingMessage = {
   subject?: string;
   eventTimestamp?: Date;
   isBusinessManualReply?: boolean;
+  businessReplyKind?: "manual" | "system_echo";
 };
 
 type RuntimeChannelAdapter = {
@@ -2411,11 +2412,14 @@ async function handleIncomingEventWithDeps(
       threadId: incoming.threadId,
       subject: incoming.subject,
     });
-    const shouldPause = shouldPauseAfterBusinessManualMessage({
-      control,
-      message: incoming.message,
-      priorBusinessManualMessageCount,
-    });
+    const shouldPause =
+      incoming.businessReplyKind === "system_echo"
+        ? false
+        : shouldPauseAfterBusinessManualMessage({
+            control,
+            message: incoming.message,
+            priorBusinessManualMessageCount,
+          });
 
     if (shouldPause) {
       await pauseConversationForBusinessHandoffWithDb({

@@ -902,6 +902,7 @@ test("processDelayedDeliveryByIdWithDeps requeues transient failures with backof
 
 test("processDelayedDeliveryByIdWithDeps cancels buffered reply superseded while processing", async () => {
   const updates: Record<string, unknown>[] = [];
+  const deletedMessages: Record<string, unknown>[] = [];
   let sendReplyCalled = false;
   const now = new Date("2026-04-20T16:00:00.000Z");
 
@@ -961,6 +962,10 @@ test("processDelayedDeliveryByIdWithDeps cancels buffered reply superseded while
           findFirst: async () => ({
             id: "message-new",
           }),
+          deleteMany: async (args: Record<string, unknown>) => {
+            deletedMessages.push(args);
+            return { count: 1 };
+          },
         },
       } as never,
       decrypt: (value: string) => value,
@@ -989,6 +994,13 @@ test("processDelayedDeliveryByIdWithDeps cancels buffered reply superseded while
   assert.equal(result.ok, true);
   assert.equal(result.status, "buffered_delivery_superseded_during_processing");
   assert.equal(sendReplyCalled, false);
+  assert.equal(deletedMessages.length, 1);
+  assert.equal(
+    deletedMessages[0]?.where && typeof deletedMessages[0].where === "object"
+      ? (deletedMessages[0].where as Record<string, unknown>).conversationId
+      : null,
+    "conv-buffered-race",
+  );
   assert.equal(
     updates[0]?.data && typeof updates[0].data === "object"
       ? (updates[0].data as Record<string, unknown>).status

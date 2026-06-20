@@ -197,6 +197,45 @@ function shouldSuppressRepeatedMissingField(args: {
   return askedInPreviousPlan || hasHighConfidenceQuestion(args.analysis) || hasHighConfidenceObjection(args.analysis);
 }
 
+function attemptedAnswerToPreviousMissingField(args: {
+  state: WeddingSalesState;
+  analysis: SemanticAnalysisV2;
+}) {
+  const askedField = args.state.lastActionPlan?.actions.find(
+    (action) => action.type === "ask_missing_field" && action.field,
+  )?.field;
+
+  if (!askedField) {
+    return null;
+  }
+
+  if (hasProvidedFieldInCurrentTurn(args.state, askedField)) {
+    return null;
+  }
+
+  if (hasHighConfidenceQuestion(args.analysis) || hasHighConfidenceObjection(args.analysis)) {
+    return null;
+  }
+
+  const message = args.state.latestCustomerMessage?.trim();
+  if (!message) {
+    return null;
+  }
+
+  return askedField;
+}
+
+function attemptedAskedFieldAnswerConflictsWithControl(args: {
+  state: WeddingSalesState;
+  analysis: SemanticAnalysisV2;
+  attemptedAskedFieldAnswer: WeddingSalesField | null;
+}) {
+  return Boolean(
+    args.attemptedAskedFieldAnswer &&
+      (isOwnerContext(args.state, args.analysis) || hasUnknownBusinessQuestion(args.analysis)),
+  );
+}
+
 function firstMissingField(state: WeddingSalesState): WeddingSalesField | null {
   const nameState = migrateWeddingSalesNames(state);
   const effectiveState = {
@@ -439,7 +478,18 @@ export function selectWeddingSalesActionPlan(args: {
     });
   }
 
-  if (isOwnerContext(state, analysis) && !isActiveSalesContinuationQuestion(state, analysis)) {
+  const attemptedAskedFieldAnswer = attemptedAnswerToPreviousMissingField({ state, analysis });
+  const requestedFieldAnswerConflictsWithControl = attemptedAskedFieldAnswerConflictsWithControl({
+    state,
+    analysis,
+    attemptedAskedFieldAnswer,
+  });
+
+  if (
+    isOwnerContext(state, analysis) &&
+    !isActiveSalesContinuationQuestion(state, analysis) &&
+    !requestedFieldAnswerConflictsWithControl
+  ) {
     return buildPlan({
       responseGoal: "handoff",
       actions: [
@@ -451,7 +501,11 @@ export function selectWeddingSalesActionPlan(args: {
     });
   }
 
-  if (hasUnknownBusinessQuestion(analysis) && !isActiveSalesContinuationQuestion(state, analysis)) {
+  if (
+    hasUnknownBusinessQuestion(analysis) &&
+    !isActiveSalesContinuationQuestion(state, analysis) &&
+    !requestedFieldAnswerConflictsWithControl
+  ) {
     return buildPlan({
       responseGoal: "handoff",
       actions: [
@@ -533,6 +587,20 @@ export function selectWeddingSalesActionPlan(args: {
         action({
           type: "acknowledge_objection",
           reason: "customer_expressed_objection_or_hesitation",
+        }),
+      ],
+    });
+  }
+
+  if (requestedFieldAnswerConflictsWithControl) {
+    return buildPlan({
+      responseGoal: "clarify",
+      guardrailTrace,
+      actions: [
+        action({
+          type: "request_clarification",
+          field: attemptedAskedFieldAnswer,
+          reason: "customer_answer_to_requested_field_was_not_grounded",
         }),
       ],
     });

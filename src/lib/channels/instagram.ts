@@ -34,6 +34,7 @@ type InstagramPayload = {
   source?: string;
   senderType?: string;
   isBusinessManualReply?: boolean;
+  businessReplyKind?: "manual" | "system_echo";
   fromBusiness?: boolean;
   entry?: Array<{
     messaging?: InstagramMessagingEvent[];
@@ -223,6 +224,11 @@ export const instagramAdapter = {
       messageId: String(event?.message?.mid ?? ""),
       eventTimestamp: parseInstagramTimestamp(event?.timestamp),
       isBusinessManualReply,
+      businessReplyKind: isBusinessManualReply
+        ? payload.businessReplyKind === "system_echo"
+          ? "system_echo"
+          : "manual"
+        : undefined,
     };
   },
   formatReply: (text: string, config?: unknown) => {

@@ -25,6 +25,7 @@ import { decrypt } from "@/lib/crypto";
 import { saveMessages } from "@/lib/agent-memory";
 import type { InvokeAgentResult } from "@/lib/ai-runtime";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
+import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
 
 type RuntimeInvokeAgent = typeof import("@/lib/ai-runtime").invokeAgent;
 
@@ -280,6 +281,32 @@ async function markDeliverySentIfProcessing(args: {
       status: DelayedDeliveryStatus.SENT,
       error: null,
       sentAt: new Date(),
+    },
+  });
+}
+
+async function deleteStaleBufferedReplyArtifacts(args: {
+  database: typeof db;
+  conversationId: string;
+  createdAtOrAfter: Date;
+}) {
+  await args.database.message.deleteMany({
+    where: {
+      conversationId: args.conversationId,
+      createdAt: {
+        gte: args.createdAtOrAfter,
+      },
+      OR: [
+        {
+          role: MessageRole.ASSISTANT,
+        },
+        {
+          role: MessageRole.TOOL,
+          NOT: {
+            toolName: BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
+          },
+        },
+      ],
     },
   });
 }
@@ -552,6 +579,7 @@ async function processBufferedReply(args: {
   }
 
   const combinedMessage = pendingUserMessages.map((message) => message.content.trim()).join("\n");
+  const processingStartedAt = new Date();
   const result = await args.deps.invokeAgent({
     tenantId: args.delivery.agent.tenantId,
     agentId: args.delivery.agentId,
@@ -578,6 +606,11 @@ async function processBufferedReply(args: {
     });
 
     if (latestUserMessageBeforeSend?.id && latestUserMessageBeforeSend.id !== payload.triggerMessageId) {
+      await deleteStaleBufferedReplyArtifacts({
+        database: args.deps.db,
+        conversationId: args.delivery.conversationId,
+        createdAtOrAfter: processingStartedAt,
+      });
       await markDeliveryStatus({
         database: args.deps.db,
         deliveryId: args.deliveryId,

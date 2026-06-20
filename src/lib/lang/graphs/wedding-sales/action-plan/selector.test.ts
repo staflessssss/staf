@@ -1214,3 +1214,53 @@ test("action selector suppresses repeated missing-field pressure across qualific
     );
   }
 });
+
+test("action selector clarifies an ungrounded answer to the previously requested field instead of handoff", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Tampa Garden Club",
+    previousState: {
+      leadStage: "availability_checked",
+      names: "Rick and Rachel",
+      customerName: "Rick",
+      partnerName: "Rachel",
+      coupleDisplayName: "Rick and Rachel",
+      nameCollectionStatus: "both",
+      weddingDate: "2026-11-08",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Tampa, FL",
+      availability: "available",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "venue",
+            topicId: null,
+            reason: "next_required_qualification_field_missing",
+          },
+        ],
+      },
+    },
+  });
+
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      clientType: {
+        value: "vendor",
+        confidence: 0.82,
+        evidence: "Tampa Garden Club",
+      },
+    }),
+  });
+
+  assert.deepEqual(
+    plan.actions.map((item) => item.type),
+    ["request_clarification"],
+  );
+  assert.equal(plan.actions[0]?.field, "venue");
+});

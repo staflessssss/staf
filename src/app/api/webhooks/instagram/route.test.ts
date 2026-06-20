@@ -183,7 +183,7 @@ test("instagram webhook signature can use the shared Meta app secret", () => {
   assert.match(source, /META_APP_SECRET/);
 });
 
-test("instagram webhook routes business message echoes as manual owner replies", () => {
+test("instagram webhook marks unknown business message echoes as system echoes", () => {
   const source = readFileSync(
     "src/app/api/webhooks/instagram/route.ts",
     "utf8",
@@ -201,6 +201,7 @@ test("instagram webhook routes business message echoes as manual owner replies",
   assert.match(source, /contains: text/);
   assert.match(source, /ignored_known_outbound_echo/);
   assert.match(source, /isBusinessManualReply: true/);
+  assert.match(source, /businessReplyKind: "system_echo"/);
   assert.match(source, /fromBusiness: true/);
   assert.doesNotMatch(source, /single active Instagram agent fallback/);
 });

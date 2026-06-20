@@ -1055,6 +1055,252 @@ test("handleIncomingEventWithDeps pauses a dialog after a manual business reply"
   assert.equal(deliveryUpdates.length, 2);
 });
 
+test("handleIncomingEventWithDeps records Instagram business system echoes without pausing", async () => {
+  const createdMessages: Array<Record<string, unknown>> = [];
+  const conversationUpdates: Array<Record<string, unknown>> = [];
+  const existingConversation = {
+    id: "conv-instagram-system-echo",
+    status: ConversationStatus.ACTIVE,
+  };
+  const fakeDb = {
+    agent: {
+      findFirst: async () => ({
+        id: "agent-instagram",
+        tenantId: "tenant-1",
+        channelConfig: {
+          control: {
+            pauseOnBusinessIntervention: true,
+            autoResumeEnabled: true,
+            autoResumeAfterValue: 3,
+            autoResumeAfterUnit: "hours",
+            resumeMessageEnabled: false,
+            businessExceptionPhrases: [],
+          },
+        },
+        channel: {
+          type: "INSTAGRAM",
+          credentialsEnc: "encrypted",
+        },
+      }),
+    },
+    message: {
+      findFirst: async () => null,
+      findMany: async () => [],
+      create: async (args: Record<string, unknown>) => {
+        createdMessages.push(args);
+        return { id: "business-system-message-1" };
+      },
+    },
+    conversation: {
+      findUnique: async () => existingConversation,
+      create: async () => existingConversation,
+      update: async (args: Record<string, unknown>) => {
+        conversationUpdates.push(args);
+        return { ...existingConversation, status: ConversationStatus.ESCALATED };
+      },
+    },
+    delayedDelivery: {
+      updateMany: async () => ({ count: 0 }),
+      create: async () => ({ id: "delivery-1" }),
+    },
+    $transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        conversation: {
+          findUnique: async () => existingConversation,
+          create: async () => existingConversation,
+        },
+        message: {
+          create: async (args: Record<string, unknown>) => {
+            createdMessages.push(args);
+            return { id: "business-system-message-1" };
+          },
+        },
+      }),
+  } as never;
+  let invokeCalled = false;
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-instagram",
+      channel: "INSTAGRAM" as never,
+      payload: {
+        contactId: "customer-ig-1",
+        text: "Please fill out the form.",
+        isBusinessManualReply: true,
+        businessReplyKind: "system_echo",
+        fromBusiness: true,
+      },
+    },
+    {
+      db: fakeDb,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => {
+        invokeCalled = true;
+        throw new Error("invokeAgent should not run for business system echoes");
+      },
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "customer-ig-1",
+            message: "Please fill out the form.",
+            messageId: "business-system-message-id",
+            isBusinessManualReply: true,
+            businessReplyKind: "system_echo",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async () => ({}),
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal("status" in result ? result.status : null, "business_manual_reply_recorded");
+  assert.equal(invokeCalled, false);
+  assert.equal(conversationUpdates.length, 0);
+  assert.equal(
+    createdMessages[0]?.data && typeof createdMessages[0].data === "object"
+      ? (createdMessages[0].data as Record<string, unknown>).toolName
+      : null,
+    "business_manual_message",
+  );
+});
+
+test("handleIncomingEventWithDeps keeps replying after an Instagram business system echo", async () => {
+  const createdMessages: Array<Record<string, unknown>> = [];
+  const conversationUpdates: Array<Record<string, unknown>> = [];
+  const existingConversation = {
+    id: "conv-instagram-after-system-echo",
+    status: ConversationStatus.ACTIVE,
+  };
+  const fakeDb = {
+    agent: {
+      findFirst: async () => ({
+        id: "agent-instagram",
+        tenantId: "tenant-1",
+        channelConfig: {
+          control: {
+            pauseOnBusinessIntervention: true,
+            autoResumeEnabled: true,
+            autoResumeAfterValue: 3,
+            autoResumeAfterUnit: "hours",
+            resumeMessageEnabled: false,
+            businessExceptionPhrases: [],
+          },
+        },
+        channel: {
+          type: "INSTAGRAM",
+          credentialsEnc: "encrypted",
+        },
+      }),
+    },
+    message: {
+      findFirst: async () => null,
+      findMany: async () => [],
+      create: async (args: Record<string, unknown>) => {
+        createdMessages.push(args);
+        return { id: `message-${createdMessages.length}` };
+      },
+    },
+    conversation: {
+      findUnique: async () => existingConversation,
+      create: async () => existingConversation,
+      update: async (args: Record<string, unknown>) => {
+        conversationUpdates.push(args);
+        return { ...existingConversation, status: ConversationStatus.ESCALATED };
+      },
+    },
+    delayedDelivery: {
+      updateMany: async () => ({ count: 0 }),
+      create: async () => ({ id: "delivery-1" }),
+    },
+    $transaction: async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        conversation: {
+          findUnique: async () => existingConversation,
+          create: async () => existingConversation,
+        },
+        message: {
+          create: async (args: Record<string, unknown>) => {
+            createdMessages.push(args);
+            return { id: `message-${createdMessages.length}` };
+          },
+        },
+      }),
+  } as never;
+  let invokeCalls = 0;
+  let sentReply: Record<string, unknown> | null = null;
+
+  const deps = {
+    db: fakeDb,
+    decrypt: (value: string) => value,
+    invokeAgent: async () => {
+      invokeCalls += 1;
+      return {
+        message: "Agent reply after customer follow-up",
+        promptPreview: "preview",
+        conversationId: existingConversation.id,
+      };
+    },
+    getChannelAdapter: () =>
+      ({
+        parseIncoming: (payload: {
+          contactId: string;
+          text: string;
+          isBusinessManualReply?: boolean;
+          businessReplyKind?: "manual" | "system_echo";
+        }) => ({
+          contactId: payload.contactId,
+          message: payload.text,
+          messageId: payload.isBusinessManualReply ? "system-echo-message-id" : "customer-message-id",
+          isBusinessManualReply: payload.isBusinessManualReply,
+          businessReplyKind: payload.businessReplyKind,
+        }),
+        formatReply: (text: string) => text,
+        sendReply: async (args: Record<string, unknown>) => {
+          sentReply = args;
+          return { delivered: true };
+        },
+      }) as never,
+    sleep: async () => {},
+  };
+
+  const echoResult = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-instagram",
+      channel: "INSTAGRAM" as never,
+      payload: {
+        contactId: "customer-ig-1",
+        text: "Please fill out the form.",
+        isBusinessManualReply: true,
+        businessReplyKind: "system_echo",
+        fromBusiness: true,
+      },
+    },
+    deps,
+  );
+
+  const customerResult = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-instagram",
+      channel: "INSTAGRAM" as never,
+      payload: {
+        contactId: "customer-ig-1",
+        text: "Can we book a call?",
+      },
+    },
+    deps,
+  );
+
+  assert.equal(echoResult.ok, true);
+  assert.equal("status" in echoResult ? echoResult.status : null, "business_manual_reply_recorded");
+  assert.equal(customerResult.ok, true);
+  assert.equal("reply" in customerResult ? customerResult.reply : null, "Agent reply after customer follow-up");
+  assert.equal(invokeCalls, 1);
+  assert.equal(conversationUpdates.length, 0);
+  assert.equal(sentReply?.contactId, "customer-ig-1");
+});
+
 test("wedding sales runtime detects action-plan owner handoff requests", () => {
   assert.equal(
     aiRuntimeTestHelpers.getWeddingSalesOwnerHandoffReason({
