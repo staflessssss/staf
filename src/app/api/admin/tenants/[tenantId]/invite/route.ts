@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { db } from "@/lib/db";
+import { createInviteWithDeps } from "@/lib/tenant-admin";
 
 type InviteRouteContext = {
   params: Promise<{ tenantId: string }>;
 };
-
-const createInviteSchema = z.object({
-  email: z.string().email(),
-});
 
 export async function POST(request: Request, context: InviteRouteContext) {
   const session = await requireAdminApiSession();
@@ -21,19 +17,11 @@ export async function POST(request: Request, context: InviteRouteContext) {
 
   const { tenantId } = await context.params;
   const json = await request.json().catch(() => null);
-  const parsed = createInviteSchema.safeParse(json);
+  const invite = await createInviteWithDeps(db, tenantId, json);
 
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid invite payload." }, { status: 400 });
+  if (!invite.ok) {
+    return NextResponse.json({ error: invite.error }, { status: invite.status });
   }
 
-  const invite = await db.inviteToken.create({
-    data: {
-      tenantId,
-      email: parsed.data.email,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
-    },
-  });
-
-  return NextResponse.json({ item: invite }, { status: 201 });
+  return NextResponse.json({ item: invite.value }, { status: 201 });
 }
