@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import test from "node:test";
 
 function listRouteFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -15,8 +15,8 @@ function listRouteFiles(dir: string): string[] {
   });
 }
 
-test("all admin API routes require admin sessions before handler logic", () => {
-  const routeFiles = listRouteFiles(resolve(process.cwd(), "src/app/api/admin"));
+test("all client API routes require client sessions before handler logic", () => {
+  const routeFiles = listRouteFiles(resolve(process.cwd(), "src/app/api/client"));
 
   assert.ok(routeFiles.length > 0);
 
@@ -26,40 +26,38 @@ test("all admin API routes require admin sessions before handler logic", () => {
     const methods = [...source.matchAll(/export async function (GET|POST|PATCH|PUT|DELETE)\b/g)];
 
     assert.ok(methods.length > 0, routePath);
-    assert.match(source, /import \{ requireAdminApiSession \}/, routePath);
+    assert.match(source, /import \{ requireClientApiSession \}/, routePath);
 
     for (const method of methods) {
       const methodSource = source.slice(source.indexOf(`export async function ${method[1]}`));
-      const guardIndex = methodSource.indexOf("const session = await requireAdminApiSession();");
+      const guardIndex = methodSource.indexOf("const session = await requireClientApiSession();");
 
       assert.ok(guardIndex >= 0, routePath);
 
       assert.match(
         source,
-        new RegExp(`export async function ${method[1]}[\\s\\S]*?const session = await requireAdminApiSession\\(\\);`),
+        new RegExp(`export async function ${method[1]}[\\s\\S]*?const session = await requireClientApiSession\\(\\);`),
         routePath,
       );
 
       for (const riskyOperation of [
         ".json()",
         "db.",
-        "deployAgent(",
-        "inspectGoogleSheets",
-        "listGoogleSheetsCatalog",
+        "invokeAgent(",
       ]) {
         const riskyIndex = methodSource.indexOf(riskyOperation);
 
         if (riskyIndex >= 0) {
           assert.ok(
             guardIndex < riskyIndex,
-            `${routePath} should require an admin session before ${riskyOperation}`,
+            `${routePath} should require a client session before ${riskyOperation}`,
           );
         }
       }
     }
 
     assert.equal(
-      source.match(/const session = await requireAdminApiSession\(\);/g)?.length,
+      source.match(/const session = await requireClientApiSession\(\);/g)?.length,
       methods.length,
       routePath,
     );
