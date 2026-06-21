@@ -792,6 +792,124 @@ test("instagram missing-name follow-up avoids repeating the same full prompt", (
   assert.doesNotMatch(response, /That way I can check our availability/i);
 });
 
+test("instagram delayed follow-up softens missing names and date prompt", () => {
+  const originalActionRuntime = process.env.WEDDING_SALES_ACTION_RUNTIME_V2;
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_ACTION_RUNTIME_V2 = "true";
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = composeWeddingSalesResponse({
+      intent: "ask_missing_info",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        agentId: "cmq6m9uk2000duxospuaod8al",
+        runtimeEvent: "follow_up",
+        runtimeMode: "unified_v2",
+        semanticStateVersion: 2,
+        leadStage: "missing_names_or_date",
+        names: undefined,
+        weddingDate: undefined,
+        weddingDateText: undefined,
+        askedForNames: true,
+        assistantReplyCount: 1,
+        hasGreeted: true,
+        lastActionPlan: {
+          schemaVersion: 1,
+          actions: [
+            {
+              type: "ask_missing_field",
+              field: "customerName",
+              topicId: null,
+              reason: "follow_up_continue_current_action_plan_missing_field",
+            },
+          ],
+          responseGoal: "clarify",
+          guardrailTrace: [],
+        },
+      },
+    });
+
+    assert.match(response, /Whenever you get a chance/i);
+    assert.match(response, /both of your names and your wedding date/i);
+    assert.doesNotMatch(response, /^What are both of your names/i);
+  } finally {
+    if (originalActionRuntime === undefined) {
+      delete process.env.WEDDING_SALES_ACTION_RUNTIME_V2;
+    } else {
+      process.env.WEDDING_SALES_ACTION_RUNTIME_V2 = originalActionRuntime;
+    }
+
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
+test("instagram delayed follow-up softens every planned missing-field prompt", () => {
+  const originalActionRuntime = process.env.WEDDING_SALES_ACTION_RUNTIME_V2;
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_ACTION_RUNTIME_V2 = "true";
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const cases = [
+      { field: "venue", expected: /send over the venue/i },
+      { field: "callTime", expected: /send over a time that works/i },
+      { field: "email", expected: /send over the best email/i },
+      { field: "weddingDate", expected: /send over your wedding date/i },
+    ] as const;
+
+    for (const item of cases) {
+      const response = composeWeddingSalesResponse({
+        intent: "ask_missing_info",
+        config,
+        state: {
+          ...baseState,
+          channel: "instagram",
+          agentId: "cmq6m9uk2000duxospuaod8al",
+          runtimeEvent: "follow_up",
+          runtimeMode: "unified_v2",
+          semanticStateVersion: 2,
+          leadStage: "missing_names_or_date",
+          lastActionPlan: {
+            schemaVersion: 1,
+            actions: [
+              {
+                type: "ask_missing_field",
+                field: item.field,
+                topicId: null,
+                reason: "follow_up_continue_current_action_plan_missing_field",
+              },
+            ],
+            responseGoal: "clarify",
+            guardrailTrace: [],
+          },
+        },
+      });
+
+      assert.match(response, /Whenever you get a chance/i);
+      assert.match(response, item.expected);
+    }
+  } finally {
+    if (originalActionRuntime === undefined) {
+      delete process.env.WEDDING_SALES_ACTION_RUNTIME_V2;
+    } else {
+      process.env.WEDDING_SALES_ACTION_RUNTIME_V2 = originalActionRuntime;
+    }
+
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
 test("instagram first missing-info reply asks for both names when no name is known", () => {
   const response = composeWeddingSalesResponse({
     intent: "ask_missing_info",

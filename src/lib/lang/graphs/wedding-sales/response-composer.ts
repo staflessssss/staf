@@ -331,7 +331,45 @@ function hasActionPlanQuestionAuthorityWithoutPlannedQuestion(state: WeddingSale
   return responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField === null;
 }
 
+function followUpQuestionForPlannedField(state: WeddingSalesState, field: WeddingSalesField | null) {
+  if (state.runtimeEvent !== "follow_up") return null;
+
+  switch (field) {
+    case "customerName":
+      if (!hasCoupleNamesForState(state) && !state.weddingDate && !state.weddingDateText) {
+        return "Whenever you get a chance, send over both of your names and your wedding date, and I'll check everything for you.";
+      }
+
+      return "Whenever you get a chance, send over both of your names and I'll keep everything organized for you.";
+    case "partnerName":
+      return "Whenever you get a chance, send over your fiance's name and I'll keep everything personalized for you.";
+    case "names":
+      return getCustomerNameForState(state)
+        ? "Whenever you get a chance, send over your fiance's name and I'll keep everything personalized for you."
+        : "Whenever you get a chance, send over both of your names and I'll keep everything organized for you.";
+    case "weddingDate":
+      return "Whenever you get a chance, send over your wedding date and I'll check availability for you.";
+    case "weddingYear":
+      return `Whenever you get a chance, what year is ${state.weddingDateText || "the wedding date"}?`;
+    case "location":
+      return "Whenever you get a chance, send over the city or venue and I'll check the details for you.";
+    case "venue":
+      return state.location
+        ? `Whenever you get a chance, send over the venue in ${state.location} and I'll check the details for you.`
+        : "Whenever you get a chance, send over the venue and I'll check the details for you.";
+    case "callTime":
+      return "Whenever you get a chance, send over a time that works for a quick call. I'm free Mon-Fri, 9 AM to 2 PM Eastern.";
+    case "email":
+      return "Whenever you get a chance, send over the best email for the calendar invite.";
+    default:
+      return null;
+  }
+}
+
 function questionForPlannedField(state: WeddingSalesState, field: WeddingSalesField | null) {
+  const followUpQuestion = followUpQuestionForPlannedField(state, field);
+  if (followUpQuestion) return followUpQuestion;
+
   switch (field) {
     case "customerName":
       if (!hasCoupleNamesForState(state) && !state.weddingDate && !state.weddingDateText) {
