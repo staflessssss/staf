@@ -815,11 +815,14 @@ export function analyzeWeddingSalesMessageWithSemantics(
 export async function analyzeWeddingSalesMessage(
   state: WeddingSalesState,
 ): Promise<Partial<WeddingSalesState>> {
-  if (isGroundedWeddingExecutionEnabled(state.agentId)) {
+  if (isGroundedWeddingExecutionEnabled(state.agentId, state.runtimeMode)) {
     return analyzeWeddingSalesMessageWithGroundedV3(state);
   }
 
-  if (isSemanticV2ExecutionEnabled(state.agentId, state.runtimeMode)) {
+  if (
+    state.runtimeMode === "unified_v2" ||
+    isSemanticV2ExecutionEnabled(state.agentId, state.runtimeMode)
+  ) {
     const semanticV2Result = await analyzeWeddingSalesMessageWithSemanticV2(state);
     if (isGroundedWeddingShadowEnabled(state.agentId)) {
       await runGroundedWeddingV3Shadow(state, semanticV2Result);
