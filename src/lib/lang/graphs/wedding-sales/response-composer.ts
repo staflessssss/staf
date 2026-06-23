@@ -247,6 +247,12 @@ function hasCoupleNamesForState(state: WeddingSalesState) {
   return Boolean(getCustomerNameForState(state) && getPartnerNameForState(state)) || hasCoupleNames(state.names);
 }
 
+function checkedWeddingAvailabilityThisTurn(state: WeddingSalesState) {
+  return state.turnToolObservations.some(
+    (observation) => observation.toolName === "check_wedding_availability",
+  );
+}
+
 function formatInstagramAvailabilityLine(state: WeddingSalesState) {
   const customerName = getCustomerNameForState(state);
   const weddingDate = formatWeddingDateForReply(state.weddingDate);
@@ -932,6 +938,18 @@ export function composeWeddingSalesResponse(args: ComposeWeddingSalesResponseArg
 
         if (state.availability === "unavailable" && faqAnswer && !asksAvailabilityOrBooking) {
           return faqAnswer;
+        }
+
+        if (
+          isInstagram(state) &&
+          state.availability === "available" &&
+          checkedWeddingAvailabilityThisTurn(state)
+        ) {
+          return [
+            formatInstagramAvailabilityLine(state),
+            `${formatStartingPriceLine(config, state).replace(/\.$/, "")} — let me send you the guide so you can see everything ✨`,
+            faqAnswer,
+          ].filter(Boolean).join("\n\n");
         }
 
         if (state.availability === "unavailable") {

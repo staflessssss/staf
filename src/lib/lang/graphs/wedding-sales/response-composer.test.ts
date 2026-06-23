@@ -742,6 +742,72 @@ test("instagram FAQ answers package inclusions and shooter in the same turn", ()
   assert.equal((response.match(/What time works best/g) ?? []).length, 1);
 });
 
+test("instagram mixed availability and FAQ turn includes availability guide and all answers", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 3,
+      leadStage: "availability_checked",
+      names: "Cindy and Paul",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      weddingDate: "2026-10-18",
+      weddingDateText: "October 18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Safety Harbor FL",
+      venue: "Harborside Chapel",
+      availability: "available",
+      guideSent: true,
+      guideOffered: true,
+      callProposed: true,
+      latestCustomerMessage:
+        "I’m Cindy and my fiancé is Paul. Our wedding is 10/18/26 at Harborside Chapel in Safety Harbor FL. Also do you include raw footage and who is the shooter?",
+      turnToolObservations: [
+        {
+          toolName: "check_wedding_availability",
+          result: "Wedding date check: 2026-10-18 is available for FL (0/1 booked).",
+        },
+      ],
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "run_tools_then_reply",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "check_wedding_availability",
+            field: null,
+            topicId: null,
+            reason: "date_and_location_are_ready_for_capacity_check",
+          },
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "package_inclusions",
+            reason: "answer_customer_question_after_required_tool",
+          },
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "team_florida",
+            reason: "answer_customer_question_after_required_tool",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.match(response, /available/i);
+  assert.match(response, /\$2,950/i);
+  assert.match(response, /guide/i);
+  assert.match(response, /raw footage/i);
+  assert.match(response, /Jay/i);
+  assert.match(response, /What time works best/i);
+});
+
 test("instagram FAQ resolves shooter answer from saved location when no action-plan topic is present", () => {
   const response = composeWeddingSalesResponse({
     intent: "answer_question",
