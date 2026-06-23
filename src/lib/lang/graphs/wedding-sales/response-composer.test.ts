@@ -1003,6 +1003,60 @@ test("instagram v3 action-plan replies use grounded voice outside the old availa
   assert.equal(shouldUseGroundedVoice, true);
 });
 
+test("instagram v3 first-contact fallback does not stop at greeting only", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "answer_question",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 3,
+        leadStage: "missing_names_or_date",
+        names: undefined,
+        customerName: undefined,
+        partnerName: undefined,
+        weddingDate: undefined,
+        weddingDateText: undefined,
+        weddingYear: undefined,
+        weddingYearKnown: false,
+        location: undefined,
+        availability: undefined,
+        assistantReplyCount: 0,
+        hasGreeted: false,
+        latestCustomerMessage: "Get in touch",
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "continue",
+          actions: [
+            {
+              type: "continue_conversation",
+              field: null,
+              topicId: null,
+              reason: "new_instagram_inquiry_without_specific_question",
+            },
+          ],
+          guardrailTrace: [],
+        },
+      },
+    });
+
+    assert.ok(response.startsWith(instagramFirstContactOpening));
+    assert.notEqual(response.trim(), instagramFirstContactOpening);
+    assert.match(response, /both of your names/i);
+    assert.match(response, /wedding date/i);
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
 test("instagram v3 handoff-only plans stay customer-silent instead of using grounded voice", () => {
   const shouldUseGroundedVoice = weddingSalesResponseComposerTestHelpers.shouldUseGroundedInstagramVoice({
     intent: "handoff",

@@ -406,6 +406,41 @@ function questionForPlannedField(state: WeddingSalesState, field: WeddingSalesFi
   }
 }
 
+function groundedNextQuestionFromState(state: WeddingSalesState) {
+  if (!hasCoupleNamesForState(state)) {
+    return questionForPlannedField(
+      state,
+      getCustomerNameForState(state) ? "partnerName" : "customerName",
+    );
+  }
+
+  if (!state.weddingDate && !state.weddingDateText) {
+    return questionForPlannedField(state, "weddingDate");
+  }
+
+  if (state.weddingDateText && !state.weddingYearKnown) {
+    return questionForPlannedField(state, "weddingYear");
+  }
+
+  if (!state.location) {
+    return questionForPlannedField(state, "location");
+  }
+
+  if (state.availability === "available" && !state.venue) {
+    return questionForPlannedField(state, "venue");
+  }
+
+  if (state.availability === "available" && state.venue && !state.callProposed) {
+    return questionForPlannedField(state, "callTime");
+  }
+
+  if (state.calendarStatus === "available" && !state.customerEmail) {
+    return questionForPlannedField(state, "email");
+  }
+
+  return "";
+}
+
 function nextStepAfterFaq(state: WeddingSalesState) {
   if (shouldUseActionPlanQuestionAuthority(state)) {
     const plannedQuestion = questionForPlannedField(state, plannedAskField(state));
@@ -871,6 +906,10 @@ function composeGroundedInstagramFallback(args: ComposeWeddingSalesResponseArgs,
 
   if (paragraphs.length === 0) {
     paragraphs.push(...formatGroundedSchedulingFallback(args));
+  }
+
+  if (paragraphs.length === 0) {
+    paragraphs.push(groundedNextQuestionFromState(args.state));
   }
 
   const text = paragraphs
