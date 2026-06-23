@@ -1030,6 +1030,80 @@ test("instagram v3 handoff-only plans stay customer-silent instead of using grou
   assert.equal(shouldUseGroundedVoice, false);
 });
 
+test("instagram v3 fallback avoids old stock availability wording when grounded voice is unavailable", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "answer_question",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 3,
+        leadStage: "availability_checked",
+        names: "Cindy and Paul",
+        customerName: "Cindy",
+        partnerName: "Paul",
+        weddingDate: "2026-10-18",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Safety Harbor FL",
+        venue: "Harborside Chapel",
+        availability: "available",
+        guideSent: true,
+        callProposed: true,
+        latestCustomerMessage: "Do you include raw footage and who is the shooter?",
+        turnToolObservations: [
+          {
+            toolName: "check_wedding_availability",
+            result: JSON.stringify({ status: "available", region: "FL" }),
+          },
+        ],
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "run_tools_then_reply",
+          actions: [
+            {
+              type: "check_wedding_availability",
+              field: null,
+              topicId: null,
+              reason: "date_and_location_are_ready_for_capacity_check",
+            },
+            {
+              type: "answer_question",
+              field: null,
+              topicId: "package_inclusions",
+              reason: "answer_customer_question_after_required_tool",
+            },
+            {
+              type: "answer_question",
+              field: null,
+              topicId: "team_florida",
+              reason: "answer_customer_question_after_required_tool",
+            },
+          ],
+          guardrailTrace: [],
+        },
+      },
+    });
+
+    assert.doesNotMatch(response, /^Awesome Cindy! We have/i);
+    assert.match(response, /I checked October 18, 2026 in Safety Harbor FL/i);
+    assert.match(response, /\$2,950/i);
+    assert.match(response, /raw footage/i);
+    assert.match(response, /Jay is our lead filmmaker in Tampa/i);
+    assert.match(response, /What time works best/i);
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
 test("instagram human composer keeps the first-contact introduction when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";

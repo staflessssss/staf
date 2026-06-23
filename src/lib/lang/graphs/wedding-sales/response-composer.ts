@@ -734,6 +734,69 @@ function formatFaqAnswer(args: {
   return null;
 }
 
+function regionLabelForReply(state: WeddingSalesState) {
+  const region = resolveWeddingSalesRegion(state);
+
+  if (region === "FL") return "Florida";
+  if (region === "NC_SC_GA") return "NC, SC, and GA";
+  return null;
+}
+
+function formatGroundedAvailabilityPriceGuide(args: ComposeWeddingSalesResponseArgs) {
+  const { config, state } = args;
+
+  if (state.availability !== "available" || !checkedWeddingAvailabilityThisTurn(state)) {
+    return [];
+  }
+
+  const date = formatWeddingDateForReply(state.weddingDate);
+  const location = formatLocationSuffix(state.location);
+  const pricing = selectWeddingSalesPricing(config, state);
+  const coverageHours = pricing.coverageHours ?? 8;
+  const regionLabel = regionLabelForReply(state);
+  const priceLine = regionLabel
+    ? `For ${regionLabel}, our ${coverageHours}-hour collections start at ${pricing.startPrice}.`
+    : `Our ${coverageHours}-hour collections start at ${pricing.startPrice}.`;
+
+  return [
+    `I checked ${date}${location}, and we're open for your wedding 🤍`,
+    `${priceLine} I'll send the guide so you can see what's included.`,
+  ];
+}
+
+function composeGroundedInstagramFallback(args: ComposeWeddingSalesResponseArgs, fallback: string) {
+  if (!shouldUseGroundedInstagramVoice(args)) {
+    return fallback;
+  }
+
+  const responseContext = buildWeddingSalesResponseContext(args.state);
+  const paragraphs = [
+    ...formatGroundedAvailabilityPriceGuide(args),
+  ];
+  const faqAnswer = responseContext.answerTopicIds.length
+    ? formatFaqAnswer({ config: args.config, state: args.state })
+    : null;
+
+  if (faqAnswer) {
+    paragraphs.push(faqAnswer);
+  } else {
+    const plannedQuestion = questionForPlannedField(args.state, responseContext.plannedQuestionField);
+
+    if (plannedQuestion) {
+      paragraphs.push(plannedQuestion);
+    }
+  }
+
+  const text = paragraphs
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+
+  return text
+    ? ensureInstagramFirstContactOpening(args, normalizeCustomerFacingPunctuation(text))
+    : fallback;
+}
+
 function formatUnavailableWeddingReply(args: {
   state: WeddingSalesState;
   summary?: string;
@@ -1872,11 +1935,14 @@ async function reflectWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs
 }
 
 export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs) {
-  const fallback = normalizeCustomerFacingPunctuation(
+  const deterministicFallback = normalizeCustomerFacingPunctuation(
     sanitizeActionPlanFallback(
       args,
       ensureInstagramFirstContactOpening(args, composeWeddingSalesResponse(args)),
     ),
+  );
+  const fallback = normalizeCustomerFacingPunctuation(
+    composeGroundedInstagramFallback(args, deterministicFallback),
   );
 
   if (args.testMode && args.intent === "booking_confirmed") {
