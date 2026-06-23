@@ -26,6 +26,7 @@ Grounding contract:
 - Extract all questions, even when the same message also provides facts or requests a tool-related next step.
 - mode=correct only when the customer explicitly replaces a previously known value. Otherwise use assert.
 - Preserve a call scheduling phrase as callTime. normalizedValue may be an ISO datetime only when the message and context support it.
+- If the assistant just asked for a consultation/call time, a short customer reply containing a weekday, date, time, or time range is callTime, not off_topic. Examples: "Friday 10am", "Monday at 1", "12:30 works", "the 24th at noon".
 - A wedding date is not a consultation date. Never use one as the other.
 - For unknown business/service questions, use topicId=unknown_service_request rather than inventing an answer.
 - Trusted question topics include pricing, travel_fees, final_film_delivery, film_length, package_inclusions, availability, portfolio, reviews, booking, venue_travel_details, style, music, hidden_fees, insurance, photographers, team_florida, team_nc_sc_ga, business_location, unknown_service_request, and other.

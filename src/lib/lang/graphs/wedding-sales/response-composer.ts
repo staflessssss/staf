@@ -1651,6 +1651,92 @@ function isSchedulingQuestionIntent(intent: WeddingSalesResponseIntent) {
   );
 }
 
+function shouldUseGroundedInstagramVoice(args: ComposeWeddingSalesResponseArgs) {
+  if (args.state.channel !== "instagram" || args.state.semanticStateVersion !== 3) {
+    return false;
+  }
+
+  if (args.intent === "availability_available" || args.intent === "ask_call_time") {
+    return true;
+  }
+
+  if (
+    args.intent === "answer_question" &&
+    (checkedWeddingAvailabilityThisTurn(args.state) || Boolean(buildWeddingSalesResponseContext(args.state).answerTopicIds.length))
+  ) {
+    return true;
+  }
+
+  return isSchedulingQuestionIntent(args.intent) || args.intent === "ask_email";
+}
+
+function hasCalendarAvailabilityToolThisTurn(state: WeddingSalesState) {
+  return state.turnToolObservations.some(
+    (observation) => observation.toolName === "check_consultation_calendar",
+  );
+}
+
+function claimsUncheckedCalendarAvailability(args: ComposeWeddingSalesResponseArgs, text: string) {
+  if (args.state.channel !== "instagram") {
+    return false;
+  }
+
+  if (args.state.calendarStatus === "available" || hasCalendarAvailabilityToolThisTurn(args.state)) {
+    return false;
+  }
+
+  if (!/\b(?:works?|available|perfect|great|confirmed|booked)\b/i.test(text)) {
+    return false;
+  }
+
+  return /\b(?:\d{1,2}(?::\d{2})?\s*(?:am|pm)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)\b/i.test(text);
+}
+
+async function generateGroundedInstagramVoiceDraft(args: ComposeWeddingSalesResponseArgs & { fallback: string }) {
+  return traceLangRuntime(
+    "wedding_sales.response.grounded_instagram_voice",
+    buildTraceMetadata(args, {
+      composerModel: process.env.WEDDING_SALES_RESPONSE_MODEL || DEFAULT_RESPONSE_MODEL,
+      groundedVoice: true,
+    }),
+    async () => {
+      const responseContext = buildWeddingSalesResponseContext(args.state);
+      const { text } = await generateText({
+        model: openai(process.env.WEDDING_SALES_RESPONSE_MODEL || DEFAULT_RESPONSE_MODEL),
+        system: [
+          "You write the next Instagram DM for Myndful Films.",
+          "Code has already chosen the action plan and tools. You only phrase the customer-facing reply.",
+          "Sound like Taras: warm, brief, human, and specific. Do not sound like a form or bot.",
+          "Do not repeat the same opening pattern from the previous assistant response.",
+          "Do not use 'Awesome [name]! We have...' or '[venue] sounds lovely' as a stock line.",
+          "Answer every FAQ topic listed by responseContext.answerTopicIds.",
+          "Ask only responseContext.plannedQuestionField if it is not null. Ask no other qualification question.",
+          "Never ask for a field already present in leadState.",
+          "Only mention wedding availability if toolObservations show check_wedding_availability or leadState.availability is available.",
+          "Only say a call time works, is available, or is confirmed if leadState.calendarStatus is available or toolObservations show check_consultation_calendar.",
+          "If a call time was offered but calendar availability is not checked, ask to confirm/check it rather than saying it works.",
+          "If availability was just checked and is available, mention the date is available, the correct starting price, and the guide naturally.",
+          "If venue is known and the next step is callTime, ask for a call time without generic venue praise.",
+          "Keep it to 1-3 short DM bubbles separated by blank lines.",
+        ].join("\n"),
+        prompt: [
+          "Write the reply from these grounded facts.",
+          "Fallback draft is provided only as safety context; do not copy its wording if it sounds templated.",
+          "Facts:",
+          safeJson({
+            ...buildComposerFacts(args),
+            responseContext,
+            fallbackDraft: args.fallback,
+          }),
+        ].join("\n\n"),
+        temperature: 0.8,
+      });
+
+      return { text, textLength: text.length };
+    },
+  );
+}
+
 export function finalizeLlmWeddingSalesResponse(args: ComposeWeddingSalesResponseArgs & { text: string }) {
   const formatting = getChannelFormatting(args.config, args.state);
   const policy = args.policy ?? buildWeddingSalesDialogPolicy(args);
@@ -1792,7 +1878,9 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
   }
 
   try {
-    const { text } = await generateWeddingSalesComposerDraft(args);
+    const { text } = shouldUseGroundedInstagramVoice(args)
+      ? await generateGroundedInstagramVoiceDraft({ ...args, fallback })
+      : await generateWeddingSalesComposerDraft(args);
 
     const trimmed = text.trim();
 
@@ -1804,6 +1892,10 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
 
     const reflected = await reflectWeddingSalesResponse({ ...args, draft });
 
+    if (claimsUncheckedCalendarAvailability(args, reflected)) {
+      return fallback;
+    }
+
     return normalizeCustomerFacingPunctuation(enforceInstagramResponseStyle(args, reflected, fallback));
   } catch (error) {
     console.warn("[wedding-sales] LLM response composer failed; using fallback.", error);
@@ -1813,4 +1905,6 @@ export async function composeHumanWeddingSalesResponse(args: ComposeWeddingSales
 
 export const weddingSalesResponseComposerTestHelpers = {
   enforceInstagramResponseStyle,
+  claimsUncheckedCalendarAvailability,
+  shouldUseGroundedInstagramVoice,
 };

@@ -327,6 +327,82 @@ test("normalizes known package and shooter questions before action planning", ()
   );
 });
 
+test("grounds a short call-time reply after the agent asked for call time", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Friday 10am",
+    previousState: {
+      semanticStateVersion: 3,
+      leadStage: "asking_call_time",
+      customerName: "Cindy",
+      partnerName: "Paul",
+      names: "Cindy and Paul",
+      weddingDate: "2026-10-18",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Charlotte, NC",
+      venue: "The Ivy Place",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      askedForCallTime: true,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "clarify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "callTime",
+            topicId: null,
+            reason: "next_required_qualification_field_missing",
+          },
+        ],
+      },
+    },
+  });
+  const adapted = adaptGroundedWeddingUnderstanding({
+    state,
+    understanding: understanding({
+      summary: "Customer proposed Friday at 10am for the consultation call.",
+      facts: [
+        {
+          field: "callTime",
+          value: "Friday 10am",
+          normalizedValue: null,
+          evidence: "Friday 10am",
+          relation: "wedding",
+          mode: "assert",
+          confidence: 0.96,
+        },
+      ],
+      questions: [
+        {
+          topicId: "booking",
+          normalizedQuestion: "They want Friday at 10am for the call.",
+          evidence: "Friday 10am",
+          confidence: 0.9,
+        },
+      ],
+    }),
+  });
+  const mutation = applySemanticV2StateMutation({
+    state,
+    analysis: adapted.analysis,
+  });
+  const nextState = { ...state, ...mutation };
+  const plan = selectWeddingSalesActionPlan({
+    state: nextState,
+    analysis: adapted.analysis,
+  });
+
+  assert.equal(mutation.proposedCallTime, "Friday 10am");
+  assert.deepEqual(
+    plan.actions.map((action) => action.type),
+    ["check_consultation_calendar"],
+  );
+});
+
 test("an explicit date correction clears only dependent availability and scheduling state", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

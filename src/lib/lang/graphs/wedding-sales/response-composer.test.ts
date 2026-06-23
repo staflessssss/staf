@@ -880,6 +880,68 @@ test("instagram FAQ uses first-person Florida team wording", () => {
   assert.doesNotMatch(response, /Taras and the Myndful Films team/i);
 });
 
+test("instagram guard rejects calendar availability claims before the calendar tool runs", () => {
+  const unsafe = weddingSalesResponseComposerTestHelpers.claimsUncheckedCalendarAvailability(
+    {
+      intent: "answer_question",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 3,
+        leadStage: "asking_call_time",
+        names: "Cindy and Paul",
+        customerName: "Cindy",
+        partnerName: "Paul",
+        weddingDate: "2026-10-18",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Charlotte, NC",
+        venue: "The Ivy Place",
+        availability: "available",
+        callProposed: true,
+        proposedCallTime: undefined,
+        calendarStatus: undefined,
+        latestCustomerMessage: "Friday 10am",
+      },
+    },
+    "Friday at 10 AM Eastern works perfectly. Looking forward to our call.",
+  );
+
+  assert.equal(unsafe, true);
+});
+
+test("instagram guard allows calendar availability language after calendar check", () => {
+  const unsafe = weddingSalesResponseComposerTestHelpers.claimsUncheckedCalendarAvailability(
+    {
+      intent: "ask_email",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 3,
+        leadStage: "waiting_customer_email",
+        names: "Cindy and Paul",
+        customerName: "Cindy",
+        partnerName: "Paul",
+        weddingDate: "2026-10-18",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Charlotte, NC",
+        venue: "The Ivy Place",
+        availability: "available",
+        callProposed: true,
+        proposedCallTime: "Friday 10am",
+        calendarStatus: "available",
+        latestCustomerMessage: "Friday 10am",
+      },
+    },
+    "Friday at 10 AM Eastern works perfectly. What email should I use for the invite?",
+  );
+
+  assert.equal(unsafe, false);
+});
+
 test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";
