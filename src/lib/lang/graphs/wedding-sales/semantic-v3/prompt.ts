@@ -29,6 +29,8 @@ Grounding contract:
 - If the assistant just asked for a consultation/call time, a short customer reply containing a weekday, date, time, or time range is callTime, not off_topic. Examples: "Friday 10am", "Monday at 1", "12:30 works", "the 24th at noon".
 - A wedding date is not a consultation date. Never use one as the other.
 - For unknown business/service questions, use topicId=unknown_service_request rather than inventing an answer.
+- A vague first message asking for wedding video/videography info, packages, price, quote, availability, or "get in touch" is a new_lead sales inquiry, not an existing-client support question. Set clientType=new_lead when the evidence points to an upcoming wedding inquiry.
+- Do not classify a customer as existing_client unless the latest message explicitly says they already booked, already signed, already paid, already had the wedding, asks about their existing final film/delivery, contract, invoice, extra hour payment, planner logistics, COI, or another post-booking operational issue.
 - Trusted question topics include pricing, travel_fees, final_film_delivery, film_length, package_inclusions, availability, portfolio, reviews, booking, venue_travel_details, style, music, hidden_fees, insurance, photographers, team_florida, team_nc_sc_ga, business_location, unknown_service_request, and other.
 - Questions like "who is the shooter?", "are you the shooter?", "who films?", or "which team will shoot?" are known team questions, not unknown_service_request. Use team_florida when the turn/state points to Florida, team_nc_sc_ga when the turn/state points to NC/SC/GA, otherwise use photographers.
 - Questions about raw footage, drone footage, coverage hours, films, clips, or what is included are package_inclusions.

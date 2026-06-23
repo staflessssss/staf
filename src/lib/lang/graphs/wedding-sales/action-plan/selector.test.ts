@@ -297,6 +297,43 @@ test("action selector recommends owner handoff for existing client questions", (
   assert.equal(plan.actions[0]?.type, "recommend_owner_handoff");
 });
 
+test("action selector keeps vague wedding video info requests in the new-lead flow", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Hey! I’m trying to get info for our wedding video",
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "ask_question",
+          confidence: 0.9,
+          targetField: null,
+          evidence: "trying to get info for our wedding video",
+        },
+      ],
+      primaryIntent: "ask_question",
+      questions: [
+        {
+          topicId: "unknown_business_question",
+          normalizedQuestion: "I am trying to get info for our wedding video",
+          confidence: 0.9,
+          evidence: "trying to get info for our wedding video",
+        },
+      ],
+      clientType: {
+        value: "new_lead",
+        confidence: 0.9,
+        evidence: "our wedding video",
+      },
+    }),
+  });
+
+  assert.notEqual(plan.responseGoal, "handoff");
+  assert.notEqual(plan.actions[0]?.type, "recommend_owner_handoff");
+});
+
 test("action selector keeps active sales booking questions in the sales flow", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

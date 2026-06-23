@@ -84,7 +84,7 @@ function highConfidenceQuestionTopics(analysis: SemanticAnalysisV2) {
   return topics;
 }
 
-function hasUnknownBusinessQuestion(analysis: SemanticAnalysisV2) {
+function hasRawUnknownBusinessQuestion(analysis: SemanticAnalysisV2) {
   return analysis.questions.some(
     (question) =>
       question.confidence >= 0.75 &&
@@ -94,6 +94,49 @@ function hasUnknownBusinessQuestion(analysis: SemanticAnalysisV2) {
         question.topicId === "unknown_service_request" ||
         question.topicId === "unknown_business_question"),
   );
+}
+
+function hasUnknownServiceRequest(analysis: SemanticAnalysisV2) {
+  return analysis.questions.some(
+    (question) =>
+      question.confidence >= 0.75 &&
+      question.topicId === "unknown_service_request",
+  );
+}
+
+function isEarlySalesInquiry(state: WeddingSalesState, analysis: SemanticAnalysisV2) {
+  if (hasUnknownServiceRequest(analysis)) {
+    return false;
+  }
+
+  const clientType = state.clientType ?? analysis.clientType?.value;
+  if (clientType && clientType !== "new_lead" && clientType !== "unknown") {
+    return false;
+  }
+
+  const text = [
+    state.latestCustomerMessage,
+    ...analysis.questions.map((question) => `${question.normalizedQuestion} ${question.evidence}`),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    /\b(?:wedding|bride|groom|fiance|fiancee|married|elopement)\b/.test(text) &&
+    /\b(?:video|videography|film|films|info|information|package|packages|pricing|price|cost|available|availability|quote|inquiry|get in touch)\b/.test(text)
+  );
+}
+
+function hasUnknownBusinessQuestion(args: {
+  state: WeddingSalesState;
+  analysis: SemanticAnalysisV2;
+}) {
+  if (isEarlySalesInquiry(args.state, args.analysis)) {
+    return false;
+  }
+
+  return hasRawUnknownBusinessQuestion(args.analysis);
 }
 
 function isBusinessLocationQuestion(question: SemanticAnalysisV2["questions"][number]) {
@@ -232,7 +275,7 @@ function attemptedAskedFieldAnswerConflictsWithControl(args: {
 }) {
   return Boolean(
     args.attemptedAskedFieldAnswer &&
-      (isOwnerContext(args.state, args.analysis) || hasUnknownBusinessQuestion(args.analysis)),
+      (isOwnerContext(args.state, args.analysis) || hasUnknownBusinessQuestion(args)),
   );
 }
 
@@ -523,7 +566,7 @@ export function selectWeddingSalesActionPlan(args: {
   }
 
   if (
-    hasUnknownBusinessQuestion(analysis) &&
+    hasUnknownBusinessQuestion({ state, analysis }) &&
     !isActiveSalesContinuationQuestion(state, analysis) &&
     !requestedFieldAnswerConflictsWithControl
   ) {
