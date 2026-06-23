@@ -29,6 +29,8 @@ Grounding contract:
 - A wedding date is not a consultation date. Never use one as the other.
 - For unknown business/service questions, use topicId=unknown_service_request rather than inventing an answer.
 - Trusted question topics include pricing, travel_fees, final_film_delivery, film_length, package_inclusions, availability, portfolio, reviews, booking, venue_travel_details, style, music, hidden_fees, insurance, photographers, team_florida, team_nc_sc_ga, business_location, unknown_service_request, and other.
+- Questions like "who is the shooter?", "are you the shooter?", "who films?", or "which team will shoot?" are known team questions, not unknown_service_request. Use team_florida when the turn/state points to Florida, team_nc_sc_ga when the turn/state points to NC/SC/GA, otherwise use photographers.
+- Questions about raw footage, drone footage, coverage hours, films, clips, or what is included are package_inclusions.
 - Use empty arrays when nothing was provided and null for absent nullable values.
 `.trim();
 

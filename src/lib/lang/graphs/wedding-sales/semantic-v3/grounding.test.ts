@@ -229,6 +229,104 @@ test("keeps every customer question when availability is ready to run", () => {
   );
 });
 
+test("normalizes known package and shooter questions before action planning", () => {
+  const message =
+    "I’m Cindy and my fiancé is Paul. Our wedding is 10/18/26 at Harborside Chapel in Safety Harbor FL. Also do you include raw footage and who is the shooter?";
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message,
+  });
+  const adapted = adaptGroundedWeddingUnderstanding({
+    state,
+    understanding: understanding({
+      facts: [
+        {
+          field: "customerName",
+          value: "Cindy",
+          normalizedValue: "Cindy",
+          evidence: "I’m Cindy",
+          relation: "speaker_self",
+          mode: "assert",
+          confidence: 0.99,
+        },
+        {
+          field: "partnerName",
+          value: "Paul",
+          normalizedValue: "Paul",
+          evidence: "my fiancé is Paul",
+          relation: "speaker_partner",
+          mode: "assert",
+          confidence: 0.99,
+        },
+        {
+          field: "weddingDate",
+          value: "10/18/26",
+          normalizedValue: "2026-10-18",
+          evidence: "Our wedding is 10/18/26",
+          relation: "wedding",
+          mode: "assert",
+          confidence: 0.99,
+        },
+        {
+          field: "venue",
+          value: "Harborside Chapel",
+          normalizedValue: "Harborside Chapel",
+          evidence: "at Harborside Chapel",
+          relation: "wedding",
+          mode: "assert",
+          confidence: 0.99,
+        },
+        {
+          field: "location",
+          value: "Safety Harbor FL",
+          normalizedValue: "Safety Harbor, FL",
+          evidence: "Safety Harbor FL",
+          relation: "wedding",
+          mode: "assert",
+          confidence: 0.99,
+        },
+      ],
+      questions: [
+        {
+          topicId: null,
+          normalizedQuestion: "Do you include raw footage?",
+          evidence: "do you include raw footage",
+          confidence: 0.99,
+        },
+        {
+          topicId: "unknown_service_request",
+          normalizedQuestion: "Who is the shooter?",
+          evidence: "who is the shooter?",
+          confidence: 0.99,
+        },
+      ],
+    }),
+  });
+  const mutation = applySemanticV2StateMutation({
+    state,
+    analysis: adapted.analysis,
+  });
+  const nextState = { ...state, ...mutation };
+  const plan = selectWeddingSalesActionPlan({
+    state: nextState,
+    analysis: adapted.analysis,
+  });
+
+  assert.deepEqual(
+    adapted.analysis.questions.map((question) => question.topicId),
+    ["package_inclusions", "team_florida"],
+  );
+  assert.notEqual(plan.responseGoal, "handoff");
+  assert.deepEqual(
+    plan.actions.map((action) => [action.type, action.topicId]),
+    [
+      ["check_wedding_availability", null],
+      ["answer_question", "package_inclusions"],
+      ["answer_question", "team_florida"],
+    ],
+  );
+});
+
 test("an explicit date correction clears only dependent availability and scheduling state", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",

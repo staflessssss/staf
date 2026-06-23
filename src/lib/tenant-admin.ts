@@ -53,7 +53,7 @@ export type CreateTenantData = {
   name: string;
   slug: string;
   timezone: string;
-  status: TenantStatus.ONBOARDING;
+  status: TenantStatus;
 };
 
 export type UpdateTenantData = {
@@ -65,7 +65,7 @@ export type UpdateTenantData = {
 export type CreateInviteData = {
   tenantId: string;
   email: string;
-  role: UserRole.CLIENT;
+  role: UserRole;
   expiresAt: Date;
 };
 

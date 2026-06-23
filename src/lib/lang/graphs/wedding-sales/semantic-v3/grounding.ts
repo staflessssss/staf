@@ -65,6 +65,50 @@ export type GroundedWeddingAdaptation = {
   rejectedFacts: GroundedWeddingFact[];
 };
 
+function normalizeKnownQuestionTopic(args: {
+  topicId: string | null;
+  text: string;
+  state: WeddingSalesState;
+  acceptedFacts: GroundedWeddingFact[];
+}) {
+  const topic = args.topicId;
+  const text = args.text.toLowerCase();
+
+  if (/\b(?:raw footage|drone footage|coverage|included|include|comes with|film|clip)\b/.test(text)) {
+    return "package_inclusions";
+  }
+
+  if (/\b(?:shooter|shoot|filmmaker|films?|filming|team)\b/.test(text)) {
+    const location =
+      args.acceptedFacts.find((fact) => fact.field === "location")?.normalizedValue ??
+      args.acceptedFacts.find((fact) => fact.field === "location")?.value ??
+      args.state.location ??
+      "";
+    const normalizedLocation = `${location} ${args.state.latestCustomerMessage ?? ""}`.toLowerCase();
+
+    if (/\b(?:fl|florida|tampa|miami|orlando|safety harbor|fort lauderdale)\b/.test(normalizedLocation)) {
+      return "team_florida";
+    }
+
+    if (/\b(?:nc|north carolina|sc|south carolina|ga|georgia|charlotte|raleigh|charleston)\b/.test(normalizedLocation)) {
+      return "team_nc_sc_ga";
+    }
+
+    return "photographers";
+  }
+
+  if (
+    topic &&
+    topic !== "other" &&
+    topic !== "unknown_service_request" &&
+    topic !== "unknown_business_question"
+  ) {
+    return topic;
+  }
+
+  return topic;
+}
+
 export function adaptGroundedWeddingUnderstanding(args: {
   state: WeddingSalesState;
   understanding: GroundedWeddingUnderstanding;
@@ -165,7 +209,12 @@ export function adaptGroundedWeddingUnderstanding(args: {
       partnerName: partnerName ? asProvidedValue(partnerName) : null,
     },
     questions: questions.map((question) => ({
-      topicId: question.topicId,
+      topicId: normalizeKnownQuestionTopic({
+        topicId: question.topicId,
+        text: `${question.normalizedQuestion} ${question.evidence}`,
+        state: args.state,
+        acceptedFacts,
+      }),
       normalizedQuestion: question.normalizedQuestion,
       confidence: question.confidence,
       evidence: question.evidence,
