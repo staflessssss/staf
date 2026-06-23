@@ -298,9 +298,51 @@ test("action selector recommends owner handoff for existing client questions", (
 });
 
 test("action selector keeps vague wedding video info requests in the new-lead flow", () => {
+  const assertNewLeadFlow = (message: string) => {
+    const state = createInitialWeddingSalesState({
+      channel: "instagram",
+      message,
+    });
+    const plan = selectWeddingSalesActionPlan({
+      state,
+      analysis: analysis({
+        intents: [
+          {
+            category: "ask_question",
+            confidence: 0.9,
+            targetField: null,
+            evidence: message,
+          },
+        ],
+        primaryIntent: "ask_question",
+        questions: [
+          {
+            topicId: "unknown_business_question",
+            normalizedQuestion: message,
+            confidence: 0.9,
+            evidence: message,
+          },
+        ],
+        clientType: {
+          value: "new_lead",
+          confidence: 0.9,
+          evidence: message,
+        },
+      }),
+    });
+
+    assert.notEqual(plan.responseGoal, "handoff");
+    assert.notEqual(plan.actions[0]?.type, "recommend_owner_handoff");
+  };
+
+  assertNewLeadFlow("Hey! I’m trying to get info for our wedding video");
+  assertNewLeadFlow("Inquire about wedding videography");
+});
+
+test("action selector does not treat Instagram inquiry button text as handoff", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
-    message: "Hey! I’m trying to get info for our wedding video",
+    message: "Inquire about wedding videography",
   });
   const plan = selectWeddingSalesActionPlan({
     state,
@@ -310,22 +352,22 @@ test("action selector keeps vague wedding video info requests in the new-lead fl
           category: "ask_question",
           confidence: 0.9,
           targetField: null,
-          evidence: "trying to get info for our wedding video",
+          evidence: "Inquire about wedding videography",
         },
       ],
       primaryIntent: "ask_question",
       questions: [
         {
           topicId: "unknown_business_question",
-          normalizedQuestion: "I am trying to get info for our wedding video",
+          normalizedQuestion: "Inquire about wedding videography",
           confidence: 0.9,
-          evidence: "trying to get info for our wedding video",
+          evidence: "Inquire about wedding videography",
         },
       ],
       clientType: {
-        value: "new_lead",
+        value: "unknown",
         confidence: 0.9,
-        evidence: "our wedding video",
+        evidence: "Inquire about wedding videography",
       },
     }),
   });
