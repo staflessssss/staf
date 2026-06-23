@@ -167,6 +167,51 @@ test("action executor runs availability then calendar from validated state", asy
   assert.match(result.responseDraft ?? "", /time|email/i);
 });
 
+test("action executor keeps first-contact greeting for the final reply after an intermediate tool", async () => {
+  const execute = createWeddingSalesActionPlanExecutor({
+    config: defaultWeddingSalesConfig,
+    toolContext: testToolContext(),
+  });
+  const result = await execute(
+    createInitialWeddingSalesState({
+      channel: "instagram",
+      message: "Do you include raw footage?",
+      previousState: {
+        leadStage: "ready_for_availability",
+        names: "Cindy and Paul",
+        customerName: "Cindy",
+        partnerName: "Paul",
+        weddingDate: "2026-10-18",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Safety Harbor, FL",
+        venue: "Harborside Chapel",
+        assistantReplyCount: 0,
+        hasGreeted: false,
+        lastActionPlan: plan([
+          {
+            type: "check_wedding_availability",
+            field: null,
+            topicId: null,
+            reason: "date_and_location_are_ready_for_capacity_check",
+          },
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "raw_footage",
+            reason: "customer_asked_current_business_question",
+          },
+        ]),
+      },
+    }),
+  );
+
+  assert.equal(result.assistantReplyCount, 1);
+  assert.equal(result.hasGreeted, true);
+  assert.match(result.responseDraft ?? "", /^Hey there! Thank you so much for reaching out/);
+  assert.match(result.responseDraft ?? "", /raw footage/i);
+});
+
 test("action executor books only when booking requirements are already committed", async () => {
   const execute = createWeddingSalesActionPlanExecutor({
     config: defaultWeddingSalesConfig,

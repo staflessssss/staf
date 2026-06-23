@@ -91,6 +91,32 @@ function isToolAction(action: WeddingSalesAction) {
   );
 }
 
+function hasLaterCustomerReplyAction(actions: WeddingSalesAction[], index: number) {
+  return actions.slice(index + 1).some((action) => !isToolAction(action));
+}
+
+function stripIntermediateReplyPatch(
+  patch: WeddingSalesStatePatch,
+): WeddingSalesStatePatch {
+  const statePatch = { ...patch };
+  delete statePatch.responseDraft;
+  delete statePatch.conversationSummary;
+  delete statePatch.assistantReplyCount;
+  delete statePatch.hasGreeted;
+  delete statePatch.signatureSent;
+  delete statePatch.portfolioSent;
+  delete statePatch.reviewsSent;
+  delete statePatch.guideOffered;
+  delete statePatch.askedForNames;
+  delete statePatch.askedForWeddingYear;
+  delete statePatch.askedForVenue;
+  delete statePatch.askedForCallTime;
+  delete statePatch.askedForEmail;
+  delete statePatch.askedFieldCounts;
+  delete statePatch.lastAssistantIntent;
+  return statePatch;
+}
+
 export function createWeddingSalesActionPlanExecutor(args: {
   config: WeddingSalesConfig;
   toolContext?: WeddingSalesToolContext | null;
@@ -145,10 +171,13 @@ export function createWeddingSalesActionPlanExecutor(args: {
     let resultPatch: WeddingSalesStatePatch = {};
     let replyComposed = false;
 
-    for (const action of plan.actions) {
+    for (const [index, action] of plan.actions.entries()) {
       if (replyComposed && !isToolAction(action)) continue;
 
-      const patch = await runAction(action, workingState);
+      const rawPatch = await runAction(action, workingState);
+      const patch = isToolAction(action) && hasLaterCustomerReplyAction(plan.actions, index)
+        ? stripIntermediateReplyPatch(rawPatch)
+        : rawPatch;
       workingState = mergePatchIntoWorkingState(workingState, patch);
       resultPatch = mergePatchIntoResult(resultPatch, patch);
 

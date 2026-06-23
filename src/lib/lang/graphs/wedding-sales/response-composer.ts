@@ -1656,6 +1656,16 @@ function shouldUseGroundedInstagramVoice(args: ComposeWeddingSalesResponseArgs) 
     return false;
   }
 
+  if (
+    args.state.lastActionPlan?.actions.some(
+      (action) =>
+        action.type !== "recommend_owner_handoff" &&
+        action.type !== "suppress_reply",
+    )
+  ) {
+    return true;
+  }
+
   if (args.intent === "availability_available" || args.intent === "ask_call_time") {
     return true;
   }

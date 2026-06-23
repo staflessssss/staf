@@ -972,6 +972,64 @@ test("instagram human composer keeps deterministic fallback when the LLM compose
   }
 });
 
+test("instagram v3 action-plan replies use grounded voice outside the old availability subset", () => {
+  const shouldUseGroundedVoice = weddingSalesResponseComposerTestHelpers.shouldUseGroundedInstagramVoice({
+    intent: "ask_missing_info",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 3,
+      leadStage: "missing_names_or_date",
+      names: undefined,
+      weddingDate: undefined,
+      weddingDateText: undefined,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "qualify",
+        actions: [
+          {
+            type: "ask_missing_field",
+            field: "names",
+            topicId: null,
+            reason: "continue_qualification_after_new_inquiry",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  assert.equal(shouldUseGroundedVoice, true);
+});
+
+test("instagram v3 handoff-only plans stay customer-silent instead of using grounded voice", () => {
+  const shouldUseGroundedVoice = weddingSalesResponseComposerTestHelpers.shouldUseGroundedInstagramVoice({
+    intent: "handoff",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 3,
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "handoff",
+        actions: [
+          {
+            type: "recommend_owner_handoff",
+            field: null,
+            topicId: null,
+            reason: "unknown_business_question_requires_owner",
+          },
+        ],
+        guardrailTrace: [],
+      },
+    },
+  });
+
+  assert.equal(shouldUseGroundedVoice, false);
+});
+
 test("instagram human composer keeps the first-contact introduction when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";
