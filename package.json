@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "eval:wedding-sales": "node --env-file=.env --import tsx scripts/eval-wedding-sales.ts",
     "eval:wedding-semantic-v2": "node --env-file=.env --import tsx scripts/eval-wedding-semantic-v2.ts",
+    "eval:wedding-grounded-v3": "node --env-file=.env --import tsx scripts/eval-wedding-grounded-v3.ts",
     "dry-run:wedding-sales": "node --env-file=.env --import tsx scripts/dry-run-wedding-sales.ts",
     "smoke:wedding-sales-checkpoint": "node --env-file=.env --import tsx scripts/smoke-wedding-sales-checkpoint.ts",
     "setup:instagram-channel": "node --env-file=.env --import tsx scripts/setup-instagram-channel.ts",

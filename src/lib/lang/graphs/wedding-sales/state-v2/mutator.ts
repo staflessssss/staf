@@ -835,6 +835,9 @@ export function applySemanticV2StateMutation(args: {
         update.location = entry.value;
         if (state.location && normalizeForComparison(state.location) !== normalizeForComparison(entry.value)) {
           update.venue = undefined;
+          // Pricing and guide selection are region-dependent. A corrected
+          // location must allow the runtime to select and send the right guide.
+          update.guideSent = false;
           Object.assign(update, clearAvailabilityResult(), clearSchedulingProgressUnlessBooked(state));
         }
         Object.assign(update, clearPendingChange());

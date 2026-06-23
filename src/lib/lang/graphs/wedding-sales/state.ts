@@ -98,7 +98,7 @@ export type WeddingSalesState = {
   pendingChangeValue?: string;
   pendingChangeDisplay?: string;
   changeConfirmationRejected?: boolean;
-  semanticStateVersion?: 2;
+  semanticStateVersion?: 2 | 3;
   clientType?: WeddingSalesClientType;
   pendingConfirmations?: WeddingSalesPendingConfirmation[];
   askedFieldCounts?: Partial<Record<WeddingSalesField, number>>;
@@ -176,7 +176,7 @@ export const WeddingSalesStateAnnotation = Annotation.Root({
   pendingChangeValue: Annotation<string | undefined>(),
   pendingChangeDisplay: Annotation<string | undefined>(),
   changeConfirmationRejected: Annotation<boolean | undefined>(),
-  semanticStateVersion: Annotation<2 | undefined>(),
+  semanticStateVersion: Annotation<2 | 3 | undefined>(),
   clientType: Annotation<WeddingSalesClientType | undefined>(),
   pendingConfirmations: Annotation<WeddingSalesPendingConfirmation[] | undefined>(),
   askedFieldCounts: Annotation<Partial<Record<WeddingSalesField, number>> | undefined>(),

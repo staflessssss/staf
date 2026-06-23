@@ -422,6 +422,27 @@ function buildPlan(args: {
   };
 }
 
+function answerActionsForCurrentTurn(
+  analysis: SemanticAnalysisV2,
+  toolAnsweredTopics: string[] = [],
+  toolAnswersUntypedQuestion = false,
+) {
+  if (!hasHighConfidenceQuestion(analysis)) return [];
+
+  const allTopics = highConfidenceQuestionTopics(analysis);
+  const topics = allTopics.filter((topicId) => !toolAnsweredTopics.includes(topicId));
+  if (topics.length === 0 && allTopics.length > 0) return [];
+  if (topics.length === 0 && toolAnswersUntypedQuestion) return [];
+
+  return (topics.length > 0 ? topics : [null]).map((topicId) =>
+    action({
+      type: "answer_question",
+      topicId,
+      reason: "answer_customer_question_after_required_tool",
+    }),
+  );
+}
+
 export function selectWeddingSalesActionPlan(args: {
   state: WeddingSalesState;
   analysis: SemanticAnalysisV2;
@@ -528,6 +549,7 @@ export function selectWeddingSalesActionPlan(args: {
           type: "book_consultation",
           reason: "email_call_time_and_available_calendar_are_committed",
         }),
+        ...answerActionsForCurrentTurn(analysis, ["booking"], true),
       ],
     });
   }
@@ -545,6 +567,7 @@ export function selectWeddingSalesActionPlan(args: {
           type: "check_consultation_calendar",
           reason: "call_time_is_ready_and_wedding_date_is_available",
         }),
+        ...answerActionsForCurrentTurn(analysis, ["booking", "availability"], true),
       ],
     });
   }
@@ -572,6 +595,8 @@ export function selectWeddingSalesActionPlan(args: {
         }),
       );
     }
+
+    actions.push(...answerActionsForCurrentTurn(analysis, ["availability"], true));
 
     return buildPlan({
       responseGoal: "run_tools_then_reply",

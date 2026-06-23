@@ -4,9 +4,17 @@ import {
   type WeddingSalesSemanticAnalysis,
 } from "../semantic-analyzer";
 import { runWeddingSalesSemanticV2Shadow } from "../semantic-v2/shadow";
+import {
+  isGroundedWeddingExecutionEnabled,
+  isGroundedWeddingShadowEnabled,
+} from "../semantic-v3/rollout";
 import { isInstagramCtaStarter } from "../starter-intents";
 import { isSemanticV2ExecutionEnabled } from "../state-v2/mutator";
 import { analyzeWeddingSalesMessageWithSemanticV2 } from "./analyze-v2";
+import {
+  analyzeWeddingSalesMessageWithGroundedV3,
+  runGroundedWeddingV3Shadow,
+} from "./analyze-v3";
 
 const monthPattern =
   "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
@@ -807,8 +815,16 @@ export function analyzeWeddingSalesMessageWithSemantics(
 export async function analyzeWeddingSalesMessage(
   state: WeddingSalesState,
 ): Promise<Partial<WeddingSalesState>> {
+  if (isGroundedWeddingExecutionEnabled(state.agentId)) {
+    return analyzeWeddingSalesMessageWithGroundedV3(state);
+  }
+
   if (isSemanticV2ExecutionEnabled(state.agentId, state.runtimeMode)) {
-    return analyzeWeddingSalesMessageWithSemanticV2(state);
+    const semanticV2Result = await analyzeWeddingSalesMessageWithSemanticV2(state);
+    if (isGroundedWeddingShadowEnabled(state.agentId)) {
+      await runGroundedWeddingV3Shadow(state, semanticV2Result);
+    }
+    return semanticV2Result;
   }
 
   const semantic = await analyzeWeddingSalesSemantics(state);

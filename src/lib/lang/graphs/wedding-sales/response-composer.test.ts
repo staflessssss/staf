@@ -687,6 +687,133 @@ test("instagram team follow-up answers shooter question without repeating venue 
   assert.doesNotMatch(response, /venue/i);
 });
 
+test("instagram FAQ answers package inclusions and shooter in the same turn", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 3,
+      leadStage: "asking_call_time",
+      names: "Bob and Marie",
+      customerName: "Bob",
+      partnerName: "Marie",
+      weddingDate: "2026-10-23",
+      weddingDateText: "October 23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      latestCustomerMessage: "Do you include raw footage? Who is the shooter?",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "package_inclusions",
+            reason: "customer_asked_current_business_question",
+          },
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "team_nc_sc_ga",
+            reason: "customer_asked_current_business_question",
+          },
+          {
+            type: "ask_missing_field",
+            field: "callTime",
+            topicId: null,
+            reason: "continue_sales_flow_after_answers",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.match(response, /raw footage/i);
+  assert.match(response, /Dima and Marie/i);
+  assert.equal((response.match(/What time works best/g) ?? []).length, 1);
+});
+
+test("instagram FAQ resolves shooter answer from saved location when no action-plan topic is present", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 3,
+      leadStage: "asking_call_time",
+      names: "Bob and Marie",
+      customerName: "Bob",
+      partnerName: "Marie",
+      weddingDate: "2026-10-23",
+      weddingDateText: "October 23",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Raleigh, NC",
+      venue: "Evergreen Park",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      latestCustomerMessage: "Who is the shooter?",
+      lastActionPlan: undefined,
+    },
+  });
+
+  assert.match(response, /Dima and Marie/i);
+});
+
+test("instagram FAQ uses first-person Florida team wording", () => {
+  const response = composeWeddingSalesResponse({
+    intent: "answer_question",
+    config,
+    state: {
+      ...baseState,
+      channel: "instagram",
+      semanticStateVersion: 3,
+      leadStage: "asking_call_time",
+      names: "Rachel and Mike",
+      customerName: "Rachel",
+      partnerName: "Mike",
+      weddingDate: "2026-11-08",
+      weddingDateText: "November 8",
+      weddingYear: "2026",
+      weddingYearKnown: true,
+      location: "Tampa, FL",
+      venue: "The Vault",
+      availability: "available",
+      guideSent: true,
+      callProposed: true,
+      latestCustomerMessage: "Who is the shooter?",
+      lastActionPlan: {
+        schemaVersion: 1,
+        responseGoal: "answer_and_qualify",
+        guardrailTrace: [],
+        actions: [
+          {
+            type: "answer_question",
+            field: null,
+            topicId: "team_florida",
+            reason: "customer_asked_current_business_question",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.match(response, /Jay/i);
+  assert.match(response, /I’ll confirm the exact team details/i);
+  assert.doesNotMatch(response, /Taras and the Myndful Films team/i);
+});
+
 test("instagram human composer keeps deterministic fallback when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";

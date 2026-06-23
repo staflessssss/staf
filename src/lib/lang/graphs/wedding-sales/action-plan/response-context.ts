@@ -42,7 +42,9 @@ export type WeddingSalesResponseContext = {
 export function buildWeddingSalesResponseContext(
   state: Pick<WeddingSalesState, "semanticStateVersion" | "lastActionPlan">,
 ): WeddingSalesResponseContext {
-  const hasActionPlanAuthority = state.semanticStateVersion === 2 && Boolean(state.lastActionPlan);
+  const hasActionPlanAuthority =
+    (state.semanticStateVersion === 2 || state.semanticStateVersion === 3) &&
+    Boolean(state.lastActionPlan);
   const answerTopicIds =
     state.lastActionPlan?.actions
       .filter((action) => action.type === "answer_question" && action.topicId)

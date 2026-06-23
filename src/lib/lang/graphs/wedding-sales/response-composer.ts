@@ -523,20 +523,34 @@ function formatFaqAnswer(args: {
     : /\b(?:include|included|what comes with|what's included|whats included|raw footage)\b/i.test(message);
   const topicIs = (topicId: string, pattern: RegExp) =>
     responseContext.hasActionPlanAuthority ? hasTopic(topicId) : pattern.test(message);
-
-  if (asksPricing || asksTravel || asksPackageInclusions) {
-    return [
-      asksPricing && canShareRegionalPricing(args.state)
-        ? formatStartingPriceLine(args.config, args.state)
-        : asksPricing
-          ? formatRegionalPricingLine(args.config)
-          : "",
-      asksPackageInclusions
-        ? "All collections include the full ceremony and speeches, a cinematic clip, a wedding film, drone footage, raw footage, and digital delivery."
+  const asksTeamQuestion = /\b(?:filmmaker|team|who|shoot|shooter)\b/i.test(message);
+  const region = resolveWeddingSalesRegion(args.state);
+  const shouldAnswerFloridaTeam = responseContext.hasActionPlanAuthority
+    ? hasTopic("team_florida")
+    : asksTeamQuestion && region === "FL";
+  const shouldAnswerNcScGaTeam = responseContext.hasActionPlanAuthority
+    ? hasTopic("team_nc_sc_ga")
+    : asksTeamQuestion && region === "NC_SC_GA";
+  const pricingTravelPackageAnswers = [
+    asksPricing && canShareRegionalPricing(args.state)
+      ? formatStartingPriceLine(args.config, args.state)
+      : asksPricing
+        ? formatRegionalPricingLine(args.config)
         : "",
-      asksTravel ? formatTravelAnswer(args.state) : "",
-      nextStep,
-    ].filter(Boolean).join("\n\n");
+    asksPackageInclusions
+      ? "All collections include the full ceremony and speeches, a cinematic clip, a wedding film, drone footage, raw footage, and digital delivery."
+      : "",
+    asksTravel ? formatTravelAnswer(args.state) : "",
+  ].filter(Boolean);
+  const withPricingTravelPackageAnswers = (items: Array<string | undefined | null>) =>
+    [...pricingTravelPackageAnswers, ...items].filter(Boolean).join("\n\n");
+
+  if (
+    pricingTravelPackageAnswers.length > 0 &&
+    !shouldAnswerFloridaTeam &&
+    !shouldAnswerNcScGaTeam
+  ) {
+    return withPricingTravelPackageAnswers([nextStep]);
   }
 
   if (topicIs("venue_travel_details", /\b(?:venue|location|travel details)\b/i)) {
@@ -603,7 +617,11 @@ function formatFaqAnswer(args: {
     ].filter(Boolean).join("\n\n");
   }
 
-  if (topicIs("package_inclusions", /\b(?:include|included|what comes with|what's included|whats included)\b/i)) {
+  if (
+    topicIs("package_inclusions", /\b(?:include|included|what comes with|what's included|whats included)\b/i) &&
+    !shouldAnswerFloridaTeam &&
+    !shouldAnswerNcScGaTeam
+  ) {
     return [
       "All collections include the full ceremony and speeches, a cinematic clip, a wedding film, drone footage, raw footage, and digital delivery.",
       nextStep,
@@ -685,26 +703,26 @@ function formatFaqAnswer(args: {
     ].filter(Boolean).join("\n\n");
   }
 
-  if (topicIs("team_florida", /\b(?:florida|tampa)\b/i) && /\b(?:filmmaker|team|who|shoot|shooter)\b/i.test(message)) {
+  if (shouldAnswerFloridaTeam) {
     const teamAnswer = asksIfTarasWillShoot(message)
-      ? "I personally won’t be the lead shooter in Florida. Jay is our lead filmmaker there, and he shoots in the same Myndful style."
-      : "For Florida, our lead filmmaker is Jay in Tampa.";
+      ? "I’m not usually the lead shooter for Florida weddings. Jay is our lead filmmaker in Tampa, and he shoots in the same Myndful style."
+      : "For Florida weddings, Jay is our lead filmmaker in Tampa. I’ll confirm the exact team details with you on the call.";
 
-    return [
+    return withPricingTravelPackageAnswers([
       teamAnswer,
       withoutRepeatedVenueQuestion(args.state, nextStep),
-    ].filter(Boolean).join("\n\n");
+    ]);
   }
 
-  if (topicIs("team_nc_sc_ga", /\b(?:nc|north carolina|south carolina|sc|georgia|ga|charlotte)\b/i) && /\b(?:filmmaker|team|who|shoot|shooter)\b/i.test(message)) {
+  if (shouldAnswerNcScGaTeam) {
     const teamAnswer = asksIfTarasWillShoot(message)
       ? "I personally won’t be the lead shooter for NC, SC, or GA weddings. Dima and Marie are our lead filmmakers there, and they shoot in the same Myndful style."
       : "For NC, SC, and GA, our lead filmmakers are Dima and Marie, a husband-wife team based in Charlotte.";
 
-    return [
+    return withPricingTravelPackageAnswers([
       teamAnswer,
       withoutRepeatedVenueQuestion(args.state, nextStep),
-    ].filter(Boolean).join("\n\n");
+    ]);
   }
 
   return null;
@@ -1246,6 +1264,8 @@ function buildComposerFacts(args: ComposeWeddingSalesResponseArgs) {
           "Myndful works collaboratively with photographers and does not interfere with their workflow.",
         teams:
           "NC/SC/GA lead filmmakers are Dima and Marie in Charlotte. Florida lead filmmaker is Jay in Tampa.",
+        currentTeams:
+          "NC/SC/GA lead filmmakers are Dima and Marie in Charlotte. Florida lead filmmaker is Jay in Tampa.",
       },
     },
     dialogPolicy: policy,
@@ -1374,6 +1394,9 @@ function buildReflectionSystemPrompt(args: ComposeWeddingSalesResponseArgs) {
     "Fail and rewrite if the draft repeats the previous assistant response, greets mid-thread, includes a forbidden signature, sounds like a bot status message, ignores the customer's latest question, or exceeds the paragraph limit.",
     responseContext.hasActionPlanAuthority
       ? `Action-plan authority is active. The final reply may answer only these FAQ topic IDs: ${responseContext.answerTopicIds.join(", ") || "(none)"}. It may ask only this missing field: ${responseContext.plannedQuestionField ?? "(none)"}. If the draft asks any other customer-facing question, fail and rewrite.`
+      : "",
+    args.state.semanticStateVersion === 3 && responseContext.answerTopicIds.length > 0
+      ? `The final reply must answer every requested topic in this turn: ${responseContext.answerTopicIds.join(", ")}. If any topic is omitted, fail and rewrite.`
       : "",
     responseContext.hasActionPlanAuthority && responseContext.plannedQuestionField === null
       ? "Fail and rewrite if the draft asks for names, fiance name, wedding date, wedding year, location, venue, call time, email, or any other qualification detail."
@@ -1521,6 +1544,9 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
   const wordCount = body.split(/\s+/).filter(Boolean).length;
   const paragraphCount = body.split(/\n\s*\n/).filter(Boolean).length;
   const questionCount = body.split("?").length - 1;
+  const plannedAnswerCount = responseContext.answerTopicIds.length;
+  const maxWordCount = plannedAnswerCount > 1 ? 80 : 35;
+  const maxParagraphCount = plannedAnswerCount > 1 ? 6 : 3;
   const asksQuestionWithoutPlan = responseContext.hasActionPlanAuthority
     && responseContext.plannedQuestionField === null
     && questionCount > 0;
@@ -1561,8 +1587,8 @@ function enforceInstagramResponseStyle(args: ComposeWeddingSalesResponseArgs, te
           && !normalizedBody.includes("city"))
       ));
 
-  return wordCount > 35
-    || paragraphCount > 3
+  return wordCount > maxWordCount
+    || paragraphCount > maxParagraphCount
     || questionCount > 1
     || asksQuestionWithoutPlan
     || asksUnplannedNameQuestion
