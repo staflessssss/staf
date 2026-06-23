@@ -868,6 +868,25 @@ function composeGroundedInstagramFallback(args: ComposeWeddingSalesResponseArgs,
   }
 
   const responseContext = buildWeddingSalesResponseContext(args.state);
+
+  if (declinesSuggestedWeddingDates(args.state)) {
+    return normalizeCustomerFacingPunctuation(
+      "I'm so sorry those dates don't work out. If anything changes, please let me know. Wishing you both such a beautiful wedding day.",
+    );
+  }
+
+  if (
+    isBookedConversation(args.state) &&
+    (args.intent === "availability_available" || checkedWeddingAvailabilityThisTurn(args.state))
+  ) {
+    return normalizeCustomerFacingPunctuation(
+      [
+        "I have the updated wedding date noted.",
+        "We'll keep the consultation call you already booked.",
+      ].join("\n\n"),
+    );
+  }
+
   const paragraphs = [
     ...formatGroundedAvailabilityPriceGuide(args),
   ];

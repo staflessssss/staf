@@ -273,6 +273,23 @@ test("instagram wedding sales treats get in touch as a fresh inquiry starter", a
   assert.doesNotMatch(result.responseDraft ?? "", /tell me a little more/i);
 });
 
+test("instagram wedding sales treats videography inquiry CTA as a fresh inquiry starter", async () => {
+  const result = await invokeWeddingSalesGraph({
+    channel: "instagram",
+    agentId: "agent-grounded-v3",
+    runtimeMode: "unified_v2",
+    message: "Inquire about wedding videography",
+  });
+
+  assert.notEqual(result.lastActionPlan?.responseGoal, "handoff");
+  assert.equal(result.leadStage, "missing_names_or_date");
+  assert.match(result.responseDraft ?? "", /Hey there!/);
+  assert.match(result.responseDraft ?? "", /founder of Myndful Films/);
+  assert.match(result.responseDraft ?? "", /both of your names/i);
+  assert.match(result.responseDraft ?? "", /wedding date/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /tell me a little more/i);
+});
+
 test("instagram wedding sales greets and qualifies a plain first hello", async () => {
   const result = await invokeWeddingSalesGraph({
     channel: "instagram",

@@ -104,11 +104,22 @@ function hasUnknownServiceRequest(analysis: SemanticAnalysisV2) {
   );
 }
 
-function isEarlySalesInquiry(state: WeddingSalesState, analysis: SemanticAnalysisV2) {
-  if (hasUnknownServiceRequest(analysis)) {
+function isWeddingSalesStarterInquiryText(text: string) {
+  const normalized = text.toLowerCase();
+  const asksAboutUnsupportedService =
+    /\b(?:photography|photo|rehearsal dinner|rehearsal|coi|certificate of insurance|invoice|contract|deposit|final film|delivery|extra hour|planner)\b/.test(normalized);
+
+  if (asksAboutUnsupportedService) {
     return false;
   }
 
+  return (
+    /\b(?:wedding|bride|groom|fiance|fiancee|married|elopement)\b/.test(normalized) &&
+    /\b(?:video|videography|film|films|info|information|package|packages|pricing|price|cost|available|availability|quote|inquiry|get in touch|inquire)\b/.test(normalized)
+  );
+}
+
+function isEarlySalesInquiry(state: WeddingSalesState, analysis: SemanticAnalysisV2) {
   const clientType = state.clientType ?? analysis.clientType?.value;
   if (clientType && clientType !== "new_lead" && clientType !== "unknown") {
     return false;
@@ -122,10 +133,15 @@ function isEarlySalesInquiry(state: WeddingSalesState, analysis: SemanticAnalysi
     .join(" ")
     .toLowerCase();
 
-  return (
-    /\b(?:wedding|bride|groom|fiance|fiancee|married|elopement)\b/.test(text) &&
-    /\b(?:video|videography|film|films|info|information|package|packages|pricing|price|cost|available|availability|quote|inquiry|get in touch)\b/.test(text)
-  );
+  if (isWeddingSalesStarterInquiryText(text)) {
+    return true;
+  }
+
+  if (hasUnknownServiceRequest(analysis)) {
+    return false;
+  }
+
+  return false;
 }
 
 function hasUnknownBusinessQuestion(args: {

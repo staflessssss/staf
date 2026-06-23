@@ -1939,6 +1939,93 @@ test("handleIncomingEventWithDeps treats Instagram get in touch as the first inq
   assert.doesNotMatch(String(sentMessage), /tell me a little more/i);
 });
 
+test("handleIncomingEventWithDeps treats Instagram videography inquiry as the first inquiry prompt", async () => {
+  let sentMessage: unknown = null;
+
+  const result = await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "INSTAGRAM" as never,
+      payload: { text: "Inquire about wedding videography" },
+    },
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({
+            id: "agent-1",
+            tenantId: "tenant-1",
+            channelConfig: {
+              runtimeType: "langgraph_wedding_sales",
+            },
+            channel: {
+              type: "INSTAGRAM",
+              credentialsEnc: "instagram-credentials",
+            },
+          }),
+        },
+        message: {
+          findFirst: async () => null,
+          create: async () => ({ id: "message-1" }),
+        },
+        conversation: {
+          findUnique: async () => null,
+        },
+        $transaction: async (
+          callback: (tx: {
+            conversation: {
+              findUnique: () => Promise<null>;
+              create: () => Promise<{ id: string; status: ConversationStatus }>;
+            };
+            message: {
+              create: () => Promise<{ id: string }>;
+            };
+          }) => Promise<unknown>,
+        ) =>
+          callback({
+            conversation: {
+              findUnique: async () => null,
+              create: async () => ({
+                id: "conv-instagram-langgraph",
+                status: ConversationStatus.ACTIVE,
+              }),
+            },
+            message: {
+              create: async () => ({ id: "message-1" }),
+            },
+          }),
+        delayedDelivery: {
+          updateMany: async () => ({ count: 0 }),
+          create: async () => ({ id: "delivery-1" }),
+        },
+      } as never,
+      decrypt: (value: string) => `decrypted:${value}`,
+      invokeAgent: async () => {
+        throw new Error("legacy invokeAgent should not run for Instagram LangGraph runtime");
+      },
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "ig-user-1",
+            message: "Inquire about wedding videography",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async (args: { message: unknown }) => {
+            sentMessage = args.message;
+            return { mode: "meta_send_pending" };
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.equal(result.ok, true);
+  assert.match(String(sentMessage), /Hey there!/);
+  assert.match(String(sentMessage), /founder of Myndful Films/);
+  assert.match(String(sentMessage), /both of your names/i);
+  assert.match(String(sentMessage), /wedding date/i);
+  assert.doesNotMatch(String(sentMessage), /tell me a little more/i);
+});
+
 test("control user message limit can suppress replies without a fallback message", () => {
   const intercept = aiRuntimeTestHelpers.getAntiSpamIntercept({
     control: {

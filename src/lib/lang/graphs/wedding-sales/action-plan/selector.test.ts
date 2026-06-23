@@ -376,6 +376,43 @@ test("action selector does not treat Instagram inquiry button text as handoff", 
   assert.notEqual(plan.actions[0]?.type, "recommend_owner_handoff");
 });
 
+test("action selector keeps Instagram inquiry button text in flow even if v3 marks it unknown service", () => {
+  const state = createInitialWeddingSalesState({
+    channel: "instagram",
+    message: "Inquire about wedding videography",
+  });
+  const plan = selectWeddingSalesActionPlan({
+    state,
+    analysis: analysis({
+      intents: [
+        {
+          category: "ask_question",
+          confidence: 0.9,
+          targetField: null,
+          evidence: "Inquire about wedding videography",
+        },
+      ],
+      primaryIntent: "ask_question",
+      questions: [
+        {
+          topicId: "unknown_service_request",
+          normalizedQuestion: "Inquire about wedding videography",
+          confidence: 0.9,
+          evidence: "Inquire about wedding videography",
+        },
+      ],
+      clientType: {
+        value: "unknown",
+        confidence: 0.9,
+        evidence: "Inquire about wedding videography",
+      },
+    }),
+  });
+
+  assert.notEqual(plan.responseGoal, "handoff");
+  assert.notEqual(plan.actions[0]?.type, "recommend_owner_handoff");
+});
+
 test("action selector keeps active sales booking questions in the sales flow", () => {
   const state = createInitialWeddingSalesState({
     channel: "instagram",
