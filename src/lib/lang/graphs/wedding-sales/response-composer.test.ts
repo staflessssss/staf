@@ -1104,6 +1104,109 @@ test("instagram v3 fallback avoids old stock availability wording when grounded 
   }
 });
 
+test("instagram v3 fallback keeps scheduling replies grounded when voice is unavailable", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "ask_email",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 3,
+        names: "Cindy and Paul",
+        customerName: "Cindy",
+        partnerName: "Paul",
+        weddingDate: "2026-10-18",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Safety Harbor FL",
+        venue: "Harborside Chapel",
+        availability: "available",
+        callProposed: true,
+        proposedCallTime: "2026-06-24T12:30:00",
+        calendarStatus: "available",
+        checkedCallDate: "2026-06-24",
+        checkedCallTime: "12:30",
+        latestCustomerMessage: "12:30 works",
+        lastActionPlan: {
+          schemaVersion: 1,
+          responseGoal: "clarify",
+          actions: [
+            {
+              type: "ask_missing_field",
+              field: "email",
+              topicId: null,
+              reason: "email_required_after_calendar_check",
+            },
+          ],
+          guardrailTrace: [],
+        },
+      },
+    });
+
+    assert.match(response, /12:30.*available/i);
+    assert.match(response, /email/i);
+    assert.doesNotMatch(response, /Perfect, .*works great/i);
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
+test("instagram v3 fallback does not ask to book before email after calendar availability", async () => {
+  const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
+  process.env.WEDDING_SALES_LLM_COMPOSER = "false";
+
+  try {
+    const response = await composeHumanWeddingSalesResponse({
+      intent: "calendar_available",
+      config,
+      state: {
+        ...baseState,
+        channel: "instagram",
+        semanticStateVersion: 3,
+        names: "Cindy and Paul",
+        customerName: "Cindy",
+        partnerName: "Paul",
+        weddingDate: "2026-10-18",
+        weddingYear: "2026",
+        weddingYearKnown: true,
+        location: "Safety Harbor FL",
+        venue: "Harborside Chapel",
+        availability: "available",
+        callProposed: true,
+        proposedCallTime: "2026-06-24T12:30:00",
+        calendarStatus: "available",
+        checkedCallDate: "2026-06-24",
+        checkedCallTime: "12:30",
+        latestCustomerMessage: "Can we do Wednesday June 24 at 12:30?",
+        turnToolObservations: [
+          {
+            toolName: "check_consultation_calendar",
+            result: JSON.stringify({ status: "available", date: "2026-06-24", time: "12:30" }),
+          },
+        ],
+      },
+    });
+
+    assert.match(response, /12:30.*available/i);
+    assert.match(response, /email/i);
+    assert.doesNotMatch(response, /Would you like me to book/i);
+  } finally {
+    if (originalComposerFlag === undefined) {
+      delete process.env.WEDDING_SALES_LLM_COMPOSER;
+    } else {
+      process.env.WEDDING_SALES_LLM_COMPOSER = originalComposerFlag;
+    }
+  }
+});
+
 test("instagram human composer keeps the first-contact introduction when the LLM composer is disabled", async () => {
   const originalComposerFlag = process.env.WEDDING_SALES_LLM_COMPOSER;
   process.env.WEDDING_SALES_LLM_COMPOSER = "false";

@@ -764,6 +764,69 @@ function formatGroundedAvailabilityPriceGuide(args: ComposeWeddingSalesResponseA
   ];
 }
 
+function formatGroundedSchedulingFallback(args: ComposeWeddingSalesResponseArgs) {
+  const { intent, state, summary } = args;
+  const callTime = formatCallTimeForReply(state.proposedCallTime);
+  const suggestedTimes = state.suggestedCallTimes?.filter(Boolean) ?? [];
+  const suggestedTimesText = suggestedTimes.length
+    ? `Would ${suggestedTimes.join(", ")} work instead?`
+    : "What other time works for you Mon-Fri, 9 AM to 2 PM Eastern?";
+
+  switch (intent) {
+    case "ask_call_time":
+      return [
+        formatVenueAcknowledgement(state),
+        "What time works best for a quick call? I'm free Mon-Fri, 9 AM to 2 PM Eastern.",
+      ].filter(Boolean);
+    case "ask_email":
+      return [
+        state.calendarStatus === "available"
+          ? `${callTime} is available.`
+          : "Perfect.",
+        "What's the best email for the calendar invite?",
+      ];
+    case "calendar_available":
+      return state.customerEmail
+        ? [`${callTime} is available. I'll get the invite set up.`]
+        : [`${callTime} is available.`, "What's the best email for the calendar invite?"];
+    case "calendar_busy":
+      return [
+        state.calendarContextDate
+          ? `That time on ${formatWeddingDateForReply(state.calendarContextDate)} is already taken.`
+          : "That time is already taken.",
+        suggestedTimesText,
+      ];
+    case "calendar_outside_window":
+      return [
+        summary || "Calls are available Mon-Fri, 9 AM to 2 PM Eastern.",
+        "What time in that window works for you?",
+      ];
+    case "calendar_date_mismatch":
+      return [
+        summary || "I want to make sure I check the right day.",
+        "Could you confirm the exact date you mean?",
+      ];
+    case "calendar_time_missing":
+      return [
+        state.calendarContextDate
+          ? `What time on ${formatWeddingDateForReply(state.calendarContextDate)} works for you?`
+          : "What time works for you Mon-Fri, 9 AM to 2 PM Eastern?",
+      ];
+    case "booking_confirmed":
+      return [
+        `You're all set - I sent the calendar invite${state.customerEmail ? ` to ${state.customerEmail}` : ""}.`,
+        `Really looking forward to meeting you both ${callTime} 🤍`,
+      ];
+    case "booking_failed":
+      return [
+        "I couldn't get that invite fully confirmed on my end.",
+        "Could you send one more time option Mon-Fri, 9 AM to 2 PM Eastern?",
+      ];
+    default:
+      return [];
+  }
+}
+
 function composeGroundedInstagramFallback(args: ComposeWeddingSalesResponseArgs, fallback: string) {
   if (!shouldUseGroundedInstagramVoice(args)) {
     return fallback;
@@ -783,8 +846,31 @@ function composeGroundedInstagramFallback(args: ComposeWeddingSalesResponseArgs,
     const plannedQuestion = questionForPlannedField(args.state, responseContext.plannedQuestionField);
 
     if (plannedQuestion) {
-      paragraphs.push(plannedQuestion);
+      if (args.intent === "ask_email" && args.state.calendarStatus === "available") {
+        paragraphs.push(`${formatCallTimeForReply(args.state.proposedCallTime)} is available.`);
+        paragraphs.push(plannedQuestion);
+      } else if (args.intent === "ask_call_time") {
+        paragraphs.push(...[
+          formatVenueAcknowledgement(args.state),
+          plannedQuestion,
+        ].filter(Boolean));
+      } else {
+        paragraphs.push(plannedQuestion);
+      }
     }
+  }
+
+  if (paragraphs.length === 0 && args.intent === "availability_unavailable") {
+    paragraphs.push(formatUnavailableWeddingReply({
+      state: args.state,
+      summary: args.summary,
+      weddingDate: formatWeddingDateForReply(args.state.weddingDate),
+      location: formatLocationSuffix(args.state.location),
+    }));
+  }
+
+  if (paragraphs.length === 0) {
+    paragraphs.push(...formatGroundedSchedulingFallback(args));
   }
 
   const text = paragraphs
