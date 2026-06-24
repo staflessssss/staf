@@ -105,6 +105,50 @@ test("simple wedding sales runtime sends price guide without unsolicited portfol
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
 });
 
+test("simple wedding sales runtime handles availability pricing and shooter question in one DM", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Are you available June 15 2027 in Tampa? How much? Who would shoot our wedding?",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+      portfolio: [
+        {
+          label: "Recent Film",
+          url: "https://galleries.example/recent",
+        },
+      ],
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "availability_question",
+        facts: {
+          weddingDate: "2027-06-15",
+          weddingDateText: "June 15 2027",
+          location: "Tampa",
+        },
+        questionsAskedByCustomer: ["availability", "pricing", "team"],
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.missingField, "names");
+  assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_wedding_availability"],
+  );
+  assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /wedding films start at/i);
+  assert.match(result.responseDraft ?? "", /collections guide image/i);
+  assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
+  assert.match(result.responseDraft ?? "", /both of your names/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
+});
+
 test("simple wedding sales runtime greets once and does not repeat availability after names", async () => {
   const first = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
@@ -1078,6 +1122,59 @@ test("simple wedding sales runtime handles call time and shooter question in one
   assert.match(result.responseDraft ?? "", /10(?:\:00)?\s*(?:am|AM).*works perfectly/i);
   assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
+});
+
+test("simple wedding sales runtime handles call time and explicit portfolio request in one DM", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can we call tomorrow at 10am? Also can you send recent films?",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+      portfolio: [
+        {
+          label: "Recent Film",
+          url: "https://galleries.example/recent",
+        },
+      ],
+    },
+    previousState: {
+      customerName: "Rick",
+      partnerName: "Dakota",
+      weddingDate: "2026-10-17",
+      location: "Tampa, Florida",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityCheck: {
+        date: "2026-10-17",
+        location: "Tampa, Florida",
+        status: "available",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {
+          proposedCallTime: "tomorrow at 10am",
+        },
+        questionsAskedByCustomer: ["portfolio"],
+      }),
+  });
+
+  assert.notEqual(result.nextStep, "handoff");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.decisionTrace?.toolCalled, "checkCalendar");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_consultation_calendar"],
+  );
+  assert.match(result.responseDraft ?? "", /10(?:\:00)?\s*(?:am|AM).*works perfectly/i);
+  assert.match(result.responseDraft ?? "", /recent films.*Recent Film: https:\/\/galleries\.example\/recent/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /wedding films start|collections guide/i);
 });
 
 test("simple wedding sales runtime asks for date when availability question has no date", async () => {

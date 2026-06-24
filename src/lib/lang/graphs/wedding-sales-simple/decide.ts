@@ -150,11 +150,15 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     state.weddingDate && state.location && !isAvailabilityContextCurrent(state),
   );
   const hasActionableCallTime = Boolean(state.proposedCallTime);
+  const checkedAvailabilityThisTurn = state.toolObservations.some(
+    (observation) => observation.toolName === "check_wedding_availability",
+  );
 
   if (
     state.questionsAskedByCustomer.includes("team") &&
     !hasActionableCallTime &&
-    !hasUncheckedAvailability
+    !hasUncheckedAvailability &&
+    !checkedAvailabilityThisTurn
   ) {
     return decision({
       nextStep: "reply_only",
