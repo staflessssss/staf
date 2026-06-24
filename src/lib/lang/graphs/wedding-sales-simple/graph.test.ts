@@ -323,6 +323,108 @@ test("simple wedding sales runtime does not resend the same price guide after fo
   assert.doesNotMatch(result.responseDraft ?? "", /collections guide image/i);
 });
 
+test("simple wedding sales runtime handles the live Instagram canary transcript without clarification or repeated CTA", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "1. Hi! Are you available June 14 2027 in Tampa? How much?",
+    toolContext,
+    understand: () =>
+      understanding({
+        customerMessageType: "availability_question",
+        facts: {
+          weddingDate: "2027-06-14",
+          weddingDateText: "June 14 2027",
+          location: "Tampa",
+        },
+        questionsAskedByCustomer: ["availability", "pricing"],
+      }),
+  });
+
+  assert.equal(first.replyGuardResult?.ok, true);
+  assert.match(first.responseDraft ?? "", /June 14, 2027 in Tampa.*date is available/i);
+  assert.match(first.responseDraft ?? "", /both of your names/i);
+
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "2. Mike and Sarah",
+    previousState: first,
+    toolContext,
+    understand: () =>
+      understanding({
+        customerMessageType: "unclear",
+        facts: {
+          customerName: "Mike",
+          partnerName: "Sarah",
+        },
+        confidence: 0.2,
+      }),
+  });
+
+  assert.equal(second.nextStep, "ask_venue");
+  assert.equal(second.decisionTrace?.replyType, "ask_venue");
+  assert.doesNotMatch(second.responseDraft ?? "", /make sure I understand/i);
+  assert.doesNotMatch(second.responseDraft ?? "", /both of your names/i);
+  assert.match(second.responseDraft ?? "", /venue/i);
+
+  const third = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Our names Mike and Sarah",
+    previousState: second,
+    toolContext,
+    understand: () =>
+      understanding({
+        facts: {
+          customerName: "Mike",
+          partnerName: "Sarah",
+        },
+      }),
+  });
+
+  assert.equal(third.nextStep, "ask_venue");
+  assert.doesNotMatch(third.responseDraft ?? "", /both of your names/i);
+  assert.match(third.responseDraft ?? "", /venue/i);
+
+  const fourth = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Evergreen Park",
+    previousState: third,
+    toolContext,
+    understand: () =>
+      understanding({
+        facts: {
+          venue: "Evergreen Park",
+        },
+      }),
+  });
+
+  assert.equal(fourth.nextStep, "ask_call_time");
+  assert.match(fourth.responseDraft ?? "", /Evergreen Park gives us a good starting point/i);
+  assert.match(fourth.responseDraft ?? "", /quick consult/i);
+  assert.match(fourth.responseDraft ?? "", /What time works best/i);
+
+  const fifth = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Actually, we may move the wedding to June 15 2027",
+    previousState: fourth,
+    toolContext,
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {
+          weddingDate: "2027-06-15",
+          weddingDateText: "June 15 2027",
+        },
+      }),
+  });
+
+  assert.equal(fifth.nextStep, "ask_call_time");
+  assert.equal(fifth.availabilityCheck?.date, "2027-06-15");
+  assert.match(fifth.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.doesNotMatch(fifth.responseDraft ?? "", /Evergreen Park gives us a good starting point/i);
+  assert.doesNotMatch(fifth.responseDraft ?? "", /sounds like such a beautiful setting/i);
+  assert.match(fifth.responseDraft ?? "", /Same next step from here/i);
+});
+
 test("simple wedding sales runtime resolves a selected suggested call time", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

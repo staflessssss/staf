@@ -1099,6 +1099,32 @@ function shouldUseWeddingSalesSimpleRuntime(args: {
   );
 }
 
+function getOutboundChannelConfig(args: {
+  channelConfig: unknown;
+  result: Pick<InvokeAgentResult, "model">;
+}) {
+  if (args.result.model !== "wedding_sales_simple") {
+    return args.channelConfig;
+  }
+
+  const rawChannelConfig = getChannelConfigObject(args.channelConfig as never);
+  const channelBehavior =
+    rawChannelConfig.channelBehavior &&
+    typeof rawChannelConfig.channelBehavior === "object" &&
+    !Array.isArray(rawChannelConfig.channelBehavior)
+      ? (rawChannelConfig.channelBehavior as Record<string, unknown>)
+      : {};
+
+  return {
+    ...rawChannelConfig,
+    channelBehavior: {
+      ...channelBehavior,
+      messageFormat: "single_message",
+      splitMessageDelaySeconds: 0,
+    },
+  };
+}
+
 function getWeddingSalesGraphChannel(channel: ChannelType) {
   return channel === ChannelType.INSTAGRAM ? "instagram" : "gmail";
 }
@@ -2512,6 +2538,7 @@ export const aiRuntimeTestHelpers = {
   getAntiSpamIntercept,
   classifyGmailClientMessage,
   getRuntimeType,
+  getOutboundChannelConfig,
   shouldUseWeddingSalesSimpleRuntime,
   shouldUseWeddingSalesRuntime,
 };
@@ -3074,7 +3101,11 @@ async function handleIncomingEventWithDeps(
     };
   }
 
-  const formattedReply = adapter.formatReply(result.message, agent.channelConfig);
+  const outboundChannelConfig = getOutboundChannelConfig({
+    channelConfig: agent.channelConfig,
+    result,
+  });
+  const formattedReply = adapter.formatReply(result.message, outboundChannelConfig);
   const outboundMessage = formattedReply as string | string[] | { text: string; html?: string };
 
   const delivery = await adapter.sendReply({
@@ -3091,7 +3122,7 @@ async function handleIncomingEventWithDeps(
       messageBehavior.allowAttachments || args.channel === ChannelType.INSTAGRAM
         ? result.attachments
         : undefined,
-    channelConfig: agent.channelConfig,
+    channelConfig: outboundChannelConfig,
   });
 
   if (args.channel === ChannelType.INSTAGRAM && result.conversationId) {

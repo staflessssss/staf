@@ -120,6 +120,17 @@ export type SimpleWeddingSalesReplyMemory = {
       lastMentionedAt: string;
     };
   };
+  questionMemory?: {
+    lastRequiredQuestion?: string;
+    lastQuestionText?: string;
+    askedQuestions?: Array<{
+      type: string;
+      turnId: string;
+      text: string;
+    }>;
+    complimentedVenue?: string;
+    lastCtaText?: string;
+  };
   lastReplyType?: SimpleWeddingSalesDecisionTrace["replyType"];
   lastRequiredQuestion?: string;
   lastOutboundText?: string;

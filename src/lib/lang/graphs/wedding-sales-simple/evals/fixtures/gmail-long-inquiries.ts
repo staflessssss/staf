@@ -23,7 +23,8 @@ export const gmailLongInquiryReplay: SimpleWeddingSalesReplayTurn[] = [
       replyIncludes: [
         /June 14, 2027 in Tampa.*date is available/i,
         /wedding films start at/i,
-        /What time works best for a quick call/i,
+        /quick consult/i,
+        /What time works best/i,
       ],
     },
   },

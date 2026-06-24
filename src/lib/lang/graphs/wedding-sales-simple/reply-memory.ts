@@ -18,6 +18,15 @@ function mentionsGuide(text: string) {
   return /\b(?:collections? guide|guide image|price image)\b/i.test(text);
 }
 
+function extractQuestionText(text: string) {
+  const question = text
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .find((part) => part.includes("?"));
+
+  return question;
+}
+
 export function updateSimpleWeddingReplyMemory(args: {
   state: SimpleWeddingSalesState;
   contract: ReplyActionContract;
@@ -30,6 +39,9 @@ export function updateSimpleWeddingReplyMemory(args: {
   const now = (args.now ?? new Date()).toISOString();
   const previous = state.replyMemory ?? {};
   const previousMentioned = previous.mentioned ?? {};
+  const previousQuestionMemory = previous.questionMemory ?? {};
+  const questionText = contract.requiredQuestion ? extractQuestionText(replyText) : undefined;
+  const askedQuestions = previousQuestionMemory.askedQuestions ?? [];
   const mentionedPrice =
     knowledge.pricing.startPrice && replyText.includes(knowledge.pricing.startPrice);
   const mentionedAvailability =
@@ -80,6 +92,32 @@ export function updateSimpleWeddingReplyMemory(args: {
                 lastMentionedAt: now,
               }
             : undefined),
+    },
+    questionMemory: {
+      ...previousQuestionMemory,
+      lastRequiredQuestion: contract.requiredQuestion ?? previousQuestionMemory.lastRequiredQuestion,
+      lastQuestionText: questionText ?? previousQuestionMemory.lastQuestionText,
+      askedQuestions:
+        contract.requiredQuestion && questionText
+          ? [
+              ...askedQuestions,
+              {
+                type: contract.requiredQuestion,
+                turnId,
+                text: questionText,
+              },
+            ]
+          : askedQuestions,
+      complimentedVenue:
+        contract.questionPolicy.allowCompliment &&
+        contract.questionPolicy.complimentSubject === "venue" &&
+        state.venue
+          ? state.venue
+          : previousQuestionMemory.complimentedVenue,
+      lastCtaText:
+        contract.questionPolicy.cta && questionText
+          ? questionText
+          : previousQuestionMemory.lastCtaText,
     },
     lastReplyType: contract.replyType,
     lastRequiredQuestion: contract.requiredQuestion,

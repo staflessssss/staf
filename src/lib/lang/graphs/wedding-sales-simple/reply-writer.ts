@@ -159,6 +159,8 @@ function questionLine(args: {
   state: SimpleWeddingSalesState;
   knowledge: SimpleWeddingKnowledgeContext;
 }) {
+  const callWindow = args.knowledge.scheduling.callWindow.replace("America/New_York", "Eastern");
+
   switch (args.contract.requiredQuestion) {
     case "coupleNames":
       return "What are the couple's names? I’ll keep everything organized on my side.";
@@ -171,9 +173,22 @@ function questionLine(args: {
     case "venue":
       return `${args.knowledge.persona.replyStyle.namesAcknowledgement} Do you already have a venue picked out?`;
     case "callTime":
-      return `${renderCopy(args.knowledge.persona.replyStyle.venueAcknowledgement, {
-        venue: args.state.venue,
-      })} What time works best for a quick call? I do consults ${args.knowledge.scheduling.callWindow.replace("America/New_York", "Eastern")}.`;
+      if (args.contract.questionPolicy.mode === "ask_after_context_change") {
+        return `Same next step from here - what time would be best for a quick call? I do consults ${callWindow}.`;
+      }
+
+      if (args.contract.questionPolicy.mode === "gentle_reminder") {
+        return `What time would be best for a quick call? I do consults ${callWindow}.`;
+      }
+
+      if (
+        args.contract.questionPolicy.allowCompliment &&
+        args.contract.questionPolicy.complimentSubject === "venue"
+      ) {
+        return `Beautiful - ${args.state.venue} gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults ${callWindow}.`;
+      }
+
+      return `From here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults ${callWindow}.`;
     case "email":
       return "What’s the best email for the calendar invite?";
     default:
@@ -299,6 +314,33 @@ function renderSafeTemplate(args: {
   ]) || questionLine(args) || "Got it. I can help with that.";
 }
 
+function renderCompactInstagramFallback(args: {
+  state: SimpleWeddingSalesState;
+  contract: ReplyActionContract;
+  knowledge: SimpleWeddingKnowledgeContext;
+}) {
+  const greeting = greetingLine(args)?.replace(/\n{2,}/g, " ");
+  const factLine = [
+    args.contract.mustMentionWeddingAvailability
+      ? availabilityLine({ state: args.state, contract: args.contract })
+      : undefined,
+    pricingLine(args),
+    guideLine(args),
+    args.contract.mustMentionCalendarAvailability
+      ? calendarLine(args.state, args.knowledge)
+      : undefined,
+    args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
+    callLogisticsLine(args.state),
+    args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
+    args.contract.replyType === "clarification" ? clarificationLine() : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const question = questionLine(args);
+
+  return joinLines([greeting, factLine || undefined, question]) || "Got it. I can help with that.";
+}
+
 export function writeConstrainedWeddingReply(args: {
   state: SimpleWeddingSalesState;
   contract: ReplyActionContract;
@@ -343,14 +385,40 @@ export function writeConstrainedWeddingReply(args: {
     };
   }
 
+  const fallback =
+    knowledge.channel === "instagram"
+      ? renderCompactInstagramFallback(args)
+      : renderSafeTemplate(args);
+  const fallbackGuard = validateGeneratedReply({
+    reply: fallback,
+    contract,
+    knowledge,
+    state,
+  });
+
+  if (fallbackGuard.ok) {
+    return {
+      text: fallback,
+      guardResult: fallbackGuard,
+    };
+  }
+
+  const minimal = renderSafeTemplate(args);
+
   return {
-    text: renderSafeTemplate(args),
-    guardResult: guard,
+    text: minimal,
+    guardResult: validateGeneratedReply({
+      reply: minimal,
+      contract,
+      knowledge,
+      state,
+    }),
   };
 }
 
 export const simpleWeddingReplyWriterTestHelpers = {
   renderSafeTemplate,
+  renderCompactInstagramFallback,
   pricingLine,
   guideLine,
 };

@@ -114,10 +114,11 @@ function extractMonthDate(message: string) {
 }
 
 function extractNames(message: string) {
+  const normalizedMessage = message.replace(/^\s*\d+[\).:-]?\s*/, "");
   const introduced = /\b(?:we are|we're|this is|names are|i am|i'm)\s+([A-Z][a-z]+)(?:\s+(?:and|&)\s+([A-Z][a-z]+))?/i.exec(
-    message,
+    normalizedMessage,
   );
-  const barePair = /^\s*([A-Z][a-z]+)\s+(?:and|&)\s+([A-Z][a-z]+)[.!]?\s*$/.exec(message);
+  const barePair = /^\s*([A-Z][a-z]+)\s+(?:and|&)\s+([A-Z][a-z]+)[.!]?\s*$/.exec(normalizedMessage);
   const match = introduced ?? barePair;
 
   return {

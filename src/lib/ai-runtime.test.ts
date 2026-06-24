@@ -192,6 +192,32 @@ test("wedding-sales-simple runtime routing does not affect legacy Instagram", ()
   );
 });
 
+test("wedding-sales-simple runtime forces single Instagram text formatting", () => {
+  const originalConfig = {
+    runtimeType: "wedding_sales_simple",
+    channelBehavior: {
+      messageFormat: "split_into_2_3_messages",
+      splitMessageDelaySeconds: 6,
+    },
+  };
+  const outboundConfig = aiRuntimeTestHelpers.getOutboundChannelConfig({
+    channelConfig: originalConfig,
+    result: {
+      model: "wedding_sales_simple",
+    },
+  });
+
+  assert.equal(
+    splitOutgoingMessage("Part one\n\nPart two\n\nPart three", outboundConfig),
+    "Part one\n\nPart two\n\nPart three",
+  );
+
+  assert.deepEqual(
+    splitOutgoingMessage("Part one\n\nPart two\n\nPart three", originalConfig),
+    ["Part one", "Part two", "Part three"],
+  );
+});
+
 test("wedding-sales-simple runtime has an Instagram kill switch", () => {
   const previous = process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM;
   process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM = "true";

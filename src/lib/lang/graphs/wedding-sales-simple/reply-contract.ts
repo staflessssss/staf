@@ -7,6 +7,10 @@ import {
   buildSimpleWeddingMentionPolicy,
   type SimpleWeddingMentionPolicy,
 } from "./mention-policy";
+import {
+  buildSimpleWeddingQuestionPolicy,
+  type SimpleWeddingQuestionPolicy,
+} from "./question-policy";
 
 export type SimpleWeddingRequiredQuestion =
   | "names"
@@ -30,6 +34,7 @@ export type ReplyActionContract = {
   mayMentionGuide: boolean;
   mustMentionGuide: boolean;
   mentionPolicy: SimpleWeddingMentionPolicy;
+  questionPolicy: SimpleWeddingQuestionPolicy;
   mayAskQuestion: boolean;
   requiredToolResult?: "available" | "unavailable" | "busy" | "booked" | "failed";
   bookingConfirmed: boolean;
@@ -70,6 +75,10 @@ export function buildReplyActionContract(args: {
   const { state } = args;
   const requiredQuestion = requiredQuestionForState(state);
   const mentionPolicy = buildSimpleWeddingMentionPolicy(args);
+  const questionPolicy = buildSimpleWeddingQuestionPolicy({
+    state,
+    requiredQuestion,
+  });
   const currentTurnProposedCallTime = state.lastUnderstanding?.facts.proposedCallTime;
   const mustMentionWeddingAvailability = Boolean(
     mentionPolicy.availability.mode !== "skip",
@@ -98,6 +107,7 @@ export function buildReplyActionContract(args: {
     mayMentionGuide: mentionPolicy.guide.mode !== "skip",
     mustMentionGuide: mentionPolicy.guide.mode !== "skip",
     mentionPolicy,
+    questionPolicy,
     mayAskQuestion: Boolean(requiredQuestion),
     requiredToolResult:
       mustMentionBookingConfirmation

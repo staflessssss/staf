@@ -13,6 +13,26 @@ function hasQuestion(state: SimpleWeddingSalesState) {
   return state.questionsAskedByCustomer.length > 0;
 }
 
+function answeredPreviousRequiredQuestion(state: SimpleWeddingSalesState) {
+  switch (state.replyMemory?.lastRequiredQuestion) {
+    case "names":
+    case "coupleNames":
+      return hasNames(state);
+    case "weddingDate":
+      return Boolean(state.weddingDate);
+    case "location":
+      return Boolean(state.location);
+    case "venue":
+      return Boolean(state.venue);
+    case "callTime":
+      return Boolean(state.proposedCallTime);
+    case "email":
+      return Boolean(state.customerEmail);
+    default:
+      return false;
+  }
+}
+
 function isAvailabilityContextCurrent(state: SimpleWeddingSalesState) {
   if (!state.weddingDate) {
     return false;
@@ -96,8 +116,9 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   }
 
   if (
-    state.lastUnderstanding?.customerMessageType === "unclear" ||
-    (state.lastUnderstanding?.confidence ?? 1) < 0.35
+    !answeredPreviousRequiredQuestion(state) &&
+    (state.lastUnderstanding?.customerMessageType === "unclear" ||
+      (state.lastUnderstanding?.confidence ?? 1) < 0.35)
   ) {
     return decision({
       nextStep: "reply_only",
