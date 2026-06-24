@@ -8,15 +8,20 @@ function joinLines(lines: Array<string | undefined>) {
   return lines.filter(Boolean).join("\n\n");
 }
 
-function greetingLine(state: SimpleWeddingSalesState) {
-  return state.isFirstTurn ? "Hey! Taras here - thanks for reaching out." : undefined;
-}
+function greetingLine(args: {
+  contract: ReplyActionContract;
+  state: SimpleWeddingSalesState;
+}) {
+  if (!args.contract.mustGreet) {
+    return undefined;
+  }
 
-function shouldMentionAvailability(state: SimpleWeddingSalesState) {
-  return Boolean(
-    state.decisionTrace?.toolCalled === "checkAvailability" ||
-      state.questionsAskedByCustomer.includes("availability"),
-  );
+  const introduction =
+    "Hey there! Thank you so much for reaching out 🤍✨\nI’m Taras, the founder of Myndful Films.";
+
+  return args.state.senderRole === "mother" || args.state.senderRole === "planner"
+    ? introduction
+    : `${introduction} Huge congratulations on your engagement - such an exciting season of life!`;
 }
 
 function availabilityLine(state: SimpleWeddingSalesState) {
@@ -28,7 +33,7 @@ function availabilityLine(state: SimpleWeddingSalesState) {
   const place = state.location ? ` in ${state.location}` : "";
 
   if (state.availability === "available") {
-    return `Yes, ${date}${place} is open for us right now.`;
+    return `Great news - I checked ${date}${place}, and the date is available 🤍`;
   }
 
   const alternatives = state.suggestedWeddingDates
@@ -71,15 +76,15 @@ function guideLine(args: {
   }
 
   if (args.knowledge.channel === "instagram" && args.knowledge.guide.imageUrl) {
-    return "I'm sending the collections guide image here too.";
+    return "I’m sending the collections guide image here too 🎥";
   }
 
   if (args.knowledge.guide.link) {
-    return `I'm sending the collections guide here too: ${args.knowledge.guide.link}`;
+    return `I’m sending the collections guide here too 🎥 ${args.knowledge.guide.link}`;
   }
 
   if (args.knowledge.guide.imageUrl) {
-    return "I'm sending the collections guide image here too.";
+    return "I’m sending the collections guide image here too 🎥";
   }
 
   return undefined;
@@ -106,15 +111,15 @@ function questionLine(args: {
     case "coupleNames":
       return "What are the couple's names? I’ll keep everything organized on my side.";
     case "names":
-      return "What are both of your names? I’ll keep everything organized on my side.";
+      return "And what are both of your names? I’ll keep everything organized on my side.";
     case "weddingDate":
       return "What date are you looking at?";
     case "location":
       return "What city or area is the wedding in?";
     case "venue":
-      return "Do you already have a venue picked out?";
+      return "So nice to meet you both! Do you already have a venue picked out?";
     case "callTime":
-      return `What time works best for a quick call? I do consults ${args.knowledge.scheduling.callWindow}.`;
+      return `What time works best for a quick call? I do consults ${args.knowledge.scheduling.callWindow.replace("America/New_York", "Eastern")}.`;
     case "email":
       return "What’s the best email for the calendar invite?";
     default:
@@ -124,7 +129,7 @@ function questionLine(args: {
 
 function calendarLine(state: SimpleWeddingSalesState) {
   if (state.calendarStatus === "available" && state.checkedCallTime) {
-    return `${state.checkedCallTime} works for a call.`;
+    return `${state.checkedCallTime} works perfectly for a call ✨`;
   }
 
   if (state.calendarStatus === "busy") {
@@ -164,12 +169,12 @@ function renderSafeTemplate(args: {
   }
 
   return joinLines([
-    greetingLine(args.state),
-    shouldMentionAvailability(args.state) ? availabilityLine(args.state) : undefined,
+    greetingLine({ contract: args.contract, state: args.state }),
+    args.contract.mustMentionWeddingAvailability ? availabilityLine(args.state) : undefined,
     pricingLine(args),
     guideLine(args),
-    calendarLine(args.state),
-    bookingLine(args.state),
+    args.contract.mustMentionCalendarAvailability ? calendarLine(args.state) : undefined,
+    args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     questionLine(args),
   ]) || questionLine(args) || "Got it. I can help with that.";
 }
@@ -190,13 +195,13 @@ export function writeConstrainedWeddingReply(args: {
     state.nextStep === "handoff"
       ? handoffLine()
       : joinLines([
-          greetingLine(state),
-          shouldMentionAvailability(state) ? availabilityLine(state) : undefined,
+          greetingLine({ contract, state }),
+          contract.mustMentionWeddingAvailability ? availabilityLine(state) : undefined,
           pricingLine({ contract, knowledge }),
           guideLine({ contract, knowledge }),
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,
-          calendarLine(state),
-          bookingLine(state),
+          contract.mustMentionCalendarAvailability ? calendarLine(state) : undefined,
+          contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);
   const guard = validateGeneratedReply({

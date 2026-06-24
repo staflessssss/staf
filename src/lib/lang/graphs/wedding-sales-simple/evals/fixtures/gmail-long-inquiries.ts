@@ -21,7 +21,7 @@ export const gmailLongInquiryReplay: SimpleWeddingSalesReplayTurn[] = [
       nextStep: "ask_call_time",
       toolCalls: ["check_wedding_availability"],
       replyIncludes: [
-        /June 14, 2027 in Tampa is open/i,
+        /June 14, 2027 in Tampa.*date is available/i,
         /wedding films start at/i,
         /What time works best for a quick call/i,
       ],

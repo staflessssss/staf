@@ -157,3 +157,107 @@ test("gmail guide link may appear while guard still blocks guide-unavailable lan
     badGuard.reasons.includes("reply says guide/image is unavailable even though it exists"),
   );
 });
+
+test("calendar result contract does not repeat persistent wedding availability", () => {
+  const state = baseState({
+    latestCustomerMessage: "Can we call tomorrow at 10am?",
+    isFirstTurn: false,
+    customerName: "Mike",
+    partnerName: "Sarah",
+    weddingDate: "2027-06-14",
+    location: "Tampa",
+    venue: "Evergreen Park",
+    availability: "available",
+    calendarStatus: "available",
+    checkedCallTime: "10:00",
+    questionsAskedByCustomer: ["availability"],
+    lastUnderstanding: {
+      customerMessageType: "call_time_proposed",
+      facts: { proposedCallTime: "tomorrow at 10am" },
+      questionsAskedByCustomer: ["availability"],
+      confidence: 0.9,
+    },
+    decisionTrace: {
+      extractedFacts: { proposedCallTime: "tomorrow at 10am" },
+      missingFields: ["email"],
+      nextStep: "ask_email",
+      toolCalled: "checkCalendar",
+      replyType: "ask_email",
+      reason: "calendar slot is available and email is needed",
+    },
+    nextStep: "ask_email",
+    missingField: undefined,
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const reply = writeConstrainedWeddingReply({ state, knowledge, contract }).text;
+
+  assert.equal(contract.mustMentionWeddingAvailability, false);
+  assert.equal(contract.mustMentionCalendarAvailability, true);
+  assert.match(reply, /10:00 works perfectly for a call/i);
+  assert.doesNotMatch(reply, /June 14|date is available/i);
+});
+
+test("booking result contract does not repeat the previously confirmed calendar slot", () => {
+  const state = baseState({
+    latestCustomerMessage: "mike@example.com",
+    isFirstTurn: false,
+    customerName: "Mike",
+    partnerName: "Sarah",
+    weddingDate: "2027-06-14",
+    location: "Tampa",
+    venue: "Evergreen Park",
+    availability: "available",
+    calendarStatus: "available",
+    checkedCallTime: "10:00",
+    customerEmail: "mike@example.com",
+    bookingConfirmed: true,
+    questionsAskedByCustomer: [],
+    lastUnderstanding: {
+      customerMessageType: "email_provided",
+      facts: { email: "mike@example.com" },
+      questionsAskedByCustomer: [],
+      confidence: 0.95,
+    },
+    decisionTrace: {
+      extractedFacts: { email: "mike@example.com" },
+      missingFields: [],
+      nextStep: "reply_only",
+      toolCalled: "bookCall",
+      replyType: "booking_confirmed",
+      reason: "booking has been confirmed",
+    },
+    nextStep: "reply_only",
+    missingField: undefined,
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const reply = writeConstrainedWeddingReply({ state, knowledge, contract }).text;
+
+  assert.equal(contract.mustMentionCalendarAvailability, false);
+  assert.equal(contract.mustMentionBookingConfirmation, true);
+  assert.match(reply, /I booked the call for Mike and Sarah/i);
+  assert.doesNotMatch(reply, /10:00 works/i);
+});
+
+test("reply guard rejects stale wedding availability outside the contract", () => {
+  const state = baseState({
+    isFirstTurn: false,
+    availability: "available",
+    weddingDate: "2027-06-14",
+    location: "Tampa",
+    questionsAskedByCustomer: [],
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const guard = validateGeneratedReply({
+    reply: "I checked June 14, 2027 in Tampa, and the date is available.",
+    state,
+    knowledge,
+    contract,
+  });
+
+  assert.equal(contract.mustMentionWeddingAvailability, false);
+  assert.equal(guard.ok, false);
+  assert.ok(guard.reasons.includes("stale wedding availability was repeated"));
+});

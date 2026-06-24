@@ -17,6 +17,10 @@ export type ReplyActionContract = {
   nextStep: SimpleWeddingSalesState["nextStep"];
   replyType?: SimpleWeddingSalesDecisionTrace["replyType"];
   requiredQuestion?: SimpleWeddingRequiredQuestion;
+  mustGreet: boolean;
+  mustMentionWeddingAvailability: boolean;
+  mustMentionCalendarAvailability: boolean;
+  mustMentionBookingConfirmation: boolean;
   mayMentionPricing: boolean;
   mustMentionPricing: boolean;
   mayMentionGuide: boolean;
@@ -72,26 +76,45 @@ export function buildReplyActionContract(args: {
   const justCheckedAvailability =
     state.decisionTrace?.toolCalled === "checkAvailability" &&
     state.availability === "available";
+  const currentTurnProposedCallTime = state.lastUnderstanding?.facts.proposedCallTime;
+  const askedWeddingAvailability =
+    state.questionsAskedByCustomer.includes("availability") &&
+    !currentTurnProposedCallTime;
+  const mustMentionWeddingAvailability = Boolean(
+    state.decisionTrace?.toolCalled === "checkAvailability" || askedWeddingAvailability,
+  );
+  const mustMentionCalendarAvailability = Boolean(
+    state.decisionTrace?.toolCalled === "checkCalendar" ||
+      state.decisionTrace?.replyType === "calendar_busy" ||
+      (currentTurnProposedCallTime && state.calendarStatus),
+  );
+  const mustMentionBookingConfirmation = Boolean(
+    state.bookingConfirmed && state.decisionTrace?.toolCalled === "bookCall",
+  );
 
   return {
     nextStep: state.nextStep,
     replyType: state.decisionTrace?.replyType,
     requiredQuestion,
+    mustGreet: Boolean(state.isFirstTurn),
+    mustMentionWeddingAvailability,
+    mustMentionCalendarAvailability,
+    mustMentionBookingConfirmation,
     mayMentionPricing: askedPricing || justCheckedAvailability,
     mustMentionPricing: askedPricing,
     mayMentionGuide: guideExists && (askedPricing || askedGuide || justCheckedAvailability),
     mustMentionGuide: guideExists && askedGuide,
     mayAskQuestion: Boolean(requiredQuestion),
     requiredToolResult:
-      state.bookingConfirmed
+      mustMentionBookingConfirmation
         ? "booked"
-        : state.calendarStatus === "busy"
+        : mustMentionCalendarAvailability && state.calendarStatus === "busy"
           ? "busy"
-          : state.calendarStatus === "available"
+          : mustMentionCalendarAvailability && state.calendarStatus === "available"
             ? "available"
-            : state.availability === "unavailable"
+            : mustMentionWeddingAvailability && state.availability === "unavailable"
               ? "unavailable"
-              : state.availability === "available"
+              : mustMentionWeddingAvailability && state.availability === "available"
                 ? "available"
                 : undefined,
     bookingConfirmed: state.bookingConfirmed,

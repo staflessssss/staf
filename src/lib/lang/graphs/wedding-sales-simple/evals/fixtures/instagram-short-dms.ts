@@ -56,7 +56,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_missing_info",
       toolCalls: ["check_wedding_availability"],
-      replyIncludes: [/June 14, 2027 in Tampa is open/i, /both of your names/i],
+      replyIncludes: [/June 14, 2027 in Tampa.*date is available/i, /both of your names/i],
     },
   },
   {
@@ -105,7 +105,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_email",
       toolCalls: ["check_consultation_calendar"],
-      replyIncludes: [/works for a call/i, /best email/i],
+      replyIncludes: [/works perfectly for a call/i, /best email/i],
     },
   },
   {

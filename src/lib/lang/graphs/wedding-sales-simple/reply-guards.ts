@@ -43,6 +43,14 @@ function hasSignature(text: string) {
   return /\bTaras Mynd\b|\bFounder & Creative Director\b|\bMYNDFUL FILMS LLC\b/i.test(text);
 }
 
+function hasWeddingAvailabilityResult(text: string) {
+  return /\b(?:date is available|date is not available|is not open for us|is open for us)\b/i.test(text);
+}
+
+function hasCalendarAvailabilityResult(text: string) {
+  return /\b(?:works perfectly for a call|works for a call|time is already taken)\b/i.test(text);
+}
+
 function paragraphCount(text: string) {
   return text.split(/\n{2,}/).filter((part) => part.trim()).length;
 }
@@ -58,6 +66,16 @@ export function validateGeneratedReply(args: {
 
   if (!reply) {
     reasons.push("reply is empty");
+  }
+
+  if (
+    args.contract.mustGreet &&
+    (!/thank you so much for reaching out/i.test(reply) ||
+      !/\bTaras\b/.test(reply) ||
+      !reply.includes("🤍") ||
+      !reply.includes("✨"))
+  ) {
+    reasons.push("first-turn founder greeting is incomplete");
   }
 
   if (args.contract.mustMentionPricing && !reply.includes(args.knowledge.pricing.startPrice)) {
@@ -88,6 +106,22 @@ export function validateGeneratedReply(args: {
     reasons.push("booking confirmation appeared before bookingConfirmed");
   }
 
+  if (!args.contract.mustMentionWeddingAvailability && hasWeddingAvailabilityResult(reply)) {
+    reasons.push("stale wedding availability was repeated");
+  }
+
+  if (!args.contract.mustMentionCalendarAvailability && hasCalendarAvailabilityResult(reply)) {
+    reasons.push("stale calendar availability was repeated");
+  }
+
+  if (
+    args.contract.bookingConfirmed &&
+    !args.contract.mustMentionBookingConfirmation &&
+    hasBookingConfirmation(reply)
+  ) {
+    reasons.push("stale booking confirmation was repeated");
+  }
+
   if (
     (args.knowledge.guide.imageUrl || args.knowledge.guide.link) &&
     saysGuideUnavailable(reply)
@@ -104,11 +138,10 @@ export function validateGeneratedReply(args: {
       reasons.push("instagram reply is too long");
     }
 
-    if (paragraphCount(reply) > 4) {
+    if (paragraphCount(reply) > 5) {
       reasons.push("instagram reply has too many paragraphs");
     }
   }
 
   return reasons.length > 0 ? { ok: false, reasons } : { ok: true };
 }
-
