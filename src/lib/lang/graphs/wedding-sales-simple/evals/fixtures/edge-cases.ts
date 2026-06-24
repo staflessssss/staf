@@ -90,11 +90,11 @@ export const callTimeChangeReplay: SimpleWeddingSalesReplayTurn[] = [
     },
   },
   {
-    message: "Actually 4pm",
+    message: "Actually 2pm",
     understanding: {
       customerMessageType: "call_time_proposed",
       facts: {
-        proposedCallTime: "2026-06-24T16:00:00-04:00",
+        proposedCallTime: "2026-06-24T14:00:00-04:00",
       },
       questionsAskedByCustomer: [],
       confidence: 0.95,
@@ -102,7 +102,7 @@ export const callTimeChangeReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_email",
       toolCalls: ["check_consultation_calendar"],
-      replyIncludes: [/4:00 PM works perfectly for a call/i],
+      replyIncludes: [/2:00 PM works perfectly for a call/i],
     },
   },
 ];

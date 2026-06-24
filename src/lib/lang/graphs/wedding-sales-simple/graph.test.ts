@@ -160,6 +160,73 @@ test("simple wedding sales runtime checks consultation time and asks for email",
   assert.match(result.responseDraft ?? "", /best email/i);
 });
 
+test("simple wedding sales runtime retries call time outside consult window without calendar tool", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Tomorrow at 3pm works for a call",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-14",
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {
+          proposedCallTime: "Tomorrow at 3pm",
+        },
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_call_time");
+  assert.equal(result.decisionTrace?.replyType, "call_time_out_of_window");
+  assert.equal(result.replyContract?.requiredQuestion, "callTime");
+  assert.equal(result.replyContract?.requiredToolResult, "out_of_window");
+  assert.equal(result.replyContract?.questionPolicy.mode, "invalid_answer_retry");
+  assert.equal(result.replyGuardResult?.ok, true);
+  assert.deepEqual(result.toolObservations, []);
+  assert.match(result.responseDraft ?? "", /3pm.*outside my consult window/i);
+  assert.match(result.responseDraft ?? "", /9am-2pm Eastern/i);
+  assert.match(result.responseDraft ?? "", /1pm or 2pm work/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Got it\. I can help with that/i);
+});
+
+test("simple wedding sales runtime still checks calendar for call time inside consult window", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Tomorrow at 1pm works for a call",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-14",
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {
+          proposedCallTime: "Tomorrow at 1pm",
+        },
+      }),
+  });
+
+  assert.notEqual(result.decisionTrace?.replyType, "call_time_out_of_window");
+  assert.equal(result.decisionTrace?.toolCalled, "checkCalendar");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_consultation_calendar"],
+  );
+});
+
 test("simple wedding sales runtime books after email when calendar is available", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

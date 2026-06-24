@@ -56,6 +56,52 @@ function isCalendarContextCurrent(state: SimpleWeddingSalesState) {
   );
 }
 
+function parseProposedCallTimeMinutes(value: string) {
+  const trimmed = value.trim();
+  const canonicalMatch = /T(\d{2}):(\d{2})/.exec(trimmed);
+
+  if (canonicalMatch) {
+    return Number(canonicalMatch[1]) * 60 + Number(canonicalMatch[2]);
+  }
+
+  const naturalMatch = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(trimmed);
+
+  if (!naturalMatch) {
+    return undefined;
+  }
+
+  let hour = Number(naturalMatch[1]);
+  const minutes = Number(naturalMatch[2] ?? "0");
+  const suffix = naturalMatch[3].toLowerCase();
+
+  if (suffix === "pm" && hour < 12) {
+    hour += 12;
+  }
+
+  if (suffix === "am" && hour === 12) {
+    hour = 0;
+  }
+
+  return hour * 60 + minutes;
+}
+
+function isProposedCallTimeOutsideConsultWindow(state: SimpleWeddingSalesState) {
+  if (!state.proposedCallTime) {
+    return false;
+  }
+
+  const proposedMinutes = parseProposedCallTimeMinutes(state.proposedCallTime);
+
+  if (proposedMinutes === undefined) {
+    return false;
+  }
+
+  const startMinutes = 9 * 60;
+  const endMinutes = 14 * 60;
+
+  return proposedMinutes < startMinutes || proposedMinutes > endMinutes;
+}
+
 export function decideNextStep(state: SimpleWeddingSalesState): {
   nextStep: SimpleWeddingSalesNextStep;
   missingField?: SimpleWeddingSalesState["missingField"];
@@ -209,6 +255,18 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       nextStep: "ask_call_time",
       replyType: "ask_call_time",
       reason: "availability is open and call time is not known",
+    });
+  }
+
+  if (
+    state.proposedCallTime &&
+    !isCalendarContextCurrent(state) &&
+    isProposedCallTimeOutsideConsultWindow(state)
+  ) {
+    return decision({
+      nextStep: "ask_call_time",
+      replyType: "call_time_out_of_window",
+      reason: "customer proposed a consultation time outside the configured consult window",
     });
   }
 

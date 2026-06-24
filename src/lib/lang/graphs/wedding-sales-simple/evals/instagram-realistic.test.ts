@@ -135,6 +135,6 @@ test("instagram replay rechecks calendar after call time changes", async () => {
     turns: callTimeChangeReplay,
   });
 
-  assert.equal(finalState.proposedCallTime, "2026-06-24T16:00:00-04:00");
-  assert.equal(finalState.consultationCheck?.proposedTime, "2026-06-24T16:00:00-04:00");
+  assert.equal(finalState.proposedCallTime, "2026-06-24T14:00:00-04:00");
+  assert.equal(finalState.consultationCheck?.proposedTime, "2026-06-24T14:00:00-04:00");
 });

@@ -89,6 +89,7 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "ask_email"
     | "calendar_available"
     | "calendar_busy"
+    | "call_time_out_of_window"
     | "booking_confirmed"
     | "identity_answer"
     | "clarification"

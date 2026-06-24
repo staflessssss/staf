@@ -160,6 +160,7 @@ function questionLine(args: {
   knowledge: SimpleWeddingKnowledgeContext;
 }) {
   const callWindow = args.knowledge.scheduling.callWindow.replace("America/New_York", "Eastern");
+  const proposedTime = displayProposedCallTime(args.state.proposedCallTime);
 
   switch (args.contract.requiredQuestion) {
     case "coupleNames":
@@ -173,6 +174,10 @@ function questionLine(args: {
     case "venue":
       return `${args.knowledge.persona.replyStyle.namesAcknowledgement} Do you already have a venue picked out?`;
     case "callTime":
+      if (args.contract.questionPolicy.mode === "invalid_answer_retry") {
+        return `${proposedTime ?? "That time"} is just outside my consult window - I do calls ${callWindow}. Would 1pm or 2pm work?`;
+      }
+
       if (args.contract.questionPolicy.mode === "ask_after_context_change") {
         return `Same next step from here - what time would be best for a quick call? I do consults ${callWindow}.`;
       }
@@ -194,6 +199,26 @@ function questionLine(args: {
     default:
       return undefined;
   }
+}
+
+function displayProposedCallTime(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const naturalMatch = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i.exec(value);
+
+  if (naturalMatch) {
+    return naturalMatch[0].toLowerCase().replace(/\s+/g, "");
+  }
+
+  const canonicalMatch = /T(\d{2}):(\d{2})/.exec(value.trim());
+
+  if (!canonicalMatch) {
+    return value;
+  }
+
+  return formatCallTime(`${canonicalMatch[1]}:${canonicalMatch[2]}`);
 }
 
 function formatCallTime(value: string) {
@@ -283,6 +308,10 @@ function clarificationLine() {
   return "I want to make sure I understand you correctly. Could you tell me a little more about what you'd like to know?";
 }
 
+function fallbackClarificationLine() {
+  return "I don't want to guess here. Could you send that one more time?";
+}
+
 function handoffLine() {
   return "I want to make sure I answer this correctly, so I’ll have someone take a look.";
 }
@@ -311,7 +340,7 @@ function renderSafeTemplate(args: {
     args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
-  ]) || questionLine(args) || "Got it. I can help with that.";
+  ]) || questionLine(args) || fallbackClarificationLine();
 }
 
 function renderCompactInstagramFallback(args: {
@@ -338,7 +367,7 @@ function renderCompactInstagramFallback(args: {
     .join(" ");
   const question = questionLine(args);
 
-  return joinLines([greeting, factLine || undefined, question]) || "Got it. I can help with that.";
+  return joinLines([greeting, factLine || undefined, question]) || fallbackClarificationLine();
 }
 
 export function writeConstrainedWeddingReply(args: {

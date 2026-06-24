@@ -3,7 +3,12 @@ import type { SimpleWeddingSalesState } from "./state";
 
 export type SimpleWeddingQuestionPolicy = {
   requiredQuestion?: SimpleWeddingRequiredQuestion;
-  mode: "first_ask" | "ask_after_context_change" | "gentle_reminder" | "skip_already_asked";
+  mode:
+    | "first_ask"
+    | "ask_after_context_change"
+    | "gentle_reminder"
+    | "invalid_answer_retry"
+    | "skip_already_asked";
   avoidRepeatingPreviousWording: boolean;
   allowCompliment: boolean;
   complimentSubject?: "venue" | "date" | "couple";
@@ -49,12 +54,17 @@ export function buildSimpleWeddingQuestionPolicy(args: {
   }
 
   const alreadyAsked = wasQuestionAsked(state, requiredQuestion);
+  const invalidCallTime =
+    requiredQuestion === "callTime" &&
+    state.decisionTrace?.replyType === "call_time_out_of_window";
   const contextChanged = hasContextChangeForRepeatedQuestion(state);
-  const mode = !alreadyAsked
-    ? "first_ask"
-    : contextChanged
-      ? "ask_after_context_change"
-      : "gentle_reminder";
+  const mode = invalidCallTime
+    ? "invalid_answer_retry"
+    : !alreadyAsked
+      ? "first_ask"
+      : contextChanged
+        ? "ask_after_context_change"
+        : "gentle_reminder";
   const venueAlreadyComplimented = Boolean(
     state.venue &&
       state.replyMemory?.questionMemory?.complimentedVenue?.toLowerCase() ===
@@ -68,15 +78,21 @@ export function buildSimpleWeddingQuestionPolicy(args: {
   return {
     requiredQuestion,
     mode,
-    avoidRepeatingPreviousWording: alreadyAsked,
-    allowCompliment: allowVenueCompliment || allowCoupleCompliment,
-    complimentSubject: allowVenueCompliment ? "venue" : allowCoupleCompliment ? "couple" : undefined,
+    avoidRepeatingPreviousWording: alreadyAsked || invalidCallTime,
+    allowCompliment: invalidCallTime ? false : allowVenueCompliment || allowCoupleCompliment,
+    complimentSubject: invalidCallTime
+      ? undefined
+      : allowVenueCompliment
+        ? "venue"
+        : allowCoupleCompliment
+          ? "couple"
+          : undefined,
     cta:
       requiredQuestion === "callTime"
         ? {
             type: "quick_consult",
             style:
-              mode === "ask_after_context_change"
+              mode === "ask_after_context_change" || mode === "invalid_answer_retry"
                 ? "reminder"
                 : mode === "first_ask"
                   ? "soft_next_step"

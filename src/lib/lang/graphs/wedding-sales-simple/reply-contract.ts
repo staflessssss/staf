@@ -36,7 +36,7 @@ export type ReplyActionContract = {
   mentionPolicy: SimpleWeddingMentionPolicy;
   questionPolicy: SimpleWeddingQuestionPolicy;
   mayAskQuestion: boolean;
-  requiredToolResult?: "available" | "unavailable" | "busy" | "booked" | "failed";
+  requiredToolResult?: "available" | "unavailable" | "busy" | "booked" | "failed" | "out_of_window";
   bookingConfirmed: boolean;
 };
 
@@ -110,7 +110,9 @@ export function buildReplyActionContract(args: {
     questionPolicy,
     mayAskQuestion: Boolean(requiredQuestion),
     requiredToolResult:
-      mustMentionBookingConfirmation
+      state.decisionTrace?.replyType === "call_time_out_of_window"
+        ? "out_of_window"
+        : mustMentionBookingConfirmation
         ? "booked"
         : mustMentionCalendarAvailability && state.calendarStatus === "busy"
           ? "busy"
