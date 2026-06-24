@@ -72,6 +72,25 @@ function isToolStep(state: SimpleWeddingSalesState) {
   );
 }
 
+function stateWithReplyMemory(args: {
+  state: SimpleWeddingSalesState;
+  replyText: string;
+  knowledge: SimpleWeddingKnowledgeContext;
+}) {
+  const mentionedCurrentPrice =
+    args.knowledge.pricing.startPrice &&
+    args.replyText.includes(args.knowledge.pricing.startPrice);
+  const mentionedGuide = /\b(?:collections? guide|guide image|price image)\b/i.test(args.replyText);
+
+  return {
+    ...args.state,
+    lastMentionedStartPrice: mentionedCurrentPrice
+      ? args.knowledge.pricing.startPrice
+      : args.state.lastMentionedStartPrice,
+    guideMentioned: args.state.guideMentioned || mentionedGuide,
+  };
+}
+
 export async function invokeWeddingSalesSimpleGraph(
   input: InvokeWeddingSalesSimpleGraphInput,
 ): Promise<SimpleWeddingSalesState> {
@@ -146,7 +165,11 @@ export async function invokeWeddingSalesSimpleGraph(
   });
 
   return {
-    ...state,
+    ...stateWithReplyMemory({
+      state,
+      replyText: reply.text,
+      knowledge,
+    }),
     replyContract: contract,
     replyGuardResult: reply.guardResult,
     responseDraft: reply.text || writeHumanReply({

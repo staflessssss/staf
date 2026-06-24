@@ -56,7 +56,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_missing_info",
       toolCalls: ["check_wedding_availability"],
-      replyIncludes: [/June 14, 2027 in Tampa.*date is available/i, /both of your names/i],
+      replyIncludes: [/June 14, 2027.*available/i, /both of your names/i],
     },
   },
   {

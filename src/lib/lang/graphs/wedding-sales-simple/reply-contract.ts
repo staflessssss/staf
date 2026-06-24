@@ -36,6 +36,25 @@ function requiresGuide(state: SimpleWeddingSalesState) {
   return /\b(price\s*(?:image|guide)|guide|collections?\s*guide)\b/.test(message);
 }
 
+function previousReplyMentionsCurrentPrice(args: {
+  state: SimpleWeddingSalesState;
+  knowledge: SimpleWeddingKnowledgeContext;
+}) {
+  return Boolean(
+    args.state.lastMentionedStartPrice === args.knowledge.pricing.startPrice ||
+      (args.state.responseDraft &&
+        args.knowledge.pricing.startPrice &&
+        args.state.responseDraft.includes(args.knowledge.pricing.startPrice)),
+  );
+}
+
+function previousReplyMentionsGuide(state: SimpleWeddingSalesState) {
+  return Boolean(
+    state.guideMentioned ||
+      /\b(?:collections? guide|guide image|price image)\b/i.test(state.responseDraft ?? ""),
+  );
+}
+
 function requiredQuestionForState(
   state: SimpleWeddingSalesState,
 ): SimpleWeddingRequiredQuestion | undefined {
@@ -76,6 +95,10 @@ export function buildReplyActionContract(args: {
   const justCheckedAvailability =
     state.decisionTrace?.toolCalled === "checkAvailability" &&
     state.availability === "available";
+  const shouldRefreshPricingAfterAvailability =
+    justCheckedAvailability && !previousReplyMentionsCurrentPrice(args);
+  const shouldRefreshGuideAfterAvailability =
+    justCheckedAvailability && !previousReplyMentionsGuide(state);
   const currentTurnProposedCallTime = state.lastUnderstanding?.facts.proposedCallTime;
   const askedWeddingAvailability =
     state.questionsAskedByCustomer.includes("availability") &&
@@ -100,9 +123,10 @@ export function buildReplyActionContract(args: {
     mustMentionWeddingAvailability,
     mustMentionCalendarAvailability,
     mustMentionBookingConfirmation,
-    mayMentionPricing: askedPricing || justCheckedAvailability,
+    mayMentionPricing: askedPricing || shouldRefreshPricingAfterAvailability,
     mustMentionPricing: askedPricing,
-    mayMentionGuide: guideExists && (askedPricing || askedGuide || justCheckedAvailability),
+    mayMentionGuide:
+      guideExists && (askedPricing || askedGuide || shouldRefreshGuideAfterAvailability),
     mustMentionGuide: guideExists && askedGuide,
     mayAskQuestion: Boolean(requiredQuestion),
     requiredToolResult:

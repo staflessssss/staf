@@ -106,7 +106,9 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.questionsAskedByCustomer.includes("other")) {
+  const hasKnownQuestion = state.questionsAskedByCustomer.some((question) => question !== "other");
+
+  if (state.questionsAskedByCustomer.includes("other") && !hasKnownQuestion) {
     return decision({
       nextStep: "handoff",
       mode: "human_needed",

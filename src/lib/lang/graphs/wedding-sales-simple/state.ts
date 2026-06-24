@@ -137,6 +137,8 @@ export type SimpleWeddingSalesState = {
   checkedCallEndTime?: string;
   bookingConfirmed: boolean;
   bookedEventId?: string;
+  lastMentionedStartPrice?: string;
+  guideMentioned?: boolean;
   mode: SimpleWeddingSalesMode;
   handoffReason?: SimpleWeddingSalesHandoffReason;
   unclearAttemptCount: number;
@@ -191,6 +193,8 @@ export function createInitialSimpleWeddingSalesState(args: {
     checkedCallEndTime: args.previousState?.checkedCallEndTime,
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
     bookedEventId: args.previousState?.bookedEventId,
+    lastMentionedStartPrice: args.previousState?.lastMentionedStartPrice,
+    guideMentioned: args.previousState?.guideMentioned,
     mode: args.previousState?.mode ?? "bot_active",
     handoffReason: args.previousState?.handoffReason,
     unclearAttemptCount: args.previousState?.unclearAttemptCount ?? 0,

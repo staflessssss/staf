@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { invokeWeddingSalesSimpleGraph } from "./graph";
 import type { TurnUnderstanding } from "./state";
+import { understandTurnHeuristically } from "./understand";
 
 function understanding(update: Partial<TurnUnderstanding>): TurnUnderstanding {
   return {
@@ -283,6 +284,119 @@ test("simple wedding sales runtime rechecks availability when the customer chang
     result.toolObservations.map((observation) => observation.toolName),
     ["check_wedding_availability"],
   );
+});
+
+test("simple wedding sales runtime does not resend the same price guide after follow-up availability checks", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Actually, they may move the wedding to June 15 2027.",
+    previousState: {
+      customerName: "Emily",
+      partnerName: "Daniel",
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityCheck: {
+        date: "2027-06-14",
+        location: "Tampa",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+      responseDraft:
+        "Our 8-hour wedding films start at $2,950 for Florida.\n\nI’m sending the collections guide image here too 🎥",
+    },
+    toolContext,
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {
+          weddingDate: "2027-06-15",
+          weddingDateText: "June 15 2027",
+        },
+      }),
+  });
+
+  assert.equal(result.availabilityCheck?.date, "2027-06-15");
+  assert.match(result.responseDraft ?? "", /I checked June 15, 2027 in Tampa too/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Our 8-hour wedding films start/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /collections guide image/i);
+});
+
+test("simple wedding sales runtime resolves a selected suggested call time", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "10:30 works",
+    previousState: {
+      customerName: "Emily",
+      partnerName: "Daniel",
+      weddingDate: "2027-06-15",
+      location: "Orlando",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityCheck: {
+        date: "2027-06-15",
+        location: "Orlando",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+      proposedCallTime: "2026-06-24T10:00:00-04:00",
+      calendarStatus: "busy",
+      calendarContextDate: "2026-06-24",
+      suggestedCallTimes: ["09:00", "09:30", "10:30"],
+      consultationCheck: {
+        proposedTime: "2026-06-24T10:00:00-04:00",
+        status: "unavailable",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+    },
+    toolContext,
+    understand: (state) => understandTurnHeuristically(state),
+  });
+
+  assert.equal(result.proposedCallTime, "2026-06-24T10:30:00");
+  assert.equal(result.calendarStatus, "available");
+  assert.equal(result.checkedCallTime, "10:30");
+  assert.equal(result.nextStep, "ask_email");
+  assert.match(result.responseDraft ?? "", /10:30 AM works perfectly for a call/i);
+  assert.match(result.responseDraft ?? "", /best email/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Got it\. I can help/i);
+});
+
+test("simple wedding sales runtime answers where the consultation call will happen", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Where we will call?",
+    previousState: {
+      customerName: "Emily",
+      partnerName: "Daniel",
+      weddingDate: "2027-06-15",
+      location: "Orlando",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityCheck: {
+        date: "2027-06-15",
+        location: "Orlando",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+      proposedCallTime: "2026-06-24T10:30:00",
+      calendarStatus: "available",
+      checkedCallDate: "2026-06-24",
+      checkedCallTime: "10:30",
+      consultationCheck: {
+        proposedTime: "2026-06-24T10:30:00",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+    },
+    understand: (state) => understandTurnHeuristically(state),
+  });
+
+  assert.equal(result.nextStep, "ask_email");
+  assert.match(result.responseDraft ?? "", /calendar invite with the call details/i);
+  assert.match(result.responseDraft ?? "", /best email/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Got it\. I can help/i);
 });
 
 test("simple wedding sales runtime answers as Taras instead of handing off to Taras", async () => {

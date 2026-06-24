@@ -47,8 +47,21 @@ function availabilityLine(state: SimpleWeddingSalesState) {
 
   const date = formatSimpleWeddingDate(state.weddingDate);
   const place = state.location ? ` in ${state.location}` : "";
+  const isFollowUpCheck = Boolean(!state.isFirstTurn && state.responseDraft);
+  const updatedDateThisTurn = Boolean(state.lastUnderstanding?.facts.weddingDate);
+  const updatedLocationThisTurn = Boolean(
+    state.lastUnderstanding?.facts.location && !state.lastUnderstanding?.facts.weddingDate,
+  );
 
   if (state.availability === "available") {
+    if (isFollowUpCheck && updatedLocationThisTurn) {
+      return `I checked ${state.location} too, and ${date} is still available there 🤍`;
+    }
+
+    if (isFollowUpCheck && updatedDateThisTurn) {
+      return `I checked ${date}${place} too, and that date is available 🤍`;
+    }
+
     return `Great news - I checked ${date}${place}, and the date is available 🤍`;
   }
 
@@ -204,6 +217,26 @@ function bookingLine(state: SimpleWeddingSalesState) {
     : "You’re all set. I booked the call.";
 }
 
+function callLogisticsLine(state: SimpleWeddingSalesState) {
+  if (!state.questionsAskedByCustomer.includes("booking")) {
+    return undefined;
+  }
+
+  if (!/\b(?:where|how)\b[\s\S]{0,40}\b(?:call|talk|meet|consult)\b/i.test(state.latestCustomerMessage)) {
+    return undefined;
+  }
+
+  if (state.bookingConfirmed) {
+    return "The calendar invite has the call details. If anything looks off, just send me a message here.";
+  }
+
+  if (state.calendarStatus === "available") {
+    return "Once I have the best email, I’ll send the calendar invite with the call details.";
+  }
+
+  return "We’ll use the calendar invite for the call details once we lock in the time.";
+}
+
 function identityLine(knowledge: SimpleWeddingKnowledgeContext) {
   return `Absolutely - you're speaking with me here. I'm ${knowledge.persona.name}, and I'm happy to go over anything you'd like before we finish 🤍`;
 }
@@ -234,6 +267,7 @@ function renderSafeTemplate(args: {
       ? calendarLine(args.state, args.knowledge)
       : undefined,
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
+    callLogisticsLine(args.state),
     args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
@@ -263,6 +297,7 @@ export function writeConstrainedWeddingReply(args: {
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,
           contract.mustMentionCalendarAvailability ? calendarLine(state, knowledge) : undefined,
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
+          callLogisticsLine(state),
           contract.replyType === "identity_answer" ? identityLine(knowledge) : undefined,
           contract.replyType === "clarification" ? clarificationLine() : undefined,
           questionLine({ contract, state, knowledge }),

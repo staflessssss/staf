@@ -176,16 +176,52 @@ function extractLocation(message: string) {
   return match?.[1]?.trim();
 }
 
-function extractCallTime(message: string) {
-  const match = /\b(?:(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|next monday|next tuesday|next wednesday|next thursday|next friday)[^?.!,]{0,40})?\b(?:at\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i.exec(
-    message,
-  );
+function normalizeSuggestedTimeLabel(value: string) {
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(?:am|pm)?$/i.exec(value.trim());
 
   if (!match) {
     return undefined;
   }
 
-  return match[0].trim();
+  return `${match[1]?.padStart(2, "0")}:${match[2] ?? "00"}`;
+}
+
+function resolveSuggestedCallTime(
+  state: SimpleWeddingSalesState,
+  message: string,
+) {
+  const normalizedMessage = message.toLowerCase();
+
+  if (!/\b(?:works?|yes|yeah|yep|ok|okay|sure|let'?s do|that one)\b/i.test(message)) {
+    return undefined;
+  }
+
+  const mentionedTimes = Array.from(
+    normalizedMessage.matchAll(/\b(\d{1,2}(?::\d{2})?)\s*(?:am|pm)?\b/g),
+  )
+    .map((match) => normalizeSuggestedTimeLabel(match[1] ?? ""))
+    .filter((value): value is string => Boolean(value));
+  const suggestions = state.suggestedCallTimes ?? [];
+  const selectedTime = mentionedTimes.find((time) => suggestions.includes(time));
+  const calendarDate = state.calendarContextDate ?? state.checkedCallDate;
+
+  if (!selectedTime || !calendarDate) {
+    return undefined;
+  }
+
+  return `${calendarDate}T${selectedTime}:00`;
+}
+
+function extractCallTime(state: SimpleWeddingSalesState, message: string) {
+  const match = /\b(?:(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|next monday|next tuesday|next wednesday|next thursday|next friday)[^?.!,]{0,40})?\b(?:at\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i.exec(
+    message,
+  );
+
+  if (match) {
+    return match[0].trim();
+  }
+
+  return resolveSuggestedCallTime(state, message);
 }
 
 function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCustomer"] {
@@ -217,6 +253,10 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
   }
 
   if (/\b(book|booking|reserve|lock it in)\b/.test(normalized)) {
+    questions.push("booking");
+  }
+
+  if (/\b(?:where|how)\b[\s\S]{0,40}\b(?:call|talk|meet|consult)\b/.test(normalized)) {
     questions.push("booking");
   }
 
@@ -267,7 +307,7 @@ export function understandTurnHeuristically(
   const isoDate = extractIsoDate(message);
   const monthDate = extractMonthDate(message);
   const email = extractEmail(message);
-  const proposedCallTime = extractCallTime(message);
+  const proposedCallTime = extractCallTime(state, message);
   const names = extractNames(message);
 
   const customerMessageType: TurnUnderstanding["customerMessageType"] = email
