@@ -37,6 +37,7 @@ export const turnUnderstandingSchema = z.object({
       "package_inclusions",
       "team",
       "booking",
+      "identity",
       "other",
     ]),
   ),
@@ -70,6 +71,7 @@ export type SimpleWeddingSalesHandoffReason =
   | "unclear_after_2_attempts"
   | "tool_error"
   | "booking_conflict"
+  | "unanswered_business_question"
   | "customer_requests_human";
 
 export type SimpleWeddingSalesDecisionTrace = {
@@ -88,6 +90,8 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "calendar_available"
     | "calendar_busy"
     | "booking_confirmed"
+    | "identity_answer"
+    | "clarification"
     | "handoff"
     | "reply_only";
   reason: string;
@@ -234,7 +238,7 @@ export function mergeTurnUnderstanding(
     checkedCallStartTime: callTimeChanged ? undefined : state.checkedCallStartTime,
     checkedCallEndTime: callTimeChanged ? undefined : state.checkedCallEndTime,
     unclearAttemptCount:
-      understanding.customerMessageType === "unclear"
+      understanding.customerMessageType === "unclear" || understanding.confidence < 0.35
         ? state.unclearAttemptCount + 1
         : 0,
     questionsAskedByCustomer: understanding.questionsAskedByCustomer,

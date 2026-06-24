@@ -87,11 +87,12 @@ test("instagram realistic replay books a consultation across short DMs", async (
   assert.equal(finalState.consultationCheck?.status, "available");
 });
 
-test("instagram replay routes explicit human requests to handoff", async () => {
+test("instagram replay keeps the founder persona active when asked for Taras", async () => {
   const finalState = await runReplay({ turns: instagramEdgeCaseTurns });
 
-  assert.equal(finalState.mode, "human_needed");
-  assert.equal(finalState.handoffReason, "customer_requests_human");
+  assert.equal(finalState.mode, "bot_active");
+  assert.equal(finalState.handoffReason, undefined);
+  assert.equal(finalState.decisionTrace?.replyType, "identity_answer");
 });
 
 test("instagram replay rechecks availability after date changes", async () => {

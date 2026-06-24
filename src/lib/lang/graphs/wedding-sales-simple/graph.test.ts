@@ -285,22 +285,23 @@ test("simple wedding sales runtime rechecks availability when the customer chang
   );
 });
 
-test("simple wedding sales runtime routes explicit human requests to handoff", async () => {
+test("simple wedding sales runtime answers as Taras instead of handing off to Taras", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
-    message: "Can I talk to a real person?",
+    message: "Before we finish, can I speak directly with Taras?",
     understand: () =>
       understanding({
         customerMessageType: "business_question",
-        questionsAskedByCustomer: ["other"],
+        questionsAskedByCustomer: ["identity"],
+        confidence: 0.2,
       }),
   });
 
-  assert.equal(result.nextStep, "handoff");
-  assert.equal(result.mode, "human_needed");
-  assert.equal(result.handoffReason, "customer_requests_human");
-  assert.equal(result.decisionTrace?.replyType, "handoff");
-  assert.match(result.responseDraft ?? "", /someone take a look/i);
+  assert.equal(result.nextStep, "reply_only");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.handoffReason, undefined);
+  assert.equal(result.decisionTrace?.replyType, "identity_answer");
+  assert.match(result.responseDraft ?? "", /speaking with me here.*I'm Taras/i);
 });
 
 test("simple wedding sales runtime routes missing tool execution to handoff", async () => {
@@ -425,7 +426,7 @@ test("simple wedding sales runtime asks for date when availability question has 
   assert.deepEqual(result.toolObservations, []);
 });
 
-test("simple wedding sales runtime routes angry customers to handoff", async () => {
+test("simple wedding sales runtime does not hand off from sentiment alone", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
     message: "This is ridiculous, why are you asking so many questions?",
@@ -433,13 +434,52 @@ test("simple wedding sales runtime routes angry customers to handoff", async () 
       understanding({
         customerMessageType: "business_question",
         facts: {},
+        questionsAskedByCustomer: [],
+      }),
+  });
+
+  assert.notEqual(result.nextStep, "handoff");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.handoffReason, undefined);
+});
+
+test("simple wedding sales runtime hands off a business question outside configured knowledge", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can you also arrange a live band for us?",
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
         questionsAskedByCustomer: ["other"],
+        confidence: 0.95,
       }),
   });
 
   assert.equal(result.nextStep, "handoff");
   assert.equal(result.mode, "human_needed");
-  assert.equal(result.handoffReason, "angry_customer");
+  assert.equal(result.handoffReason, "unanswered_business_question");
+  assert.equal(result.decisionTrace?.replyType, "handoff");
+});
+
+test("simple wedding sales runtime asks for clarification before handing off", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "the other thing maybe",
+    understand: () =>
+      understanding({
+        customerMessageType: "unclear",
+        facts: {},
+        questionsAskedByCustomer: [],
+        confidence: 0.2,
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.unclearAttemptCount, 1);
+  assert.equal(result.decisionTrace?.replyType, "clarification");
+  assert.match(result.responseDraft ?? "", /tell me a little more/i);
 });
 
 test("simple wedding sales runtime routes repeated unclear messages to handoff", async () => {

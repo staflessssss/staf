@@ -53,6 +53,8 @@ Rules:
 - senderRole is who appears to be writing: bride, groom, mother, planner, friend, or unknown.
 - customerMessageType is the main intent of the latest message.
 - questionsAskedByCustomer can include multiple topics.
+- A request to speak with Taras, the owner, a person, or a human is an identity question because
+  this assistant writes as the configured founder. Include identity; do not treat it as a handoff decision.
 `.trim();
 
 function extractEmail(message: string) {
@@ -216,6 +218,15 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
 
   if (/\b(book|booking|reserve|lock it in)\b/.test(normalized)) {
     questions.push("booking");
+  }
+
+  if (
+    /\b(?:are you|is this)\s+taras\b/.test(normalized) ||
+    /\b(?:speak|talk|chat)\b[\s\S]{0,40}\b(?:taras|human|person|someone real|owner)\b/.test(
+      normalized,
+    )
+  ) {
+    questions.push("identity");
   }
 
   return [...new Set(questions)];

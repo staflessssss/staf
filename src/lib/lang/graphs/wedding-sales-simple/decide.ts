@@ -77,45 +77,11 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  const message = state.latestCustomerMessage.toLowerCase();
-
-  if (/\b(angry|upset|frustrated|annoyed|terrible|awful|ridiculous)\b/.test(message)) {
+  if (state.questionsAskedByCustomer.includes("identity")) {
     return decision({
-      nextStep: "handoff",
-      mode: "human_needed",
-      handoffReason: "angry_customer",
-      replyType: "handoff",
-      reason: "customer sentiment indicates a human should take over",
-    });
-  }
-
-  if (/\b(discount|negotiate|cheaper|lower price|too expensive|match this price)\b/.test(message)) {
-    return decision({
-      nextStep: "handoff",
-      mode: "human_needed",
-      handoffReason: "pricing_negotiation",
-      replyType: "handoff",
-      reason: "customer is negotiating pricing",
-    });
-  }
-
-  if (/\b(human|person|someone real|manager|owner)\b/.test(message)) {
-    return decision({
-      nextStep: "handoff",
-      mode: "human_needed",
-      handoffReason: "customer_requests_human",
-      replyType: "handoff",
-      reason: "customer explicitly asked for a person",
-    });
-  }
-
-  if ((state.lastUnderstanding?.confidence ?? 1) < 0.35) {
-    return decision({
-      nextStep: "handoff",
-      mode: "human_needed",
-      handoffReason: "unclear_after_2_attempts",
-      replyType: "handoff",
-      reason: "understanding confidence is too low",
+      nextStep: "reply_only",
+      replyType: "identity_answer",
+      reason: "customer asked whether they are speaking with the configured founder persona",
     });
   }
 
@@ -126,6 +92,27 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       handoffReason: "unclear_after_2_attempts",
       replyType: "handoff",
       reason: "customer message stayed unclear after repeated attempts",
+    });
+  }
+
+  if (
+    state.lastUnderstanding?.customerMessageType === "unclear" ||
+    (state.lastUnderstanding?.confidence ?? 1) < 0.35
+  ) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "clarification",
+      reason: "customer message is unclear and needs one clarification before handoff",
+    });
+  }
+
+  if (state.questionsAskedByCustomer.includes("other")) {
+    return decision({
+      nextStep: "handoff",
+      mode: "human_needed",
+      handoffReason: "unanswered_business_question",
+      replyType: "handoff",
+      reason: "customer asked a business question that is not covered by configured knowledge",
     });
   }
 

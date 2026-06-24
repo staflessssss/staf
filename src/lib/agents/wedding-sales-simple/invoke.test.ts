@@ -267,18 +267,21 @@ test("wedding-sales-simple adapter marks processed after successful invocation",
   assert.deepEqual(processed, ["mid-2"]);
 });
 
-test("wedding-sales-simple adapter persists bot_paused after human-needed handoff", async () => {
+test("wedding-sales-simple adapter persists bot_paused after repeated unresolved input", async () => {
   const incoming = normalizeInstagramWeddingSalesIncoming({
     tenantId: "tenant-1",
     agentId: "agent-wedding",
     contactId: "ig-contact-1",
-    text: "Can I speak to a person?",
-    messageId: "mid-human",
+    text: "the other thing maybe",
+    messageId: "mid-unclear",
   });
   let savedState: SimpleWeddingSalesState | undefined;
   const result = await invokeWeddingSalesSimpleAdapter({
     incoming,
     deps: {
+      loadState: () => ({
+        unclearAttemptCount: 1,
+      }),
       saveState: ({ state }) => {
         savedState = state;
       },
@@ -288,10 +291,10 @@ test("wedding-sales-simple adapter persists bot_paused after human-needed handof
             invokeWeddingSalesSimpleGraph({
               ...input,
               understand: () => ({
-                customerMessageType: "business_question",
+                customerMessageType: "unclear",
                 facts: {},
-                questionsAskedByCustomer: ["other"],
-                confidence: 0.95,
+                questionsAskedByCustomer: [],
+                confidence: 0.2,
               }),
             }),
         ),
@@ -317,7 +320,7 @@ test("wedding-sales-simple graph does not auto-resume from prior human_needed st
     deps: {
       loadState: () => ({
         mode: "human_needed",
-        handoffReason: "customer_requests_human",
+        handoffReason: "unclear_after_2_attempts",
       }),
       invokeGraph: (input) =>
         import("@/lib/lang/graphs/wedding-sales-simple/graph").then(
@@ -341,7 +344,7 @@ test("wedding-sales-simple graph does not auto-resume from prior human_needed st
   assert.equal(result.status, "processed");
   assert.equal(result.outbound.handoffMode, "bot_paused");
   assert.equal(result.state.mode, "bot_paused");
-  assert.equal(result.state.handoffReason, "customer_requests_human");
+  assert.equal(result.state.handoffReason, "unclear_after_2_attempts");
 });
 
 test("wedding-sales-simple canary routing matches tenant, agent, and channel", () => {

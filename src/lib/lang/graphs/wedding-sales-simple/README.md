@@ -13,6 +13,11 @@ centers, not by lines of code.
 - `reply-writer.ts` only renders the contract in the configured voice.
 - Unsafe or stale output is blocked by `reply-guards.ts`.
 - Transport and webhook behavior must not alter business decisions.
+- The configured founder persona is the speaker. Requests to speak with that founder are identity
+  questions, not handoff triggers.
+- Handoff is reserved for business questions outside configured knowledge, repeated unclear input,
+  or operational failures. Sentiment, negotiation, and words such as `human`, `person`, or `owner`
+  do not independently trigger it.
 
 Do not add planner, analyzer, reflection, reasoner, strategy, semantic-vNext, or action-plan
 layers to this runtime. If a bug appears, fix it in exactly one existing responsibility:

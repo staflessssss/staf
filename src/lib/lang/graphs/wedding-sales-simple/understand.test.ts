@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { weddingSalesSimpleUnderstandTestHelpers } from "./understand";
+import {
+  understandTurnHeuristically,
+  weddingSalesSimpleUnderstandTestHelpers,
+} from "./understand";
 
 test("LLM understanding requires every fact and allows unknown facts to be null", () => {
   const result = weddingSalesSimpleUnderstandTestHelpers.llmTurnUnderstandingSchema.parse({
@@ -105,4 +108,19 @@ test("LLM understanding splits a combined couple name", () => {
 
   assert.equal(result.facts.customerName, "Mike");
   assert.equal(result.facts.partnerName, "Sarah");
+});
+
+test("deterministic understanding treats a request for Taras as an identity question", () => {
+  const result = understandTurnHeuristically({
+    channel: "instagram",
+    latestCustomerMessage: "Before we finish, can I speak directly with Taras?",
+    bookingConfirmed: false,
+    mode: "bot_active",
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  });
+
+  assert.equal(result.customerMessageType, "business_question");
+  assert.deepEqual(result.questionsAskedByCustomer, ["identity"]);
 });

@@ -204,6 +204,14 @@ function bookingLine(state: SimpleWeddingSalesState) {
     : "You’re all set. I booked the call.";
 }
 
+function identityLine(knowledge: SimpleWeddingKnowledgeContext) {
+  return `Absolutely - you're speaking with me here. I'm ${knowledge.persona.name}, and I'm happy to go over anything you'd like before we finish 🤍`;
+}
+
+function clarificationLine() {
+  return "I want to make sure I understand you correctly. Could you tell me a little more about what you'd like to know?";
+}
+
 function handoffLine() {
   return "I want to make sure I answer this correctly, so I’ll have someone take a look.";
 }
@@ -226,6 +234,8 @@ function renderSafeTemplate(args: {
       ? calendarLine(args.state, args.knowledge)
       : undefined,
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
+    args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
+    args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
   ]) || questionLine(args) || "Got it. I can help with that.";
 }
@@ -253,6 +263,8 @@ export function writeConstrainedWeddingReply(args: {
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,
           contract.mustMentionCalendarAvailability ? calendarLine(state, knowledge) : undefined,
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
+          contract.replyType === "identity_answer" ? identityLine(knowledge) : undefined,
+          contract.replyType === "clarification" ? clarificationLine() : undefined,
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);
   const guard = validateGeneratedReply({

@@ -128,17 +128,17 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
 
 export const instagramEdgeCaseTurns: SimpleWeddingSalesReplayTurn[] = [
   {
-    message: "Can I speak to a person?",
+    message: "Before we finish, can I speak directly with Taras?",
     understanding: {
       customerMessageType: "business_question",
       facts: {},
-      questionsAskedByCustomer: ["other"],
+      questionsAskedByCustomer: ["identity"],
       confidence: 0.95,
     },
     expect: {
-      nextStep: "handoff",
+      nextStep: "reply_only",
       toolCalls: [],
-      replyIncludes: [/someone take a look/i],
+      replyIncludes: [/speaking with me here.*I'm Taras/i],
     },
   },
 ];
