@@ -17,6 +17,7 @@ import {
   type SimpleWeddingKnowledgeContext,
 } from "./knowledge";
 import { buildReplyActionContract } from "./reply-contract";
+import { updateSimpleWeddingReplyMemory } from "./reply-memory";
 import { writeConstrainedWeddingReply } from "./reply-writer";
 
 function toolNameForStep(state: SimpleWeddingSalesState) {
@@ -70,25 +71,6 @@ function isToolStep(state: SimpleWeddingSalesState) {
     state.nextStep === "check_calendar" ||
     state.nextStep === "book_call"
   );
-}
-
-function stateWithReplyMemory(args: {
-  state: SimpleWeddingSalesState;
-  replyText: string;
-  knowledge: SimpleWeddingKnowledgeContext;
-}) {
-  const mentionedCurrentPrice =
-    args.knowledge.pricing.startPrice &&
-    args.replyText.includes(args.knowledge.pricing.startPrice);
-  const mentionedGuide = /\b(?:collections? guide|guide image|price image)\b/i.test(args.replyText);
-
-  return {
-    ...args.state,
-    lastMentionedStartPrice: mentionedCurrentPrice
-      ? args.knowledge.pricing.startPrice
-      : args.state.lastMentionedStartPrice,
-    guideMentioned: args.state.guideMentioned || mentionedGuide,
-  };
 }
 
 export async function invokeWeddingSalesSimpleGraph(
@@ -165,10 +147,12 @@ export async function invokeWeddingSalesSimpleGraph(
   });
 
   return {
-    ...stateWithReplyMemory({
+    ...state,
+    replyMemory: updateSimpleWeddingReplyMemory({
       state,
-      replyText: reply.text,
+      contract,
       knowledge,
+      replyText: reply.text,
     }),
     replyContract: contract,
     replyGuardResult: reply.guardResult,

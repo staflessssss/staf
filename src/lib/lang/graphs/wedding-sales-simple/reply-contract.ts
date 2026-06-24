@@ -3,6 +3,10 @@ import type {
   SimpleWeddingSalesState,
 } from "./state";
 import type { SimpleWeddingKnowledgeContext } from "./knowledge";
+import {
+  buildSimpleWeddingMentionPolicy,
+  type SimpleWeddingMentionPolicy,
+} from "./mention-policy";
 
 export type SimpleWeddingRequiredQuestion =
   | "names"
@@ -25,35 +29,11 @@ export type ReplyActionContract = {
   mustMentionPricing: boolean;
   mayMentionGuide: boolean;
   mustMentionGuide: boolean;
+  mentionPolicy: SimpleWeddingMentionPolicy;
   mayAskQuestion: boolean;
   requiredToolResult?: "available" | "unavailable" | "busy" | "booked" | "failed";
   bookingConfirmed: boolean;
 };
-
-function requiresGuide(state: SimpleWeddingSalesState) {
-  const message = state.latestCustomerMessage.toLowerCase();
-
-  return /\b(price\s*(?:image|guide)|guide|collections?\s*guide)\b/.test(message);
-}
-
-function previousReplyMentionsCurrentPrice(args: {
-  state: SimpleWeddingSalesState;
-  knowledge: SimpleWeddingKnowledgeContext;
-}) {
-  return Boolean(
-    args.state.lastMentionedStartPrice === args.knowledge.pricing.startPrice ||
-      (args.state.responseDraft &&
-        args.knowledge.pricing.startPrice &&
-        args.state.responseDraft.includes(args.knowledge.pricing.startPrice)),
-  );
-}
-
-function previousReplyMentionsGuide(state: SimpleWeddingSalesState) {
-  return Boolean(
-    state.guideMentioned ||
-      /\b(?:collections? guide|guide image|price image)\b/i.test(state.responseDraft ?? ""),
-  );
-}
 
 function requiredQuestionForState(
   state: SimpleWeddingSalesState,
@@ -88,23 +68,11 @@ export function buildReplyActionContract(args: {
   knowledge: SimpleWeddingKnowledgeContext;
 }): ReplyActionContract {
   const { state } = args;
-  const askedPricing = state.questionsAskedByCustomer.includes("pricing");
-  const askedGuide = requiresGuide(state);
   const requiredQuestion = requiredQuestionForState(state);
-  const guideExists = Boolean(args.knowledge.guide.imageUrl || args.knowledge.guide.link);
-  const justCheckedAvailability =
-    state.decisionTrace?.toolCalled === "checkAvailability" &&
-    state.availability === "available";
-  const shouldRefreshPricingAfterAvailability =
-    justCheckedAvailability && !previousReplyMentionsCurrentPrice(args);
-  const shouldRefreshGuideAfterAvailability =
-    justCheckedAvailability && !previousReplyMentionsGuide(state);
+  const mentionPolicy = buildSimpleWeddingMentionPolicy(args);
   const currentTurnProposedCallTime = state.lastUnderstanding?.facts.proposedCallTime;
-  const askedWeddingAvailability =
-    state.questionsAskedByCustomer.includes("availability") &&
-    !currentTurnProposedCallTime;
   const mustMentionWeddingAvailability = Boolean(
-    state.decisionTrace?.toolCalled === "checkAvailability" || askedWeddingAvailability,
+    mentionPolicy.availability.mode !== "skip",
   );
   const mustMentionCalendarAvailability = Boolean(
     state.decisionTrace?.toolCalled === "checkCalendar" ||
@@ -123,11 +91,13 @@ export function buildReplyActionContract(args: {
     mustMentionWeddingAvailability,
     mustMentionCalendarAvailability,
     mustMentionBookingConfirmation,
-    mayMentionPricing: askedPricing || shouldRefreshPricingAfterAvailability,
-    mustMentionPricing: askedPricing,
-    mayMentionGuide:
-      guideExists && (askedPricing || askedGuide || shouldRefreshGuideAfterAvailability),
-    mustMentionGuide: guideExists && askedGuide,
+    mayMentionPricing: mentionPolicy.pricing.mode !== "skip",
+    mustMentionPricing:
+      mentionPolicy.pricing.mode === "full" ||
+      mentionPolicy.pricing.mode === "same_as_before",
+    mayMentionGuide: mentionPolicy.guide.mode !== "skip",
+    mustMentionGuide: mentionPolicy.guide.mode !== "skip",
+    mentionPolicy,
     mayAskQuestion: Boolean(requiredQuestion),
     requiredToolResult:
       mustMentionBookingConfirmation

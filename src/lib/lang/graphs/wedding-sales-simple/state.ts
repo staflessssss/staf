@@ -97,6 +97,34 @@ export type SimpleWeddingSalesDecisionTrace = {
   reason: string;
 };
 
+export type SimpleWeddingSalesReplyMemory = {
+  greeted?: boolean;
+  turnIndex?: number;
+  mentioned?: {
+    pricing?: {
+      value: string;
+      turnId?: string;
+      lastMentionedAt: string;
+    };
+    availability?: {
+      date: string;
+      location?: string;
+      status: "available" | "unavailable" | "unknown";
+      turnId?: string;
+      lastMentionedAt: string;
+    };
+    guide?: {
+      imageUrl?: string;
+      link?: string;
+      turnId?: string;
+      lastMentionedAt: string;
+    };
+  };
+  lastReplyType?: SimpleWeddingSalesDecisionTrace["replyType"];
+  lastRequiredQuestion?: string;
+  lastOutboundText?: string;
+};
+
 export type SimpleWeddingSalesState = {
   tenantId?: string;
   agentId?: string;
@@ -137,7 +165,10 @@ export type SimpleWeddingSalesState = {
   checkedCallEndTime?: string;
   bookingConfirmed: boolean;
   bookedEventId?: string;
+  replyMemory?: SimpleWeddingSalesReplyMemory;
+  /** @deprecated Use replyMemory. Kept only to migrate live persisted simple-runtime state. */
   lastMentionedStartPrice?: string;
+  /** @deprecated Use replyMemory. Kept only to migrate live persisted simple-runtime state. */
   guideMentioned?: boolean;
   mode: SimpleWeddingSalesMode;
   handoffReason?: SimpleWeddingSalesHandoffReason;
@@ -193,6 +224,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     checkedCallEndTime: args.previousState?.checkedCallEndTime,
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
     bookedEventId: args.previousState?.bookedEventId,
+    replyMemory: args.previousState?.replyMemory,
     lastMentionedStartPrice: args.previousState?.lastMentionedStartPrice,
     guideMentioned: args.previousState?.guideMentioned,
     mode: args.previousState?.mode ?? "bot_active",

@@ -40,7 +40,12 @@ function greetingLine(args: {
   ]);
 }
 
-function availabilityLine(state: SimpleWeddingSalesState) {
+function availabilityLine(args: {
+  state: SimpleWeddingSalesState;
+  contract: ReplyActionContract;
+}) {
+  const { state, contract } = args;
+
   if (!state.availability || !state.weddingDate) {
     return undefined;
   }
@@ -54,6 +59,12 @@ function availabilityLine(state: SimpleWeddingSalesState) {
   );
 
   if (state.availability === "available") {
+    if (contract.mentionPolicy.availability.mode === "still_available") {
+      return state.location
+        ? `Yep, that date is still showing open for ${state.location} 🤍`
+        : "Yep, that date is still showing open 🤍";
+    }
+
     if (isFollowUpCheck && updatedLocationThisTurn) {
       return `I checked ${state.location} too, and ${date} is still available there 🤍`;
     }
@@ -79,7 +90,7 @@ function pricingLine(args: {
   contract: ReplyActionContract;
   knowledge: SimpleWeddingKnowledgeContext;
 }) {
-  if (!args.contract.mustMentionPricing && !args.contract.mayMentionPricing) {
+  if (args.contract.mentionPolicy.pricing.mode === "skip") {
     return undefined;
   }
 
@@ -93,6 +104,14 @@ function pricingLine(args: {
     ? `${args.knowledge.pricing.coverageHours}-hour `
     : "";
 
+  if (args.contract.mentionPolicy.pricing.mode === "same_as_before") {
+    return `Yep, pricing is the same as I mentioned - ${args.knowledge.pricing.startPrice} for the ${coverage || ""}collection${regionText}.`;
+  }
+
+  if (args.contract.mentionPolicy.pricing.mode === "brief_reference") {
+    return `Same starting point: ${args.knowledge.pricing.startPrice}${regionText}.`;
+  }
+
   return `Our ${coverage}wedding films start at ${args.knowledge.pricing.startPrice}${regionText}.`;
 }
 
@@ -100,8 +119,12 @@ function guideLine(args: {
   contract: ReplyActionContract;
   knowledge: SimpleWeddingKnowledgeContext;
 }) {
-  if (!args.contract.mustMentionGuide && !args.contract.mayMentionGuide) {
+  if (args.contract.mentionPolicy.guide.mode === "skip") {
     return undefined;
+  }
+
+  if (args.contract.mentionPolicy.guide.mode === "mention_already_sent") {
+    return "I already sent the collections guide above, so you can reference that same one 🎥";
   }
 
   if (args.knowledge.channel === "instagram" && args.knowledge.guide.imageUrl) {
@@ -260,7 +283,9 @@ function renderSafeTemplate(args: {
 
   return joinLines([
     greetingLine({ contract: args.contract, state: args.state, knowledge: args.knowledge }),
-    args.contract.mustMentionWeddingAvailability ? availabilityLine(args.state) : undefined,
+    args.contract.mustMentionWeddingAvailability
+      ? availabilityLine({ state: args.state, contract: args.contract })
+      : undefined,
     pricingLine(args),
     guideLine(args),
     args.contract.mustMentionCalendarAvailability
@@ -285,13 +310,15 @@ export function writeConstrainedWeddingReply(args: {
   const { state, contract, knowledge } = args;
   const shouldSharePortfolio =
     state.questionsAskedByCustomer.includes("portfolio") ||
-    (contract.mustMentionGuide && knowledge.channel === "instagram");
+    (contract.mentionPolicy.guide.mode === "send_attachment" && knowledge.channel === "instagram");
   const draft =
     state.nextStep === "handoff"
       ? handoffLine()
       : joinLines([
           greetingLine({ contract, state, knowledge }),
-          contract.mustMentionWeddingAvailability ? availabilityLine(state) : undefined,
+          contract.mustMentionWeddingAvailability
+            ? availabilityLine({ state, contract })
+            : undefined,
           pricingLine({ contract, knowledge }),
           guideLine({ contract, knowledge }),
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,

@@ -192,6 +192,65 @@ test("wedding-sales-simple adapter returns pricing guide image attachment when g
   ]);
 });
 
+test("wedding-sales-simple adapter does not resend guide attachment when guide was already sent", async () => {
+  const incoming = normalizeInstagramWeddingSalesIncoming({
+    tenantId: "tenant-1",
+    agentId: "agent-wedding",
+    contactId: "ig-contact-1",
+    text: "Can you send the guide again?",
+    messageId: "mid-guide-again",
+  });
+  const result = await invokeWeddingSalesSimpleAdapter({
+    incoming,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price.png",
+        fileName: "price.png",
+      },
+    },
+    deps: {
+      loadState: () => ({
+        weddingDate: "2027-06-14",
+        location: "Tampa",
+        availability: "available",
+        availabilityCheck: {
+          date: "2027-06-14",
+          location: "Tampa",
+          status: "available",
+          checkedAt: "2026-06-23T00:00:00.000Z",
+        },
+        replyMemory: {
+          mentioned: {
+            guide: {
+              imageUrl: "https://example.com/price.png",
+              turnId: "turn-1",
+              lastMentionedAt: "2026-06-24T00:00:00.000Z",
+            },
+          },
+        },
+      }),
+      invokeGraph: (input) =>
+        import("@/lib/lang/graphs/wedding-sales-simple/graph").then(
+          ({ invokeWeddingSalesSimpleGraph }) =>
+            invokeWeddingSalesSimpleGraph({
+              ...input,
+              understand: () => ({
+                customerMessageType: "business_question",
+                facts: {},
+                questionsAskedByCustomer: [],
+                confidence: 0.95,
+              }),
+            }),
+        ),
+    },
+  });
+
+  assert.equal(result.status, "processed");
+  assert.match(result.outbound.text, /already sent the collections guide/i);
+  assert.equal(result.outbound.attachments, undefined);
+  assert.equal(result.state.replyContract?.mentionPolicy.guide.mode, "mention_already_sent");
+});
+
 test("wedding-sales-simple adapter skips duplicate incoming message ids", async () => {
   const incoming = normalizeInstagramWeddingSalesIncoming({
     tenantId: "tenant-1",

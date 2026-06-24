@@ -79,10 +79,33 @@ test("reply contract requires price and names after pricing question", () => {
 
   assert.equal(contract.mustMentionPricing, true);
   assert.equal(contract.requiredQuestion, "names");
-  assert.equal(contract.mustMentionGuide, false);
+  assert.equal(contract.mentionPolicy.pricing.mode, "full");
+  assert.equal(contract.mentionPolicy.guide.mode, "send_attachment");
   assert.equal(guard.ok, true);
   assert.match(reply, /\$2,950/);
   assert.match(reply, /both of your names/i);
+});
+
+test("reply contract uses same-as-before pricing when customer asks again", () => {
+  const state = baseState({
+    replyMemory: {
+      mentioned: {
+        pricing: {
+          value: "$2,950",
+          turnId: "turn-1",
+          lastMentionedAt: "2026-06-24T00:00:00.000Z",
+        },
+      },
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const reply = writeConstrainedWeddingReply({ state, knowledge, contract }).text;
+
+  assert.equal(contract.mentionPolicy.pricing.mode, "same_as_before");
+  assert.match(contract.mentionPolicy.pricing.reason, /already mentioned/i);
+  assert.match(reply, /same as I mentioned/i);
+  assert.match(reply, /\$2,950/);
 });
 
 test("instagram guide image and link prefer image attachment without long link text", () => {
@@ -118,6 +141,7 @@ test("instagram guide image and link prefer image attachment without long link t
   });
 
   assert.equal(contract.mustMentionGuide, true);
+  assert.equal(contract.mentionPolicy.guide.mode, "send_attachment");
   assert.equal(guard.ok, true);
   assert.match(reply, /guide image/i);
   assert.doesNotMatch(reply, /example\.com\/guide/i);
@@ -149,6 +173,7 @@ test("gmail guide link may appear while guard still blocks guide-unavailable lan
   });
 
   assert.equal(contract.mustMentionGuide, true);
+  assert.equal(contract.mentionPolicy.guide.mode, "send_attachment");
   assert.equal(guard.ok, true);
   assert.match(reply, /collections guide/i);
   assert.match(reply, /example\.com\/guide/i);

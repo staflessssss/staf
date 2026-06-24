@@ -96,10 +96,15 @@ function stateForPersistence(state: SimpleWeddingSalesState): SimpleWeddingSales
 function outboundAttachments(args: {
   text: string;
   knowledge?: SimpleWeddingKnowledgeContext;
+  state?: SimpleWeddingSalesState;
 }): NormalizedWeddingSalesOutboundMessage["attachments"] {
   const knowledge = args.knowledge;
 
-  if (!knowledge || !/\b(?:guide|collections?|price)\b/i.test(args.text)) {
+  if (
+    !knowledge ||
+    args.state?.replyContract?.mentionPolicy.guide.mode !== "send_attachment" ||
+    !/\b(?:guide|collections?|price)\b/i.test(args.text)
+  ) {
     return undefined;
   }
 
@@ -189,6 +194,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     attachments: outboundAttachments({
       text: graphState.responseDraft ?? "",
       knowledge,
+      state: graphState,
     }),
   });
   const persistedState = stateForPersistence(graphState);
