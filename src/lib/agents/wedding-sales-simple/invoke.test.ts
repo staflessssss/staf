@@ -59,7 +59,9 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
     incoming,
     toolContext,
     deps: {
-      recordSafetyLog: (entry) => safetyLogs.push(entry),
+      recordSafetyLog: (entry) => {
+        safetyLogs.push(entry);
+      },
       saveState: ({ state }) => {
         savedState = state;
       },
@@ -88,7 +90,7 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
   assert.equal(result.outbound.conversationId, "agent-wedding:ig-contact-1");
   assert.equal(result.outbound.handoffMode, "bot_active");
   assert.equal(result.outbound.decisionTrace.toolCalled, "checkAvailability");
-  assert.match(result.outbound.text, /collections start at/i);
+  assert.match(result.outbound.text, /wedding films start at/i);
   assert.match(result.outbound.text, /both of your names/i);
   assert.equal(savedState?.availabilityCheck?.status, "available");
   assert.equal(safetyLogs.length, 1);
@@ -130,8 +132,64 @@ test("wedding-sales-simple adapter normalizes Gmail thread and preserves sender 
   assert.equal(result.status, "processed");
   assert.equal(result.outbound.channel, "gmail");
   assert.equal(result.outbound.conversationId, "thread-1");
-  assert.match(result.outbound.text, /collections start at/i);
+  assert.match(result.outbound.text, /wedding films start at/i);
   assert.match(result.outbound.text, /What date are you looking at/i);
+});
+
+test("wedding-sales-simple adapter returns pricing guide image attachment when guide is mentioned", async () => {
+  const incoming = normalizeInstagramWeddingSalesIncoming({
+    tenantId: "tenant-1",
+    agentId: "agent-wedding",
+    contactId: "ig-contact-1",
+    text: "Yes send me here price image",
+    messageId: "mid-guide",
+  });
+  const result = await invokeWeddingSalesSimpleAdapter({
+    incoming,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price.png",
+        fileName: "price.png",
+      },
+    },
+    deps: {
+      loadState: () => ({
+        weddingDate: "2027-06-14",
+        location: "Tampa",
+        availability: "available",
+        availabilityCheck: {
+          date: "2027-06-14",
+          location: "Tampa",
+          status: "available",
+          checkedAt: "2026-06-23T00:00:00.000Z",
+        },
+      }),
+      invokeGraph: (input) =>
+        import("@/lib/lang/graphs/wedding-sales-simple/graph").then(
+          ({ invokeWeddingSalesSimpleGraph }) =>
+            invokeWeddingSalesSimpleGraph({
+              ...input,
+              understand: () => ({
+                customerMessageType: "business_question",
+                facts: {},
+                questionsAskedByCustomer: ["pricing"],
+                confidence: 0.95,
+              }),
+            }),
+        ),
+    },
+  });
+
+  assert.equal(result.status, "processed");
+  assert.match(result.outbound.text, /guide image/i);
+  assert.deepEqual(result.outbound.attachments, [
+    {
+      type: "image",
+      url: "https://example.com/price.png",
+      label: "price.png",
+      purpose: "pricing_guide",
+    },
+  ]);
 });
 
 test("wedding-sales-simple adapter skips duplicate incoming message ids", async () => {

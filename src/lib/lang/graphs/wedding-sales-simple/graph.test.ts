@@ -64,8 +64,8 @@ test("simple wedding sales runtime checks availability before asking for names",
     result.toolObservations.map((observation) => observation.toolName),
     ["check_wedding_availability"],
   );
-  assert.match(result.responseDraft ?? "", /June 14, 2027 is open for Tampa/i);
-  assert.match(result.responseDraft ?? "", /collections start at/i);
+  assert.match(result.responseDraft ?? "", /June 14, 2027 in Tampa is open/i);
+  assert.match(result.responseDraft ?? "", /wedding films start at/i);
   assert.match(result.responseDraft ?? "", /both of your names/i);
 });
 
@@ -85,7 +85,7 @@ test("simple wedding sales runtime answers pricing but asks for date before tool
   assert.equal(result.missingField, "weddingDate");
   assert.equal(result.decisionTrace?.replyType, "pricing_answer");
   assert.deepEqual(result.toolObservations, []);
-  assert.match(result.responseDraft ?? "", /collections start at/i);
+  assert.match(result.responseDraft ?? "", /wedding films start at/i);
   assert.match(result.responseDraft ?? "", /What date are you looking at/i);
 });
 
@@ -120,7 +120,7 @@ test("simple wedding sales runtime checks consultation time and asks for email",
     ["check_consultation_calendar"],
   );
   assert.match(result.responseDraft ?? "", /works for a call/i);
-  assert.match(result.responseDraft ?? "", /What email/i);
+  assert.match(result.responseDraft ?? "", /best email/i);
 });
 
 test("simple wedding sales runtime books after email when calendar is available", async () => {
@@ -165,7 +165,7 @@ test("simple wedding sales runtime books after email when calendar is available"
     result.toolObservations.map((observation) => observation.toolName),
     ["book_consultation"],
   );
-  assert.match(result.responseDraft ?? "", /Done - I booked the call/i);
+  assert.match(result.responseDraft ?? "", /I booked the call/i);
 });
 
 test("simple wedding sales replies avoid known robotic phrases", async () => {
@@ -211,7 +211,7 @@ test("simple wedding sales runtime does not recheck availability for the same da
   assert.equal(result.missingField, "names");
   assert.deepEqual(result.toolObservations, []);
   assert.equal(result.decisionTrace?.toolCalled, undefined);
-  assert.match(result.responseDraft ?? "", /collections start at/i);
+  assert.match(result.responseDraft ?? "", /wedding films start at/i);
 });
 
 test("simple wedding sales runtime rechecks availability when the customer changes date", async () => {
@@ -307,7 +307,7 @@ test("simple wedding sales runtime formats Gmail with a compact recap", async ()
       }),
   });
 
-  assert.match(result.responseDraft ?? "", /I have date: June 14, 2027, location: Tampa/i);
+  assert.match(result.responseDraft ?? "", /June 14, 2027 in Tampa is open/i);
   assert.match(result.responseDraft ?? "", /Do you already have a venue picked out/i);
 });
 
@@ -463,4 +463,107 @@ test("simple wedding sales runtime asks another time when checked calendar slot 
   assert.equal(result.nextStep, "reply_only");
   assert.equal(result.decisionTrace?.replyType, "calendar_busy");
   assert.match(result.responseDraft ?? "", /10:00, 11:00 could work/i);
+});
+
+test("simple wedding sales runtime asks for couple names when sender is mother of bride", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can we talk tomorrow? I'm mother of bride",
+    previousState: {
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      availability: "available",
+      availabilityCheck: {
+        date: "2027-06-14",
+        location: "Tampa",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {
+          senderRole: "mother",
+        },
+        questionsAskedByCustomer: ["booking"],
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.missingField, "names");
+  assert.match(result.responseDraft ?? "", /couple's names/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /both of your names/i);
+});
+
+test("simple wedding sales runtime mentions guide image availability when price image exists", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Yes send me here price image",
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        fileName: "price-fl.png",
+      },
+    },
+    previousState: {
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      availability: "available",
+      availabilityCheck: {
+        date: "2027-06-14",
+        location: "Tampa",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["pricing"],
+      }),
+  });
+
+  assert.match(result.responseDraft ?? "", /\$2,950/i);
+  assert.match(result.responseDraft ?? "", /guide image/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /don'?t have|cannot|can't|unable/i);
+});
+
+test("simple wedding sales runtime does not book or confirm a call without email", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "10am works for us",
+    toolContext,
+    previousState: {
+      customerName: "Anna",
+      partnerName: "Mark",
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      venue: "The Don Cesar",
+      availability: "available",
+      availabilityCheck: {
+        date: "2027-06-14",
+        location: "Tampa",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {
+          proposedCallTime: "2026-06-24T10:00:00-04:00",
+        },
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_email");
+  assert.equal(result.bookingConfirmed, false);
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_consultation_calendar"],
+  );
+  assert.match(result.responseDraft ?? "", /best email/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /booked|confirmed|all set/i);
 });

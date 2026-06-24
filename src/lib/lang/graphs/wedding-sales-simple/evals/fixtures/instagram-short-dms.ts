@@ -23,7 +23,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_missing_info",
       toolCalls: [],
-      replyIncludes: [/collections start at/i, /What date/i],
+      replyIncludes: [/wedding films start at/i, /What date/i],
     },
   },
   {
@@ -56,7 +56,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_missing_info",
       toolCalls: ["check_wedding_availability"],
-      replyIncludes: [/June 14, 2027 is open for Tampa/i, /both of your names/i],
+      replyIncludes: [/June 14, 2027 in Tampa is open/i, /both of your names/i],
     },
   },
   {
@@ -89,7 +89,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_call_time",
       toolCalls: [],
-      replyIncludes: [/good time/i],
+      replyIncludes: [/What time works best/i],
     },
   },
   {
@@ -105,7 +105,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_email",
       toolCalls: ["check_consultation_calendar"],
-      replyIncludes: [/works for a call/i, /What email/i],
+      replyIncludes: [/works for a call/i, /best email/i],
     },
   },
   {

@@ -4,6 +4,12 @@ import {
 } from "@/lib/lang/graphs/wedding-sales-simple/graph";
 import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
 import type { WeddingSalesToolContext } from "@/lib/lang/tools/wedding-sales";
+import {
+  buildSimpleWeddingKnowledgeContext,
+  type SimpleWeddingKnowledgeContext,
+  type SimpleWeddingKnowledgeFeature,
+} from "@/lib/lang/graphs/wedding-sales-simple/knowledge";
+import type { WeddingSalesConfig } from "@/lib/lang/graphs/wedding-sales/config";
 
 import type {
   NormalizedWeddingSalesIncomingMessage,
@@ -23,7 +29,7 @@ export type WeddingSalesSimpleInvokeResult =
   | {
       status: "duplicate";
       outbound: null;
-      state?: SimpleWeddingSalesState;
+      state?: Partial<SimpleWeddingSalesState>;
     };
 
 export type WeddingSalesSimpleInvokeDeps = {
@@ -87,9 +93,58 @@ function stateForPersistence(state: SimpleWeddingSalesState): SimpleWeddingSales
   };
 }
 
+function outboundAttachments(args: {
+  text: string;
+  knowledge?: SimpleWeddingKnowledgeContext;
+}): NormalizedWeddingSalesOutboundMessage["attachments"] {
+  const knowledge = args.knowledge;
+
+  if (!knowledge || !/\b(?:guide|collections?|price)\b/i.test(args.text)) {
+    return undefined;
+  }
+
+  const attachments: NormalizedWeddingSalesOutboundMessage["attachments"] = [];
+
+  if (knowledge.guide.imageUrl) {
+    attachments.push({
+      type: "image",
+      url: knowledge.guide.imageUrl,
+      label: knowledge.guide.fileName ?? "Collections guide",
+      purpose: "pricing_guide",
+    });
+  } else if (knowledge.guide.link) {
+    attachments.push({
+      type: "link",
+      url: knowledge.guide.link,
+      label: "Collections guide",
+      purpose: "pricing_guide",
+    });
+  }
+
+  return attachments.length > 0 ? attachments : undefined;
+}
+
+function knowledgeSummary(knowledge?: SimpleWeddingKnowledgeContext) {
+  if (!knowledge) {
+    return undefined;
+  }
+
+  return {
+    hasPricing: Boolean(knowledge.pricing.startPrice),
+    startPrice: knowledge.pricing.startPrice,
+    hasGuideImage: Boolean(knowledge.guide.imageUrl),
+    hasGuideLink: Boolean(knowledge.guide.link),
+    personaName: knowledge.persona.name,
+  };
+}
+
 export async function invokeWeddingSalesSimpleAdapter(args: {
   incoming: NormalizedWeddingSalesIncomingMessage;
   toolContext?: WeddingSalesToolContext | null;
+  config?: Partial<WeddingSalesConfig>;
+  channelConfig?: unknown;
+  features?: SimpleWeddingKnowledgeFeature[];
+  knowledge?: SimpleWeddingKnowledgeContext;
   deps?: WeddingSalesSimpleInvokeDeps;
 }): Promise<WeddingSalesSimpleInvokeResult> {
   const deps = args.deps ?? {};
@@ -114,10 +169,27 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     customerEmail: args.incoming.senderEmail,
     previousState,
     toolContext: args.toolContext,
+    config: args.config,
+    channelConfig: args.channelConfig,
+    knowledgeFeatures: args.features,
+    knowledge: args.knowledge,
   });
+  const knowledge =
+    args.knowledge ??
+    buildSimpleWeddingKnowledgeContext({
+      channel: args.incoming.channel,
+      channelConfig: args.channelConfig,
+      features: args.features,
+      config: args.config,
+      state: graphState,
+    });
   const outbound = buildWeddingSalesSimpleOutbound({
     incoming: args.incoming,
     state: graphState,
+    attachments: outboundAttachments({
+      text: graphState.responseDraft ?? "",
+      knowledge,
+    }),
   });
   const persistedState = stateForPersistence(graphState);
 
@@ -125,6 +197,10 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     inboundText: args.incoming.text,
     outboundText: outbound.text,
     decisionTrace: graphState.decisionTrace,
+    replyContract: graphState.replyContract,
+    guardResult: graphState.replyGuardResult,
+    attachments: outbound.attachments,
+    knowledgeSummary: knowledgeSummary(knowledge),
     toolCalls: graphState.toolObservations.map((observation) => observation.toolName),
     previousState,
     nextState: persistedState,

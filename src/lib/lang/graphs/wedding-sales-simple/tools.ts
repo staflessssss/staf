@@ -247,7 +247,7 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
     const steps = getStepResults(parseToolJson(resultText));
     const bookedStep = steps.find((step) => step.status === "booked");
     const parsed = parseToolJson(resultText);
-    const testModeBooked = toolContext.testMode && parsed.status === "missing_credentials";
+    const testModeBooked = Boolean(toolContext.testMode) && parsed.status === "missing_credentials";
 
     return appendObservation(
       {

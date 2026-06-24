@@ -32,7 +32,7 @@ export const dateChangeAfterAvailabilityReplay: SimpleWeddingSalesReplayTurn[] =
     expect: {
       nextStep: "ask_missing_info",
       toolCalls: ["check_wedding_availability"],
-      replyIncludes: [/June 15, 2027 is open for Tampa/i],
+      replyIncludes: [/June 15, 2027 in Tampa is open/i],
     },
   },
 ];
@@ -68,7 +68,7 @@ export const locationChangeAfterAvailabilityReplay: SimpleWeddingSalesReplayTurn
     expect: {
       nextStep: "ask_missing_info",
       toolCalls: ["check_wedding_availability"],
-      replyIncludes: [/June 14, 2027 is open for Orlando/i],
+      replyIncludes: [/June 14, 2027 in Orlando is open/i],
     },
   },
 ];

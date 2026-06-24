@@ -11,6 +11,13 @@ import {
 import { maybeRunSimpleWeddingSalesTool } from "./tools";
 import { understandTurn, type SimpleWeddingSalesUnderstandTurn } from "./understand";
 import type { WeddingSalesConfig } from "../wedding-sales/config";
+import {
+  buildSimpleWeddingKnowledgeContext,
+  type SimpleWeddingKnowledgeFeature,
+  type SimpleWeddingKnowledgeContext,
+} from "./knowledge";
+import { buildReplyActionContract } from "./reply-contract";
+import { writeConstrainedWeddingReply } from "./reply-writer";
 
 function toolNameForStep(state: SimpleWeddingSalesState) {
   if (state.nextStep === "check_availability") {
@@ -37,6 +44,9 @@ export type InvokeWeddingSalesSimpleGraphInput = {
   customerEmail?: string;
   previousState?: Partial<SimpleWeddingSalesState>;
   config?: Partial<WeddingSalesConfig>;
+  channelConfig?: unknown;
+  knowledgeFeatures?: SimpleWeddingKnowledgeFeature[];
+  knowledge?: SimpleWeddingKnowledgeContext;
   toolContext?: WeddingSalesToolContext | null;
   understand?: SimpleWeddingSalesUnderstandTurn;
 };
@@ -116,9 +126,30 @@ export async function invokeWeddingSalesSimpleGraph(
     };
   }
 
+  const knowledge =
+    input.knowledge ??
+    buildSimpleWeddingKnowledgeContext({
+      channel: input.channel,
+      channelConfig: input.channelConfig,
+      features: input.knowledgeFeatures,
+      config: input.config,
+      state,
+    });
+  const contract = buildReplyActionContract({
+    state,
+    knowledge,
+  });
+  const reply = writeConstrainedWeddingReply({
+    state,
+    contract,
+    knowledge,
+  });
+
   return {
     ...state,
-    responseDraft: writeHumanReply({
+    replyContract: contract,
+    replyGuardResult: reply.guardResult,
+    responseDraft: reply.text || writeHumanReply({
       state,
       config: input.config,
     }),

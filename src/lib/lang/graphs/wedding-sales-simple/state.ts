@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import type { WeddingSalesChannel } from "../wedding-sales/state";
+import type { ReplyActionContract } from "./reply-contract";
+import type { ReplyGuardResult } from "./reply-guards";
 
 export type SimpleWeddingSalesChannel = WeddingSalesChannel;
 
@@ -24,6 +26,7 @@ export const turnUnderstandingSchema = z.object({
     venue: z.string().trim().min(1).optional(),
     email: z.string().trim().email().optional(),
     proposedCallTime: z.string().trim().min(1).optional(),
+    senderRole: z.enum(["bride", "groom", "mother", "planner", "friend", "unknown"]).optional(),
   }),
   questionsAskedByCustomer: z.array(
     z.enum([
@@ -103,6 +106,7 @@ export type SimpleWeddingSalesState = {
   location?: string;
   venue?: string;
   customerEmail?: string;
+  senderRole?: "bride" | "groom" | "mother" | "planner" | "friend" | "unknown";
   availability?: "available" | "unavailable";
   availabilityContextDate?: string;
   availabilityRegion?: string;
@@ -136,6 +140,8 @@ export type SimpleWeddingSalesState = {
   nextStep?: SimpleWeddingSalesNextStep;
   missingField?: "names" | "weddingDate" | "location";
   decisionTrace?: SimpleWeddingSalesDecisionTrace;
+  replyContract?: ReplyActionContract;
+  replyGuardResult?: ReplyGuardResult;
   responseDraft?: string;
   toolObservations: Array<{ toolName: string; result: string }>;
 };
@@ -162,6 +168,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     location: args.previousState?.location,
     venue: args.previousState?.venue,
     customerEmail: args.customerEmail ?? args.previousState?.customerEmail,
+    senderRole: args.previousState?.senderRole,
     availability: args.previousState?.availability,
     availabilityContextDate: args.previousState?.availabilityContextDate,
     availabilityRegion: args.previousState?.availabilityRegion,
@@ -186,6 +193,8 @@ export function createInitialSimpleWeddingSalesState(args: {
     nextStep: args.previousState?.nextStep,
     missingField: args.previousState?.missingField,
     decisionTrace: args.previousState?.decisionTrace,
+    replyContract: args.previousState?.replyContract,
+    replyGuardResult: args.previousState?.replyGuardResult,
     responseDraft: args.previousState?.responseDraft,
     toolObservations: [],
   };
@@ -212,6 +221,7 @@ export function mergeTurnUnderstanding(
     location: facts.location ?? state.location,
     venue: facts.venue ?? state.venue,
     customerEmail: facts.email ?? state.customerEmail,
+    senderRole: facts.senderRole ?? state.senderRole,
     proposedCallTime,
     calendarStatus: callTimeChanged ? undefined : state.calendarStatus,
     calendarContextDate: callTimeChanged ? undefined : state.calendarContextDate,

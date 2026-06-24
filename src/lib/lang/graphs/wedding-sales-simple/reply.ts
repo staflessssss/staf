@@ -5,7 +5,7 @@ import {
 } from "../wedding-sales/config";
 import { getCoupleName, type SimpleWeddingSalesState } from "./state";
 
-function formatDate(date: string | undefined) {
+export function formatSimpleWeddingDate(date: string | undefined) {
   if (!date) {
     return undefined;
   }
@@ -44,14 +44,14 @@ function availabilityLine(state: SimpleWeddingSalesState) {
     return undefined;
   }
 
-  const date = formatDate(state.weddingDate);
+  const date = formatSimpleWeddingDate(state.weddingDate);
   const place = state.location ? ` for ${state.location}` : "";
 
   if (state.availability === "available") {
     return `Yes - ${date} is open${place}.`;
   }
 
-  const alternatives = state.suggestedWeddingDates?.map(formatDate).filter(Boolean).join(" or ");
+  const alternatives = state.suggestedWeddingDates?.map(formatSimpleWeddingDate).filter(Boolean).join(" or ");
 
   return alternatives
     ? `${date} is not open${place}, but ${alternatives} may work.`
@@ -124,7 +124,7 @@ function bookingLine(state: SimpleWeddingSalesState) {
 
 function recapLine(state: SimpleWeddingSalesState) {
   const details = [
-    state.weddingDate ? `date: ${formatDate(state.weddingDate)}` : undefined,
+    state.weddingDate ? `date: ${formatSimpleWeddingDate(state.weddingDate)}` : undefined,
     state.location ? `location: ${state.location}` : undefined,
     state.venue ? `venue: ${state.venue}` : undefined,
   ].filter(Boolean);
@@ -191,7 +191,7 @@ export function writeHumanReply(args: {
 }
 
 export const simpleWeddingSalesReplyTestHelpers = {
-  formatDate,
+  formatDate: formatSimpleWeddingDate,
   availabilityLine,
   pricingLine,
 };

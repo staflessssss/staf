@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/lib/lang/graphs/wedding-sales-simple/**/*.ts",
+    "src/lib/agents/wedding-sales-simple/**/*.ts",
+    "src/lib/lang/graphs/wedding-sales/config.ts",
+    "src/lib/lang/graphs/wedding-sales/config-from-agent.ts",
+    "src/lib/lang/graphs/wedding-sales/state.ts",
+    "src/lib/lang/graphs/wedding-sales/tools.ts",
+    "src/lib/lang/tools/wedding-sales.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/lib/lang/graphs/wedding-sales/**/*.test.ts",
+    "src/lib/tools/**/*.test.ts"
+  ]
+}

@@ -62,6 +62,7 @@ import {
 import { invokeWeddingSalesSimpleAdapter } from "@/lib/agents/wedding-sales-simple/invoke";
 import type {
   NormalizedWeddingSalesIncomingMessage,
+  NormalizedWeddingSalesOutboundMessage,
   WeddingSalesSimpleSafetyLogEntry,
 } from "@/lib/agents/wedding-sales-simple/contracts";
 import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
@@ -157,6 +158,19 @@ function getWeddingSalesGuideAttachment(args: {
   ] satisfies RuntimeAttachment[];
 }
 
+function getSimpleWeddingSalesAttachments(
+  attachments?: NormalizedWeddingSalesOutboundMessage["attachments"],
+) {
+  return attachments
+    ?.filter((attachment) => attachment.type === "image" && attachment.url)
+    .map((attachment) => ({
+      fileId: attachment.url,
+      fileName: attachment.label,
+      mimeType: "image/png",
+      publicUrl: attachment.url,
+    })) satisfies RuntimeAttachment[] | undefined;
+}
+
 type ParsedIncomingMessage = {
   contactId: string;
   contactUsername?: string;
@@ -228,7 +242,12 @@ type HandleIncomingEventDeps = {
   }) => Promise<InstagramConversationPreflightResult>;
 };
 
-type IncomingEventAgent = Pick<AgentWithConfigData, "id" | "tenantId" | "channelConfig" | "channel">;
+type IncomingEventAgent = Pick<
+  AgentWithConfigData,
+  "id" | "tenantId" | "channelConfig" | "channel"
+> & {
+  features?: AgentWithConfigData["features"];
+};
 
 type InstagramConversationPreflightResult =
   | {
@@ -1887,6 +1906,7 @@ async function runWeddingSalesSimpleRuntime(args: {
     toolFeatures,
     defaultEmail,
   });
+  const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
   const incoming: NormalizedWeddingSalesIncomingMessage = {
     channel: "instagram",
     tenantId: args.agent.tenantId,
@@ -1902,6 +1922,9 @@ async function runWeddingSalesSimpleRuntime(args: {
   const adapterResult = await invokeWeddingSalesSimpleAdapter({
     incoming,
     toolContext,
+    config,
+    channelConfig: args.agent.channelConfig,
+    features: args.agent.features ?? [],
     deps: {
       loadState: () =>
         loadWeddingSalesSimpleStateWithDb({
@@ -1976,6 +1999,7 @@ async function runWeddingSalesSimpleRuntime(args: {
     usedTooling,
     conversationId: conversation.id,
     model: "wedding_sales_simple",
+    attachments: getSimpleWeddingSalesAttachments(adapterResult.outbound.attachments),
   };
 }
 

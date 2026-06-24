@@ -32,6 +32,7 @@ Rules:
 - Put a month/day without a year into weddingDateText.
 - location is a city or region. venue is the specific place.
 - proposedCallTime is the customer's requested consultation call time.
+- senderRole is who appears to be writing: bride, groom, mother, planner, friend, or unknown.
 - customerMessageType is the main intent of the latest message.
 - questionsAskedByCustomer can include multiple topics.
 `.trim();
@@ -158,6 +159,32 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
   return [...new Set(questions)];
 }
 
+function inferSenderRole(message: string): TurnUnderstanding["facts"]["senderRole"] {
+  const normalized = message.toLowerCase();
+
+  if (/\bmother of (?:the )?bride\b|\bbride'?s mom\b|\bmom of (?:the )?bride\b/.test(normalized)) {
+    return "mother";
+  }
+
+  if (/\bplanner|coordinator\b/.test(normalized)) {
+    return "planner";
+  }
+
+  if (/\bbride\b/.test(normalized)) {
+    return "bride";
+  }
+
+  if (/\bgroom\b/.test(normalized)) {
+    return "groom";
+  }
+
+  if (/\bfriend of\b/.test(normalized)) {
+    return "friend";
+  }
+
+  return undefined;
+}
+
 export function understandTurnHeuristically(
   state: SimpleWeddingSalesState,
 ): TurnUnderstanding {
@@ -191,6 +218,7 @@ export function understandTurnHeuristically(
       location: extractLocation(message),
       email,
       proposedCallTime,
+      senderRole: inferSenderRole(message),
     },
     questionsAskedByCustomer,
     confidence: 0.7,
