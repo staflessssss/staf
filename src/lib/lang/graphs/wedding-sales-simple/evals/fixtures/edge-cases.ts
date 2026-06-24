@@ -102,7 +102,7 @@ export const callTimeChangeReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_email",
       toolCalls: ["check_consultation_calendar"],
-      replyIncludes: [/16:00 works perfectly for a call/i],
+      replyIncludes: [/4:00 PM works perfectly for a call/i],
     },
   },
 ];

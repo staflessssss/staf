@@ -194,7 +194,7 @@ test("calendar result contract does not repeat persistent wedding availability",
 
   assert.equal(contract.mustMentionWeddingAvailability, false);
   assert.equal(contract.mustMentionCalendarAvailability, true);
-  assert.match(reply, /10:00 works perfectly for a call/i);
+  assert.match(reply, /10:00 AM works perfectly for a call/i);
   assert.doesNotMatch(reply, /June 14|date is available/i);
 });
 
@@ -260,4 +260,31 @@ test("reply guard rejects stale wedding availability outside the contract", () =
   assert.equal(contract.mustMentionWeddingAvailability, false);
   assert.equal(guard.ok, false);
   assert.ok(guard.reasons.includes("stale wedding availability was repeated"));
+});
+
+test("writer reads founder greeting from structured knowledge instead of fixed copy", () => {
+  const state = baseState({
+    isFirstTurn: true,
+  });
+  const knowledge = buildSimpleWeddingKnowledgeContext({
+    channel: "instagram",
+    channelConfig: {
+      prompting: {
+        persona: "You are Elena, the founder of Northlight Weddings.",
+        replyStyle: {
+          greetingOpening: "Hello from Northlight 🤍✨",
+          greetingIntroduction: "I’m {{name}}, founder of {{company}}.",
+          greetingCelebration: "Congratulations on this beautiful chapter!",
+        },
+      },
+    },
+    state: { location: "Tampa" },
+  });
+  const contract = buildReplyActionContract({ state, knowledge });
+  const reply = writeConstrainedWeddingReply({ state, knowledge, contract }).text;
+
+  assert.match(reply, /^Hello from Northlight 🤍✨/);
+  assert.match(reply, /I’m Elena, founder of Northlight Weddings/);
+  assert.match(reply, /Congratulations on this beautiful chapter/);
+  assert.doesNotMatch(reply, /Taras|Myndful/);
 });

@@ -253,6 +253,17 @@ export type PromptingConfig = {
   showContactIdentity: boolean;
   showChannelContext: boolean;
   notes?: string | null;
+  replyStyle?: PromptingReplyStyleConfig;
+};
+
+export type PromptingReplyStyleConfig = {
+  greetingOpening?: string | null;
+  greetingIntroduction?: string | null;
+  greetingCelebration?: string | null;
+  namesAcknowledgement?: string | null;
+  venueAcknowledgement?: string | null;
+  calendarAlternativesIntro?: string | null;
+  calendarAlternativesQuestion?: string | null;
 };
 
 export type IntegrationsConfig = {
@@ -774,6 +785,15 @@ export function getDefaultAgentSettingsConfig(timezone?: string | null): AgentSe
 export function normalizePromptingConfig(
   value?: Partial<PromptingConfig> | null,
 ): PromptingConfig {
+  const replyStyle = value?.replyStyle;
+  const normalizedReplyStyle = replyStyle
+    ? Object.fromEntries(
+        Object.entries(replyStyle)
+          .filter(([, entry]) => typeof entry === "string" && entry.trim().length > 0)
+          .map(([key, entry]) => [key, (entry as string).trim()]),
+      )
+    : {};
+
   return {
     persona:
       typeof value?.persona === "string" && value.persona.trim().length > 0
@@ -800,6 +820,9 @@ export function normalizePromptingConfig(
       typeof value?.notes === "string" && value.notes.trim().length > 0
         ? value.notes.trim()
         : null,
+    ...(Object.keys(normalizedReplyStyle).length > 0
+      ? { replyStyle: normalizedReplyStyle as PromptingReplyStyleConfig }
+      : {}),
   };
 }
 
@@ -1045,6 +1068,17 @@ export const channelConfigSchema = z
           .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
+        replyStyle: z
+          .object({
+            greetingOpening: z.string().trim().max(1000).nullable().optional(),
+            greetingIntroduction: z.string().trim().max(1000).nullable().optional(),
+            greetingCelebration: z.string().trim().max(1000).nullable().optional(),
+            namesAcknowledgement: z.string().trim().max(1000).nullable().optional(),
+            venueAcknowledgement: z.string().trim().max(1000).nullable().optional(),
+            calendarAlternativesIntro: z.string().trim().max(1000).nullable().optional(),
+            calendarAlternativesQuestion: z.string().trim().max(1000).nullable().optional(),
+          })
+          .optional(),
       })
       .optional(),
     conversationPlaybook: z

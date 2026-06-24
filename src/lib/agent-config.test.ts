@@ -699,6 +699,22 @@ test("normalizePromptingConfig trims text and defaults visibility flags to false
   });
 });
 
+test("normalizePromptingConfig preserves structured simple-runtime reply copy", () => {
+  const normalized = normalizePromptingConfig({
+    replyStyle: {
+      greetingOpening: "  Welcome 🤍  ",
+      venueAcknowledgement: "  {{venue}} looks beautiful.  ",
+      calendarAlternativesQuestion: "  Which time works?  ",
+    },
+  });
+
+  assert.deepEqual(normalized.replyStyle, {
+    greetingOpening: "Welcome 🤍",
+    venueAcknowledgement: "{{venue}} looks beautiful.",
+    calendarAlternativesQuestion: "Which time works?",
+  });
+});
+
 test("agentDraftSchema accepts prompting nulls from editor state and normalizes them away", () => {
   const parsed = agentDraftSchema.parse({
     name: "Studio Concierge",

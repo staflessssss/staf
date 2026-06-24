@@ -8,20 +8,36 @@ function joinLines(lines: Array<string | undefined>) {
   return lines.filter(Boolean).join("\n\n");
 }
 
+function renderCopy(template: string, values: Record<string, string | undefined>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{{${key}}}`, value ?? ""),
+    template,
+  ).trim();
+}
+
 function greetingLine(args: {
   contract: ReplyActionContract;
   state: SimpleWeddingSalesState;
+  knowledge: SimpleWeddingKnowledgeContext;
 }) {
   if (!args.contract.mustGreet) {
     return undefined;
   }
 
-  const introduction =
-    "Hey there! Thank you so much for reaching out 🤍✨\nI’m Taras, the founder of Myndful Films.";
+  const style = args.knowledge.persona.replyStyle;
+  const introduction = renderCopy(style.greetingIntroduction, {
+    name: args.knowledge.persona.name,
+    company: args.knowledge.persona.company,
+  });
+  const celebration =
+    args.state.senderRole === "mother" || args.state.senderRole === "planner"
+      ? undefined
+      : style.greetingCelebration;
 
-  return args.state.senderRole === "mother" || args.state.senderRole === "planner"
-    ? introduction
-    : `${introduction} Huge congratulations on your engagement - such an exciting season of life!`;
+  return joinLines([
+    style.greetingOpening,
+    [introduction, celebration].filter(Boolean).join(" "),
+  ]);
 }
 
 function availabilityLine(state: SimpleWeddingSalesState) {
@@ -117,9 +133,11 @@ function questionLine(args: {
     case "location":
       return "What city or area is the wedding in?";
     case "venue":
-      return "So nice to meet you both! Do you already have a venue picked out?";
+      return `${args.knowledge.persona.replyStyle.namesAcknowledgement} Do you already have a venue picked out?`;
     case "callTime":
-      return `What time works best for a quick call? I do consults ${args.knowledge.scheduling.callWindow.replace("America/New_York", "Eastern")}.`;
+      return `${renderCopy(args.knowledge.persona.replyStyle.venueAcknowledgement, {
+        venue: args.state.venue,
+      })} What time works best for a quick call? I do consults ${args.knowledge.scheduling.callWindow.replace("America/New_York", "Eastern")}.`;
     case "email":
       return "What’s the best email for the calendar invite?";
     default:
@@ -127,16 +145,47 @@ function questionLine(args: {
   }
 }
 
-function calendarLine(state: SimpleWeddingSalesState) {
+function formatCallTime(value: string) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return value;
+  }
+
+  const hour = Number(match[1]);
+  const minutes = match[2];
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${suffix}`;
+}
+
+function formatTimeList(values: string[]) {
+  const labels = values.map(formatCallTime);
+
+  if (labels.length <= 1) {
+    return labels[0] ?? "";
+  }
+
+  if (labels.length === 2) {
+    return `${labels[0]} or ${labels[1]}`;
+  }
+
+  return `${labels.slice(0, -1).join(", ")}, or ${labels.at(-1)}`;
+}
+
+function calendarLine(
+  state: SimpleWeddingSalesState,
+  knowledge: SimpleWeddingKnowledgeContext,
+) {
   if (state.calendarStatus === "available" && state.checkedCallTime) {
-    return `${state.checkedCallTime} works perfectly for a call ✨`;
+    return `${formatCallTime(state.checkedCallTime)} works perfectly for a call ✨`;
   }
 
   if (state.calendarStatus === "busy") {
-    const suggestions = state.suggestedCallTimes?.join(", ");
+    const suggestions = formatTimeList(state.suggestedCallTimes ?? []);
 
     return suggestions
-      ? `That time is already taken, but ${suggestions} could work.`
+      ? `${knowledge.persona.replyStyle.calendarAlternativesIntro} ${suggestions} instead. ${knowledge.persona.replyStyle.calendarAlternativesQuestion}`
       : "That time is already taken.";
   }
 
@@ -169,11 +218,13 @@ function renderSafeTemplate(args: {
   }
 
   return joinLines([
-    greetingLine({ contract: args.contract, state: args.state }),
+    greetingLine({ contract: args.contract, state: args.state, knowledge: args.knowledge }),
     args.contract.mustMentionWeddingAvailability ? availabilityLine(args.state) : undefined,
     pricingLine(args),
     guideLine(args),
-    args.contract.mustMentionCalendarAvailability ? calendarLine(args.state) : undefined,
+    args.contract.mustMentionCalendarAvailability
+      ? calendarLine(args.state, args.knowledge)
+      : undefined,
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     questionLine(args),
   ]) || questionLine(args) || "Got it. I can help with that.";
@@ -195,12 +246,12 @@ export function writeConstrainedWeddingReply(args: {
     state.nextStep === "handoff"
       ? handoffLine()
       : joinLines([
-          greetingLine({ contract, state }),
+          greetingLine({ contract, state, knowledge }),
           contract.mustMentionWeddingAvailability ? availabilityLine(state) : undefined,
           pricingLine({ contract, knowledge }),
           guideLine({ contract, knowledge }),
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,
-          contract.mustMentionCalendarAvailability ? calendarLine(state) : undefined,
+          contract.mustMentionCalendarAvailability ? calendarLine(state, knowledge) : undefined,
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);

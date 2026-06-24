@@ -70,10 +70,9 @@ export function validateGeneratedReply(args: {
 
   if (
     args.contract.mustGreet &&
-    (!/thank you so much for reaching out/i.test(reply) ||
-      !/\bTaras\b/.test(reply) ||
-      !reply.includes("🤍") ||
-      !reply.includes("✨"))
+    (!reply.includes(args.knowledge.persona.replyStyle.greetingOpening) ||
+      !reply.includes(args.knowledge.persona.name) ||
+      !reply.includes(args.knowledge.persona.company))
   ) {
     reasons.push("first-turn founder greeting is incomplete");
   }

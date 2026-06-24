@@ -499,7 +499,8 @@ test("simple wedding sales runtime asks another time when checked calendar slot 
 
   assert.equal(result.nextStep, "reply_only");
   assert.equal(result.decisionTrace?.replyType, "calendar_busy");
-  assert.match(result.responseDraft ?? "", /10:00, 11:00 could work/i);
+  assert.match(result.responseDraft ?? "", /10:00 AM or 11:00 AM instead/i);
+  assert.match(result.responseDraft ?? "", /Would one of those work for you/i);
 });
 
 test("simple wedding sales runtime asks for couple names when sender is mother of bride", async () => {

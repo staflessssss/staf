@@ -21,6 +21,15 @@ export type SimpleWeddingKnowledgeContext = {
     name: string;
     company: string;
     voice: string;
+    replyStyle: {
+      greetingOpening: string;
+      greetingIntroduction: string;
+      greetingCelebration: string;
+      namesAcknowledgement: string;
+      venueAcknowledgement: string;
+      calendarAlternativesIntro: string;
+      calendarAlternativesQuestion: string;
+    };
   };
   pricing: {
     startPrice: string;
@@ -144,6 +153,32 @@ function publicDriveUrl(fileId?: string) {
     : undefined;
 }
 
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function readString(record: Record<string, unknown> | undefined, key: string, fallback: string) {
+  const value = record?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function readPersonaIdentity(channelConfig: unknown) {
+  const root = asRecord(channelConfig);
+  const prompting = asRecord(root?.prompting);
+  const persona = typeof prompting?.persona === "string" ? prompting.persona : "";
+  const identity = /\b(?:you are|i(?:'|’)m)\s+([A-Z][\p{L}'’-]+)(?:\s+[A-Z][\p{L}'’-]+)*,?\s+(?:the\s+)?founder of\s+([^.?\n]+)/iu.exec(
+    persona,
+  );
+
+  return {
+    name: identity?.[1]?.trim() || "Taras",
+    company: identity?.[2]?.trim() || "Myndful Films",
+    prompting,
+  };
+}
+
 export function buildSimpleWeddingKnowledgeContext(input: {
   channelConfig?: unknown;
   features?: SimpleWeddingKnowledgeFeature[];
@@ -166,13 +201,52 @@ export function buildSimpleWeddingKnowledgeContext(input: {
   const voice =
     featureText(features, /founder|identity|voice/i) ||
     "Taras Mynd is the founder of Myndful Films. Write warm, human, founder-led messages that never sound robotic.";
+  const identity = readPersonaIdentity(input.channelConfig);
+  const replyStyle = asRecord(identity.prompting?.replyStyle);
 
   return {
     channel: input.channel,
     persona: {
-      name: "Taras",
-      company: "Myndful Films",
+      name: identity.name,
+      company: identity.company,
       voice,
+      replyStyle: {
+        greetingOpening: readString(
+          replyStyle,
+          "greetingOpening",
+          "Hey there! Thank you so much for reaching out 🤍✨",
+        ),
+        greetingIntroduction: readString(
+          replyStyle,
+          "greetingIntroduction",
+          "I’m {{name}}, the founder of {{company}}.",
+        ),
+        greetingCelebration: readString(
+          replyStyle,
+          "greetingCelebration",
+          "Huge congratulations on your engagement - such an exciting season of life!",
+        ),
+        namesAcknowledgement: readString(
+          replyStyle,
+          "namesAcknowledgement",
+          "So nice to meet you both!",
+        ),
+        venueAcknowledgement: readString(
+          replyStyle,
+          "venueAcknowledgement",
+          "{{venue}} sounds like a wonderful choice.",
+        ),
+        calendarAlternativesIntro: readString(
+          replyStyle,
+          "calendarAlternativesIntro",
+          "That time is already taken, but I could do",
+        ),
+        calendarAlternativesQuestion: readString(
+          replyStyle,
+          "calendarAlternativesQuestion",
+          "Would one of those work for you? ✨",
+        ),
+      },
     },
     pricing: {
       startPrice: pricing.startPrice,
@@ -201,4 +275,3 @@ export function buildSimpleWeddingKnowledgeContext(input: {
     ],
   };
 }
-
