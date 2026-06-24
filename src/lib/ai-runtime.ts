@@ -59,6 +59,12 @@ import {
   requestOwnerHandoffWithDb,
   shouldRequestOwnerHandoff,
 } from "@/lib/owner-handoff";
+import { invokeWeddingSalesSimpleAdapter } from "@/lib/agents/wedding-sales-simple/invoke";
+import type {
+  NormalizedWeddingSalesIncomingMessage,
+  WeddingSalesSimpleSafetyLogEntry,
+} from "@/lib/agents/wedding-sales-simple/contracts";
+import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
 
 type LightweightKnowledgeBlock = {
   name: string;
@@ -241,6 +247,8 @@ type LangGraphToolObservation = {
 };
 
 const WEDDING_SALES_TEST_STATE_TOOL_NAME = "__wedding_sales_state";
+const WEDDING_SALES_SIMPLE_STATE_TOOL_NAME = "__wedding_sales_simple_state";
+const WEDDING_SALES_SIMPLE_SAFETY_LOG_TOOL_NAME = "__wedding_sales_simple_safety_log";
 
 function getWeddingSalesOwnerHandoffReason(state: WeddingSalesState) {
   return (
@@ -324,6 +332,110 @@ async function recordLangGraphToolObservationsWithDb(args: {
       },
     });
   }
+}
+
+function parseSimpleWeddingSalesState(value: unknown): Partial<SimpleWeddingSalesState> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const maybeState = value as { state?: unknown };
+  const state = maybeState.state ?? value;
+
+  return state && typeof state === "object" && !Array.isArray(state)
+    ? (state as Partial<SimpleWeddingSalesState>)
+    : undefined;
+}
+
+async function loadWeddingSalesSimpleStateWithDb(args: {
+  database: typeof db;
+  conversationId: string;
+}) {
+  const stateMessage = await args.database.message.findFirst({
+    where: {
+      conversationId: args.conversationId,
+      role: MessageRole.TOOL,
+      toolName: WEDDING_SALES_SIMPLE_STATE_TOOL_NAME,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return parseSimpleWeddingSalesState(stateMessage?.toolResult);
+}
+
+async function saveWeddingSalesSimpleStateWithDb(args: {
+  database: typeof db;
+  conversationId: string;
+  state: SimpleWeddingSalesState;
+}) {
+  await args.database.message.create({
+    data: {
+      conversationId: args.conversationId,
+      role: MessageRole.TOOL,
+      toolName: WEDDING_SALES_SIMPLE_STATE_TOOL_NAME,
+      content: `wedding-sales-simple state: ${args.state.mode}`,
+      toolResult: { state: args.state },
+      model: "wedding_sales_simple",
+    },
+  });
+
+  if (args.state.mode === "bot_paused") {
+    await args.database.conversation.update({
+      where: { id: args.conversationId },
+      data: { status: ConversationStatus.ESCALATED },
+    });
+  }
+}
+
+async function recordWeddingSalesSimpleSafetyLogWithDb(args: {
+  database: typeof db;
+  conversationId: string;
+  entry: WeddingSalesSimpleSafetyLogEntry;
+}) {
+  await args.database.message.create({
+    data: {
+      conversationId: args.conversationId,
+      role: MessageRole.TOOL,
+      toolName: WEDDING_SALES_SIMPLE_SAFETY_LOG_TOOL_NAME,
+      content: `wedding-sales-simple: ${args.entry.decisionTrace?.replyType ?? "unknown"}`,
+      toolResult: args.entry,
+      model: "wedding_sales_simple",
+    },
+  });
+}
+
+async function hasProcessedWeddingSalesSimpleIncomingWithDb(args: {
+  database: typeof db;
+  agentId: string;
+  contactId: string;
+  messageId?: string;
+}) {
+  const messageId = args.messageId?.trim();
+
+  if (!messageId) {
+    return false;
+  }
+
+  const existing = await args.database.message.findFirst({
+    where: {
+      role: MessageRole.USER,
+      conversation: {
+        agentId: args.agentId,
+        contactId: args.contactId,
+      },
+      toolInput: {
+        path: ["messageId"],
+        equals: messageId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  return Boolean(existing);
 }
 
 function splitSignature(text: string) {
@@ -936,9 +1048,15 @@ function isGmailClientClassifierEnabled(channelConfig: unknown) {
 function getRuntimeType(channelConfig: unknown) {
   const rawChannelConfig = getChannelConfigObject(channelConfig as never);
 
-  return rawChannelConfig.runtimeType === "langgraph_wedding_sales"
-    ? "langgraph_wedding_sales"
-    : "legacy";
+  if (rawChannelConfig.runtimeType === "langgraph_wedding_sales") {
+    return "langgraph_wedding_sales";
+  }
+
+  if (rawChannelConfig.runtimeType === "wedding_sales_simple") {
+    return "wedding_sales_simple";
+  }
+
+  return "legacy";
 }
 
 function shouldUseWeddingSalesRuntime(args: {
@@ -948,6 +1066,17 @@ function shouldUseWeddingSalesRuntime(args: {
   return (
     (args.channel === ChannelType.GMAIL || args.channel === ChannelType.INSTAGRAM) &&
     args.runtimeType === "langgraph_wedding_sales"
+  );
+}
+
+function shouldUseWeddingSalesSimpleRuntime(args: {
+  channel: ChannelType;
+  runtimeType: ReturnType<typeof getRuntimeType>;
+}) {
+  return (
+    process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM !== "true" &&
+    args.channel === ChannelType.INSTAGRAM &&
+    args.runtimeType === "wedding_sales_simple"
   );
 }
 
@@ -1685,6 +1814,171 @@ async function runWeddingSalesRuntime(args: {
   };
 }
 
+async function runWeddingSalesSimpleRuntime(args: {
+  database: typeof db;
+  agent: IncomingEventAgent;
+  incoming: ParsedIncomingMessage;
+  channel: ChannelType;
+  existingConversationStatus?: ConversationStatus;
+  skipInboundPersistence?: boolean;
+  conversationId?: string;
+}): Promise<InvokeAgentResult> {
+  if (args.channel !== ChannelType.INSTAGRAM) {
+    throw new Error("wedding-sales-simple runtime is currently enabled only for Instagram.");
+  }
+
+  if (
+    !args.skipInboundPersistence &&
+    (await hasProcessedWeddingSalesSimpleIncomingWithDb({
+      database: args.database,
+      agentId: args.agent.id,
+      contactId: args.incoming.contactId,
+      messageId: args.incoming.messageId,
+    }))
+  ) {
+    return {
+      message: "",
+      promptPreview: "wedding_sales_simple_duplicate",
+      usedTooling: [],
+      model: "wedding_sales_simple",
+      suppressReply: true,
+    };
+  }
+
+  const conversation =
+    args.skipInboundPersistence && args.conversationId
+      ? { id: args.conversationId }
+      : await recordInboundMessageWithDb(args.database, {
+          agentId: args.agent.id,
+          contactId: args.incoming.contactId,
+          contactUsername: args.incoming.contactUsername,
+          contactDisplayName: args.incoming.contactDisplayName,
+          channel: args.agent.channel.type,
+          message: args.incoming.message,
+          messageId: args.incoming.messageId,
+          gmailMessageId: args.incoming.gmailMessageId,
+          threadId: args.incoming.threadId,
+          subject: args.incoming.subject,
+          conversationStatus: args.existingConversationStatus ?? ConversationStatus.ACTIVE,
+        });
+
+  if (!args.skipInboundPersistence) {
+    await cancelPendingDelayedDeliveriesWithDb({
+      database: args.database,
+      conversationId: conversation.id,
+      kinds: [DelayedDeliveryKind.FOLLOW_UP],
+    });
+  }
+
+  const toolFeatures = await hydrateFunctionBlocksForRuntime(
+    {
+      id: args.agent.id,
+      tenantId: args.agent.tenantId,
+      channelConfig: args.agent.channelConfig,
+    },
+    args.database,
+  );
+  const defaultEmail = resolveWeddingSalesDefaultEmail({
+    channel: args.channel,
+    incoming: args.incoming,
+  });
+  const toolContext = createWeddingSalesToolContextFromFeatures({
+    tenantId: args.agent.tenantId,
+    toolFeatures,
+    defaultEmail,
+  });
+  const incoming: NormalizedWeddingSalesIncomingMessage = {
+    channel: "instagram",
+    tenantId: args.agent.tenantId,
+    agentId: args.agent.id,
+    contactId: args.incoming.contactId,
+    conversationId: conversation.id,
+    text: args.incoming.message,
+    incomingMessageId: args.incoming.messageId,
+    senderName: args.incoming.contactDisplayName ?? args.incoming.contactUsername,
+    senderEmail: defaultEmail,
+    receivedAt: new Date().toISOString(),
+  };
+  const adapterResult = await invokeWeddingSalesSimpleAdapter({
+    incoming,
+    toolContext,
+    deps: {
+      loadState: () =>
+        loadWeddingSalesSimpleStateWithDb({
+          database: args.database,
+          conversationId: conversation.id,
+        }),
+      saveState: ({ state }) =>
+        saveWeddingSalesSimpleStateWithDb({
+          database: args.database,
+          conversationId: conversation.id,
+          state,
+        }),
+      recordSafetyLog: (entry) =>
+        recordWeddingSalesSimpleSafetyLogWithDb({
+          database: args.database,
+          conversationId: conversation.id,
+          entry,
+        }),
+    },
+  });
+
+  if (adapterResult.status === "duplicate") {
+    return {
+      message: "",
+      promptPreview: "wedding_sales_simple_duplicate",
+      usedTooling: [],
+      conversationId: conversation.id,
+      model: "wedding_sales_simple",
+      suppressReply: true,
+    };
+  }
+
+  const message = adapterResult.outbound.text;
+  await recordLangGraphToolObservationsWithDb({
+    database: args.database,
+    conversationId: conversation.id,
+    observations: adapterResult.state.toolObservations,
+  });
+
+  if (message) {
+    await args.database.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: MessageRole.ASSISTANT,
+        content: message,
+        model: "wedding_sales_simple",
+      },
+    });
+  }
+
+  const usedTooling = adapterResult.state.toolObservations.map(
+    (observation) => observation.toolName,
+  );
+
+  if (adapterResult.state.mode === "bot_paused") {
+    const handoff = await requestOwnerHandoffWithDb({
+      database: args.database,
+      agent: args.agent,
+      conversationId: conversation.id,
+      customerMessage: args.incoming.message,
+      reason: adapterResult.state.handoffReason ?? "wedding_sales_simple_handoff",
+    });
+
+    if (handoff.status === "owner_handoff_requested") {
+      usedTooling.push(OWNER_HANDOFF_REQUEST_TOOL_NAME);
+    }
+  }
+
+  return {
+    message,
+    promptPreview: "wedding_sales_simple",
+    usedTooling,
+    conversationId: conversation.id,
+    model: "wedding_sales_simple",
+  };
+}
+
 async function recordInboundMessage(args: {
   agentId: string;
   contactId: string;
@@ -1945,8 +2239,30 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     throw new Error(input.allowDraftAgent ? "Saved agent not found." : "Active deployed agent not found.");
   }
 
-  const runtimeBlocks = await mapAgentToRuntimeBlocks(agent);
   const runtimeType = getRuntimeType(agent.channelConfig);
+  if (
+    !input.testMode &&
+    shouldUseWeddingSalesSimpleRuntime({ channel: agent.channel.type, runtimeType })
+  ) {
+    return runWeddingSalesSimpleRuntime({
+      database: db,
+      agent,
+      incoming: {
+        contactId: input.contactId,
+        contactEmail: input.contactEmail,
+        message: input.message,
+        messageId: input.messageId,
+        gmailMessageId: input.gmailMessageId,
+        threadId: input.threadId,
+        subject: input.subject,
+      },
+      channel: agent.channel.type,
+      skipInboundPersistence: input.skipInboundPersistence,
+      conversationId: input.conversationId,
+    });
+  }
+
+  const runtimeBlocks = await mapAgentToRuntimeBlocks(agent);
   if (
     !input.testMode &&
     shouldUseWeddingSalesRuntime({ channel: agent.channel.type, runtimeType })
@@ -2171,6 +2487,9 @@ export const aiRuntimeTestHelpers = {
   buildRuntimeContextLines,
   getAntiSpamIntercept,
   classifyGmailClientMessage,
+  getRuntimeType,
+  shouldUseWeddingSalesSimpleRuntime,
+  shouldUseWeddingSalesRuntime,
 };
 
 async function handleIncomingEventWithDeps(
@@ -2375,6 +2694,11 @@ async function handleIncomingEventWithDeps(
   const agentSettings = getRuntimeAgentSettingsConfig(agent.channelConfig);
   const control = getRuntimeControlConfig(agent.channelConfig);
   const messageBehavior = readMessageBehaviorConfig(agent.channelConfig);
+  const runtimeType = getRuntimeType(agent.channelConfig);
+  const useWeddingSalesSimpleRuntime = shouldUseWeddingSalesSimpleRuntime({
+    channel: args.channel,
+    runtimeType,
+  });
   const replyContext = {
     contactId: incoming.contactId,
     contactEmail: incoming.contactEmail,
@@ -2596,6 +2920,7 @@ async function handleIncomingEventWithDeps(
   }
 
   if (
+    !useWeddingSalesSimpleRuntime &&
     args.channel !== ChannelType.GMAIL &&
     messageBehavior.bufferDelaySeconds > 0
   ) {
@@ -2650,9 +2975,16 @@ async function handleIncomingEventWithDeps(
     };
   }
 
-  const runtimeType = getRuntimeType(agent.channelConfig);
   const result =
-    shouldUseWeddingSalesRuntime({ channel: args.channel, runtimeType })
+    useWeddingSalesSimpleRuntime
+      ? await runWeddingSalesSimpleRuntime({
+          database: deps.db,
+          agent,
+          incoming,
+          channel: args.channel,
+          existingConversationStatus: existingConversation?.status,
+        })
+      : shouldUseWeddingSalesRuntime({ channel: args.channel, runtimeType })
       ? await runWeddingSalesRuntime({
           database: deps.db,
           agent,

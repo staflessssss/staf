@@ -926,7 +926,10 @@ const scheduleWindowSchema = z.object({
 
 export const channelConfigSchema = z
   .object({
-    runtimeType: z.enum(["legacy", "langgraph_wedding_sales"]).optional().default("legacy"),
+    runtimeType: z
+      .enum(["legacy", "langgraph_wedding_sales", "wedding_sales_simple"])
+      .optional()
+      .default("legacy"),
     priceAttachmentFileId: z
       .string()
       .trim()

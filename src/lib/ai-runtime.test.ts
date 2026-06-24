@@ -148,6 +148,93 @@ test("invokeAgent sandbox stays multilingual-first without tools", async () => {
   assert.deepEqual(result.usedTooling, []);
 });
 
+test("wedding-sales-simple runtime routing is Instagram-only", () => {
+  const runtimeType = aiRuntimeTestHelpers.getRuntimeType({
+    runtimeType: "wedding_sales_simple",
+  });
+
+  assert.equal(runtimeType, "wedding_sales_simple");
+  assert.equal(
+    aiRuntimeTestHelpers.shouldUseWeddingSalesSimpleRuntime({
+      channel: "INSTAGRAM" as never,
+      runtimeType,
+    }),
+    true,
+  );
+  assert.equal(
+    aiRuntimeTestHelpers.shouldUseWeddingSalesSimpleRuntime({
+      channel: "GMAIL" as never,
+      runtimeType,
+    }),
+    false,
+  );
+  assert.equal(
+    aiRuntimeTestHelpers.shouldUseWeddingSalesSimpleRuntime({
+      channel: "TELEGRAM" as never,
+      runtimeType,
+    }),
+    false,
+  );
+});
+
+test("wedding-sales-simple runtime routing does not affect legacy Instagram", () => {
+  const runtimeType = aiRuntimeTestHelpers.getRuntimeType({
+    runtimeType: "legacy",
+  });
+
+  assert.equal(runtimeType, "legacy");
+  assert.equal(
+    aiRuntimeTestHelpers.shouldUseWeddingSalesSimpleRuntime({
+      channel: "INSTAGRAM" as never,
+      runtimeType,
+    }),
+    false,
+  );
+});
+
+test("wedding-sales-simple runtime has an Instagram kill switch", () => {
+  const previous = process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM;
+  process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM = "true";
+
+  try {
+    assert.equal(
+      aiRuntimeTestHelpers.shouldUseWeddingSalesSimpleRuntime({
+        channel: "INSTAGRAM" as never,
+        runtimeType: "wedding_sales_simple",
+      }),
+      false,
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM;
+    } else {
+      process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM = previous;
+    }
+  }
+});
+
+test("langgraph wedding sales routing remains separate from simple runtime", () => {
+  const runtimeType = aiRuntimeTestHelpers.getRuntimeType({
+    runtimeType: "langgraph_wedding_sales",
+  });
+
+  assert.equal(runtimeType, "langgraph_wedding_sales");
+  assert.equal(
+    aiRuntimeTestHelpers.shouldUseWeddingSalesRuntime({
+      channel: "INSTAGRAM" as never,
+      runtimeType,
+    }),
+    true,
+  );
+  assert.equal(
+    aiRuntimeTestHelpers.shouldUseWeddingSalesSimpleRuntime({
+      channel: "INSTAGRAM" as never,
+      runtimeType,
+    }),
+    false,
+  );
+});
+
 test("finalizeAssistantText strips emojis outside the allowed set", () => {
   const finalized = aiRuntimeTestHelpers.finalizeAssistantText({
     text: "Thanks so much 😊 Sunset in Miami feels amazing 🤍",
@@ -1673,6 +1760,9 @@ test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when 
         conversation: {
           findUnique: async () => null,
         },
+        telegramOwnerLink: {
+          findUnique: async () => null,
+        },
         $transaction: async (
           callback: (tx: {
             conversation: {
@@ -1784,6 +1874,9 @@ test("handleIncomingEventWithDeps routes Instagram through wedding sales graph w
         conversation: {
           findUnique: async () => null,
         },
+        telegramOwnerLink: {
+          findUnique: async () => null,
+        },
         $transaction: async (
           callback: (tx: {
             conversation: {
@@ -1881,6 +1974,9 @@ test("handleIncomingEventWithDeps treats Instagram get in touch as the first inq
           create: async () => ({ id: "message-1" }),
         },
         conversation: {
+          findUnique: async () => null,
+        },
+        telegramOwnerLink: {
           findUnique: async () => null,
         },
         $transaction: async (
