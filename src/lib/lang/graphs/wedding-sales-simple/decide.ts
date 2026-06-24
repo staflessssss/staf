@@ -261,6 +261,14 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  if (state.callTimeAmbiguousChoice) {
+    return decision({
+      nextStep: "ask_call_time",
+      replyType: "call_time_ambiguous",
+      reason: "customer accepted multiple suggested call times without choosing one",
+    });
+  }
+
   if (
     state.proposedCallTime &&
     !isCalendarContextCurrent(state) &&

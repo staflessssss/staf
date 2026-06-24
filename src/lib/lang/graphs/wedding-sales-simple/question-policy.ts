@@ -56,7 +56,8 @@ export function buildSimpleWeddingQuestionPolicy(args: {
   const alreadyAsked = wasQuestionAsked(state, requiredQuestion);
   const invalidCallTime =
     requiredQuestion === "callTime" &&
-    state.decisionTrace?.replyType === "call_time_out_of_window";
+    (state.decisionTrace?.replyType === "call_time_out_of_window" ||
+      state.decisionTrace?.replyType === "call_time_ambiguous");
   const contextChanged = hasContextChangeForRepeatedQuestion(state);
   const mode = invalidCallTime
     ? "invalid_answer_retry"

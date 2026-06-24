@@ -89,6 +89,7 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "ask_email"
     | "calendar_available"
     | "calendar_busy"
+    | "call_time_ambiguous"
     | "call_time_out_of_window"
     | "booking_confirmed"
     | "identity_answer"
@@ -163,6 +164,7 @@ export type SimpleWeddingSalesState = {
     checkedAt: string;
   };
   proposedCallTime?: string;
+  callTimeAmbiguousChoice?: boolean;
   calendarStatus?: "available" | "busy";
   calendarContextDate?: string;
   suggestedCallTimes?: string[];
@@ -226,6 +228,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     suggestedWeddingDates: args.previousState?.suggestedWeddingDates,
     availabilityCheck: args.previousState?.availabilityCheck,
     proposedCallTime: args.previousState?.proposedCallTime,
+    callTimeAmbiguousChoice: false,
     calendarStatus: args.previousState?.calendarStatus,
     calendarContextDate: args.previousState?.calendarContextDate,
     suggestedCallTimes: args.previousState?.suggestedCallTimes,
@@ -261,11 +264,11 @@ export function mergeTurnUnderstanding(
   const facts = understanding.facts;
   const customerName = facts.customerName ?? state.customerName;
   const partnerName = facts.partnerName ?? state.partnerName;
-  const proposedCallTime = facts.proposedCallTime
-    ? resolveProposedCallTimeFromPreviousContext(facts.proposedCallTime, state.proposedCallTime)
-    : state.proposedCallTime;
+  const callTimeCompletion = completeCallTimeFromAnswerContext(state, facts.proposedCallTime);
+  const proposedCallTime = callTimeCompletion.proposedCallTime ?? state.proposedCallTime;
   const callTimeChanged = Boolean(
-    facts.proposedCallTime && facts.proposedCallTime !== state.proposedCallTime,
+    callTimeCompletion.proposedCallTime &&
+      callTimeCompletion.proposedCallTime !== state.proposedCallTime,
   );
 
   return {
@@ -279,6 +282,7 @@ export function mergeTurnUnderstanding(
     customerEmail: facts.email ?? state.customerEmail,
     senderRole: facts.senderRole ?? state.senderRole,
     proposedCallTime,
+    callTimeAmbiguousChoice: callTimeCompletion.ambiguousChoice,
     calendarStatus: callTimeChanged ? undefined : state.calendarStatus,
     calendarContextDate: callTimeChanged ? undefined : state.calendarContextDate,
     suggestedCallTimes: callTimeChanged ? undefined : state.suggestedCallTimes,
@@ -296,8 +300,37 @@ export function mergeTurnUnderstanding(
   };
 }
 
+function wasAnsweringCallTimeQuestion(state: SimpleWeddingSalesState) {
+  return Boolean(
+    state.replyMemory?.lastRequiredQuestion === "callTime" ||
+      state.replyMemory?.questionMemory?.lastRequiredQuestion === "callTime",
+  );
+}
+
+function isAmbiguousCallTimeChoice(message: string) {
+  return /^\s*(?:either|both|any|whatever|whichever)(?:\s+(?:works?|is fine|is good))?[.!]?\s*$/i.test(
+    message,
+  );
+}
+
+function extractShortCallTimeAnswer(message: string) {
+  const match = /^\s*(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s+(?:works?|works too|is fine|is good|sounds good|please|pls|ok|okay))?[.!]?\s*$/i.exec(
+    message,
+  );
+
+  if (!match) {
+    return undefined;
+  }
+
+  return {
+    hour: match[1],
+    minutes: match[2],
+    suffix: match[3],
+  };
+}
+
 function isBareCallTime(value: string) {
-  return /^\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)\s*$/i.test(value);
+  return /^\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*$/i.test(value);
 }
 
 function toTwentyFourHourTime(value: string) {
@@ -320,6 +353,77 @@ function toTwentyFourHourTime(value: string) {
   }
 
   return `${String(hour).padStart(2, "0")}:${minutes}`;
+}
+
+function inferCallTimeSuffix(args: {
+  hour: string;
+  explicitSuffix?: string;
+  previousProposedCallTime?: string;
+  lastQuestionText?: string;
+}) {
+  if (args.explicitSuffix) {
+    return args.explicitSuffix.toLowerCase();
+  }
+
+  const hourPattern = new RegExp(`\\b${Number(args.hour)}(?::\\d{2})?\\s*(am|pm)\\b`, "i");
+  const optionSuffix = hourPattern.exec(args.lastQuestionText ?? "")?.[1];
+
+  if (optionSuffix) {
+    return optionSuffix.toLowerCase();
+  }
+
+  return /\b\d{1,2}(?::\d{2})?\s*(pm)\b/i.exec(args.previousProposedCallTime ?? "")?.[1]?.toLowerCase() ??
+    /\b\d{1,2}(?::\d{2})?\s*(am)\b/i.exec(args.previousProposedCallTime ?? "")?.[1]?.toLowerCase();
+}
+
+function normalizeShortCallTimeAnswer(args: {
+  hour: string;
+  minutes?: string;
+  suffix?: string;
+  previousProposedCallTime?: string;
+  lastQuestionText?: string;
+}) {
+  const suffix = inferCallTimeSuffix({
+    hour: args.hour,
+    explicitSuffix: args.suffix,
+    previousProposedCallTime: args.previousProposedCallTime,
+    lastQuestionText: args.lastQuestionText,
+  });
+
+  return suffix ? `${Number(args.hour)}${args.minutes ? `:${args.minutes}` : ""}${suffix}` : undefined;
+}
+
+function completeCallTimeFromAnswerContext(
+  state: SimpleWeddingSalesState,
+  proposedCallTime?: string,
+) {
+  const lastQuestionText = state.replyMemory?.questionMemory?.lastQuestionText;
+  const answeringCallTime = wasAnsweringCallTimeQuestion(state);
+
+  if (answeringCallTime && !proposedCallTime && isAmbiguousCallTimeChoice(state.latestCustomerMessage)) {
+    return {
+      ambiguousChoice: true,
+    };
+  }
+
+  const shortAnswer = answeringCallTime
+    ? extractShortCallTimeAnswer(proposedCallTime ?? state.latestCustomerMessage)
+    : undefined;
+  const normalizedShortAnswer = shortAnswer
+    ? normalizeShortCallTimeAnswer({
+        ...shortAnswer,
+        previousProposedCallTime: state.proposedCallTime,
+        lastQuestionText,
+      })
+    : undefined;
+  const candidate = normalizedShortAnswer ?? proposedCallTime;
+
+  return {
+    proposedCallTime: candidate
+      ? resolveProposedCallTimeFromPreviousContext(candidate, state.proposedCallTime)
+      : undefined,
+    ambiguousChoice: false,
+  };
 }
 
 function resolveProposedCallTimeFromPreviousContext(

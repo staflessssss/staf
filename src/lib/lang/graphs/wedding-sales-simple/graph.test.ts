@@ -300,6 +300,171 @@ test("simple wedding sales runtime asks again instead of repeating calendar chec
   assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess/i);
 });
 
+test("simple wedding sales runtime resolves a bare numeric call time from rejected time context", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "2 works",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 3pm",
+      replyMemory: {
+        lastRequiredQuestion: "callTime",
+        questionMemory: {
+          lastRequiredQuestion: "callTime",
+          lastQuestionText:
+            "3pm is just outside my consult window - I do calls Monday-Friday, 9am-2pm Eastern. Would 1pm or 2pm work?",
+        },
+      },
+      consultationCheck: {
+        proposedTime: "tomorrow at 3pm",
+        status: "unknown",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {},
+      }),
+  });
+
+  assert.equal(result.proposedCallTime, "tomorrow at 2pm");
+  assert.equal(result.nextStep, "ask_email");
+  assert.equal(result.decisionTrace?.toolCalled, "checkCalendar");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_consultation_calendar"],
+  );
+});
+
+test("simple wedding sales runtime does not guess when customer accepts multiple call times", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Either works",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 3pm",
+      replyMemory: {
+        lastRequiredQuestion: "callTime",
+        questionMemory: {
+          lastRequiredQuestion: "callTime",
+          lastQuestionText:
+            "3pm is just outside my consult window - I do calls Monday-Friday, 9am-2pm Eastern. Would 1pm or 2pm work?",
+        },
+      },
+      consultationCheck: {
+        proposedTime: "tomorrow at 3pm",
+        status: "unknown",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {},
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_call_time");
+  assert.equal(result.decisionTrace?.replyType, "call_time_ambiguous");
+  assert.equal(result.replyContract?.questionPolicy.mode, "invalid_answer_retry");
+  assert.deepEqual(result.toolObservations, []);
+  assert.match(result.responseDraft ?? "", /one specific time/i);
+  assert.match(result.responseDraft ?? "", /1pm or 2pm/i);
+});
+
+test("simple wedding sales runtime treats yes after available calendar as email step when email is missing", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "yes",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 2pm",
+      calendarStatus: "available",
+      consultationCheck: {
+        proposedTime: "tomorrow at 2pm",
+        status: "available",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+      checkedCallDate: "2026-06-25",
+      checkedCallTime: "14:00",
+      checkedCallStartTime: "2026-06-25T14:00:00-04:00",
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "booking_confirmation",
+        facts: {},
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_email");
+  assert.equal(result.bookingConfirmed, false);
+  assert.deepEqual(result.toolObservations, []);
+  assert.match(result.responseDraft ?? "", /best email/i);
+});
+
+test("simple wedding sales runtime can book after yes when email and available calendar are known", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "yes",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      customerEmail: "mike@example.com",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 2pm",
+      calendarStatus: "available",
+      consultationCheck: {
+        proposedTime: "tomorrow at 2pm",
+        status: "available",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+      checkedCallDate: "2026-06-25",
+      checkedCallTime: "14:00",
+      checkedCallStartTime: "2026-06-25T14:00:00-04:00",
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "booking_confirmation",
+        facts: {},
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.equal(result.bookingConfirmed, true);
+  assert.equal(result.decisionTrace?.toolCalled, "bookCall");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["book_consultation"],
+  );
+});
+
 test("simple wedding sales runtime books after email when calendar is available", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

@@ -175,6 +175,10 @@ function questionLine(args: {
       return `${args.knowledge.persona.replyStyle.namesAcknowledgement} Do you already have a venue picked out?`;
     case "callTime":
       if (args.contract.questionPolicy.mode === "invalid_answer_retry") {
+        if (args.contract.replyType === "call_time_ambiguous") {
+          return "Either works - I just need one specific time to check the calendar. Would you prefer 1pm or 2pm?";
+        }
+
         return `${proposedTime ?? "That time"} is just outside my consult window - I do calls ${callWindow}. Would 1pm or 2pm work?`;
       }
 
