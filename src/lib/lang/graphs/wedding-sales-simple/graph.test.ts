@@ -70,6 +70,41 @@ test("simple wedding sales runtime checks availability before asking for names",
   assert.match(result.responseDraft ?? "", /both of your names/i);
 });
 
+test("simple wedding sales runtime sends price guide without unsolicited portfolio links", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Tampa, Florida",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+      portfolio: [
+        {
+          label: "Recent Film",
+          url: "https://galleries.example/recent",
+        },
+      ],
+    },
+    previousState: {
+      weddingDate: "2026-10-17",
+      weddingDateText: "17/10/2026",
+    },
+    understand: () =>
+      understanding({
+        facts: {
+          location: "Tampa, Florida",
+        },
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
+  assert.match(result.responseDraft ?? "", /collections guide image/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
+});
+
 test("simple wedding sales runtime greets once and does not repeat availability after names", async () => {
   const first = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
@@ -825,6 +860,35 @@ test("simple wedding sales runtime answers as Taras instead of handing off to Ta
   assert.match(result.responseDraft ?? "", /speaking with me here.*I'm Taras/i);
 });
 
+test("simple wedding sales runtime answers shooter question as team knowledge instead of identity", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Who will be shooter? You?",
+    previousState: {
+      weddingDate: "2026-10-17",
+      location: "Tampa, Florida",
+      availability: "available",
+      availabilityCheck: {
+        date: "2026-10-17",
+        location: "Tampa, Florida",
+        status: "available",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {},
+        questionsAskedByCustomer: ["identity", "team"],
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.equal(result.decisionTrace?.replyType, "team_answer");
+  assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /speaking with me here/i);
+});
+
 test("simple wedding sales runtime routes missing tool execution to handoff", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
@@ -927,6 +991,44 @@ test("simple wedding sales runtime checks availability before calendar when call
     ["check_wedding_availability"],
   );
   assert.equal(result.consultationCheck, undefined);
+});
+
+test("simple wedding sales runtime does not hand off when call time is actionable despite other classification", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can we call tomorrow at 10 am?",
+    toolContext,
+    previousState: {
+      customerName: "Rick",
+      partnerName: "Dakota",
+      weddingDate: "2026-10-17",
+      location: "Tampa, Florida",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityCheck: {
+        date: "2026-10-17",
+        location: "Tampa, Florida",
+        status: "available",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {
+          proposedCallTime: "tomorrow at 10 am",
+        },
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+
+  assert.notEqual(result.nextStep, "handoff");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.decisionTrace?.toolCalled, "checkCalendar");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_consultation_calendar"],
+  );
 });
 
 test("simple wedding sales runtime asks for date when availability question has no date", async () => {

@@ -91,6 +91,7 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "calendar_busy"
     | "call_time_ambiguous"
     | "call_time_out_of_window"
+    | "team_answer"
     | "booking_confirmed"
     | "identity_answer"
     | "clarification"

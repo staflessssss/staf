@@ -308,6 +308,16 @@ function identityLine(knowledge: SimpleWeddingKnowledgeContext) {
   return `Absolutely - you're speaking with me here. I'm ${knowledge.persona.name}, and I'm happy to go over anything you'd like before we finish 🤍`;
 }
 
+function teamLine(state: SimpleWeddingSalesState) {
+  const asksIfTarasWillShoot = /\b(?:you|taras)\b[\s\S]{0,40}\b(?:shoot|shooter|film|filming)\b|\b(?:shoot|shooter|film|filming)\b[\s\S]{0,40}\b(?:you|taras)\b/i.test(
+    state.latestCustomerMessage,
+  );
+
+  return asksIfTarasWillShoot
+    ? "I'll be your point of contact here, and for Florida weddings Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call."
+    : "For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.";
+}
+
 function clarificationLine() {
   return "I want to make sure I understand you correctly. Could you tell me a little more about what you'd like to know?";
 }
@@ -342,6 +352,7 @@ function renderSafeTemplate(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
+    args.contract.replyType === "team_answer" ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
   ]) || questionLine(args) || fallbackClarificationLine();
@@ -365,6 +376,7 @@ function renderCompactInstagramFallback(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
+    args.contract.replyType === "team_answer" ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
   ]
     .filter(Boolean)
@@ -383,9 +395,7 @@ export function writeConstrainedWeddingReply(args: {
   guardResult: ReturnType<typeof validateGeneratedReply>;
 } {
   const { state, contract, knowledge } = args;
-  const shouldSharePortfolio =
-    state.questionsAskedByCustomer.includes("portfolio") ||
-    (contract.mentionPolicy.guide.mode === "send_attachment" && knowledge.channel === "instagram");
+  const shouldSharePortfolio = state.questionsAskedByCustomer.includes("portfolio");
   const draft =
     state.nextStep === "handoff"
       ? handoffLine()
@@ -401,6 +411,7 @@ export function writeConstrainedWeddingReply(args: {
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
           callLogisticsLine(state),
           contract.replyType === "identity_answer" ? identityLine(knowledge) : undefined,
+          contract.replyType === "team_answer" ? teamLine(state) : undefined,
           contract.replyType === "clarification" ? clarificationLine() : undefined,
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);

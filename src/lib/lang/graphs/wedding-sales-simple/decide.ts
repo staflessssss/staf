@@ -146,6 +146,14 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  if (state.questionsAskedByCustomer.includes("team")) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "team_answer",
+      reason: "customer asked who will film or who the shooter will be",
+    });
+  }
+
   if (state.questionsAskedByCustomer.includes("identity")) {
     return decision({
       nextStep: "reply_only",
@@ -178,7 +186,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
 
   const hasKnownQuestion = state.questionsAskedByCustomer.some((question) => question !== "other");
 
-  if (state.questionsAskedByCustomer.includes("other") && !hasKnownQuestion) {
+  if (state.questionsAskedByCustomer.includes("other") && !hasKnownQuestion && !state.proposedCallTime) {
     return decision({
       nextStep: "handoff",
       mode: "human_needed",
