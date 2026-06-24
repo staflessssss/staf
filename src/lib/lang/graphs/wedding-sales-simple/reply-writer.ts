@@ -8,6 +8,17 @@ function joinLines(lines: Array<string | undefined>) {
   return lines.filter(Boolean).join("\n\n");
 }
 
+function greetingLine(state: SimpleWeddingSalesState) {
+  return state.isFirstTurn ? "Hey! Taras here - thanks for reaching out." : undefined;
+}
+
+function shouldMentionAvailability(state: SimpleWeddingSalesState) {
+  return Boolean(
+    state.decisionTrace?.toolCalled === "checkAvailability" ||
+      state.questionsAskedByCustomer.includes("availability"),
+  );
+}
+
 function availabilityLine(state: SimpleWeddingSalesState) {
   if (!state.availability || !state.weddingDate) {
     return undefined;
@@ -60,15 +71,15 @@ function guideLine(args: {
   }
 
   if (args.knowledge.channel === "instagram" && args.knowledge.guide.imageUrl) {
-    return "I can send the collections guide image here too.";
+    return "I'm sending the collections guide image here too.";
   }
 
   if (args.knowledge.guide.link) {
-    return `I can send the collections guide here too: ${args.knowledge.guide.link}`;
+    return `I'm sending the collections guide here too: ${args.knowledge.guide.link}`;
   }
 
   if (args.knowledge.guide.imageUrl) {
-    return "I can send the collections guide image here too.";
+    return "I'm sending the collections guide image here too.";
   }
 
   return undefined;
@@ -153,7 +164,8 @@ function renderSafeTemplate(args: {
   }
 
   return joinLines([
-    availabilityLine(args.state),
+    greetingLine(args.state),
+    shouldMentionAvailability(args.state) ? availabilityLine(args.state) : undefined,
     pricingLine(args),
     guideLine(args),
     calendarLine(args.state),
@@ -178,7 +190,8 @@ export function writeConstrainedWeddingReply(args: {
     state.nextStep === "handoff"
       ? handoffLine()
       : joinLines([
-          availabilityLine(state),
+          greetingLine(state),
+          shouldMentionAvailability(state) ? availabilityLine(state) : undefined,
           pricingLine({ contract, knowledge }),
           guideLine({ contract, knowledge }),
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,

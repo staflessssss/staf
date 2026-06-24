@@ -99,6 +99,7 @@ export type SimpleWeddingSalesState = {
   contactId?: string;
   channel: SimpleWeddingSalesChannel;
   latestCustomerMessage: string;
+  isFirstTurn?: boolean;
   customerName?: string;
   partnerName?: string;
   weddingDate?: string;
@@ -161,6 +162,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     contactId: args.contactId ?? args.previousState?.contactId,
     channel: args.channel,
     latestCustomerMessage: args.message,
+    isFirstTurn: !args.previousState,
     customerName: args.previousState?.customerName,
     partnerName: args.previousState?.partnerName,
     weddingDate: args.previousState?.weddingDate,

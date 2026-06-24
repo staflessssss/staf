@@ -44,3 +44,65 @@ test("LLM understanding rejects a facts object that omits a property", () => {
     }),
   );
 });
+
+test("LLM understanding restores a complete date from deterministic extraction", () => {
+  const state = {
+    channel: "instagram" as const,
+    latestCustomerMessage:
+      "Hi! Are you available for June 14 2027 in Tampa? How much are your packages?",
+    bookingConfirmed: false,
+    mode: "bot_active" as const,
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  };
+  const result = weddingSalesSimpleUnderstandTestHelpers.normalizeLlmUnderstanding(state, {
+    customerMessageType: "new_lead",
+    facts: {
+      customerName: null,
+      partnerName: null,
+      weddingDate: null,
+      weddingDateText: "June 14",
+      location: "Tampa",
+      venue: null,
+      email: null,
+      proposedCallTime: null,
+      senderRole: "unknown",
+    },
+    questionsAskedByCustomer: ["availability", "pricing"],
+    confidence: 0.95,
+  });
+
+  assert.equal(result.facts.weddingDate, "2027-06-14");
+});
+
+test("LLM understanding splits a combined couple name", () => {
+  const state = {
+    channel: "instagram" as const,
+    latestCustomerMessage: "Mike and Sarah",
+    bookingConfirmed: false,
+    mode: "bot_active" as const,
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  };
+  const result = weddingSalesSimpleUnderstandTestHelpers.normalizeLlmUnderstanding(state, {
+    customerMessageType: "answer_to_question",
+    facts: {
+      customerName: "Mike and Sarah",
+      partnerName: null,
+      weddingDate: null,
+      weddingDateText: null,
+      location: null,
+      venue: null,
+      email: null,
+      proposedCallTime: null,
+      senderRole: "unknown",
+    },
+    questionsAskedByCustomer: [],
+    confidence: 0.9,
+  });
+
+  assert.equal(result.facts.customerName, "Mike");
+  assert.equal(result.facts.partnerName, "Sarah");
+});

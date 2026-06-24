@@ -112,14 +112,58 @@ function extractMonthDate(message: string) {
 }
 
 function extractNames(message: string) {
-  const match = /\b(?:we are|we're|this is|names are|i am|i'm)\s+([A-Z][a-z]+)(?:\s+(?:and|&)\s+([A-Z][a-z]+))?/i.exec(
+  const introduced = /\b(?:we are|we're|this is|names are|i am|i'm)\s+([A-Z][a-z]+)(?:\s+(?:and|&)\s+([A-Z][a-z]+))?/i.exec(
     message,
   );
+  const barePair = /^\s*([A-Z][a-z]+)\s+(?:and|&)\s+([A-Z][a-z]+)[.!]?\s*$/.exec(message);
+  const match = introduced ?? barePair;
 
   return {
     customerName: match?.[1],
     partnerName: match?.[2],
   };
+}
+
+function splitCombinedCoupleName(facts: TurnUnderstanding["facts"]) {
+  if (!facts.customerName) {
+    return facts;
+  }
+
+  const match = /^\s*([A-Z][a-z]+)\s+(?:and|&)\s+([A-Z][a-z]+)\s*$/i.exec(
+    facts.customerName,
+  );
+
+  return match
+    ? {
+        ...facts,
+        customerName: match[1],
+        partnerName: facts.partnerName ?? match[2],
+      }
+    : facts;
+}
+
+function normalizeLlmUnderstanding(
+  state: SimpleWeddingSalesState,
+  output: z.infer<typeof llmTurnUnderstandingSchema>,
+) {
+  const heuristic = understandTurnHeuristically(state);
+  const llmFacts = Object.fromEntries(
+    Object.entries(output.facts).filter(([, value]) => value !== null),
+  );
+
+  return turnUnderstandingSchema.parse({
+    ...output,
+    facts: splitCombinedCoupleName({
+      ...heuristic.facts,
+      ...llmFacts,
+    }),
+    questionsAskedByCustomer: [
+      ...new Set([
+        ...output.questionsAskedByCustomer,
+        ...heuristic.questionsAskedByCustomer,
+      ]),
+    ],
+  });
 }
 
 function extractLocation(message: string) {
@@ -286,12 +330,7 @@ export async function understandTurn(
       timeout: 12_000,
     });
 
-    return turnUnderstandingSchema.parse({
-      ...output,
-      facts: Object.fromEntries(
-        Object.entries(output.facts).filter(([, value]) => value !== null),
-      ),
-    });
+    return normalizeLlmUnderstanding(state, output);
   } catch (error) {
     console.error("[wedding-sales-simple] understanding failed; using heuristic fallback", {
       error: error instanceof Error ? error.message : "unknown",
@@ -302,4 +341,5 @@ export async function understandTurn(
 
 export const weddingSalesSimpleUnderstandTestHelpers = {
   llmTurnUnderstandingSchema,
+  normalizeLlmUnderstanding,
 };

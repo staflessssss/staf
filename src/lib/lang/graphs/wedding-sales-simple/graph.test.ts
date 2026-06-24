@@ -69,6 +69,39 @@ test("simple wedding sales runtime checks availability before asking for names",
   assert.match(result.responseDraft ?? "", /both of your names/i);
 });
 
+test("simple wedding sales runtime greets once and does not repeat availability after names", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Hi! Are you available for June 14 2027 in Tampa? How much are your packages?",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        facts: { weddingDate: "2027-06-14", location: "Tampa" },
+        questionsAskedByCustomer: ["availability", "pricing"],
+      }),
+    toolContext,
+  });
+
+  assert.match(first.responseDraft ?? "", /^Hey! Taras here/i);
+  assert.match(first.responseDraft ?? "", /June 14, 2027 in Tampa is open/i);
+
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Mike and Sarah",
+    previousState: first,
+    understand: () =>
+      understanding({
+        facts: { customerName: "Mike", partnerName: "Sarah" },
+      }),
+    toolContext,
+  });
+
+  assert.doesNotMatch(second.responseDraft ?? "", /^Hey! Taras here/i);
+  assert.doesNotMatch(second.responseDraft ?? "", /is open for us/i);
+  assert.doesNotMatch(second.responseDraft ?? "", /both of your names/i);
+  assert.match(second.responseDraft ?? "", /venue/i);
+});
+
 test("simple wedding sales runtime answers pricing but asks for date before tools", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
