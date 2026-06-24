@@ -1,10 +1,28 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText, Output } from "ai";
+import { z } from "zod";
 
 import type { SimpleWeddingSalesState, TurnUnderstanding } from "./state";
 import { turnUnderstandingSchema } from "./state";
 
 const DEFAULT_UNDERSTANDING_MODEL = "gpt-4.1-mini";
+
+const llmTurnUnderstandingSchema = z.object({
+  customerMessageType: turnUnderstandingSchema.shape.customerMessageType,
+  facts: z.object({
+    customerName: z.string().trim().min(1).nullable(),
+    partnerName: z.string().trim().min(1).nullable(),
+    weddingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    weddingDateText: z.string().trim().min(1).nullable(),
+    location: z.string().trim().min(1).nullable(),
+    venue: z.string().trim().min(1).nullable(),
+    email: z.string().trim().email().nullable(),
+    proposedCallTime: z.string().trim().min(1).nullable(),
+    senderRole: z.enum(["bride", "groom", "mother", "planner", "friend", "unknown"]).nullable(),
+  }),
+  questionsAskedByCustomer: turnUnderstandingSchema.shape.questionsAskedByCustomer,
+  confidence: turnUnderstandingSchema.shape.confidence,
+});
 
 export type SimpleWeddingSalesUnderstandTurn = (
   state: SimpleWeddingSalesState,
@@ -237,35 +255,51 @@ export async function understandTurn(
     return understandTurnHeuristically(state);
   }
 
-  const { output } = await generateText({
-    model: openai(process.env.WEDDING_SALES_SIMPLE_UNDERSTANDING_MODEL || DEFAULT_UNDERSTANDING_MODEL),
-    output: Output.object({
-      schema: turnUnderstandingSchema,
-    }),
-    system: understandingSystemPrompt,
-    prompt: JSON.stringify(
-      {
-        currentState: {
-          customerName: state.customerName,
-          partnerName: state.partnerName,
-          weddingDate: state.weddingDate,
-          weddingDateText: state.weddingDateText,
-          location: state.location,
-          venue: state.venue,
-          customerEmail: state.customerEmail,
-          availability: state.availability,
-          proposedCallTime: state.proposedCallTime,
-          calendarStatus: state.calendarStatus,
+  try {
+    const { output } = await generateText({
+      model: openai(process.env.WEDDING_SALES_SIMPLE_UNDERSTANDING_MODEL || DEFAULT_UNDERSTANDING_MODEL),
+      output: Output.object({
+        schema: llmTurnUnderstandingSchema,
+      }),
+      system: understandingSystemPrompt,
+      prompt: JSON.stringify(
+        {
+          currentState: {
+            customerName: state.customerName,
+            partnerName: state.partnerName,
+            weddingDate: state.weddingDate,
+            weddingDateText: state.weddingDateText,
+            location: state.location,
+            venue: state.venue,
+            customerEmail: state.customerEmail,
+            availability: state.availability,
+            proposedCallTime: state.proposedCallTime,
+            calendarStatus: state.calendarStatus,
+          },
+          latestCustomerMessage: compact(state.latestCustomerMessage, 2000),
         },
-        latestCustomerMessage: compact(state.latestCustomerMessage, 2000),
-      },
-      null,
-      2,
-    ),
-    temperature: 0,
-    maxOutputTokens: 700,
-    timeout: 12_000,
-  });
+        null,
+        2,
+      ),
+      temperature: 0,
+      maxOutputTokens: 700,
+      timeout: 12_000,
+    });
 
-  return output;
+    return turnUnderstandingSchema.parse({
+      ...output,
+      facts: Object.fromEntries(
+        Object.entries(output.facts).filter(([, value]) => value !== null),
+      ),
+    });
+  } catch (error) {
+    console.error("[wedding-sales-simple] understanding failed; using heuristic fallback", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return understandTurnHeuristically(state);
+  }
 }
+
+export const weddingSalesSimpleUnderstandTestHelpers = {
+  llmTurnUnderstandingSchema,
+};
