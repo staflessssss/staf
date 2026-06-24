@@ -149,6 +149,76 @@ test("simple wedding sales runtime handles availability pricing and shooter ques
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
 });
 
+test("simple wedding sales runtime keeps large mixed Instagram reply compact and preserves follow-up state", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message:
+      "Are you available June 15 2027 in Tampa? How much? Who would shoot our wedding? Can you send recent films too?",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+      portfolio: [
+        {
+          label: "Recent Film",
+          url: "https://galleries.example/recent",
+        },
+      ],
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "availability_question",
+        facts: {
+          weddingDate: "2027-06-15",
+          weddingDateText: "June 15 2027",
+          location: "Tampa",
+        },
+        questionsAskedByCustomer: ["availability", "pricing", "team", "portfolio"],
+      }),
+  });
+
+  assert.equal(first.nextStep, "ask_missing_info");
+  assert.equal(first.missingField, "names");
+  assert.equal(first.decisionTrace?.toolCalled, "checkAvailability");
+  assert.deepEqual(
+    first.toolObservations.map((observation) => observation.toolName),
+    ["check_wedding_availability"],
+  );
+  assert.match(first.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(first.responseDraft ?? "", /wedding films start at/i);
+  assert.match(first.responseDraft ?? "", /collections guide image/i);
+  assert.match(first.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
+  assert.match(first.responseDraft ?? "", /recent films.*Recent Film: https:\/\/galleries\.example\/recent/i);
+  assert.match(first.responseDraft ?? "", /both of your names/i);
+  assert.equal(first.replyGuardResult?.ok, true);
+  assert.ok((first.responseDraft ?? "").length <= 900);
+  assert.ok((first.responseDraft ?? "").split(/\n{2,}/).filter((part) => part.trim()).length <= 5);
+
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Mike and Sarah",
+    previousState: first,
+    toolContext,
+    understand: () =>
+      understanding({
+        facts: {
+          customerName: "Mike",
+          partnerName: "Sarah",
+        },
+      }),
+  });
+
+  assert.equal(second.nextStep, "ask_venue");
+  assert.deepEqual(second.toolObservations, []);
+  assert.doesNotMatch(second.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.doesNotMatch(second.responseDraft ?? "", /wedding films start|collections guide/i);
+  assert.doesNotMatch(second.responseDraft ?? "", /Jay.*lead filmmaker|recent films|galleries\.example/i);
+  assert.doesNotMatch(second.responseDraft ?? "", /I want to make sure I understand/i);
+  assert.match(second.responseDraft ?? "", /venue/i);
+});
+
 test("simple wedding sales runtime greets once and does not repeat availability after names", async () => {
   const first = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

@@ -353,6 +353,9 @@ function renderSafeTemplate(args: {
     args.contract.mustMentionCalendarAvailability
       ? calendarLine(args.state, args.knowledge)
       : undefined,
+    args.state.questionsAskedByCustomer.includes("portfolio")
+      ? portfolioLine(args.knowledge)
+      : undefined,
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
@@ -376,6 +379,9 @@ function renderCompactInstagramFallback(args: {
     guideLine(args),
     args.contract.mustMentionCalendarAvailability
       ? calendarLine(args.state, args.knowledge)
+      : undefined,
+    args.state.questionsAskedByCustomer.includes("portfolio")
+      ? portfolioLine(args.knowledge)
       : undefined,
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
