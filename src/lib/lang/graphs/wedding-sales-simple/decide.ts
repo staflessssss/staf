@@ -146,7 +146,16 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.questionsAskedByCustomer.includes("team")) {
+  const hasUncheckedAvailability = Boolean(
+    state.weddingDate && state.location && !isAvailabilityContextCurrent(state),
+  );
+  const hasActionableCallTime = Boolean(state.proposedCallTime);
+
+  if (
+    state.questionsAskedByCustomer.includes("team") &&
+    !hasActionableCallTime &&
+    !hasUncheckedAvailability
+  ) {
     return decision({
       nextStep: "reply_only",
       replyType: "team_answer",
@@ -154,7 +163,11 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.questionsAskedByCustomer.includes("identity")) {
+  if (
+    state.questionsAskedByCustomer.includes("identity") &&
+    !hasActionableCallTime &&
+    !hasUncheckedAvailability
+  ) {
     return decision({
       nextStep: "reply_only",
       replyType: "identity_answer",

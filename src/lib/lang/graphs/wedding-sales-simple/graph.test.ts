@@ -1031,6 +1031,55 @@ test("simple wedding sales runtime does not hand off when call time is actionabl
   );
 });
 
+test("simple wedding sales runtime handles call time and shooter question in one DM", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can we call tomorrow at 10am? Also who shoots the wedding?",
+    toolContext,
+    config: {
+      portfolio: [
+        {
+          label: "Recent Film",
+          url: "https://galleries.example/recent",
+        },
+      ],
+    },
+    previousState: {
+      customerName: "Rick",
+      partnerName: "Dakota",
+      weddingDate: "2026-10-17",
+      location: "Tampa, Florida",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityCheck: {
+        date: "2026-10-17",
+        location: "Tampa, Florida",
+        status: "available",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {
+          proposedCallTime: "tomorrow at 10am",
+        },
+        questionsAskedByCustomer: ["team"],
+      }),
+  });
+
+  assert.notEqual(result.nextStep, "handoff");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.decisionTrace?.toolCalled, "checkCalendar");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_consultation_calendar"],
+  );
+  assert.match(result.responseDraft ?? "", /10(?:\:00)?\s*(?:am|AM).*works perfectly/i);
+  assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
+});
+
 test("simple wedding sales runtime asks for date when availability question has no date", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

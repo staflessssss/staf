@@ -318,6 +318,10 @@ function teamLine(state: SimpleWeddingSalesState) {
     : "For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.";
 }
 
+function shouldAnswerTeamQuestion(state: SimpleWeddingSalesState, contract: ReplyActionContract) {
+  return contract.replyType === "team_answer" || state.questionsAskedByCustomer.includes("team");
+}
+
 function clarificationLine() {
   return "I want to make sure I understand you correctly. Could you tell me a little more about what you'd like to know?";
 }
@@ -352,7 +356,7 @@ function renderSafeTemplate(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
-    args.contract.replyType === "team_answer" ? teamLine(args.state) : undefined,
+    shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
   ]) || questionLine(args) || fallbackClarificationLine();
@@ -376,7 +380,7 @@ function renderCompactInstagramFallback(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.replyType === "identity_answer" ? identityLine(args.knowledge) : undefined,
-    args.contract.replyType === "team_answer" ? teamLine(args.state) : undefined,
+    shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
   ]
     .filter(Boolean)
@@ -411,7 +415,7 @@ export function writeConstrainedWeddingReply(args: {
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
           callLogisticsLine(state),
           contract.replyType === "identity_answer" ? identityLine(knowledge) : undefined,
-          contract.replyType === "team_answer" ? teamLine(state) : undefined,
+          shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
           contract.replyType === "clarification" ? clarificationLine() : undefined,
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);
