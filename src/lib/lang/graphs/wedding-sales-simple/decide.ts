@@ -50,10 +50,13 @@ function isAvailabilityContextCurrent(state: SimpleWeddingSalesState) {
 
 function isCalendarContextCurrent(state: SimpleWeddingSalesState) {
   return Boolean(
-    state.calendarStatus &&
-      state.proposedCallTime &&
+    state.proposedCallTime &&
       state.consultationCheck?.proposedTime === state.proposedCallTime,
   );
+}
+
+function isCalendarResultKnown(state: SimpleWeddingSalesState) {
+  return Boolean(state.calendarStatus);
 }
 
 function parseProposedCallTimeMinutes(value: string) {
@@ -270,6 +273,18 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  if (
+    state.proposedCallTime &&
+    isCalendarContextCurrent(state) &&
+    state.consultationCheck?.status === "unknown"
+  ) {
+    return decision({
+      nextStep: "ask_call_time",
+      replyType: "ask_call_time",
+      reason: "calendar tool could not parse the proposed consultation time",
+    });
+  }
+
   if (state.proposedCallTime && !isCalendarContextCurrent(state)) {
     return decision({
       nextStep: "check_calendar",
@@ -278,7 +293,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.calendarStatus === "busy") {
+  if (isCalendarResultKnown(state) && state.calendarStatus === "busy") {
     return decision({
       nextStep: "reply_only",
       replyType: "calendar_busy",

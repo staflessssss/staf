@@ -227,6 +227,79 @@ test("simple wedding sales runtime still checks calendar for call time inside co
   );
 });
 
+test("simple wedding sales runtime keeps relative date context when customer chooses a bare call time", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "1pm works too",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 3pm",
+      consultationCheck: {
+        proposedTime: "tomorrow at 3pm",
+        status: "unknown",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {
+          proposedCallTime: "1pm",
+        },
+      }),
+  });
+
+  assert.equal(result.proposedCallTime, "tomorrow at 1pm");
+  assert.equal(result.nextStep, "ask_email");
+  assert.equal(result.decisionTrace?.toolCalled, "checkCalendar");
+  assert.deepEqual(
+    result.toolObservations.map((observation) => observation.toolName),
+    ["check_consultation_calendar"],
+  );
+  assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess/i);
+});
+
+test("simple wedding sales runtime asks again instead of repeating calendar checks for unparseable call time", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "1pm",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "1pm",
+      consultationCheck: {
+        proposedTime: "1pm",
+        status: "unknown",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {},
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_call_time");
+  assert.equal(result.consultationCheck?.status, "unknown");
+  assert.deepEqual(result.toolObservations, []);
+  assert.match(result.responseDraft ?? "", /what time|time would be best|consults/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess/i);
+});
+
 test("simple wedding sales runtime books after email when calendar is available", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

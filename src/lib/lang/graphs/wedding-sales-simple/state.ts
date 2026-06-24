@@ -261,7 +261,9 @@ export function mergeTurnUnderstanding(
   const facts = understanding.facts;
   const customerName = facts.customerName ?? state.customerName;
   const partnerName = facts.partnerName ?? state.partnerName;
-  const proposedCallTime = facts.proposedCallTime ?? state.proposedCallTime;
+  const proposedCallTime = facts.proposedCallTime
+    ? resolveProposedCallTimeFromPreviousContext(facts.proposedCallTime, state.proposedCallTime)
+    : state.proposedCallTime;
   const callTimeChanged = Boolean(
     facts.proposedCallTime && facts.proposedCallTime !== state.proposedCallTime,
   );
@@ -292,6 +294,61 @@ export function mergeTurnUnderstanding(
     questionsAskedByCustomer: understanding.questionsAskedByCustomer,
     lastUnderstanding: understanding,
   };
+}
+
+function isBareCallTime(value: string) {
+  return /^\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)\s*$/i.test(value);
+}
+
+function toTwentyFourHourTime(value: string) {
+  const match = /^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*$/i.exec(value);
+
+  if (!match) {
+    return undefined;
+  }
+
+  let hour = Number(match[1]);
+  const minutes = match[2] ?? "00";
+  const suffix = match[3].toLowerCase();
+
+  if (suffix === "pm" && hour < 12) {
+    hour += 12;
+  }
+
+  if (suffix === "am" && hour === 12) {
+    hour = 0;
+  }
+
+  return `${String(hour).padStart(2, "0")}:${minutes}`;
+}
+
+function resolveProposedCallTimeFromPreviousContext(
+  proposedCallTime: string,
+  previousProposedCallTime?: string,
+) {
+  if (!previousProposedCallTime || !isBareCallTime(proposedCallTime)) {
+    return proposedCallTime;
+  }
+
+  const previousCanonical = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(:\d{2})?((?:Z|[+-]\d{2}:\d{2})?)$/.exec(
+    previousProposedCallTime.trim(),
+  );
+
+  if (previousCanonical) {
+    const time = toTwentyFourHourTime(proposedCallTime);
+
+    return time
+      ? `${previousCanonical[1]}T${time}${previousCanonical[2] ?? ":00"}${previousCanonical[3]}`
+      : proposedCallTime;
+  }
+
+  const previousNaturalTime = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i;
+
+  if (previousNaturalTime.test(previousProposedCallTime)) {
+    return previousProposedCallTime.replace(previousNaturalTime, proposedCallTime.trim());
+  }
+
+  return proposedCallTime;
 }
 
 export function getCoupleName(state: Pick<SimpleWeddingSalesState, "customerName" | "partnerName">) {
