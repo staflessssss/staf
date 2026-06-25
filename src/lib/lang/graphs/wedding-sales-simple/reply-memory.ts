@@ -26,6 +26,52 @@ function currentConsultationSlot(state: SimpleWeddingSalesState) {
   return state.checkedCallTime ?? state.consultationCheck?.proposedTime;
 }
 
+function currentPendingBookingConfirmation(args: {
+  state: SimpleWeddingSalesState;
+  previous?: SimpleWeddingSalesReplyMemory["pendingBookingConfirmation"];
+  turnId: string;
+  now: string;
+}): SimpleWeddingSalesReplyMemory["pendingBookingConfirmation"] {
+  const { state, previous, turnId, now } = args;
+  const isAvailableSlot = Boolean(
+    state.proposedCallTime &&
+      state.customerEmail &&
+      state.calendarStatus === "available" &&
+      state.consultationCheck?.status === "available" &&
+      state.consultationCheck.proposedTime === state.proposedCallTime &&
+      state.checkedCallDate &&
+      state.checkedCallTime,
+  );
+
+  if (!isAvailableSlot || !state.proposedCallTime || !state.customerEmail) {
+    return undefined;
+  }
+
+  if (
+    previous &&
+    previous.proposedCallTime === state.proposedCallTime &&
+    previous.email === state.customerEmail &&
+    (!previous.checkedCallDate || previous.checkedCallDate === state.checkedCallDate) &&
+    (!previous.checkedCallTime || previous.checkedCallTime === state.checkedCallTime) &&
+    (!previous.checkedCallStartTime || previous.checkedCallStartTime === state.checkedCallStartTime) &&
+    (!previous.checkedCallEndTime || previous.checkedCallEndTime === state.checkedCallEndTime)
+  ) {
+    return previous;
+  }
+
+  return {
+    proposedCallTime: state.proposedCallTime,
+    email: state.customerEmail,
+    checkedCallDate: state.checkedCallDate,
+    checkedCallTime: state.checkedCallTime,
+    checkedCallStartTime: state.checkedCallStartTime,
+    checkedCallEndTime: state.checkedCallEndTime,
+    askedAtTurnId: turnId,
+    askedAt: now,
+    source: "ask_booking_confirmation",
+  };
+}
+
 function extractQuestionText(text: string) {
   const question = text
     .split(/\n{2,}/)
@@ -61,11 +107,23 @@ export function updateSimpleWeddingReplyMemory(args: {
     Boolean(consultationSlot) &&
     (contract.mentionPolicy.consultation.mode === "first_available" ||
       contract.mentionPolicy.consultation.mode === "busy");
+  const pendingBookingConfirmation =
+    contract.mentionPolicy.consultation.mode === "ask_booking_confirmation" &&
+    !state.customerConfirmedCallSlot &&
+    !state.bookingConfirmed
+      ? currentPendingBookingConfirmation({
+          state,
+          previous: previous.pendingBookingConfirmation,
+          turnId,
+          now,
+        })
+      : undefined;
 
   return {
     ...previous,
     greeted: previous.greeted || contract.mentionPolicy.greeting.mode === "first_turn",
     turnIndex,
+    pendingBookingConfirmation,
     mentioned: {
       ...previousMentioned,
       pricing: mentionedPrice

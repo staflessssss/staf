@@ -115,6 +115,17 @@ export type SimpleWeddingSalesReplyObligation =
 export type SimpleWeddingSalesReplyMemory = {
   greeted?: boolean;
   turnIndex?: number;
+  pendingBookingConfirmation?: {
+    proposedCallTime: string;
+    email: string;
+    checkedCallDate?: string;
+    checkedCallTime?: string;
+    checkedCallStartTime?: string;
+    checkedCallEndTime?: string;
+    askedAtTurnId?: string;
+    askedAt: string;
+    source: "ask_booking_confirmation";
+  };
   mentioned?: {
     pricing?: {
       value: string;
@@ -251,6 +262,17 @@ export type SimpleWeddingSalesState = {
   replyGuardResult?: ReplyGuardResult;
   replyObligations?: SimpleWeddingSalesReplyObligation[];
   invariantChecks?: SimpleWeddingSalesInvariantCheck[];
+  answerContext?: {
+    applied: boolean;
+    source:
+      | "pending_booking_confirmation"
+      | "explicit_booking_request"
+      | "offered_call_time_options"
+      | "none";
+    originalText: string;
+    resolvedValue?: string;
+    reason: string;
+  };
   responseDraft?: string;
   toolObservations: Array<{ toolName: string; result: string }>;
 };
@@ -316,6 +338,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     replyGuardResult: args.previousState?.replyGuardResult,
     replyObligations: args.previousState?.replyObligations,
     invariantChecks: args.previousState?.invariantChecks,
+    answerContext: undefined,
     responseDraft: args.previousState?.responseDraft,
     toolObservations: [],
   };
@@ -332,14 +355,19 @@ export function mergeTurnUnderstanding(
   const proposedCallTime = callTimeCompletion.clearProposedCallTime
     ? undefined
     : callTimeCompletion.proposedCallTime ?? state.proposedCallTime;
-  const customerConfirmedCallSlot = Boolean(
-    state.customerConfirmedCallSlot ||
-      understanding.customerMessageType === "booking_confirmation" ||
-      understanding.questionsAskedByCustomer.includes("booking"),
-  );
   const callTimeChanged = Boolean(
     callTimeCompletion.proposedCallTime &&
       callTimeCompletion.proposedCallTime !== state.proposedCallTime,
+  );
+  const customerEmail = facts.email ?? state.customerEmail;
+  const bookingConfirmation = resolveBookingConfirmationAnswer({
+    state,
+    understanding,
+    customerEmail,
+    callTimeChanged,
+  });
+  const customerConfirmedCallSlot = Boolean(
+    state.customerConfirmedCallSlot || bookingConfirmation.confirmed,
   );
 
   return {
@@ -350,7 +378,7 @@ export function mergeTurnUnderstanding(
     weddingDateText: facts.weddingDateText ?? state.weddingDateText,
     location: facts.location ?? state.location,
     venue: facts.venue ?? state.venue,
-    customerEmail: facts.email ?? state.customerEmail,
+    customerEmail,
     senderRole: facts.senderRole ?? state.senderRole,
     proposedCallTime,
     customerConfirmedCallSlot: callTimeChanged ? false : customerConfirmedCallSlot,
@@ -369,7 +397,126 @@ export function mergeTurnUnderstanding(
         : 0,
     questionsAskedByCustomer: understanding.questionsAskedByCustomer,
     lastUnderstanding: understanding,
+    answerContext: bookingConfirmation.answerContext ?? callTimeCompletion.answerContext,
   };
+}
+
+function resolveBookingConfirmationAnswer(args: {
+  state: SimpleWeddingSalesState;
+  understanding: TurnUnderstanding;
+  customerEmail?: string;
+  callTimeChanged: boolean;
+}): {
+  confirmed: boolean;
+  answerContext?: SimpleWeddingSalesState["answerContext"];
+} {
+  const text = args.state.latestCustomerMessage;
+  const pending = args.state.replyMemory?.pendingBookingConfirmation;
+  const explicitBookingRequest = isExplicitBookingRequest(text);
+
+  if (args.callTimeChanged) {
+    return {
+      confirmed: false,
+      answerContext: {
+        applied: true,
+        source: "none",
+        originalText: text,
+        reason: "customer changed the proposed call time, so any pending booking confirmation is stale",
+      },
+    };
+  }
+
+  if (explicitBookingRequest && isCurrentBookableSlot(args.state, args.customerEmail)) {
+    return {
+      confirmed: true,
+      answerContext: {
+        applied: true,
+        source: "explicit_booking_request",
+        originalText: text,
+        resolvedValue: args.state.proposedCallTime,
+        reason: "customer explicitly asked to book the currently available slot",
+      },
+    };
+  }
+
+  if (!isBareAffirmative(text)) {
+    return { confirmed: false };
+  }
+
+  if (!pending) {
+    return {
+      confirmed: false,
+      answerContext: {
+        applied: false,
+        source: "none",
+        originalText: text,
+        reason: "bare affirmative has no pending booking confirmation to answer",
+      },
+    };
+  }
+
+  if (!isPendingBookingConfirmationCurrent(args.state, pending, args.customerEmail)) {
+    return {
+      confirmed: false,
+      answerContext: {
+        applied: false,
+        source: "pending_booking_confirmation",
+        originalText: text,
+        resolvedValue: pending.proposedCallTime,
+        reason: "pending booking confirmation is stale for the current email or calendar slot",
+      },
+    };
+  }
+
+  return {
+    confirmed: true,
+    answerContext: {
+      applied: true,
+      source: "pending_booking_confirmation",
+      originalText: text,
+      resolvedValue: pending.proposedCallTime,
+      reason: "bare affirmative answers the previous explicit booking confirmation question",
+    },
+  };
+}
+
+function isBareAffirmative(text: string) {
+  return /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect)\s*[.!]*\s*$/i.test(
+    text,
+  );
+}
+
+function isExplicitBookingRequest(text: string) {
+  return /\b(?:book|lock\s+(?:it|that|this)?\s*in|schedule|confirm)\b/i.test(text);
+}
+
+function isCurrentBookableSlot(state: SimpleWeddingSalesState, customerEmail?: string) {
+  return Boolean(
+    state.proposedCallTime &&
+      customerEmail &&
+      state.calendarStatus === "available" &&
+      state.consultationCheck?.status === "available" &&
+      state.consultationCheck.proposedTime === state.proposedCallTime &&
+      state.checkedCallDate &&
+      state.checkedCallTime,
+  );
+}
+
+function isPendingBookingConfirmationCurrent(
+  state: SimpleWeddingSalesState,
+  pending: NonNullable<SimpleWeddingSalesReplyMemory["pendingBookingConfirmation"]>,
+  customerEmail?: string,
+) {
+  return Boolean(
+    isCurrentBookableSlot(state, customerEmail) &&
+      customerEmail === pending.email &&
+      state.proposedCallTime === pending.proposedCallTime &&
+      state.consultationCheck?.proposedTime === pending.proposedCallTime &&
+      (!pending.checkedCallDate || state.checkedCallDate === pending.checkedCallDate) &&
+      (!pending.checkedCallTime || state.checkedCallTime === pending.checkedCallTime) &&
+      (!pending.checkedCallStartTime || state.checkedCallStartTime === pending.checkedCallStartTime) &&
+      (!pending.checkedCallEndTime || state.checkedCallEndTime === pending.checkedCallEndTime),
+  );
 }
 
 function wasAnsweringCallTimeQuestion(state: SimpleWeddingSalesState) {
@@ -482,6 +629,13 @@ function completeCallTimeFromAnswerContext(
     return {
       proposedCallTime: optionResolution.proposedCallTime,
       ambiguousChoice: false,
+      answerContext: {
+        applied: true,
+        source: "offered_call_time_options" as const,
+        originalText: state.latestCustomerMessage,
+        resolvedValue: optionResolution.proposedCallTime,
+        reason: `customer chose offered call time option ${optionResolution.matchedLabel}`,
+      },
     };
   }
 
@@ -489,6 +643,12 @@ function completeCallTimeFromAnswerContext(
     return {
       ambiguousChoice: true,
       clearProposedCallTime: true,
+      answerContext: {
+        applied: false,
+        source: "offered_call_time_options" as const,
+        originalText: state.latestCustomerMessage,
+        reason: "customer accepted multiple offered call time options without choosing one",
+      },
     };
   }
 
@@ -496,6 +656,12 @@ function completeCallTimeFromAnswerContext(
     return {
       ambiguousChoice: true,
       clearProposedCallTime: Boolean(state.callTimeContext?.rejected),
+      answerContext: {
+        applied: false,
+        source: "offered_call_time_options" as const,
+        originalText: state.latestCustomerMessage,
+        reason: "customer gave an ambiguous call time answer",
+      },
     };
   }
 
@@ -517,6 +683,15 @@ function completeCallTimeFromAnswerContext(
       : undefined,
     ambiguousChoice: false,
     clearProposedCallTime: Boolean(answeringCallTime && !candidate && state.callTimeContext?.rejected),
+    answerContext: candidate
+      ? {
+          applied: true,
+          source: "offered_call_time_options" as const,
+          originalText: state.latestCustomerMessage,
+          resolvedValue: resolveProposedCallTimeFromPreviousContext(candidate, state.proposedCallTime),
+          reason: "customer answered the previous call time question with a contextual time",
+        }
+      : undefined,
   };
 }
 
