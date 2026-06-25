@@ -4,6 +4,12 @@ import type { SimpleWeddingSalesState } from "./state";
 export type PricingMentionMode = "full" | "same_as_before" | "brief_reference" | "skip";
 export type AvailabilityMentionMode = "new_result" | "still_available" | "skip";
 export type GuideMentionMode = "send_attachment" | "mention_already_sent" | "skip";
+export type ConsultationMentionMode =
+  | "first_available"
+  | "busy"
+  | "ask_booking_confirmation"
+  | "booking_success"
+  | "skip";
 
 export type SimpleWeddingMentionPolicy = {
   pricing: {
@@ -16,6 +22,10 @@ export type SimpleWeddingMentionPolicy = {
   };
   guide: {
     mode: GuideMentionMode;
+    reason: string;
+  };
+  consultation: {
+    mode: ConsultationMentionMode;
     reason: string;
   };
   greeting: {
@@ -70,6 +80,26 @@ function availabilityWasMentionedForCurrentCheck(state: SimpleWeddingSalesState)
   );
 }
 
+function currentConsultationSlot(state: SimpleWeddingSalesState) {
+  if (state.checkedCallDate && state.checkedCallTime) {
+    return `${state.checkedCallDate} ${state.checkedCallTime}`;
+  }
+
+  return state.checkedCallTime ?? state.consultationCheck?.proposedTime;
+}
+
+function consultationWasMentionedForCurrentSlot(state: SimpleWeddingSalesState) {
+  const previous = state.replyMemory?.mentioned?.consultation;
+  const slot = currentConsultationSlot(state);
+
+  return Boolean(
+    previous &&
+      slot &&
+      previous.slot === slot &&
+      previous.status === (state.calendarStatus === "busy" ? "busy" : "available"),
+  );
+}
+
 export function buildSimpleWeddingMentionPolicy(args: {
   state: SimpleWeddingSalesState;
   knowledge: SimpleWeddingKnowledgeContext;
@@ -87,6 +117,8 @@ export function buildSimpleWeddingMentionPolicy(args: {
   const priceWasMentioned = currentPriceWasMentioned(args);
   const guideMentioned = guideWasMentioned(args);
   const availabilityMentionedForCurrentCheck = availabilityWasMentionedForCurrentCheck(state);
+  const justCheckedCalendar = Boolean(state.decisionTrace?.toolCalled === "checkCalendar");
+  const consultationMentionedForCurrentSlot = consultationWasMentionedForCurrentSlot(state);
 
   const pricing = (() => {
     if (askedPricing && !priceWasMentioned) {
@@ -165,10 +197,55 @@ export function buildSimpleWeddingMentionPolicy(args: {
     };
   })();
 
+  const consultation = (() => {
+    if (state.calendarStatus === "busy" && (justCheckedCalendar || state.decisionTrace?.replyType === "calendar_busy")) {
+      return {
+        mode: "busy" as const,
+        reason: "calendar tool returned a busy result for the current slot",
+      };
+    }
+
+    if (state.calendarStatus !== "available") {
+      return {
+        mode: "skip" as const,
+        reason: "no available consultation slot is in context",
+      };
+    }
+
+    if (state.bookingConfirmed) {
+      return {
+        mode: "booking_success" as const,
+        reason: "slot is already booked, so booking confirmation owns the wording",
+      };
+    }
+
+    if (state.customerEmail && !state.customerConfirmedCallSlot) {
+      return {
+        mode: "ask_booking_confirmation" as const,
+        reason: "slot is available and email is known, so ask for booking confirmation without repeating availability",
+      };
+    }
+
+    if (justCheckedCalendar && !consultationMentionedForCurrentSlot) {
+      return {
+        mode: "first_available" as const,
+        reason: "calendar tool returned a fresh available result for this slot",
+      };
+    }
+
+    return {
+      mode: "skip" as const,
+      reason: consultationMentionedForCurrentSlot
+        ? "available consultation slot was already acknowledged"
+        : "consultation availability was not newly checked",
+    };
+  })();
+
   return {
     pricing,
     availability,
     guide,
+    consultation,
     greeting: {
       mode: state.isFirstTurn && !state.replyMemory?.greeted ? "first_turn" : "skip",
       reason: state.isFirstTurn ? "first turn of the conversation" : "conversation was already greeted",

@@ -81,14 +81,12 @@ export function buildReplyActionContract(args: {
     state,
     requiredQuestion,
   });
-  const currentTurnProposedCallTime = state.lastUnderstanding?.facts.proposedCallTime;
   const mustMentionWeddingAvailability = Boolean(
     mentionPolicy.availability.mode !== "skip",
   );
   const mustMentionCalendarAvailability = Boolean(
-    state.decisionTrace?.toolCalled === "checkCalendar" ||
-      state.decisionTrace?.replyType === "calendar_busy" ||
-      (currentTurnProposedCallTime && state.calendarStatus),
+    mentionPolicy.consultation.mode === "first_available" ||
+      mentionPolicy.consultation.mode === "busy",
   );
   const mustMentionBookingConfirmation = Boolean(
     state.bookingConfirmed && state.decisionTrace?.toolCalled === "bookCall",
@@ -120,9 +118,9 @@ export function buildReplyActionContract(args: {
         ? "out_of_window"
         : mustMentionBookingConfirmation
         ? "booked"
-        : mustMentionCalendarAvailability && state.calendarStatus === "busy"
+        : mentionPolicy.consultation.mode === "busy"
           ? "busy"
-          : mustMentionCalendarAvailability && state.calendarStatus === "available"
+          : mentionPolicy.consultation.mode === "first_available"
             ? "available"
             : mustMentionWeddingAvailability && state.availability === "unavailable"
               ? "unavailable"

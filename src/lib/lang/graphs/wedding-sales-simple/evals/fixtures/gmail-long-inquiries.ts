@@ -42,7 +42,7 @@ export const gmailLongInquiryReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_call_time",
       toolCalls: ["check_consultation_calendar"],
-      replyIncludes: [/works perfectly for a call/i, /lock that in/i],
+      replyIncludes: [/lock in 1:00 PM/i],
     },
   },
   {
@@ -56,7 +56,7 @@ export const gmailLongInquiryReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "reply_only",
       toolCalls: ["book_consultation"],
-      replyIncludes: [/booked the call/i],
+      replyIncludes: [/all set/i, /calendar invite/i],
     },
   },
 ];

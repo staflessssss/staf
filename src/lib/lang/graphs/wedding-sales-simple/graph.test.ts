@@ -467,7 +467,7 @@ test("simple wedding sales runtime checks consultation time and asks for email",
     result.toolObservations.map((observation) => observation.toolName),
     ["check_consultation_calendar"],
   );
-  assert.match(result.responseDraft ?? "", /works perfectly for a call/i);
+  assert.match(result.responseDraft ?? "", /works on my calendar/i);
   assert.doesNotMatch(result.responseDraft ?? "", /June 14, 2027|date is available/i);
   assert.match(result.responseDraft ?? "", /best email/i);
 });
@@ -1034,7 +1034,7 @@ test("simple wedding sales runtime asks for explicit confirmation after email wh
   assert.equal(result.bookingConfirmed, false);
   assert.equal(result.decisionTrace?.toolCalled, undefined);
   assert.deepEqual(result.toolObservations, []);
-  assert.match(result.responseDraft ?? "", /lock that in/i);
+  assert.match(result.responseDraft ?? "", /lock in 1:00 PM/i);
   assert.doesNotMatch(result.responseDraft ?? "", /works perfectly for a call/i);
 });
 
@@ -1081,7 +1081,9 @@ test("simple wedding sales runtime books after email when the call slot was alre
     result.toolObservations.map((observation) => observation.toolName),
     ["book_consultation"],
   );
-  assert.match(result.responseDraft ?? "", /I booked the call/i);
+  assert.match(result.responseDraft ?? "", /all set for 1:00 PM/i);
+  assert.match(result.responseDraft ?? "", /calendar invite.*anna@example\.com/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /booked the call/i);
 });
 
 test("simple wedding sales replies avoid known robotic phrases", async () => {
@@ -1338,7 +1340,7 @@ test("simple wedding sales runtime resolves a selected suggested call time", asy
   assert.equal(result.calendarStatus, "available");
   assert.equal(result.checkedCallTime, "10:30");
   assert.equal(result.nextStep, "ask_email");
-  assert.match(result.responseDraft ?? "", /10:30 AM works perfectly for a call/i);
+  assert.match(result.responseDraft ?? "", /10:30 AM works on my calendar/i);
   assert.match(result.responseDraft ?? "", /best email/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Got it\. I can help/i);
 });
@@ -1613,7 +1615,7 @@ test("simple wedding sales runtime handles call time and shooter question in one
     result.toolObservations.map((observation) => observation.toolName),
     ["check_consultation_calendar"],
   );
-  assert.match(result.responseDraft ?? "", /10(?:\:00)?\s*(?:am|AM).*works perfectly/i);
+  assert.match(result.responseDraft ?? "", /10(?:\:00)?\s*(?:am|AM).*works on my calendar/i);
   assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
 });
@@ -1666,7 +1668,7 @@ test("simple wedding sales runtime handles call time and explicit portfolio requ
     result.toolObservations.map((observation) => observation.toolName),
     ["check_consultation_calendar"],
   );
-  assert.match(result.responseDraft ?? "", /10(?:\:00)?\s*(?:am|AM).*works perfectly/i);
+  assert.match(result.responseDraft ?? "", /10(?:\:00)?\s*(?:am|AM).*works on my calendar/i);
   assert.match(result.responseDraft ?? "", /recent films.*Recent Film: https:\/\/galleries\.example\/recent/i);
   assert.doesNotMatch(result.responseDraft ?? "", /wedding films start|collections guide/i);
 });

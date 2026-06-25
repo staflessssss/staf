@@ -115,11 +115,15 @@ function bookingLine(state: SimpleWeddingSalesState) {
     return undefined;
   }
 
-  const coupleName = getCoupleName(state);
+  const time = state.checkedCallTime;
+  const email = state.customerEmail;
+  const firstLine = time
+    ? `Perfect - you're all set for ${time}.`
+    : "Perfect - you're all set.";
 
-  return coupleName
-    ? `Done - I booked the call for ${coupleName}.`
-    : "Done - I booked the call.";
+  return email
+    ? `${firstLine} You should see the calendar invite come through at ${email}.`
+    : `${firstLine} You should see the calendar invite come through shortly.`;
 }
 
 function recapLine(state: SimpleWeddingSalesState) {

@@ -219,8 +219,60 @@ test("calendar result contract does not repeat persistent wedding availability",
 
   assert.equal(contract.mustMentionWeddingAvailability, false);
   assert.equal(contract.mustMentionCalendarAvailability, true);
-  assert.match(reply, /10:00 AM works perfectly for a call/i);
+  assert.equal(contract.mentionPolicy.consultation.mode, "first_available");
+  assert.match(reply, /10:00 AM works on my calendar/i);
   assert.doesNotMatch(reply, /June 14|date is available/i);
+});
+
+test("calendar result contract does not repeat an already acknowledged consultation slot", () => {
+  const state = baseState({
+    latestCustomerMessage: "mike@example.com",
+    isFirstTurn: false,
+    customerName: "Mike",
+    partnerName: "Sarah",
+    weddingDate: "2027-06-14",
+    location: "Tampa",
+    venue: "Evergreen Park",
+    availability: "available",
+    calendarStatus: "available",
+    checkedCallDate: "2026-06-24",
+    checkedCallTime: "10:00",
+    customerEmail: "mike@example.com",
+    replyMemory: {
+      mentioned: {
+        consultation: {
+          slot: "2026-06-24 10:00",
+          status: "available",
+          turnId: "turn-1",
+          lastMentionedAt: "2026-06-24T00:00:00.000Z",
+        },
+      },
+    },
+    questionsAskedByCustomer: [],
+    lastUnderstanding: {
+      customerMessageType: "email_provided",
+      facts: { email: "mike@example.com" },
+      questionsAskedByCustomer: [],
+      confidence: 0.95,
+    },
+    decisionTrace: {
+      extractedFacts: { email: "mike@example.com" },
+      missingFields: [],
+      nextStep: "ask_call_time",
+      replyType: "ask_call_time",
+      reason: "calendar slot is available and customer must explicitly confirm before booking",
+    },
+    nextStep: "ask_call_time",
+    missingField: undefined,
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const reply = writeConstrainedWeddingReply({ state, knowledge, contract }).text;
+
+  assert.equal(contract.mustMentionCalendarAvailability, false);
+  assert.equal(contract.mentionPolicy.consultation.mode, "ask_booking_confirmation");
+  assert.match(reply, /lock in 10:00 AM/i);
+  assert.doesNotMatch(reply, /works perfectly|works on my calendar/i);
 });
 
 test("booking result contract does not repeat the previously confirmed calendar slot", () => {
@@ -260,9 +312,12 @@ test("booking result contract does not repeat the previously confirmed calendar 
   const reply = writeConstrainedWeddingReply({ state, knowledge, contract }).text;
 
   assert.equal(contract.mustMentionCalendarAvailability, false);
+  assert.equal(contract.mentionPolicy.consultation.mode, "booking_success");
   assert.equal(contract.mustMentionBookingConfirmation, true);
-  assert.match(reply, /I booked the call for Mike and Sarah/i);
-  assert.doesNotMatch(reply, /10:00 works/i);
+  assert.match(reply, /all set for 10:00 AM/i);
+  assert.match(reply, /calendar invite.*mike@example\.com/i);
+  assert.doesNotMatch(reply, /booked the call for Mike and Sarah/i);
+  assert.doesNotMatch(reply, /works perfectly|works on my calendar/i);
 });
 
 test("reply guard rejects stale wedding availability outside the contract", () => {

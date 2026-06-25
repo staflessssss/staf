@@ -134,6 +134,12 @@ export type SimpleWeddingSalesReplyMemory = {
       turnId?: string;
       lastMentionedAt: string;
     };
+    consultation?: {
+      slot: string;
+      status: "available" | "busy";
+      turnId?: string;
+      lastMentionedAt: string;
+    };
   };
   questionMemory?: {
     lastRequiredQuestion?: string;

@@ -105,7 +105,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "ask_email",
       toolCalls: ["check_consultation_calendar"],
-      replyIncludes: [/works perfectly for a call/i, /best email/i],
+      replyIncludes: [/works on my calendar/i, /best email/i],
     },
   },
   {
@@ -121,7 +121,7 @@ export const instagramBookingReplay: SimpleWeddingSalesReplayTurn[] = [
     expect: {
       nextStep: "reply_only",
       toolCalls: ["book_consultation"],
-      replyIncludes: [/booked the call/i],
+      replyIncludes: [/all set/i, /calendar invite/i],
     },
   },
 ];

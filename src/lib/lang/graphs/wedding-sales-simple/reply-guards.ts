@@ -22,7 +22,7 @@ function mentionsVenue(text: string) {
 }
 
 function mentionsCallTime(text: string) {
-  return /\b(?:what time|time works|good time|call time|within that window|lock that in|9am|10am|11am|12pm|1pm|2pm)\b/i.test(
+  return /\b(?:what time|time works|good time|call time|within that window|lock that in|lock in|9am|10am|11am|12pm|1pm|2pm)\b/i.test(
     text,
   );
 }
@@ -31,6 +31,10 @@ function hasBookingConfirmation(text: string) {
   return /\b(?:you(?:'re| are) all set|booked|booking is confirmed|confirmed|i booked|invite is on the way|calendar invite (?:has been|is) sent)\b/i.test(
     text,
   );
+}
+
+function hasCrmStyleBookingConfirmation(text: string) {
+  return /\b(?:i booked|booked) the call for\b/i.test(text);
 }
 
 function saysGuideUnavailable(text: string) {
@@ -48,7 +52,7 @@ function hasWeddingAvailabilityResult(text: string) {
 }
 
 function hasCalendarAvailabilityResult(text: string) {
-  return /\b(?:works perfectly for a call|works for a call|time is already taken)\b/i.test(text);
+  return /\b(?:works perfectly for a call|works for a call|works on my calendar|time is already taken)\b/i.test(text);
 }
 
 function paragraphCount(text: string) {
@@ -103,6 +107,14 @@ export function validateGeneratedReply(args: {
 
   if (!args.contract.bookingConfirmed && hasBookingConfirmation(reply)) {
     reasons.push("booking confirmation appeared before bookingConfirmed");
+  }
+
+  if (args.contract.bookingConfirmed && hasCrmStyleBookingConfirmation(reply)) {
+    reasons.push("booking confirmation is CRM-style instead of persona-based");
+  }
+
+  if (args.contract.mustMentionCalendarAvailability && !hasCalendarAvailabilityResult(reply)) {
+    reasons.push("calendar availability was required but missing");
   }
 
   if (!args.contract.mustMentionWeddingAvailability && hasWeddingAvailabilityResult(reply)) {

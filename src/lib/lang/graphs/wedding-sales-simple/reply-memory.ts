@@ -18,6 +18,14 @@ function mentionsGuide(text: string) {
   return /\b(?:collections? guide|guide image|price image)\b/i.test(text);
 }
 
+function currentConsultationSlot(state: SimpleWeddingSalesState) {
+  if (state.checkedCallDate && state.checkedCallTime) {
+    return `${state.checkedCallDate} ${state.checkedCallTime}`;
+  }
+
+  return state.checkedCallTime ?? state.consultationCheck?.proposedTime;
+}
+
 function extractQuestionText(text: string) {
   const question = text
     .split(/\n{2,}/)
@@ -48,6 +56,11 @@ export function updateSimpleWeddingReplyMemory(args: {
     contract.mentionPolicy.availability.mode !== "skip" &&
     Boolean(state.availability && state.weddingDate);
   const mentionedGuide = mentionsGuide(replyText);
+  const consultationSlot = currentConsultationSlot(state);
+  const mentionedConsultation =
+    Boolean(consultationSlot) &&
+    (contract.mentionPolicy.consultation.mode === "first_available" ||
+      contract.mentionPolicy.consultation.mode === "busy");
 
   return {
     ...previous,
@@ -92,6 +105,14 @@ export function updateSimpleWeddingReplyMemory(args: {
                 lastMentionedAt: now,
               }
             : undefined),
+      consultation: mentionedConsultation
+        ? {
+            slot: consultationSlot!,
+            status: state.calendarStatus === "busy" ? "busy" : "available",
+            turnId,
+            lastMentionedAt: now,
+          }
+        : previousMentioned.consultation,
     },
     questionMemory: {
       ...previousQuestionMemory,

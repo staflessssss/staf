@@ -2,7 +2,7 @@ import { formatSimpleWeddingDate } from "./reply";
 import type { SimpleWeddingKnowledgeContext } from "./knowledge";
 import type { ReplyActionContract } from "./reply-contract";
 import { validateGeneratedReply } from "./reply-guards";
-import { getCoupleName, type SimpleWeddingSalesState } from "./state";
+import type { SimpleWeddingSalesState } from "./state";
 
 function joinLines(lines: Array<string | undefined>) {
   return lines.filter(Boolean).join("\n\n");
@@ -163,6 +163,7 @@ function questionLine(args: {
   const proposedTime = displayProposedCallTime(
     args.state.proposedCallTime ?? args.state.callTimeContext?.rejected?.value,
   );
+  const checkedTime = displayCheckedCallTime(args.state);
   const offeredCallTimes = formatOfferedCallTimeOptions(args.state);
 
   switch (args.contract.requiredQuestion) {
@@ -182,7 +183,7 @@ function questionLine(args: {
         args.state.customerEmail &&
         !args.state.customerConfirmedCallSlot
       ) {
-        return "Want me to lock that in?";
+        return `Perfect, got it. Want me to lock in ${checkedTime ?? "that time"}?`;
       }
 
       if (args.contract.questionPolicy.mode === "invalid_answer_retry") {
@@ -268,6 +269,12 @@ function formatCallTime(value: string) {
   return `${displayHour}:${minutes} ${suffix}`;
 }
 
+function displayCheckedCallTime(state: SimpleWeddingSalesState) {
+  return state.checkedCallTime
+    ? formatCallTime(state.checkedCallTime)
+    : displayProposedCallTime(state.proposedCallTime);
+}
+
 function formatTimeList(values: string[]) {
   const labels = values.map(formatCallTime);
 
@@ -285,12 +292,17 @@ function formatTimeList(values: string[]) {
 function calendarLine(
   state: SimpleWeddingSalesState,
   knowledge: SimpleWeddingKnowledgeContext,
+  contract: ReplyActionContract,
 ) {
-  if (state.calendarStatus === "available" && state.checkedCallTime) {
-    return `${formatCallTime(state.checkedCallTime)} works perfectly for a call ✨`;
+  if (
+    contract.mentionPolicy.consultation.mode === "first_available" &&
+    state.calendarStatus === "available" &&
+    state.checkedCallTime
+  ) {
+    return `${formatCallTime(state.checkedCallTime)} works on my calendar ✨`;
   }
 
-  if (state.calendarStatus === "busy") {
+  if (contract.mentionPolicy.consultation.mode === "busy" && state.calendarStatus === "busy") {
     const suggestions = formatTimeList(state.suggestedCallTimes ?? []);
 
     return suggestions
@@ -306,11 +318,15 @@ function bookingLine(state: SimpleWeddingSalesState) {
     return undefined;
   }
 
-  const coupleName = getCoupleName(state);
+  const time = displayCheckedCallTime(state);
+  const email = state.customerEmail;
+  const firstLine = time
+    ? `Perfect - you're all set for ${time} ✨`
+    : "Perfect - you're all set ✨";
 
-  return coupleName
-    ? `You’re all set. I booked the call for ${coupleName}.`
-    : "You’re all set. I booked the call.";
+  return email
+    ? `${firstLine}\n\nYou should see the calendar invite come through at ${email}.`
+    : `${firstLine}\n\nYou should see the calendar invite come through shortly.`;
 }
 
 function callLogisticsLine(state: SimpleWeddingSalesState) {
@@ -384,7 +400,7 @@ function renderSafeTemplate(args: {
     pricingLine(args),
     guideLine(args),
     args.contract.mustMentionCalendarAvailability
-      ? calendarLine(args.state, args.knowledge)
+      ? calendarLine(args.state, args.knowledge, args.contract)
       : undefined,
     args.state.questionsAskedByCustomer.includes("portfolio")
       ? portfolioLine(args.knowledge)
@@ -411,7 +427,7 @@ function renderCompactInstagramFallback(args: {
     pricingLine(args),
     guideLine(args),
     args.contract.mustMentionCalendarAvailability
-      ? calendarLine(args.state, args.knowledge)
+      ? calendarLine(args.state, args.knowledge, args.contract)
       : undefined,
     args.state.questionsAskedByCustomer.includes("portfolio")
       ? portfolioLine(args.knowledge)
@@ -451,7 +467,7 @@ export function writeConstrainedWeddingReply(args: {
           pricingLine({ contract, knowledge }),
           guideLine({ contract, knowledge }),
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,
-          contract.mustMentionCalendarAvailability ? calendarLine(state, knowledge) : undefined,
+          contract.mustMentionCalendarAvailability ? calendarLine(state, knowledge, contract) : undefined,
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
           callLogisticsLine(state),
           contract.mustAnswerIdentity ? identityLine(knowledge) : undefined,
