@@ -96,6 +96,9 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
   assert.equal(safetyLogs.length, 1);
   assert.equal(safetyLogs[0]?.runtime, "wedding-sales-simple");
   assert.deepEqual(safetyLogs[0]?.toolCalls, ["check_wedding_availability"]);
+  assert.equal(result.outbound.channelDeliveryPlan?.channel, "instagram");
+  assert.equal(result.outbound.channelDeliveryPlan?.mode, "single_message");
+  assert.equal(safetyLogs[0]?.channelDeliveryPlan?.mode, "single_message");
 });
 
 test("wedding-sales-simple adapter normalizes Gmail thread and preserves sender email", async () => {
@@ -132,6 +135,8 @@ test("wedding-sales-simple adapter normalizes Gmail thread and preserves sender 
   assert.equal(result.status, "processed");
   assert.equal(result.outbound.channel, "gmail");
   assert.equal(result.outbound.conversationId, "thread-1");
+  assert.equal(result.outbound.channelDeliveryPlan?.channel, "gmail");
+  assert.equal(result.outbound.channelDeliveryPlan?.mode, "email");
   assert.match(result.outbound.text, /wedding films start at/i);
   assert.match(result.outbound.text, /What date are you looking at/i);
 });

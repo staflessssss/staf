@@ -196,6 +196,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
       knowledge,
       state: graphState,
     }),
+    channelConfig: args.channelConfig,
   });
   const persistedState = stateForPersistence(graphState);
 
@@ -206,6 +207,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     replyContract: graphState.replyContract,
     guardResult: graphState.replyGuardResult,
     attachments: outbound.attachments,
+    channelDeliveryPlan: outbound.channelDeliveryPlan,
     knowledgeSummary: knowledgeSummary(knowledge),
     toolCalls: graphState.toolObservations.map((observation) => observation.toolName),
     previousState,

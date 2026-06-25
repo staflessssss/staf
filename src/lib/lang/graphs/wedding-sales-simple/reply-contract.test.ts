@@ -128,6 +128,7 @@ test("instagram guide image and link prefer image attachment without long link t
     },
     state: {
       ...state,
+      replyContract: contract,
       responseDraft: reply,
     },
     attachments: [

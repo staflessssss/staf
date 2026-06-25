@@ -5,6 +5,7 @@ import type {
 } from "@/lib/lang/graphs/wedding-sales-simple/state";
 import type { ReplyActionContract } from "@/lib/lang/graphs/wedding-sales-simple/reply-contract";
 import type { ReplyGuardResult } from "@/lib/lang/graphs/wedding-sales-simple/reply-guards";
+import type { ChannelDeliveryPlan } from "./delivery-plan";
 
 export type WeddingSalesSimpleRuntime = "legacy" | "wedding-sales-simple";
 
@@ -33,6 +34,7 @@ export type NormalizedWeddingSalesOutboundMessage = {
   }>;
   handoffMode: SimpleWeddingSalesMode;
   decisionTrace: SimpleWeddingSalesDecisionTrace;
+  channelDeliveryPlan?: ChannelDeliveryPlan;
 };
 
 export type WeddingSalesSimpleSafetyLogEntry = {
@@ -42,6 +44,7 @@ export type WeddingSalesSimpleSafetyLogEntry = {
   replyContract?: ReplyActionContract;
   guardResult?: ReplyGuardResult;
   attachments?: NormalizedWeddingSalesOutboundMessage["attachments"];
+  channelDeliveryPlan?: ChannelDeliveryPlan;
   knowledgeSummary?: {
     hasPricing: boolean;
     startPrice?: string;

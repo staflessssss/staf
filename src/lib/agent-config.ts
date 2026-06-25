@@ -953,6 +953,7 @@ export const channelConfigSchema = z
       .enum(["legacy", "langgraph_wedding_sales", "wedding_sales_simple"])
       .optional()
       .default("legacy"),
+    enableInstagramSemanticDeliveryPlan: z.boolean().optional().default(false),
     priceAttachmentFileId: z
       .string()
       .trim()
@@ -1248,6 +1249,7 @@ export const channelConfigSchema = z
   })
   .default({
     runtimeType: "legacy",
+    enableInstagramSemanticDeliveryPlan: false,
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,
@@ -1265,6 +1267,7 @@ export const channelConfigSchema = z
 
 const agentManagedChannelConfigKeys = [
   "runtimeType",
+  "enableInstagramSemanticDeliveryPlan",
   "priceAttachmentFileId",
   "priceAttachmentFileName",
   "priceAttachmentMimeType",
@@ -1295,6 +1298,7 @@ export const agentDraftSchema = z.object({
   status: z.nativeEnum(AgentStatus).optional().default(AgentStatus.ACTIVE),
   channelConfig: channelConfigSchema.optional().default({
     runtimeType: "legacy",
+    enableInstagramSemanticDeliveryPlan: false,
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
     priceAttachmentMimeType: undefined,
