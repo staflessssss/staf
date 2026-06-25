@@ -1327,6 +1327,7 @@ test("simple wedding sales runtime answers travel question after booking without
 
   assert.equal(result.nextStep, "reply_only");
   assert.equal(result.decisionTrace?.replyType, "reply_only");
+  assert.notEqual(result.decisionTrace?.replyType, "booking_confirmed");
   assert.deepEqual(result.replyObligations, ["travel"]);
   assert.equal(result.replyContract?.mustAnswerTravel, true);
   assert.equal(result.answerContext, undefined);
@@ -1335,6 +1336,122 @@ test("simple wedding sales runtime answers travel question after booking without
   assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess|send that one more time/i);
   assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite/i);
   assert.deepEqual(result.toolObservations, []);
+});
+
+test("simple wedding sales runtime does not apply stale call-time context to FAQ questions", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Do you travel outside Tampa too?",
+    toolContext,
+    previousState: {
+      customerName: "Mark",
+      partnerName: "Rachel",
+      customerEmail: "bonkopoly@gmail.com",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 2pm",
+      callTimeContext: {
+        requiredQuestion: "callTime",
+        dateContext: "tomorrow",
+        source: "out_of_window_suggestions",
+        rejected: {
+          value: "tomorrow at 3pm",
+          reason: "out_of_window",
+        },
+        options: [
+          { label: "1pm", hour: 13, minute: 0 },
+          { label: "2pm", hour: 14, minute: 0 },
+        ],
+      },
+      calendarStatus: "available",
+      consultationCheck: {
+        proposedTime: "tomorrow at 2pm",
+        status: "available",
+        checkedAt: "2026-06-25T16:52:57.034Z",
+      },
+      customerConfirmedCallSlot: true,
+      bookingConfirmed: true,
+      replyMemory: {
+        lastRequiredQuestion: "callTime",
+        questionMemory: {
+          lastRequiredQuestion: "callTime",
+          lastQuestionText:
+            "Either works - I just need one specific time to check the calendar. Would you prefer 1pm or 2pm?",
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {
+          proposedCallTime: "tomorrow at 1pm",
+        },
+        questionsAskedByCustomer: ["travel"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.proposedCallTime, "tomorrow at 2pm");
+  assert.equal(result.answerContext, undefined);
+  assert.deepEqual(result.replyObligations, ["travel"]);
+  assert.equal(result.replyContract?.mustAnswerTravel, true);
+  assert.deepEqual(result.toolObservations, []);
+  assert.match(result.responseDraft ?? "", /travel outside Tampa/i);
+});
+
+test("simple wedding sales runtime does not treat bare yes after booking as pending booking confirmation", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Yes",
+    toolContext,
+    previousState: {
+      customerName: "Mark",
+      partnerName: "Rachel",
+      customerEmail: "bonkopoly@gmail.com",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 2pm",
+      calendarStatus: "available",
+      consultationCheck: {
+        proposedTime: "tomorrow at 2pm",
+        status: "available",
+        checkedAt: "2026-06-25T16:52:57.034Z",
+      },
+      checkedCallDate: "2026-06-26",
+      checkedCallTime: "14:00",
+      checkedCallStartTime: "2026-06-26T14:00:00-04:00",
+      checkedCallEndTime: "2026-06-26T14:30:00-04:00",
+      customerConfirmedCallSlot: true,
+      bookingConfirmed: true,
+      bookingAttempt: {
+        status: "booked",
+        attemptedAt: "2026-06-25T16:53:44.500Z",
+      },
+      replyMemory: {
+        lastReplyType: "booking_confirmed",
+        lastOutboundText:
+          "Perfect - you're all set for 2:00 PM ✨\n\nYou should see the calendar invite come through at bonkopoly@gmail.com.",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "booking_confirmation",
+        facts: {},
+        questionsAskedByCustomer: [],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.bookingConfirmed, true);
+  assert.deepEqual(result.toolObservations, []);
+  assert.notEqual(result.answerContext?.source, "pending_booking_confirmation");
+  assert.equal(result.replyMemory?.pendingBookingConfirmation, undefined);
 });
 
 test("simple wedding sales replies avoid known robotic phrases", async () => {
