@@ -237,7 +237,7 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
     questions.push("availability");
   }
 
-  if (/\b(portfolio|gallery|film|films|sample|samples)\b/.test(normalized)) {
+  if (/\b(portfolio|galler(?:y|ies)|recent films?|sample films?|examples?|full films?)\b/.test(normalized)) {
     questions.push("portfolio");
   }
 
@@ -249,7 +249,13 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
     questions.push("package_inclusions");
   }
 
-  if (/\b(shooter|team|you filming|videographer)\b/.test(normalized)) {
+  if (
+    /\bwho\s+(?:(?:will|would)\s+)?(?:shoot|film)s?\b/.test(normalized) ||
+    /\b(?:shooter|filmmaker|videographer|lead filmmaker|team)\b/.test(normalized) ||
+    /\b(?:will\s+you\s+shoot|are\s+you\s+filming|you\s+filming|taras\s+(?:shooting|filming))\b/.test(
+      normalized,
+    )
+  ) {
     questions.push("team");
   }
 

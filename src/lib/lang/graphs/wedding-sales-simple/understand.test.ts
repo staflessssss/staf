@@ -124,3 +124,33 @@ test("deterministic understanding treats a request for Taras as an identity ques
   assert.equal(result.customerMessageType, "business_question");
   assert.deepEqual(result.questionsAskedByCustomer, ["identity"]);
 });
+
+test("deterministic understanding treats who will film as team, not portfolio", () => {
+  const result = understandTurnHeuristically({
+    channel: "instagram",
+    latestCustomerMessage: "Who will film our wedding?",
+    bookingConfirmed: false,
+    mode: "bot_active",
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  });
+
+  assert.equal(result.customerMessageType, "business_question");
+  assert.deepEqual(result.questionsAskedByCustomer, ["team"]);
+});
+
+test("deterministic understanding treats recent films as portfolio, not team", () => {
+  const result = understandTurnHeuristically({
+    channel: "instagram",
+    latestCustomerMessage: "Can you send recent films?",
+    bookingConfirmed: false,
+    mode: "bot_active",
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  });
+
+  assert.equal(result.customerMessageType, "business_question");
+  assert.deepEqual(result.questionsAskedByCustomer, ["portfolio"]);
+});

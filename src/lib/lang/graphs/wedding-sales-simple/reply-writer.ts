@@ -174,6 +174,14 @@ function questionLine(args: {
     case "venue":
       return `${args.knowledge.persona.replyStyle.namesAcknowledgement} Do you already have a venue picked out?`;
     case "callTime":
+      if (
+        args.state.calendarStatus === "available" &&
+        args.state.customerEmail &&
+        !args.state.customerConfirmedCallSlot
+      ) {
+        return "Want me to lock that in?";
+      }
+
       if (args.contract.questionPolicy.mode === "invalid_answer_retry") {
         if (args.contract.replyType === "call_time_ambiguous") {
           return "Either works - I just need one specific time to check the calendar. Would you prefer 1pm or 2pm?";
@@ -403,6 +411,7 @@ export function writeConstrainedWeddingReply(args: {
 }): {
   text: string;
   guardResult: ReturnType<typeof validateGeneratedReply>;
+  forceHandoff?: true;
 } {
   const { state, contract, knowledge } = args;
   const shouldSharePortfolio = state.questionsAskedByCustomer.includes("portfolio");
@@ -458,15 +467,24 @@ export function writeConstrainedWeddingReply(args: {
   }
 
   const minimal = renderSafeTemplate(args);
+  const minimalGuard = validateGeneratedReply({
+    reply: minimal,
+    contract,
+    knowledge,
+    state,
+  });
+
+  if (!minimalGuard.ok) {
+    return {
+      text: handoffLine(),
+      guardResult: minimalGuard,
+      forceHandoff: true,
+    };
+  }
 
   return {
     text: minimal,
-    guardResult: validateGeneratedReply({
-      reply: minimal,
-      contract,
-      knowledge,
-      state,
-    }),
+    guardResult: minimalGuard,
   };
 }
 

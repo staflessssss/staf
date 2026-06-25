@@ -76,6 +76,7 @@ export function buildSimpleWeddingMentionPolicy(args: {
 }): SimpleWeddingMentionPolicy {
   const { state, knowledge } = args;
   const askedPricing = state.questionsAskedByCustomer.includes("pricing");
+  const askedPackageInclusions = state.questionsAskedByCustomer.includes("package_inclusions");
   const askedGuide = asksForGuide(state);
   const guideExists = Boolean(knowledge.guide.imageUrl || knowledge.guide.link);
   const justCheckedAvailability = Boolean(state.decisionTrace?.toolCalled === "checkAvailability");
@@ -144,7 +145,7 @@ export function buildSimpleWeddingMentionPolicy(args: {
       };
     }
 
-    if ((askedGuide || askedPricing || justCheckedAvailability) && !guideMentioned) {
+    if ((askedGuide || askedPricing || askedPackageInclusions) && !guideMentioned) {
       return {
         mode: "send_attachment" as const,
         reason: "guide is relevant and has not been mentioned in this conversation",

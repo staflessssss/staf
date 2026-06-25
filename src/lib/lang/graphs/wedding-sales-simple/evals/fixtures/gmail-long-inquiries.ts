@@ -40,8 +40,22 @@ export const gmailLongInquiryReplay: SimpleWeddingSalesReplayTurn[] = [
       confidence: 0.95,
     },
     expect: {
+      nextStep: "ask_call_time",
+      toolCalls: ["check_consultation_calendar"],
+      replyIncludes: [/works perfectly for a call/i, /lock that in/i],
+    },
+  },
+  {
+    message: "Yes, please book it.",
+    understanding: {
+      customerMessageType: "booking_confirmation",
+      facts: {},
+      questionsAskedByCustomer: ["booking"],
+      confidence: 0.95,
+    },
+    expect: {
       nextStep: "reply_only",
-      toolCalls: ["check_consultation_calendar", "book_consultation"],
+      toolCalls: ["book_consultation"],
       replyIncludes: [/booked the call/i],
     },
   },

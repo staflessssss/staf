@@ -19,6 +19,7 @@ import {
 import { buildReplyActionContract } from "./reply-contract";
 import { updateSimpleWeddingReplyMemory } from "./reply-memory";
 import { writeConstrainedWeddingReply } from "./reply-writer";
+import { defaultWeddingSalesConfig } from "../wedding-sales/config";
 
 function toolNameForStep(state: SimpleWeddingSalesState) {
   if (state.nextStep === "check_availability") {
@@ -34,6 +35,13 @@ function toolNameForStep(state: SimpleWeddingSalesState) {
   }
 
   return undefined;
+}
+
+function resolveCallBookingWindow(config?: Partial<WeddingSalesConfig>) {
+  return {
+    ...defaultWeddingSalesConfig.callBookingWindow,
+    ...config?.callBookingWindow,
+  };
 }
 
 export type InvokeWeddingSalesSimpleGraphInput = {
@@ -83,6 +91,7 @@ export async function invokeWeddingSalesSimpleGraph(
     channel: input.channel,
     message: input.message,
     customerEmail: input.customerEmail,
+    callBookingWindow: resolveCallBookingWindow(input.config),
     previousState: input.previousState,
   });
   const understanding = await understandTurn(initialState, input.understand);
@@ -145,11 +154,27 @@ export async function invokeWeddingSalesSimpleGraph(
     contract,
     knowledge,
   });
+  const finalState: SimpleWeddingSalesState = reply.forceHandoff
+    ? {
+        ...state,
+        nextStep: "handoff",
+        mode: "human_needed",
+        handoffReason: "tool_error",
+        decisionTrace: state.decisionTrace
+          ? {
+              ...state.decisionTrace,
+              nextStep: "handoff",
+              replyType: "handoff",
+              reason: "reply guard failed after all deterministic fallbacks",
+            }
+          : undefined,
+      }
+    : state;
 
   return {
-    ...state,
+    ...finalState,
     replyMemory: updateSimpleWeddingReplyMemory({
-      state,
+      state: finalState,
       contract,
       knowledge,
       replyText: reply.text,

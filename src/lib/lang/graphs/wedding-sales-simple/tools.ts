@@ -150,15 +150,22 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
       channel: state.channel,
     });
     const resultText = typeof result === "string" ? result : JSON.stringify(result);
-    const steps = getStepResults(parseToolJson(resultText));
+    const parsed = parseToolJson(resultText);
+    const steps = getStepResults(parsed);
     const available = steps.some((step) => step.status === "available");
     const unavailable = steps.some((step) => step.status === "unavailable");
     const unavailableStep = steps.find((step) => step.status === "unavailable");
+    const testModeAvailable = Boolean(toolContext.testMode) && parsed.status === "missing_credentials";
+    const availabilityStatus = available || testModeAvailable
+      ? "available"
+      : unavailable
+        ? "unavailable"
+        : "unknown";
 
     return appendObservation(
       {
         ...state,
-        availability: unavailable && !available ? "unavailable" : "available",
+        availability: availabilityStatus,
         availabilityContextDate: state.weddingDate,
         availabilityRegion:
           getString(steps.find((step) => getString(step.requestedRegion))?.requestedRegion) ??
@@ -169,7 +176,7 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
         availabilityCheck: {
           date: state.weddingDate,
           location: state.location,
-          status: unavailable && !available ? "unavailable" : "available",
+          status: availabilityStatus,
           checkedAt: new Date().toISOString(),
         },
       },
@@ -248,11 +255,16 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
     const bookedStep = steps.find((step) => step.status === "booked");
     const parsed = parseToolJson(resultText);
     const testModeBooked = Boolean(toolContext.testMode) && parsed.status === "missing_credentials";
+    const bookingConfirmed = Boolean(bookedStep) || testModeBooked;
 
     return appendObservation(
       {
         ...state,
-        bookingConfirmed: Boolean(bookedStep) || testModeBooked,
+        bookingConfirmed,
+        bookingAttempt: {
+          status: bookingConfirmed ? "booked" : "failed",
+          attemptedAt: new Date().toISOString(),
+        },
         bookedEventId: getString(bookedStep?.eventId),
       },
       {

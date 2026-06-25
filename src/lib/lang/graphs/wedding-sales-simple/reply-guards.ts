@@ -22,7 +22,7 @@ function mentionsVenue(text: string) {
 }
 
 function mentionsCallTime(text: string) {
-  return /\b(?:what time|time works|good time|call time|within that window|9am|10am|11am|12pm|1pm|2pm)\b/i.test(
+  return /\b(?:what time|time works|good time|call time|within that window|lock that in|9am|10am|11am|12pm|1pm|2pm)\b/i.test(
     text,
   );
 }

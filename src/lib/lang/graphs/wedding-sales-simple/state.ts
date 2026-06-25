@@ -91,6 +91,7 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "calendar_busy"
     | "call_time_ambiguous"
     | "call_time_out_of_window"
+    | "availability_unknown"
     | "team_answer"
     | "booking_confirmed"
     | "identity_answer"
@@ -154,7 +155,7 @@ export type SimpleWeddingSalesState = {
   venue?: string;
   customerEmail?: string;
   senderRole?: "bride" | "groom" | "mother" | "planner" | "friend" | "unknown";
-  availability?: "available" | "unavailable";
+  availability?: "available" | "unavailable" | "unknown";
   availabilityContextDate?: string;
   availabilityRegion?: string;
   suggestedWeddingDates?: string[];
@@ -178,8 +179,19 @@ export type SimpleWeddingSalesState = {
   checkedCallTime?: string;
   checkedCallStartTime?: string;
   checkedCallEndTime?: string;
+  customerConfirmedCallSlot?: boolean;
   bookingConfirmed: boolean;
+  bookingAttempt?: {
+    status: "booked" | "failed";
+    attemptedAt: string;
+  };
   bookedEventId?: string;
+  callBookingWindow?: {
+    startHour: number;
+    endHour: number;
+    businessDays: number[];
+    timezone: string;
+  };
   replyMemory?: SimpleWeddingSalesReplyMemory;
   /** @deprecated Use replyMemory. Kept only to migrate live persisted simple-runtime state. */
   lastMentionedStartPrice?: string;
@@ -206,6 +218,7 @@ export function createInitialSimpleWeddingSalesState(args: {
   agentId?: string;
   contactId?: string;
   customerEmail?: string;
+  callBookingWindow?: SimpleWeddingSalesState["callBookingWindow"];
   previousState?: Partial<SimpleWeddingSalesState>;
 }): SimpleWeddingSalesState {
   return {
@@ -238,8 +251,11 @@ export function createInitialSimpleWeddingSalesState(args: {
     checkedCallTime: args.previousState?.checkedCallTime,
     checkedCallStartTime: args.previousState?.checkedCallStartTime,
     checkedCallEndTime: args.previousState?.checkedCallEndTime,
+    customerConfirmedCallSlot: args.previousState?.customerConfirmedCallSlot,
     bookingConfirmed: args.previousState?.bookingConfirmed ?? false,
+    bookingAttempt: args.previousState?.bookingAttempt,
     bookedEventId: args.previousState?.bookedEventId,
+    callBookingWindow: args.callBookingWindow ?? args.previousState?.callBookingWindow,
     replyMemory: args.previousState?.replyMemory,
     lastMentionedStartPrice: args.previousState?.lastMentionedStartPrice,
     guideMentioned: args.previousState?.guideMentioned,
@@ -267,6 +283,11 @@ export function mergeTurnUnderstanding(
   const partnerName = facts.partnerName ?? state.partnerName;
   const callTimeCompletion = completeCallTimeFromAnswerContext(state, facts.proposedCallTime);
   const proposedCallTime = callTimeCompletion.proposedCallTime ?? state.proposedCallTime;
+  const customerConfirmedCallSlot = Boolean(
+    state.customerConfirmedCallSlot ||
+      understanding.customerMessageType === "booking_confirmation" ||
+      understanding.questionsAskedByCustomer.includes("booking"),
+  );
   const callTimeChanged = Boolean(
     callTimeCompletion.proposedCallTime &&
       callTimeCompletion.proposedCallTime !== state.proposedCallTime,
@@ -283,6 +304,7 @@ export function mergeTurnUnderstanding(
     customerEmail: facts.email ?? state.customerEmail,
     senderRole: facts.senderRole ?? state.senderRole,
     proposedCallTime,
+    customerConfirmedCallSlot: callTimeChanged ? false : customerConfirmedCallSlot,
     callTimeAmbiguousChoice: callTimeCompletion.ambiguousChoice,
     calendarStatus: callTimeChanged ? undefined : state.calendarStatus,
     calendarContextDate: callTimeChanged ? undefined : state.calendarContextDate,

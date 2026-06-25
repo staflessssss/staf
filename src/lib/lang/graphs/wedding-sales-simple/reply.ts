@@ -149,7 +149,7 @@ function fallbackQuestion(state: SimpleWeddingSalesState) {
     return "What are both of your names?";
   }
 
-  return "Got it. I can help with that.";
+  return "I want to make sure I answer this correctly, so I will have someone take a look.";
 }
 
 export function writeHumanReply(args: {

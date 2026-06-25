@@ -48,6 +48,10 @@ function isAvailabilityContextCurrent(state: SimpleWeddingSalesState) {
   return Boolean(state.availability && state.availabilityContextDate === state.weddingDate);
 }
 
+function effectiveAvailability(state: SimpleWeddingSalesState) {
+  return isAvailabilityContextCurrent(state) ? state.availability : undefined;
+}
+
 function isCalendarContextCurrent(state: SimpleWeddingSalesState) {
   return Boolean(
     state.proposedCallTime &&
@@ -99,10 +103,45 @@ function isProposedCallTimeOutsideConsultWindow(state: SimpleWeddingSalesState) 
     return false;
   }
 
-  const startMinutes = 9 * 60;
-  const endMinutes = 14 * 60;
+  const startMinutes = (state.callBookingWindow?.startHour ?? 9) * 60;
+  const endMinutes = (state.callBookingWindow?.endHour ?? 14) * 60;
 
   return proposedMinutes < startMinutes || proposedMinutes > endMinutes;
+}
+
+function proposedCallTimeViolatesBusinessDay(state: SimpleWeddingSalesState) {
+  if (!state.proposedCallTime) {
+    return false;
+  }
+
+  const businessDays = state.callBookingWindow?.businessDays ?? [1, 2, 3, 4, 5];
+  const explicitWeekday = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i.exec(
+    state.proposedCallTime,
+  )?.[1]?.toLowerCase();
+  const weekdayMap: Record<string, number> = {
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+    sunday: 7,
+  };
+  const explicitDay = explicitWeekday ? weekdayMap[explicitWeekday] : undefined;
+
+  if (explicitDay) {
+    return !businessDays.includes(explicitDay);
+  }
+
+  const isoDate = /^(\d{4}-\d{2}-\d{2})T/.exec(state.proposedCallTime.trim())?.[1];
+
+  if (!isoDate) {
+    return false;
+  }
+
+  const day = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
+  const businessDay = day === 0 ? 7 : day;
+  return !businessDays.includes(businessDay);
 }
 
 export function decideNextStep(state: SimpleWeddingSalesState): {
@@ -146,6 +185,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  const availability = effectiveAvailability(state);
   const hasUncheckedAvailability = Boolean(
     state.weddingDate && state.location && !isAvailabilityContextCurrent(state),
   );
@@ -213,6 +253,16 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  if (state.bookingAttempt?.status === "failed" && !state.bookingConfirmed) {
+    return decision({
+      nextStep: "handoff",
+      mode: "human_needed",
+      handoffReason: "tool_error",
+      replyType: "handoff",
+      reason: "booking was attempted but the booking tool did not confirm success",
+    });
+  }
+
   if (state.bookingConfirmed) {
     return decision({
       nextStep: "reply_only",
@@ -225,7 +275,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     state.questionsAskedByCustomer.includes("availability") ||
     state.lastUnderstanding?.customerMessageType === "availability_question";
 
-  if ((wantsAvailability || state.availability) && !state.weddingDate) {
+  if ((wantsAvailability || availability) && !state.weddingDate) {
     return decision({
       nextStep: "ask_missing_info",
       missingField: "weddingDate",
@@ -236,7 +286,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if ((wantsAvailability || state.availability) && !state.location) {
+  if ((wantsAvailability || availability) && !state.location) {
     return decision({
       nextStep: "ask_missing_info",
       missingField: "location",
@@ -253,7 +303,17 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.availability === "unavailable") {
+  if (availability === "unknown") {
+    return decision({
+      nextStep: "handoff",
+      mode: "human_needed",
+      handoffReason: "tool_error",
+      replyType: "availability_unknown",
+      reason: "availability tool returned an unknown result for the current date/location",
+    });
+  }
+
+  if (availability === "unavailable") {
     return decision({
       nextStep: "reply_only",
       replyType: "availability_unavailable",
@@ -261,7 +321,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.availability === "available" && !hasNames(state)) {
+  if (availability === "available" && !hasNames(state)) {
     return decision({
       nextStep: "ask_missing_info",
       missingField: "names",
@@ -270,7 +330,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.availability === "available" && !state.venue) {
+  if (availability === "available" && !state.venue) {
     return decision({
       nextStep: "ask_venue",
       replyType: "ask_venue",
@@ -278,7 +338,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.availability === "available" && !state.proposedCallTime) {
+  if (availability === "available" && !state.proposedCallTime) {
     return decision({
       nextStep: "ask_call_time",
       replyType: "ask_call_time",
@@ -297,7 +357,8 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   if (
     state.proposedCallTime &&
     !isCalendarContextCurrent(state) &&
-    isProposedCallTimeOutsideConsultWindow(state)
+    (isProposedCallTimeOutsideConsultWindow(state) ||
+      proposedCallTimeViolatesBusinessDay(state))
   ) {
     return decision({
       nextStep: "ask_call_time",
@@ -342,7 +403,22 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.calendarStatus === "available" && state.customerEmail) {
+  if (state.calendarStatus === "available" && state.customerEmail && !state.customerConfirmedCallSlot) {
+    return decision({
+      nextStep: "ask_call_time",
+      replyType: "ask_call_time",
+      reason: "calendar slot is available and customer must explicitly confirm before booking",
+    });
+  }
+
+  if (
+    state.calendarStatus === "available" &&
+    state.customerEmail &&
+    hasNames(state) &&
+    state.checkedCallDate &&
+    state.checkedCallTime &&
+    state.customerConfirmedCallSlot
+  ) {
     return decision({
       nextStep: "book_call",
       replyType: "reply_only",
@@ -398,6 +474,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
 
 function getMissingFields(state: SimpleWeddingSalesState) {
   const fields: SimpleWeddingSalesDecisionTrace["missingFields"] = [];
+  const availability = effectiveAvailability(state);
 
   if (!hasNames(state)) {
     fields.push("names");
@@ -411,11 +488,11 @@ function getMissingFields(state: SimpleWeddingSalesState) {
     fields.push("location");
   }
 
-  if (state.availability === "available" && !state.venue) {
+  if (availability === "available" && !state.venue) {
     fields.push("venue");
   }
 
-  if (state.availability === "available" && !state.proposedCallTime) {
+  if (availability === "available" && !state.proposedCallTime) {
     fields.push("callTime");
   }
 
