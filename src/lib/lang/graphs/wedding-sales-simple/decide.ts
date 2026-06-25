@@ -1,6 +1,7 @@
 import type {
   SimpleWeddingSalesDecisionTrace,
   SimpleWeddingSalesHandoffReason,
+  SimpleWeddingSalesInvariantCheck,
   SimpleWeddingSalesNextStep,
   SimpleWeddingSalesQuestion,
   SimpleWeddingSalesReplyObligation,
@@ -225,11 +226,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     mode?: SimpleWeddingSalesState["mode"];
     handoffReason?: SimpleWeddingSalesHandoffReason;
     statePatch?: Partial<SimpleWeddingSalesState>;
-    invariantCheck?: {
-      name: string;
-      passed: boolean;
-      reason?: string;
-    };
+    invariantCheck?: SimpleWeddingSalesInvariantCheck;
     replyType: SimpleWeddingSalesDecisionTrace["replyType"];
     reason: string;
   }) => ({
@@ -486,6 +483,11 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       proposedCallTimeViolatesBusinessDay(state))
   ) {
     const violatesBusinessDay = proposedCallTimeViolatesBusinessDay(state);
+    const callTimeContext = buildOutOfWindowCallTimeContext({
+      proposedCallTime: state.proposedCallTime,
+      reason: violatesBusinessDay ? "business_day" : "out_of_window",
+      state,
+    });
 
     return decision({
       nextStep: "ask_call_time",
@@ -493,12 +495,36 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       reason: "customer proposed a consultation time outside the configured consult window",
       statePatch: {
         proposedCallTime: undefined,
-        callTimeContext: buildOutOfWindowCallTimeContext({
-          proposedCallTime: state.proposedCallTime,
-          reason: violatesBusinessDay ? "business_day" : "out_of_window",
-          state,
-        }),
+        callTimeContext,
       },
+      invariantCheck: buildOfferedCallTimeOptionsInvariant(state, callTimeContext),
+    });
+  }
+
+  if (
+    state.proposedCallTime &&
+    isCalendarContextCurrent(state) &&
+    (state.consultationCheck?.status === "outside_business_hours" ||
+      state.consultationCheck?.status === "outside_business_days")
+  ) {
+    const callTimeContext = buildOutOfWindowCallTimeContext({
+      proposedCallTime: state.proposedCallTime,
+      reason:
+        state.consultationCheck.status === "outside_business_days"
+          ? "business_day"
+          : "out_of_window",
+      state,
+    });
+
+    return decision({
+      nextStep: "ask_call_time",
+      replyType: "call_time_out_of_window",
+      reason: "calendar tool parsed the consultation time and rejected it outside the consult window",
+      statePatch: {
+        proposedCallTime: undefined,
+        callTimeContext,
+      },
+      invariantCheck: buildOfferedCallTimeOptionsInvariant(state, callTimeContext),
     });
   }
 
@@ -611,7 +637,7 @@ function buildOutOfWindowCallTimeContext(args: {
   proposedCallTime: string;
   reason: "out_of_window" | "business_day";
   state: SimpleWeddingSalesState;
-}): SimpleWeddingSalesState["callTimeContext"] {
+}): NonNullable<SimpleWeddingSalesState["callTimeContext"]> {
   const endHour = args.state.callBookingWindow?.endHour ?? 14;
   const firstHour = Math.max(args.state.callBookingWindow?.startHour ?? 9, endHour - 1);
 
@@ -628,6 +654,38 @@ function buildOutOfWindowCallTimeContext(args: {
       minute: 0,
     })),
     source: "out_of_window_suggestions",
+  };
+}
+
+function buildOfferedCallTimeOptionsInvariant(
+  state: SimpleWeddingSalesState,
+  callTimeContext: NonNullable<SimpleWeddingSalesState["callTimeContext"]>,
+) {
+  const startHour = state.callBookingWindow?.startHour ?? 9;
+  const latestStartHour = state.callBookingWindow?.endHour ?? 14;
+  const startMinutes = startHour * 60;
+  const latestStartMinutes = latestStartHour * 60;
+  const invalidOptions = callTimeContext.options.filter((option) => {
+    const minutes = option.hour * 60 + option.minute;
+    return minutes < startMinutes || minutes > latestStartMinutes;
+  });
+
+  return {
+    name: "offered_call_time_options_must_pass_tool_window_validation",
+    passed: invalidOptions.length === 0,
+    reason:
+      invalidOptions.length > 0
+        ? "one or more offered call time options are outside the configured latest-start window"
+        : undefined,
+    details: {
+      offeredOptions: callTimeContext.options.map((option) => option.label),
+      invalidOptions: invalidOptions.map((option) => option.label),
+      window: {
+        startHour,
+        latestStartHour,
+        semantics: "latest_start_inclusive",
+      },
+    },
   };
 }
 

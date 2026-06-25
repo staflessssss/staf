@@ -678,7 +678,6 @@ function validateSchedulingWindow(parsed: ParsedSchedulingRequest, config: Sched
   const weekday = date.getUTCDay();
   const [hours, minutes] = parsed.time.split(":").map(Number);
   const startMinutes = hours * 60 + minutes;
-  const endMinutes = startMinutes + config.slotDurationMinutes;
   const minMinutes = config.businessWindowStartHour * 60;
   const maxMinutes = config.businessWindowEndHour * 60;
   const businessDayLabel = businessDayOptionsForMessage(config.businessDays);
@@ -691,7 +690,7 @@ function validateSchedulingWindow(parsed: ParsedSchedulingRequest, config: Sched
     };
   }
 
-  if (startMinutes < minMinutes || endMinutes > maxMinutes) {
+  if (startMinutes < minMinutes || startMinutes > maxMinutes) {
     return {
       ok: false,
       reason: "outside_business_hours",

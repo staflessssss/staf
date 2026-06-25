@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { Prisma } from "@prisma/client";
+
 import type { WeddingSalesChannel } from "../wedding-sales/state";
 import type { ReplyActionContract } from "./reply-contract";
 import type { ReplyGuardResult } from "./reply-guards";
@@ -166,6 +168,13 @@ export type SimpleWeddingSalesCallTimeContext = {
   source: "out_of_window_suggestions" | "calendar_suggestions";
 };
 
+export type SimpleWeddingSalesInvariantCheck = Prisma.JsonObject & {
+  name: string;
+  passed: boolean;
+  reason?: string;
+  details?: Prisma.JsonObject;
+};
+
 export type SimpleWeddingSalesState = {
   tenantId?: string;
   agentId?: string;
@@ -199,7 +208,7 @@ export type SimpleWeddingSalesState = {
   suggestedCallTimes?: string[];
   consultationCheck?: {
     proposedTime: string;
-    status: "available" | "unavailable" | "unknown";
+    status: "available" | "unavailable" | "unknown" | "outside_business_hours" | "outside_business_days";
     checkedAt: string;
   };
   checkedCallDate?: string;
@@ -235,11 +244,7 @@ export type SimpleWeddingSalesState = {
   replyContract?: ReplyActionContract;
   replyGuardResult?: ReplyGuardResult;
   replyObligations?: SimpleWeddingSalesReplyObligation[];
-  invariantChecks?: Array<{
-    name: string;
-    passed: boolean;
-    reason?: string;
-  }>;
+  invariantChecks?: SimpleWeddingSalesInvariantCheck[];
   responseDraft?: string;
   toolObservations: Array<{ toolName: string; result: string }>;
 };

@@ -201,6 +201,9 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
     const steps = getStepResults(parseToolJson(resultText));
     const availableStep = steps.find((step) => step.status === "available");
     const busyStep = steps.find((step) => step.status === "busy");
+    const outsideWindowStep = steps.find(
+      (step) => step.status === "outside_business_hours" || step.status === "outside_business_days",
+    );
     const testModeFallback = toolContext.testMode
       ? getTestModeCalendarFallback(state, resultText)
       : null;
@@ -223,11 +226,21 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
               ? "available"
               : busyStep
                 ? "unavailable"
-                : "unknown",
+                : outsideWindowStep?.status === "outside_business_hours"
+                  ? "outside_business_hours"
+                  : outsideWindowStep?.status === "outside_business_days"
+                    ? "outside_business_days"
+                    : "unknown",
           checkedAt: new Date().toISOString(),
         },
-        checkedCallDate: testModeFallback?.checkedCallDate ?? getString(availableStep?.date),
-        checkedCallTime: testModeFallback?.checkedCallTime ?? getString(availableStep?.time),
+        checkedCallDate:
+          testModeFallback?.checkedCallDate ??
+          getString(availableStep?.date) ??
+          getString(outsideWindowStep?.date),
+        checkedCallTime:
+          testModeFallback?.checkedCallTime ??
+          getString(availableStep?.time) ??
+          getString(outsideWindowStep?.time),
         checkedCallStartTime:
           testModeFallback?.checkedCallStartTime ?? getString(availableStep?.startTime),
         checkedCallEndTime: getString(availableStep?.endTime),

@@ -357,7 +357,7 @@ test("executeGoogleCalendarStep date-only fallback still respects configured bus
   assert.match(String(result.summary), /Monday through Friday|Monday, Tuesday, Wednesday, Thursday, and Friday/i);
 });
 
-test("validateSchedulingWindow rejects weekend and outside-hour bookings", () => {
+test("validateSchedulingWindow treats businessWindowEndHour as inclusive latest start", () => {
   const weekend = calendarSchedulingTestHelpers.validateSchedulingWindow(
     {
       date: "2026-04-11",
@@ -374,7 +374,7 @@ test("validateSchedulingWindow rejects weekend and outside-hour bookings", () =>
       businessDays: [1, 2, 3, 4, 5],
     }),
   );
-  const late = calendarSchedulingTestHelpers.validateSchedulingWindow(
+  const latestStart = calendarSchedulingTestHelpers.validateSchedulingWindow(
     {
       date: "2026-04-10",
       time: "14:00",
@@ -390,8 +390,25 @@ test("validateSchedulingWindow rejects weekend and outside-hour bookings", () =>
       businessDays: [1, 2, 3, 4, 5],
     }),
   );
+  const late = calendarSchedulingTestHelpers.validateSchedulingWindow(
+    {
+      date: "2026-04-10",
+      time: "14:30",
+      startTime: "2026-04-10T14:30:00-04:00",
+      endTime: "2026-04-10T15:00:00-04:00",
+    },
+    schedulingConfig({
+      calendarId: "primary",
+      timeZone: "America/New_York",
+      slotDurationMinutes: 30,
+      businessWindowStartHour: 9,
+      businessWindowEndHour: 14,
+      businessDays: [1, 2, 3, 4, 5],
+    }),
+  );
 
   assert.equal(weekend.ok, false);
+  assert.equal(latestStart.ok, true);
   assert.equal(late.ok, false);
 });
 

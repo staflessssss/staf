@@ -682,6 +682,49 @@ test("simple wedding sales runtime resolves a bare numeric call time from reject
   );
 });
 
+test("simple wedding sales runtime maps parsed outside business hours to out-of-window", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Tomorrow 2:30pm",
+    toolContext,
+    previousState: {
+      customerName: "Mike",
+      partnerName: "Sarah",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 2:30pm",
+      consultationCheck: {
+        proposedTime: "tomorrow at 2:30pm",
+        status: "outside_business_hours",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+      replyMemory: {
+        lastRequiredQuestion: "callTime",
+        questionMemory: {
+          lastRequiredQuestion: "callTime",
+          lastQuestionText:
+            "Either works - I just need one specific time to check the calendar. Would you prefer 1pm or 2pm?",
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "call_time_proposed",
+        facts: {},
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_call_time");
+  assert.equal(result.decisionTrace?.replyType, "call_time_out_of_window");
+  assert.doesNotMatch(result.decisionTrace?.reason ?? "", /could not parse/i);
+  assert.equal(result.proposedCallTime, undefined);
+  assert.equal(result.callTimeContext?.rejected?.value, "tomorrow at 2:30pm");
+  assert.match(result.responseDraft ?? "", /2:30pm.*outside my consult window/i);
+});
+
 test("simple wedding sales runtime does not guess when customer accepts multiple call times", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
