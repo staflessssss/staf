@@ -1772,8 +1772,22 @@ test("handleIncomingEventWithDeps passes channel delivery plan and records execu
     senderActionsFailed: 0,
     fallbackToCanonical: false,
     plannedTotalDelayMs: 10_000,
-    appliedTotalDelayMs: 6_000,
-    maxTotalDelayMs: 6_000,
+    appliedTotalDelayMs: 10_500,
+    maxTotalDelayMs: 12_000,
+    startedAt: "2026-06-25T00:00:00.000Z",
+    finishedAt: "2026-06-25T00:00:10.500Z",
+    actualTotalMs: 10_500,
+    parts: [
+      {
+        kind: "text",
+        reason: "greeting_availability",
+        plannedDelayMs: 0,
+        effectiveDelayMs: 0,
+        plannedTypingMs: 1800,
+        effectiveTypingMs: 1800,
+        sentAtMs: 1800,
+      },
+    ],
   };
 
   await aiRuntimeTestHelpers.handleIncomingEventWithDeps(

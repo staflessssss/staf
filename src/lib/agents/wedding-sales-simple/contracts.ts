@@ -59,6 +59,35 @@ export type WeddingSalesSimpleDeliveryExecution =
       plannedTotalDelayMs: number;
       appliedTotalDelayMs: number;
       maxTotalDelayMs: number;
+      startedAt: string;
+      finishedAt: string;
+      actualTotalMs: number;
+      parts: Array<
+        | {
+            kind: "sender_action";
+            action: "mark_seen" | "typing_on" | "typing_off";
+            reason: string;
+            plannedDelayMs: number;
+            effectiveDelayMs: number;
+            sentAtMs: number;
+          }
+        | {
+            kind: "text";
+            reason: string;
+            plannedDelayMs: number;
+            effectiveDelayMs: number;
+            plannedTypingMs: number;
+            effectiveTypingMs: number;
+            sentAtMs: number;
+          }
+        | {
+            kind: "attachment";
+            reason: string;
+            plannedDelayMs: number;
+            effectiveDelayMs: number;
+            sentAtMs: number;
+          }
+      >;
       warnings?: string[];
     };
 

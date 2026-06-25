@@ -52,7 +52,13 @@ type InstagramAttachment = {
   mimeType?: string;
 };
 
-const INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS = 6_000;
+const INSTAGRAM_SEMANTIC_DELIVERY_SHORT_MAX_TOTAL_DELAY_MS = 4_000;
+const INSTAGRAM_SEMANTIC_DELIVERY_TWO_TEXT_MAX_TOTAL_DELAY_MS = 7_000;
+const INSTAGRAM_SEMANTIC_DELIVERY_THREE_TEXT_MAX_TOTAL_DELAY_MS = 10_000;
+const INSTAGRAM_SEMANTIC_DELIVERY_RICH_MAX_TOTAL_DELAY_MS = 12_000;
+const INSTAGRAM_SEMANTIC_MIN_TEXT_GAP_MS = 1_600;
+const INSTAGRAM_SEMANTIC_MIN_ATTACHMENT_GAP_MS = 1_100;
+const INSTAGRAM_SEMANTIC_MIN_TYPING_MS = 1_300;
 
 function wait(ms: number) {
   return new Promise((resolve) => {
@@ -276,6 +282,39 @@ function readSemanticDeliveryPlan(value: unknown): InstagramDeliveryPlan | null 
   return plan;
 }
 
+function maxTotalDelayForInstagramPlan(plan: InstagramDeliveryPlan) {
+  const hasAttachment = plan.parts.some((part) => part.kind === "attachment");
+
+  if (hasAttachment && plan.textPartCount >= 3) {
+    return INSTAGRAM_SEMANTIC_DELIVERY_RICH_MAX_TOTAL_DELAY_MS;
+  }
+
+  if (plan.textPartCount >= 3) {
+    return INSTAGRAM_SEMANTIC_DELIVERY_THREE_TEXT_MAX_TOTAL_DELAY_MS;
+  }
+
+  if (plan.textPartCount === 2) {
+    return INSTAGRAM_SEMANTIC_DELIVERY_TWO_TEXT_MAX_TOTAL_DELAY_MS;
+  }
+
+  return INSTAGRAM_SEMANTIC_DELIVERY_SHORT_MAX_TOTAL_DELAY_MS;
+}
+
+function minDelayBeforeContentPart(args: {
+  part: Extract<InstagramDeliveryPart, { kind: "text" | "attachment" }>;
+  contentPartsSent: number;
+}) {
+  if (args.contentPartsSent === 0) {
+    return 0;
+  }
+
+  if (args.part.kind === "attachment") {
+    return INSTAGRAM_SEMANTIC_MIN_ATTACHMENT_GAP_MS;
+  }
+
+  return INSTAGRAM_SEMANTIC_MIN_TEXT_GAP_MS;
+}
+
 async function executeInstagramDeliveryPlan(args: {
   credentials: InstagramCredentials;
   contactId: string;
@@ -284,28 +323,36 @@ async function executeInstagramDeliveryPlan(args: {
   const deliveries = [];
   const warnings: string[] = [];
   const plannedTotalDelayMs = args.plan.totalDelayMs;
+  const maxTotalDelayMs = maxTotalDelayForInstagramPlan(args.plan);
   const delayScale =
-    plannedTotalDelayMs > INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS
-      ? INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS / plannedTotalDelayMs
+    plannedTotalDelayMs > maxTotalDelayMs
+      ? maxTotalDelayMs / plannedTotalDelayMs
       : 1;
   let appliedTotalDelayMs = 0;
   let partsSent = 0;
+  let contentPartsSent = 0;
   let senderActionsAttempted = 0;
   let senderActionsFailed = 0;
+  const startedAtDate = new Date();
+  const startedAtMs = Date.now();
+  const partTimings: Extract<WeddingSalesSimpleDeliveryExecution, { executed: true }>["parts"] = [];
 
-  const scaledWait = async (delayMs: number) => {
-    const scaledDelayMs = Math.max(0, Math.round(delayMs * delayScale));
+  const effectiveDelayMs = (delayMs: number, minDelayMs = 0) => {
+    return Math.max(minDelayMs, Math.round(delayMs * delayScale));
+  };
 
-    if (scaledDelayMs > 0) {
-      appliedTotalDelayMs += scaledDelayMs;
-      await wait(scaledDelayMs);
+  const trackedWait = async (delayMs: number) => {
+    if (delayMs > 0) {
+      appliedTotalDelayMs += delayMs;
+      await wait(delayMs);
     }
   };
 
   for (const part of args.plan.parts) {
     if (part.kind === "sender_action") {
       senderActionsAttempted += 1;
-      await scaledWait(part.delayMsBefore);
+      const delayMs = effectiveDelayMs(part.delayMsBefore);
+      await trackedWait(delayMs);
 
       try {
         await sendInstagramSenderAction({
@@ -318,11 +365,26 @@ async function executeInstagramDeliveryPlan(args: {
         warnings.push(error instanceof Error ? error.message : "instagram_sender_action_failed");
       }
 
+      partTimings.push({
+        kind: "sender_action",
+        action: part.action,
+        reason: part.reason,
+        plannedDelayMs: part.delayMsBefore,
+        effectiveDelayMs: delayMs,
+        sentAtMs: Date.now() - startedAtMs,
+      });
       continue;
     }
 
     if (part.kind === "text") {
-      await scaledWait(part.delayMsBefore);
+      const delayMs = effectiveDelayMs(
+        part.delayMsBefore,
+        minDelayBeforeContentPart({
+          part,
+          contentPartsSent,
+        }),
+      );
+      await trackedWait(delayMs);
 
       try {
         senderActionsAttempted += 1;
@@ -336,7 +398,8 @@ async function executeInstagramDeliveryPlan(args: {
         warnings.push(error instanceof Error ? error.message : "instagram_typing_action_failed");
       }
 
-      await scaledWait(part.typingMsBefore);
+      const typingMs = effectiveDelayMs(part.typingMsBefore, INSTAGRAM_SEMANTIC_MIN_TYPING_MS);
+      await trackedWait(typingMs);
 
       const payload = await sendInstagramMessage({
         credentials: args.credentials,
@@ -347,13 +410,37 @@ async function executeInstagramDeliveryPlan(args: {
       });
       deliveries.push(payload);
       partsSent += 1;
+      contentPartsSent += 1;
+      partTimings.push({
+        kind: "text",
+        reason: part.reason,
+        plannedDelayMs: part.delayMsBefore,
+        effectiveDelayMs: delayMs,
+        plannedTypingMs: part.typingMsBefore,
+        effectiveTypingMs: typingMs,
+        sentAtMs: Date.now() - startedAtMs,
+      });
       continue;
     }
 
-    await scaledWait(part.delayMsBefore);
+    const delayMs = effectiveDelayMs(
+      part.delayMsBefore,
+      minDelayBeforeContentPart({
+        part,
+        contentPartsSent,
+      }),
+    );
+    await trackedWait(delayMs);
 
     if (part.attachment.type !== "image") {
       warnings.push(`unsupported_instagram_attachment:${part.attachment.type}`);
+      partTimings.push({
+        kind: "attachment",
+        reason: part.reason,
+        plannedDelayMs: part.delayMsBefore,
+        effectiveDelayMs: delayMs,
+        sentAtMs: Date.now() - startedAtMs,
+      });
       continue;
     }
 
@@ -371,7 +458,16 @@ async function executeInstagramDeliveryPlan(args: {
     });
     deliveries.push(payload);
     partsSent += 1;
+    contentPartsSent += 1;
+    partTimings.push({
+      kind: "attachment",
+      reason: part.reason,
+      plannedDelayMs: part.delayMsBefore,
+      effectiveDelayMs: delayMs,
+      sentAtMs: Date.now() - startedAtMs,
+    });
   }
+  const finishedAtDate = new Date();
 
   const deliveryExecution: WeddingSalesSimpleDeliveryExecution = {
     enabled: true,
@@ -383,7 +479,11 @@ async function executeInstagramDeliveryPlan(args: {
     fallbackToCanonical: false,
     plannedTotalDelayMs,
     appliedTotalDelayMs,
-    maxTotalDelayMs: INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS,
+    maxTotalDelayMs,
+    startedAt: startedAtDate.toISOString(),
+    finishedAt: finishedAtDate.toISOString(),
+    actualTotalMs: Date.now() - startedAtMs,
+    parts: partTimings,
     ...(warnings.length > 0 ? { warnings } : {}),
   };
 

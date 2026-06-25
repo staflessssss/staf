@@ -434,29 +434,62 @@ test("instagram adapter executes semantic delivery plan with sender actions and 
       "Team and names question",
     ],
   );
-  assert.ok(delays.reduce((total, delay) => total + delay, 0) <= 6_000);
-  assert.deepEqual(result, {
-    ok: true,
-    mode: "instagram_semantic_delivery_plan",
-    deliveries: [
-      { recipient_id: "ig-user-1", message_id: "mid-3" },
-      { recipient_id: "ig-user-1", message_id: "mid-5" },
-      { recipient_id: "ig-user-1", message_id: "mid-6" },
-      { recipient_id: "ig-user-1", message_id: "mid-8" },
-    ],
+  assert.ok(delays.reduce((total, delay) => total + delay, 0) <= 12_000);
+  assert.ok(result && typeof result === "object" && !Array.isArray(result));
+  const deliveryResult = result as {
+    ok: boolean;
+    mode: string;
+    deliveries: unknown[];
     deliveryExecution: {
-      enabled: true,
-      executed: true,
-      partsAttempted: 5,
-      partsSent: 4,
-      senderActionsAttempted: 4,
-      senderActionsFailed: 0,
-      fallbackToCanonical: false,
-      plannedTotalDelayMs: 10_000,
-      appliedTotalDelayMs: 6_000,
-      maxTotalDelayMs: 6_000,
-    },
-  });
+      enabled: boolean;
+      executed: boolean;
+      partsAttempted: number;
+      partsSent: number;
+      senderActionsAttempted: number;
+      senderActionsFailed: number;
+      fallbackToCanonical: boolean;
+      plannedTotalDelayMs: number;
+      appliedTotalDelayMs: number;
+      maxTotalDelayMs: number;
+      startedAt: string;
+      finishedAt: string;
+      actualTotalMs: number;
+      parts: Array<Record<string, unknown>>;
+    };
+  };
+
+  assert.equal(deliveryResult.ok, true);
+  assert.equal(deliveryResult.mode, "instagram_semantic_delivery_plan");
+  assert.deepEqual(deliveryResult.deliveries, [
+    { recipient_id: "ig-user-1", message_id: "mid-3" },
+    { recipient_id: "ig-user-1", message_id: "mid-5" },
+    { recipient_id: "ig-user-1", message_id: "mid-6" },
+    { recipient_id: "ig-user-1", message_id: "mid-8" },
+  ]);
+  assert.equal(deliveryResult.deliveryExecution.enabled, true);
+  assert.equal(deliveryResult.deliveryExecution.executed, true);
+  assert.equal(deliveryResult.deliveryExecution.partsAttempted, 5);
+  assert.equal(deliveryResult.deliveryExecution.partsSent, 4);
+  assert.equal(deliveryResult.deliveryExecution.senderActionsAttempted, 4);
+  assert.equal(deliveryResult.deliveryExecution.senderActionsFailed, 0);
+  assert.equal(deliveryResult.deliveryExecution.fallbackToCanonical, false);
+  assert.equal(deliveryResult.deliveryExecution.plannedTotalDelayMs, 10_000);
+  assert.equal(deliveryResult.deliveryExecution.maxTotalDelayMs, 12_000);
+  assert.ok(deliveryResult.deliveryExecution.appliedTotalDelayMs >= 10_000);
+  assert.ok(deliveryResult.deliveryExecution.startedAt);
+  assert.ok(deliveryResult.deliveryExecution.finishedAt);
+  assert.equal(deliveryResult.deliveryExecution.parts.length, 5);
+  assert.deepEqual(
+    deliveryResult.deliveryExecution.parts.map((part) => part.kind),
+    ["sender_action", "text", "text", "attachment", "text"],
+  );
+  assert.deepEqual(
+    deliveryResult.deliveryExecution.parts.map((part) => part.reason),
+    ["read_receipt", "greeting_availability", "pricing", "pricing_guide", "team_qualification_question"],
+  );
+  assert.equal(deliveryResult.deliveryExecution.parts[2]?.effectiveDelayMs, 2_000);
+  assert.equal(deliveryResult.deliveryExecution.parts[3]?.effectiveDelayMs, 1_100);
+  assert.equal(deliveryResult.deliveryExecution.parts[4]?.effectiveDelayMs, 1_600);
 });
 
 test("instagram adapter ignores semantic delivery plan when kill switch is enabled", async () => {
