@@ -33,6 +33,8 @@ export type ReplyActionContract = {
   mustMentionPricing: boolean;
   mayMentionGuide: boolean;
   mustMentionGuide: boolean;
+  mustAnswerTeam: boolean;
+  mustAnswerIdentity: boolean;
   mentionPolicy: SimpleWeddingMentionPolicy;
   questionPolicy: SimpleWeddingQuestionPolicy;
   mayAskQuestion: boolean;
@@ -91,6 +93,7 @@ export function buildReplyActionContract(args: {
   const mustMentionBookingConfirmation = Boolean(
     state.bookingConfirmed && state.decisionTrace?.toolCalled === "bookCall",
   );
+  const replyObligations = state.replyObligations ?? state.decisionTrace?.replyObligations ?? [];
 
   return {
     nextStep: state.nextStep,
@@ -106,6 +109,9 @@ export function buildReplyActionContract(args: {
       mentionPolicy.pricing.mode === "same_as_before",
     mayMentionGuide: mentionPolicy.guide.mode !== "skip",
     mustMentionGuide: mentionPolicy.guide.mode !== "skip",
+    mustAnswerTeam: replyObligations.includes("team") || state.decisionTrace?.replyType === "team_answer",
+    mustAnswerIdentity:
+      replyObligations.includes("identity") || state.decisionTrace?.replyType === "identity_answer",
     mentionPolicy,
     questionPolicy,
     mayAskQuestion: Boolean(requiredQuestion),

@@ -79,6 +79,7 @@ export type SimpleWeddingSalesDecisionTrace = {
   missingFields: Array<"names" | "weddingDate" | "location" | "venue" | "callTime" | "email">;
   nextStep: SimpleWeddingSalesNextStep;
   toolCalled?: "checkAvailability" | "checkCalendar" | "bookCall";
+  replyObligations?: SimpleWeddingSalesReplyObligation[];
   replyType:
     | "availability_available"
     | "availability_unavailable"
@@ -100,6 +101,14 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "reply_only";
   reason: string;
 };
+
+export type SimpleWeddingSalesReplyObligation =
+  | "availability"
+  | "pricing"
+  | "guide"
+  | "team"
+  | "identity"
+  | "portfolio";
 
 export type SimpleWeddingSalesReplyMemory = {
   greeted?: boolean;
@@ -225,6 +234,12 @@ export type SimpleWeddingSalesState = {
   decisionTrace?: SimpleWeddingSalesDecisionTrace;
   replyContract?: ReplyActionContract;
   replyGuardResult?: ReplyGuardResult;
+  replyObligations?: SimpleWeddingSalesReplyObligation[];
+  invariantChecks?: Array<{
+    name: string;
+    passed: boolean;
+    reason?: string;
+  }>;
   responseDraft?: string;
   toolObservations: Array<{ toolName: string; result: string }>;
 };
@@ -288,6 +303,8 @@ export function createInitialSimpleWeddingSalesState(args: {
     decisionTrace: args.previousState?.decisionTrace,
     replyContract: args.previousState?.replyContract,
     replyGuardResult: args.previousState?.replyGuardResult,
+    replyObligations: args.previousState?.replyObligations,
+    invariantChecks: args.previousState?.invariantChecks,
     responseDraft: args.previousState?.responseDraft,
     toolObservations: [],
   };

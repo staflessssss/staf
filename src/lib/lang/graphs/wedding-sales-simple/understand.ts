@@ -160,12 +160,12 @@ function normalizeLlmUnderstanding(
       ...heuristic.facts,
       ...llmFacts,
     }),
-    questionsAskedByCustomer: [
+    questionsAskedByCustomer: normalizeQuestionTypes([
       ...new Set([
         ...output.questionsAskedByCustomer,
         ...heuristic.questionsAskedByCustomer,
       ]),
-    ],
+    ], state.latestCustomerMessage),
   });
 }
 
@@ -279,6 +279,27 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
   return [...new Set(questions)];
 }
 
+function normalizeQuestionTypes(
+  types: TurnUnderstanding["questionsAskedByCustomer"],
+  text: string,
+): TurnUnderstanding["questionsAskedByCustomer"] {
+  const normalized = new Set(types);
+  const lower = text.toLowerCase();
+  const isShooterQuestion =
+    /\bwho\b[\s\S]{0,60}\b(?:shoot|shoots|shooter|filming|film|films|filmmaker|videographer)\b/.test(
+      lower,
+    ) ||
+    /\bwho\s+(?:would|will)\s+shoot\b/.test(lower) ||
+    /\blead filmmaker\b/.test(lower);
+
+  if (isShooterQuestion) {
+    normalized.add("team");
+    normalized.delete("identity");
+  }
+
+  return [...normalized];
+}
+
 function inferSenderRole(message: string): TurnUnderstanding["facts"]["senderRole"] {
   const normalized = message.toLowerCase();
 
@@ -310,7 +331,7 @@ export function understandTurnHeuristically(
 ): TurnUnderstanding {
   const message = state.latestCustomerMessage;
   const normalized = message.toLowerCase();
-  const questionsAskedByCustomer = inferQuestions(message);
+  const questionsAskedByCustomer = normalizeQuestionTypes(inferQuestions(message), message);
   const isoDate = extractIsoDate(message);
   const monthDate = extractMonthDate(message);
   const email = extractEmail(message);

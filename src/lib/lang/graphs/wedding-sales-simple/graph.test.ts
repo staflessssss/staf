@@ -64,7 +64,10 @@ test("simple wedding sales runtime checks availability before asking for names",
   assert.equal(result.missingField, "names");
   assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
   assert.equal(result.decisionTrace?.replyType, "availability_available");
-  assert.match(result.decisionTrace?.reason ?? "", /names are the next qualification field/i);
+  assert.match(
+    result.decisionTrace?.reason ?? "",
+    /names are the next qualification field|invariant: reply_only cannot override/i,
+  );
   assert.deepEqual(
     result.toolObservations.map((observation) => observation.toolName),
     ["check_wedding_availability"],
@@ -180,6 +183,57 @@ test("simple wedding sales runtime handles availability pricing and shooter ques
   assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
   assert.match(result.responseDraft ?? "", /both of your names/i);
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
+});
+
+test("simple wedding sales runtime keeps names question after availability pricing and team mixed message", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Hi! Are you available June 15 2027 in Tampa? How much? Who would shoot our wedding?",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        facts: {
+          weddingDate: "2027-06-15",
+          weddingDateText: "June 15 2027",
+          location: "Tampa",
+        },
+        questionsAskedByCustomer: ["availability", "pricing", "identity", "team"],
+      }),
+  });
+
+  assert.equal(result.availability, "available");
+  assert.equal(result.customerName, undefined);
+  assert.equal(result.partnerName, undefined);
+  assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
+  assert.ok(result.decisionTrace?.missingFields.includes("names"));
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.missingField, "names");
+  assert.equal(result.replyContract?.requiredQuestion, "names");
+  assert.equal(result.replyContract?.mayAskQuestion, true);
+  assert.equal(result.replyContract?.mustMentionWeddingAvailability, true);
+  assert.equal(result.replyContract?.mustMentionPricing, true);
+  assert.equal(result.replyContract?.mustAnswerTeam, true);
+  assert.equal(result.replyContract?.mustAnswerIdentity, false);
+  assert.ok(result.replyObligations?.includes("pricing"));
+  assert.ok(result.replyObligations?.includes("guide"));
+  assert.ok(result.replyObligations?.includes("team"));
+  assert.equal(result.replyObligations?.includes("identity"), false);
+  assert.match(
+    result.decisionTrace?.reason ?? "",
+    /invariant: reply_only cannot override missing qualification fields/i,
+  );
+  assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /\$2,950|wedding films start/i);
+  assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /speaking with me here/i);
+  assert.match(result.responseDraft ?? "", /both of your names|your names|couple'?s names/i);
 });
 
 test("simple wedding sales runtime keeps large mixed Instagram reply compact and preserves follow-up state", async () => {

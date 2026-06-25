@@ -2,6 +2,8 @@ import type {
   SimpleWeddingSalesDecisionTrace,
   SimpleWeddingSalesHandoffReason,
   SimpleWeddingSalesNextStep,
+  SimpleWeddingSalesQuestion,
+  SimpleWeddingSalesReplyObligation,
   SimpleWeddingSalesState,
 } from "./state";
 
@@ -11,6 +13,63 @@ function hasNames(state: SimpleWeddingSalesState) {
 
 function hasQuestion(state: SimpleWeddingSalesState) {
   return state.questionsAskedByCustomer.length > 0;
+}
+
+function getReplyObligations(
+  questions: SimpleWeddingSalesQuestion[],
+  latestCustomerMessage = "",
+): SimpleWeddingSalesReplyObligation[] {
+  const obligations = new Set<SimpleWeddingSalesReplyObligation>();
+  const normalizedQuestions = normalizeQuestionsForDecision(questions, latestCustomerMessage);
+
+  if (normalizedQuestions.includes("availability")) {
+    obligations.add("availability");
+  }
+
+  if (normalizedQuestions.includes("pricing")) {
+    obligations.add("pricing");
+    obligations.add("guide");
+  }
+
+  if (normalizedQuestions.includes("package_inclusions")) {
+    obligations.add("pricing");
+    obligations.add("guide");
+  }
+
+  if (normalizedQuestions.includes("team")) {
+    obligations.add("team");
+  }
+
+  if (normalizedQuestions.includes("identity")) {
+    obligations.add("identity");
+  }
+
+  if (normalizedQuestions.includes("portfolio")) {
+    obligations.add("portfolio");
+  }
+
+  return [...obligations];
+}
+
+function normalizeQuestionsForDecision(
+  questions: SimpleWeddingSalesQuestion[],
+  latestCustomerMessage: string,
+) {
+  const normalized = new Set(questions);
+  const lower = latestCustomerMessage.toLowerCase();
+  const isShooterQuestion =
+    /\bwho\b[\s\S]{0,60}\b(?:shoot|shoots|shooter|filming|film|films|filmmaker|videographer)\b/.test(
+      lower,
+    ) ||
+    /\bwho\s+(?:would|will)\s+shoot\b/.test(lower) ||
+    /\blead filmmaker\b/.test(lower);
+
+  if (isShooterQuestion) {
+    normalized.add("team");
+    normalized.delete("identity");
+  }
+
+  return [...normalized];
 }
 
 function answeredPreviousRequiredQuestion(state: SimpleWeddingSalesState) {
@@ -152,6 +211,10 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   statePatch?: Partial<SimpleWeddingSalesState>;
   trace: SimpleWeddingSalesDecisionTrace;
 } {
+  const replyObligations = getReplyObligations(
+    state.questionsAskedByCustomer,
+    state.latestCustomerMessage,
+  );
   const traceBase = {
     extractedFacts: state.lastUnderstanding?.facts ?? {},
     missingFields: getMissingFields(state),
@@ -162,6 +225,11 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     mode?: SimpleWeddingSalesState["mode"];
     handoffReason?: SimpleWeddingSalesHandoffReason;
     statePatch?: Partial<SimpleWeddingSalesState>;
+    invariantCheck?: {
+      name: string;
+      passed: boolean;
+      reason?: string;
+    };
     replyType: SimpleWeddingSalesDecisionTrace["replyType"];
     reason: string;
   }) => ({
@@ -169,11 +237,18 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     missingField: args.missingField,
     mode: args.mode,
     handoffReason: args.handoffReason,
-    statePatch: args.statePatch,
+    statePatch: {
+      ...args.statePatch,
+      replyObligations,
+      invariantChecks: args.invariantCheck
+        ? [...(state.invariantChecks ?? []), args.invariantCheck]
+        : state.invariantChecks,
+    },
     trace: {
       ...traceBase,
       nextStep: args.nextStep,
       replyType: args.replyType,
+      replyObligations,
       reason: args.reason,
     },
   });
@@ -196,6 +271,53 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   const checkedAvailabilityThisTurn = state.toolObservations.some(
     (observation) => observation.toolName === "check_wedding_availability",
   );
+
+  if (checkedAvailabilityThisTurn && availability === "available") {
+    const missingFields = getMissingFields(state);
+    const firstMissing = missingFields[0];
+
+    if (firstMissing) {
+      if (firstMissing === "names" || firstMissing === "weddingDate" || firstMissing === "location") {
+        return decision({
+          nextStep: "ask_missing_info",
+          missingField: firstMissing,
+          replyType: "availability_available",
+          reason:
+            "invariant: reply_only cannot override missing qualification fields after successful availability check",
+          invariantCheck: {
+            name: "reply_only_cannot_override_missing_fields_after_availability",
+            passed: true,
+          },
+        });
+      }
+
+      if (firstMissing === "venue") {
+        return decision({
+          nextStep: "ask_venue",
+          replyType: "ask_venue",
+          reason:
+            "invariant: availability checked and venue is the next missing qualification field",
+          invariantCheck: {
+            name: "reply_only_cannot_override_missing_fields_after_availability",
+            passed: true,
+          },
+        });
+      }
+
+      if (firstMissing === "callTime") {
+        return decision({
+          nextStep: "ask_call_time",
+          replyType: "ask_call_time",
+          reason:
+            "invariant: availability checked and call time is the next missing qualification field",
+          invariantCheck: {
+            name: "reply_only_cannot_override_missing_fields_after_availability",
+            passed: true,
+          },
+        });
+      }
+    }
+  }
 
   if (
     state.questionsAskedByCustomer.includes("team") &&
