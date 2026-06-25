@@ -67,7 +67,10 @@ import type {
   WeddingSalesSimpleSafetyLogEntry,
 } from "@/lib/agents/wedding-sales-simple/contracts";
 import type { ChannelDeliveryPlan } from "@/lib/agents/wedding-sales-simple/delivery-plan";
-import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
+import {
+  loadWeddingSalesSimpleStateWithDb,
+  saveWeddingSalesSimpleStateWithDb,
+} from "@/lib/agents/wedding-sales-simple/state-store";
 
 type LightweightKnowledgeBlock = {
   name: string;
@@ -269,7 +272,6 @@ type LangGraphToolObservation = {
 };
 
 const WEDDING_SALES_TEST_STATE_TOOL_NAME = "__wedding_sales_state";
-const WEDDING_SALES_SIMPLE_STATE_TOOL_NAME = "__wedding_sales_simple_state";
 const WEDDING_SALES_SIMPLE_SAFETY_LOG_TOOL_NAME = "__wedding_sales_simple_safety_log";
 
 function getWeddingSalesOwnerHandoffReason(state: WeddingSalesState) {
@@ -353,61 +355,6 @@ async function recordLangGraphToolObservationsWithDb(args: {
         toolResult: parseLangGraphToolResult(observation.result),
         model: "langgraph_wedding_sales",
       },
-    });
-  }
-}
-
-function parseSimpleWeddingSalesState(value: unknown): Partial<SimpleWeddingSalesState> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const maybeState = value as { state?: unknown };
-  const state = maybeState.state ?? value;
-
-  return state && typeof state === "object" && !Array.isArray(state)
-    ? (state as Partial<SimpleWeddingSalesState>)
-    : undefined;
-}
-
-async function loadWeddingSalesSimpleStateWithDb(args: {
-  database: typeof db;
-  conversationId: string;
-}) {
-  const stateMessage = await args.database.message.findFirst({
-    where: {
-      conversationId: args.conversationId,
-      role: MessageRole.TOOL,
-      toolName: WEDDING_SALES_SIMPLE_STATE_TOOL_NAME,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-
-  return parseSimpleWeddingSalesState(stateMessage?.toolResult);
-}
-
-async function saveWeddingSalesSimpleStateWithDb(args: {
-  database: typeof db;
-  conversationId: string;
-  state: SimpleWeddingSalesState;
-}) {
-  await args.database.message.create({
-    data: {
-      conversationId: args.conversationId,
-      role: MessageRole.TOOL,
-      toolName: WEDDING_SALES_SIMPLE_STATE_TOOL_NAME,
-      content: `wedding-sales-simple state: ${args.state.mode}`,
-      toolResult: { state: args.state },
-      model: "wedding_sales_simple",
-    },
-  });
-
-  if (args.state.mode === "bot_paused") {
-    await args.database.conversation.update({
-      where: { id: args.conversationId },
-      data: { status: ConversationStatus.ESCALATED },
     });
   }
 }

@@ -14,6 +14,11 @@ import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
+import {
+  pauseWeddingSalesSimpleStateForConversation,
+  recordOwnerReplyInWeddingSalesSimpleState,
+  resumeWeddingSalesSimpleStateForConversation,
+} from "@/lib/agents/wedding-sales-simple/state-store";
 
 export const OWNER_HANDOFF_REQUEST_TOOL_NAME = "owner_handoff_request";
 export const OWNER_HANDOFF_RESPONSE_TOOL_NAME = "owner_handoff_response";
@@ -417,6 +422,11 @@ export async function requestOwnerHandoffWithDb(args: {
       },
     });
   }
+  await pauseWeddingSalesSimpleStateForConversation({
+    database: args.database,
+    conversationId: conversation.id,
+    handoffReason: "unanswered_business_question",
+  });
 
   return {
     status: "owner_handoff_requested" as const,
@@ -495,6 +505,11 @@ async function sendReplyThroughConversationChannel(args: {
         toolInput: replyContext,
       },
     ],
+  });
+  await recordOwnerReplyInWeddingSalesSimpleState({
+    conversationId: conversation.id,
+    text: args.text,
+    source: "telegram_owner",
   });
 
   return conversation;
@@ -602,6 +617,10 @@ export async function handleOwnerTelegramCommand(args: {
       where: { id: conversation.id },
       data: { status: ConversationStatus.ESCALATED },
     });
+    await pauseWeddingSalesSimpleStateForConversation({
+      conversationId: conversation.id,
+      handoffReason: "unanswered_business_question",
+    });
 
     return {
       message: `Manual takeover is active for conversation ${conversation.id}.`,
@@ -626,6 +645,9 @@ export async function handleOwnerTelegramCommand(args: {
     await db.conversation.update({
       where: { id: conversation.id },
       data: { status: ConversationStatus.ACTIVE },
+    });
+    await resumeWeddingSalesSimpleStateForConversation({
+      conversationId: conversation.id,
     });
 
     return {
@@ -683,6 +705,10 @@ export async function handleOwnerTelegramCallback(args: {
       where: { id: conversation.id },
       data: { status: ConversationStatus.ESCALATED },
     });
+    await pauseWeddingSalesSimpleStateForConversation({
+      conversationId: conversation.id,
+      handoffReason: "unanswered_business_question",
+    });
 
     return {
       message: `Manual takeover is active for conversation ${conversation.id}.`,
@@ -693,6 +719,9 @@ export async function handleOwnerTelegramCallback(args: {
   await db.conversation.update({
     where: { id: conversation.id },
     data: { status: ConversationStatus.ACTIVE },
+  });
+  await resumeWeddingSalesSimpleStateForConversation({
+    conversationId: conversation.id,
   });
 
   return {

@@ -380,7 +380,7 @@ function fallbackClarificationLine() {
 }
 
 function handoffLine() {
-  return "I want to make sure I answer this correctly, so I’ll have someone take a look.";
+  return "Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍";
 }
 
 function renderSafeTemplate(args: {

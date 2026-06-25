@@ -153,7 +153,7 @@ function fallbackQuestion(state: SimpleWeddingSalesState) {
     return "What are both of your names?";
   }
 
-  return "I want to make sure I answer this correctly, so I will have someone take a look.";
+  return "Good question - let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍";
 }
 
 export function writeHumanReply(args: {
@@ -175,7 +175,7 @@ export function writeHumanReply(args: {
   const { state } = args;
 
   if (state.nextStep === "handoff") {
-    return "I want to make sure I answer this correctly, so I will have someone take a look.";
+    return "Good question - let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍";
   }
 
   const body = joinLines([

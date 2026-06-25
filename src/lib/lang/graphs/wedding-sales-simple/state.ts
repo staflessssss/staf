@@ -163,6 +163,16 @@ export type SimpleWeddingSalesReplyMemory = {
     complimentedVenue?: string;
     lastCtaText?: string;
   };
+  manualIntervention?: {
+    lastOwnerReplyText?: string;
+    lastOwnerReplyAt?: string;
+    source?: "telegram_owner";
+    manualReplies?: Array<{
+      text: string;
+      source: "telegram_owner";
+      sentAt: string;
+    }>;
+  };
   lastReplyType?: SimpleWeddingSalesDecisionTrace["replyType"];
   lastRequiredQuestion?: string;
   lastOutboundText?: string;
