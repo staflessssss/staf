@@ -1738,6 +1738,7 @@ test("handleIncomingEventWithDeps auto-replies through the channel adapter when 
     subject: "Question",
     attachments: undefined,
     channelConfig: {},
+    channelDeliveryPlan: undefined,
   });
   assert.ok(invokeAgentArgs);
   const capturedInvokeAgentArgs = invokeAgentArgs as {
@@ -1748,6 +1749,116 @@ test("handleIncomingEventWithDeps auto-replies through the channel adapter when 
   assert.equal(capturedInvokeAgentArgs.messageId, "message-1");
   assert.equal(capturedInvokeAgentArgs.threadId, "thread-1");
   assert.equal(capturedInvokeAgentArgs.subject, "Question");
+});
+
+test("handleIncomingEventWithDeps passes channel delivery plan and records execution in safety log", async () => {
+  let sendReplyArgs: Record<string, unknown> | null = null;
+  let updatedSafetyLog: Record<string, unknown> | null = null;
+  const channelDeliveryPlan = {
+    channel: "instagram",
+    enabled: true,
+    mode: "semantic_split",
+    parts: [],
+    textPartCount: 0,
+    totalDelayMs: 0,
+    guardResult: { ok: true },
+  };
+  const deliveryExecution = {
+    enabled: true,
+    executed: true,
+    partsAttempted: 5,
+    partsSent: 4,
+    senderActionsAttempted: 4,
+    senderActionsFailed: 0,
+    fallbackToCanonical: false,
+    plannedTotalDelayMs: 10_000,
+    appliedTotalDelayMs: 6_000,
+    maxTotalDelayMs: 6_000,
+  };
+
+  await aiRuntimeTestHelpers.handleIncomingEventWithDeps(
+    {
+      agentId: "agent-1",
+      channel: "TELEGRAM" as never,
+      payload: { text: "hello" },
+    },
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({
+            id: "agent-1",
+            tenantId: "tenant-1",
+            channelConfig: {},
+            channel: {
+              type: "TELEGRAM",
+              credentialsEnc: "encrypted-credentials",
+            },
+          }),
+        },
+        message: {
+          findFirst: async (args: { where?: { toolName?: string } }) =>
+            args.where?.toolName === "__wedding_sales_simple_safety_log"
+              ? {
+                  id: "safety-log-1",
+                  toolResult: {
+                    inboundText: "hello",
+                    outboundText: "Agent reply",
+                  },
+                }
+              : null,
+          update: async (args: { data: { toolResult: Record<string, unknown> } }) => {
+            updatedSafetyLog = args.data.toolResult;
+            return {};
+          },
+        },
+        conversation: {
+          findUnique: async () => ({
+            id: "conv-active",
+            status: ConversationStatus.ACTIVE,
+          }),
+        },
+        delayedDelivery: {
+          updateMany: async () => ({ count: 0 }),
+          create: async () => ({ id: "delivery-1" }),
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      invokeAgent: async () => ({
+        message: "Agent reply",
+        promptPreview: "preview",
+        usedTooling: [],
+        conversationId: "conv-active",
+        model: "wedding_sales_simple",
+        channelDeliveryPlan: channelDeliveryPlan as never,
+      }),
+      getChannelAdapter: () =>
+        ({
+          parseIncoming: () => ({
+            contactId: "contact-1",
+            message: "hello",
+          }),
+          formatReply: (text: string) => text,
+          sendReply: async (args: Record<string, unknown>) => {
+            sendReplyArgs = args;
+            return {
+              ok: true,
+              mode: "instagram_semantic_delivery_plan",
+              deliveries: [{ message_id: "mid-1" }],
+              deliveryExecution,
+            };
+          },
+        }) as never,
+      sleep: async () => {},
+    },
+  );
+
+  assert.ok(sendReplyArgs);
+  assert.deepEqual(sendReplyArgs.channelDeliveryPlan, channelDeliveryPlan);
+  assert.deepEqual(updatedSafetyLog, {
+    inboundText: "hello",
+    outboundText: "Agent reply",
+    deliveryExecution,
+  });
 });
 
 test("handleIncomingEventWithDeps routes Gmail through wedding sales graph when runtime flag is enabled", async () => {
@@ -2364,6 +2475,7 @@ test("handleIncomingEventWithDeps strips outbound attachments when Messages disa
         followUpRules: [],
       },
     },
+    channelDeliveryPlan: undefined,
   });
 });
 

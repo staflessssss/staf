@@ -2,6 +2,11 @@ import {
   readMessageBehaviorConfig,
   splitOutgoingMessage,
 } from "@/lib/channels/message-behavior";
+import type {
+  InstagramDeliveryPlan,
+  InstagramDeliveryPart,
+} from "@/lib/agents/wedding-sales-simple/delivery-plan";
+import type { WeddingSalesSimpleDeliveryExecution } from "@/lib/agents/wedding-sales-simple/contracts";
 
 type InstagramCredentials = {
   pageAccessToken: string;
@@ -46,6 +51,8 @@ type InstagramAttachment = {
   fileName?: string;
   mimeType?: string;
 };
+
+const INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS = 6_000;
 
 function wait(ms: number) {
   return new Promise((resolve) => {
@@ -203,12 +210,189 @@ async function sendInstagramMessage(args: {
   return payload;
 }
 
+async function sendInstagramSenderAction(args: {
+  credentials: InstagramCredentials;
+  contactId: string;
+  action: Extract<InstagramDeliveryPart, { kind: "sender_action" }>["action"];
+}) {
+  const senderId = args.credentials.igUserId ?? args.credentials.igBusinessAccountId ?? args.credentials.pageId ?? "me";
+  const graphHost = args.credentials.igUserId || args.credentials.igBusinessAccountId
+    ? "https://graph.instagram.com"
+    : "https://graph.facebook.com";
+  const response = await fetch(
+    `${graphHost}/${args.credentials.graphApiVersion}/${senderId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${args.credentials.pageAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recipient: {
+          id: args.contactId,
+        },
+        sender_action: args.action,
+      }),
+    },
+  );
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const errorMessage =
+      payload && typeof payload === "object" && "error" in payload
+        ? JSON.stringify(payload.error)
+        : `Meta sender action failed with ${response.status}.`;
+
+    throw new Error(errorMessage);
+  }
+
+  return payload;
+}
+
 function getImageAttachments(attachments?: InstagramAttachment[]) {
   return (attachments ?? []).filter((attachment) => {
     const mimeType = attachment.mimeType?.toLowerCase() ?? "";
 
     return Boolean(attachment.publicUrl?.trim()) && (!mimeType || mimeType.startsWith("image/"));
   });
+}
+
+function readSemanticDeliveryPlan(value: unknown): InstagramDeliveryPlan | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const plan = value as InstagramDeliveryPlan;
+
+  if (
+    plan.channel !== "instagram" ||
+    plan.mode !== "semantic_split" ||
+    plan.enabled !== true ||
+    !Array.isArray(plan.parts)
+  ) {
+    return null;
+  }
+
+  return plan;
+}
+
+async function executeInstagramDeliveryPlan(args: {
+  credentials: InstagramCredentials;
+  contactId: string;
+  plan: InstagramDeliveryPlan;
+}) {
+  const deliveries = [];
+  const warnings: string[] = [];
+  const plannedTotalDelayMs = args.plan.totalDelayMs;
+  const delayScale =
+    plannedTotalDelayMs > INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS
+      ? INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS / plannedTotalDelayMs
+      : 1;
+  let appliedTotalDelayMs = 0;
+  let partsSent = 0;
+  let senderActionsAttempted = 0;
+  let senderActionsFailed = 0;
+
+  const scaledWait = async (delayMs: number) => {
+    const scaledDelayMs = Math.max(0, Math.round(delayMs * delayScale));
+
+    if (scaledDelayMs > 0) {
+      appliedTotalDelayMs += scaledDelayMs;
+      await wait(scaledDelayMs);
+    }
+  };
+
+  for (const part of args.plan.parts) {
+    if (part.kind === "sender_action") {
+      senderActionsAttempted += 1;
+      await scaledWait(part.delayMsBefore);
+
+      try {
+        await sendInstagramSenderAction({
+          credentials: args.credentials,
+          contactId: args.contactId,
+          action: part.action,
+        });
+      } catch (error) {
+        senderActionsFailed += 1;
+        warnings.push(error instanceof Error ? error.message : "instagram_sender_action_failed");
+      }
+
+      continue;
+    }
+
+    if (part.kind === "text") {
+      await scaledWait(part.delayMsBefore);
+
+      try {
+        senderActionsAttempted += 1;
+        await sendInstagramSenderAction({
+          credentials: args.credentials,
+          contactId: args.contactId,
+          action: "typing_on",
+        });
+      } catch (error) {
+        senderActionsFailed += 1;
+        warnings.push(error instanceof Error ? error.message : "instagram_typing_action_failed");
+      }
+
+      await scaledWait(part.typingMsBefore);
+
+      const payload = await sendInstagramMessage({
+        credentials: args.credentials,
+        contactId: args.contactId,
+        message: {
+          text: part.text,
+        },
+      });
+      deliveries.push(payload);
+      partsSent += 1;
+      continue;
+    }
+
+    await scaledWait(part.delayMsBefore);
+
+    if (part.attachment.type !== "image") {
+      warnings.push(`unsupported_instagram_attachment:${part.attachment.type}`);
+      continue;
+    }
+
+    const payload = await sendInstagramMessage({
+      credentials: args.credentials,
+      contactId: args.contactId,
+      message: {
+        attachment: {
+          type: "image",
+          payload: {
+            url: part.attachment.url,
+          },
+        },
+      },
+    });
+    deliveries.push(payload);
+    partsSent += 1;
+  }
+
+  const deliveryExecution: WeddingSalesSimpleDeliveryExecution = {
+    enabled: true,
+    executed: true,
+    partsAttempted: args.plan.parts.length,
+    partsSent,
+    senderActionsAttempted,
+    senderActionsFailed,
+    fallbackToCanonical: false,
+    plannedTotalDelayMs,
+    appliedTotalDelayMs,
+    maxTotalDelayMs: INSTAGRAM_SEMANTIC_DELIVERY_MAX_TOTAL_DELAY_MS,
+    ...(warnings.length > 0 ? { warnings } : {}),
+  };
+
+  return {
+    ok: true,
+    mode: "instagram_semantic_delivery_plan",
+    deliveries,
+    deliveryExecution,
+  };
 }
 
 export const instagramAdapter = {
@@ -240,11 +424,25 @@ export const instagramAdapter = {
     message: string | string[] | { text: string; html?: string };
     attachments?: InstagramAttachment[];
     channelConfig?: unknown;
+    channelDeliveryPlan?: unknown;
   }) => {
     const credentials = parseInstagramCredentials(params.credentials);
 
     if (!credentials.pageAccessToken) {
       throw new Error("Instagram connection is missing an access token.");
+    }
+
+    const semanticPlan = readSemanticDeliveryPlan(params.channelDeliveryPlan);
+
+    if (
+      semanticPlan &&
+      process.env.DISABLE_INSTAGRAM_SEMANTIC_DELIVERY_PLAN !== "true"
+    ) {
+      return executeInstagramDeliveryPlan({
+        credentials,
+        contactId: params.contactId,
+        plan: semanticPlan,
+      });
     }
 
     const messageParts = getTextPayload(params.message).filter((part) => part.trim());

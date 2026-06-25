@@ -5,10 +5,16 @@ import { instagramAdapter, parseInstagramCredentials } from "@/lib/channels/inst
 
 const originalFetch = global.fetch;
 const originalSetTimeout = global.setTimeout;
+const originalDisableSemanticDeliveryPlan = process.env.DISABLE_INSTAGRAM_SEMANTIC_DELIVERY_PLAN;
 
 afterEach(() => {
   global.fetch = originalFetch;
   global.setTimeout = originalSetTimeout;
+  if (originalDisableSemanticDeliveryPlan === undefined) {
+    delete process.env.DISABLE_INSTAGRAM_SEMANTIC_DELIVERY_PLAN;
+  } else {
+    process.env.DISABLE_INSTAGRAM_SEMANTIC_DELIVERY_PLAN = originalDisableSemanticDeliveryPlan;
+  }
 });
 
 test("parseInstagramCredentials accepts JSON credentials", () => {
@@ -325,4 +331,179 @@ test("instagram adapter waits between split message parts when configured", asyn
   });
 
   assert.deepEqual(delays, [2000, 2000]);
+});
+
+test("instagram adapter executes semantic delivery plan with sender actions and content parts", async () => {
+  const requestBodies: unknown[] = [];
+  const delays: number[] = [];
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    requestBodies.push(body);
+
+    return {
+      ok: true,
+      json: async () =>
+        "message" in body
+          ? { recipient_id: "ig-user-1", message_id: `mid-${requestBodies.length}` }
+          : { recipient_id: "ig-user-1" },
+    } as Response;
+  }) as typeof fetch;
+  global.setTimeout = ((handler: TimerHandler, timeout?: number) => {
+    delays.push(Number(timeout ?? 0));
+
+    if (typeof handler === "function") {
+      handler();
+    }
+
+    return 0 as never;
+  }) as unknown as typeof setTimeout;
+
+  const result = await instagramAdapter.sendReply({
+    credentials: JSON.stringify({
+      instagramUserAccessToken: "ig-token",
+      igUserId: "ig-professional-account",
+      graphApiVersion: "v25.0",
+    }),
+    contactId: "ig-user-1",
+    message: "Canonical should not send",
+    channelDeliveryPlan: {
+      channel: "instagram",
+      enabled: true,
+      mode: "semantic_split",
+      textPartCount: 3,
+      totalDelayMs: 10_000,
+      guardResult: { ok: true },
+      parts: [
+        {
+          kind: "sender_action",
+          action: "mark_seen",
+          reason: "read_receipt",
+          delayMsBefore: 500,
+        },
+        {
+          kind: "text",
+          reason: "greeting_availability",
+          text: "Greeting and availability",
+          delayMsBefore: 0,
+          typingMsBefore: 2_000,
+        },
+        {
+          kind: "text",
+          reason: "pricing",
+          text: "Pricing",
+          delayMsBefore: 2_000,
+          typingMsBefore: 2_000,
+        },
+        {
+          kind: "attachment",
+          reason: "pricing_guide",
+          delayMsBefore: 1_000,
+          attachment: {
+            type: "image",
+            url: "https://example.com/guide.png",
+            label: "guide.png",
+            purpose: "pricing_guide",
+          },
+        },
+        {
+          kind: "text",
+          reason: "team_qualification_question",
+          text: "Team and names question",
+          delayMsBefore: 500,
+          typingMsBefore: 2_000,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(
+    requestBodies.map((body) =>
+      typeof body === "object" && body && "sender_action" in body
+        ? (body as { sender_action: string }).sender_action
+        : (body as { message?: { text?: string; attachment?: unknown } }).message?.text ?? "attachment",
+    ),
+    [
+      "mark_seen",
+      "typing_on",
+      "Greeting and availability",
+      "typing_on",
+      "Pricing",
+      "attachment",
+      "typing_on",
+      "Team and names question",
+    ],
+  );
+  assert.ok(delays.reduce((total, delay) => total + delay, 0) <= 6_000);
+  assert.deepEqual(result, {
+    ok: true,
+    mode: "instagram_semantic_delivery_plan",
+    deliveries: [
+      { recipient_id: "ig-user-1", message_id: "mid-3" },
+      { recipient_id: "ig-user-1", message_id: "mid-5" },
+      { recipient_id: "ig-user-1", message_id: "mid-6" },
+      { recipient_id: "ig-user-1", message_id: "mid-8" },
+    ],
+    deliveryExecution: {
+      enabled: true,
+      executed: true,
+      partsAttempted: 5,
+      partsSent: 4,
+      senderActionsAttempted: 4,
+      senderActionsFailed: 0,
+      fallbackToCanonical: false,
+      plannedTotalDelayMs: 10_000,
+      appliedTotalDelayMs: 6_000,
+      maxTotalDelayMs: 6_000,
+    },
+  });
+});
+
+test("instagram adapter ignores semantic delivery plan when kill switch is enabled", async () => {
+  const requestBodies: unknown[] = [];
+  process.env.DISABLE_INSTAGRAM_SEMANTIC_DELIVERY_PLAN = "true";
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")));
+
+    return {
+      ok: true,
+      json: async () => ({ recipient_id: "ig-user-1", message_id: "mid-1" }),
+    } as Response;
+  }) as typeof fetch;
+
+  await instagramAdapter.sendReply({
+    credentials: "page-token",
+    contactId: "ig-user-1",
+    message: "Canonical",
+    channelDeliveryPlan: {
+      channel: "instagram",
+      enabled: true,
+      mode: "semantic_split",
+      textPartCount: 1,
+      totalDelayMs: 0,
+      guardResult: { ok: true },
+      parts: [
+        {
+          kind: "text",
+          reason: "single_reply",
+          text: "Semantic",
+          delayMsBefore: 0,
+          typingMsBefore: 0,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(requestBodies, [
+    {
+      recipient: {
+        id: "ig-user-1",
+      },
+      messaging_type: "RESPONSE",
+      message: {
+        text: "Canonical",
+      },
+    },
+  ]);
 });

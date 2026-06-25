@@ -37,6 +37,31 @@ export type NormalizedWeddingSalesOutboundMessage = {
   channelDeliveryPlan?: ChannelDeliveryPlan;
 };
 
+export type WeddingSalesSimpleDeliveryExecution =
+  | {
+      enabled: false;
+      executed: false;
+      reason:
+        | "feature_flag_off"
+        | "not_instagram"
+        | "not_semantic_split"
+        | "kill_switch"
+        | "missing_plan";
+    }
+  | {
+      enabled: true;
+      executed: true;
+      partsAttempted: number;
+      partsSent: number;
+      senderActionsAttempted: number;
+      senderActionsFailed: number;
+      fallbackToCanonical: false;
+      plannedTotalDelayMs: number;
+      appliedTotalDelayMs: number;
+      maxTotalDelayMs: number;
+      warnings?: string[];
+    };
+
 export type WeddingSalesSimpleSafetyLogEntry = {
   inboundText: string;
   outboundText: string;
@@ -46,6 +71,7 @@ export type WeddingSalesSimpleSafetyLogEntry = {
   attachments?: NormalizedWeddingSalesOutboundMessage["attachments"];
   channelDeliveryPlan?: ChannelDeliveryPlan;
   deliveryPlanGuard?: DeliveryPlanGuardResult;
+  deliveryExecution?: WeddingSalesSimpleDeliveryExecution;
   knowledgeSummary?: {
     hasPricing: boolean;
     startPrice?: string;

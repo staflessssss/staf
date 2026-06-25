@@ -63,8 +63,10 @@ import { invokeWeddingSalesSimpleAdapter } from "@/lib/agents/wedding-sales-simp
 import type {
   NormalizedWeddingSalesIncomingMessage,
   NormalizedWeddingSalesOutboundMessage,
+  WeddingSalesSimpleDeliveryExecution,
   WeddingSalesSimpleSafetyLogEntry,
 } from "@/lib/agents/wedding-sales-simple/contracts";
+import type { ChannelDeliveryPlan } from "@/lib/agents/wedding-sales-simple/delivery-plan";
 import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
 
 type LightweightKnowledgeBlock = {
@@ -198,6 +200,7 @@ type RuntimeChannelAdapter = {
     subject?: string;
     attachments?: RuntimeAttachment[];
     channelConfig?: unknown;
+    channelDeliveryPlan?: ChannelDeliveryPlan;
   }) => Promise<unknown>;
 };
 
@@ -284,6 +287,7 @@ export type InvokeAgentResult = {
   conversationId?: string;
   model?: string;
   attachments?: RuntimeAttachment[];
+  channelDeliveryPlan?: ChannelDeliveryPlan;
   historyAppend?: RuntimeHistoryMessage[];
   suppressReply?: boolean;
 };
@@ -421,6 +425,63 @@ async function recordWeddingSalesSimpleSafetyLogWithDb(args: {
       content: `wedding-sales-simple: ${args.entry.decisionTrace?.replyType ?? "unknown"}`,
       toolResult: args.entry,
       model: "wedding_sales_simple",
+    },
+  });
+}
+
+function extractWeddingSalesSimpleDeliveryExecution(
+  delivery: unknown,
+): WeddingSalesSimpleDeliveryExecution | undefined {
+  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
+    return undefined;
+  }
+
+  const execution = (delivery as { deliveryExecution?: unknown }).deliveryExecution;
+
+  if (!execution || typeof execution !== "object" || Array.isArray(execution)) {
+    return undefined;
+  }
+
+  return execution as WeddingSalesSimpleDeliveryExecution;
+}
+
+async function updateLatestWeddingSalesSimpleSafetyLogDeliveryExecution(args: {
+  database: typeof db;
+  conversationId: string;
+  deliveryExecution?: WeddingSalesSimpleDeliveryExecution;
+}) {
+  if (!args.deliveryExecution) {
+    return;
+  }
+
+  const safetyLog = await args.database.message.findFirst({
+    where: {
+      conversationId: args.conversationId,
+      role: MessageRole.TOOL,
+      toolName: WEDDING_SALES_SIMPLE_SAFETY_LOG_TOOL_NAME,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      id: true,
+      toolResult: true,
+    },
+  });
+
+  if (!safetyLog?.toolResult || typeof safetyLog.toolResult !== "object" || Array.isArray(safetyLog.toolResult)) {
+    return;
+  }
+
+  await args.database.message.update({
+    where: {
+      id: safetyLog.id,
+    },
+    data: {
+      toolResult: {
+        ...(safetyLog.toolResult as Record<string, unknown>),
+        deliveryExecution: args.deliveryExecution,
+      },
     },
   });
 }
@@ -2026,6 +2087,7 @@ async function runWeddingSalesSimpleRuntime(args: {
     conversationId: conversation.id,
     model: "wedding_sales_simple",
     attachments: getSimpleWeddingSalesAttachments(adapterResult.outbound.attachments),
+    channelDeliveryPlan: adapterResult.outbound.channelDeliveryPlan,
   };
 }
 
@@ -3123,6 +3185,7 @@ async function handleIncomingEventWithDeps(
         ? result.attachments
         : undefined,
     channelConfig: outboundChannelConfig,
+    channelDeliveryPlan: result.channelDeliveryPlan,
   });
 
   if (args.channel === ChannelType.INSTAGRAM && result.conversationId) {
@@ -3130,6 +3193,14 @@ async function handleIncomingEventWithDeps(
       database: deps.db,
       conversationId: result.conversationId,
       delivery,
+    });
+  }
+
+  if (result.model === "wedding_sales_simple" && result.conversationId) {
+    await updateLatestWeddingSalesSimpleSafetyLogDeliveryExecution({
+      database: deps.db,
+      conversationId: result.conversationId,
+      deliveryExecution: extractWeddingSalesSimpleDeliveryExecution(delivery),
     });
   }
 
