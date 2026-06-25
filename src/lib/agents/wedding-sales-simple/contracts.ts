@@ -56,6 +56,7 @@ export type WeddingSalesSimpleDeliveryExecution =
       senderActionsAttempted: number;
       senderActionsFailed: number;
       fallbackToCanonical: false;
+      pacing: "fast" | "human" | "slow";
       plannedTotalDelayMs: number;
       appliedTotalDelayMs: number;
       maxTotalDelayMs: number;

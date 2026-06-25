@@ -1771,6 +1771,7 @@ test("handleIncomingEventWithDeps passes channel delivery plan and records execu
     senderActionsAttempted: 4,
     senderActionsFailed: 0,
     fallbackToCanonical: false,
+    pacing: "slow",
     plannedTotalDelayMs: 10_000,
     appliedTotalDelayMs: 10_500,
     maxTotalDelayMs: 12_000,

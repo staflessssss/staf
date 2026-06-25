@@ -434,7 +434,7 @@ test("instagram adapter executes semantic delivery plan with sender actions and 
       "Team and names question",
     ],
   );
-  assert.ok(delays.reduce((total, delay) => total + delay, 0) <= 12_000);
+  assert.ok(delays.reduce((total, delay) => total + delay, 0) <= 31_000);
   assert.ok(result && typeof result === "object" && !Array.isArray(result));
   const deliveryResult = result as {
     ok: boolean;
@@ -448,6 +448,7 @@ test("instagram adapter executes semantic delivery plan with sender actions and 
       senderActionsAttempted: number;
       senderActionsFailed: number;
       fallbackToCanonical: boolean;
+      pacing: string;
       plannedTotalDelayMs: number;
       appliedTotalDelayMs: number;
       maxTotalDelayMs: number;
@@ -473,9 +474,10 @@ test("instagram adapter executes semantic delivery plan with sender actions and 
   assert.equal(deliveryResult.deliveryExecution.senderActionsAttempted, 4);
   assert.equal(deliveryResult.deliveryExecution.senderActionsFailed, 0);
   assert.equal(deliveryResult.deliveryExecution.fallbackToCanonical, false);
+  assert.equal(deliveryResult.deliveryExecution.pacing, "slow");
   assert.equal(deliveryResult.deliveryExecution.plannedTotalDelayMs, 10_000);
-  assert.equal(deliveryResult.deliveryExecution.maxTotalDelayMs, 12_000);
-  assert.ok(deliveryResult.deliveryExecution.appliedTotalDelayMs >= 10_000);
+  assert.equal(deliveryResult.deliveryExecution.maxTotalDelayMs, 31_000);
+  assert.ok(deliveryResult.deliveryExecution.appliedTotalDelayMs >= 24_000);
   assert.ok(deliveryResult.deliveryExecution.startedAt);
   assert.ok(deliveryResult.deliveryExecution.finishedAt);
   assert.equal(deliveryResult.deliveryExecution.parts.length, 5);
@@ -487,9 +489,11 @@ test("instagram adapter executes semantic delivery plan with sender actions and 
     deliveryResult.deliveryExecution.parts.map((part) => part.reason),
     ["read_receipt", "greeting_availability", "pricing", "pricing_guide", "team_qualification_question"],
   );
-  assert.equal(deliveryResult.deliveryExecution.parts[2]?.effectiveDelayMs, 2_000);
-  assert.equal(deliveryResult.deliveryExecution.parts[3]?.effectiveDelayMs, 1_100);
-  assert.equal(deliveryResult.deliveryExecution.parts[4]?.effectiveDelayMs, 1_600);
+  assert.ok(Number(deliveryResult.deliveryExecution.parts[1]?.effectiveTypingMs) >= 7_000);
+  assert.ok(Number(deliveryResult.deliveryExecution.parts[2]?.effectiveTypingMs) >= 7_000);
+  assert.ok(Number(deliveryResult.deliveryExecution.parts[4]?.effectiveTypingMs) >= 7_000);
+  assert.equal(deliveryResult.deliveryExecution.parts[3]?.effectiveDelayMs, 1_800);
+  assert.equal(deliveryResult.deliveryExecution.parts[4]?.effectiveDelayMs, 1_200);
 });
 
 test("instagram adapter ignores semantic delivery plan when kill switch is enabled", async () => {

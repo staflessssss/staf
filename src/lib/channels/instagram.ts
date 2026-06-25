@@ -52,13 +52,21 @@ type InstagramAttachment = {
   mimeType?: string;
 };
 
-const INSTAGRAM_SEMANTIC_DELIVERY_SHORT_MAX_TOTAL_DELAY_MS = 4_000;
-const INSTAGRAM_SEMANTIC_DELIVERY_TWO_TEXT_MAX_TOTAL_DELAY_MS = 7_000;
-const INSTAGRAM_SEMANTIC_DELIVERY_THREE_TEXT_MAX_TOTAL_DELAY_MS = 10_000;
-const INSTAGRAM_SEMANTIC_DELIVERY_RICH_MAX_TOTAL_DELAY_MS = 12_000;
-const INSTAGRAM_SEMANTIC_MIN_TEXT_GAP_MS = 1_600;
-const INSTAGRAM_SEMANTIC_MIN_ATTACHMENT_GAP_MS = 1_100;
-const INSTAGRAM_SEMANTIC_MIN_TYPING_MS = 1_300;
+type InstagramDeliveryPacing = "fast" | "human" | "slow";
+
+const INSTAGRAM_SEMANTIC_FAST_MAX_TOTAL_DELAY_MS = 6_000;
+const INSTAGRAM_SEMANTIC_HUMAN_SHORT_MAX_TOTAL_DELAY_MS = 4_000;
+const INSTAGRAM_SEMANTIC_HUMAN_TWO_TEXT_MAX_TOTAL_DELAY_MS = 7_000;
+const INSTAGRAM_SEMANTIC_HUMAN_THREE_TEXT_MAX_TOTAL_DELAY_MS = 10_000;
+const INSTAGRAM_SEMANTIC_HUMAN_RICH_MAX_TOTAL_DELAY_MS = 12_000;
+const INSTAGRAM_SEMANTIC_SLOW_MARK_SEEN_MIN_MS = 800;
+const INSTAGRAM_SEMANTIC_SLOW_TYPING_MIN_MS = 7_000;
+const INSTAGRAM_SEMANTIC_SLOW_TYPING_SPREAD_MS = 1_000;
+const INSTAGRAM_SEMANTIC_SLOW_TEXT_GAP_MS = 1_200;
+const INSTAGRAM_SEMANTIC_SLOW_ATTACHMENT_GAP_MS = 1_800;
+const INSTAGRAM_SEMANTIC_HUMAN_MIN_TEXT_GAP_MS = 1_600;
+const INSTAGRAM_SEMANTIC_HUMAN_MIN_ATTACHMENT_GAP_MS = 1_100;
+const INSTAGRAM_SEMANTIC_HUMAN_MIN_TYPING_MS = 1_300;
 
 function wait(ms: number) {
   return new Promise((resolve) => {
@@ -282,37 +290,86 @@ function readSemanticDeliveryPlan(value: unknown): InstagramDeliveryPlan | null 
   return plan;
 }
 
-function maxTotalDelayForInstagramPlan(plan: InstagramDeliveryPlan) {
+function readInstagramDeliveryPacing(): InstagramDeliveryPacing {
+  const pacing = process.env.INSTAGRAM_DELIVERY_PACING?.trim().toLowerCase();
+
+  if (pacing === "fast" || pacing === "human" || pacing === "slow") {
+    return pacing;
+  }
+
+  return "slow";
+}
+
+function maxTotalDelayForInstagramPlan(plan: InstagramDeliveryPlan, pacing: InstagramDeliveryPacing) {
+  if (pacing === "fast") {
+    return INSTAGRAM_SEMANTIC_FAST_MAX_TOTAL_DELAY_MS;
+  }
+
+  if (pacing === "slow") {
+    const textParts = plan.parts.filter((part) => part.kind === "text").length;
+    const attachmentParts = plan.parts.filter((part) => part.kind === "attachment").length;
+
+    return textParts * 8_500 + attachmentParts * 2_500 + 3_000;
+  }
+
   const hasAttachment = plan.parts.some((part) => part.kind === "attachment");
 
   if (hasAttachment && plan.textPartCount >= 3) {
-    return INSTAGRAM_SEMANTIC_DELIVERY_RICH_MAX_TOTAL_DELAY_MS;
+    return INSTAGRAM_SEMANTIC_HUMAN_RICH_MAX_TOTAL_DELAY_MS;
   }
 
   if (plan.textPartCount >= 3) {
-    return INSTAGRAM_SEMANTIC_DELIVERY_THREE_TEXT_MAX_TOTAL_DELAY_MS;
+    return INSTAGRAM_SEMANTIC_HUMAN_THREE_TEXT_MAX_TOTAL_DELAY_MS;
   }
 
   if (plan.textPartCount === 2) {
-    return INSTAGRAM_SEMANTIC_DELIVERY_TWO_TEXT_MAX_TOTAL_DELAY_MS;
+    return INSTAGRAM_SEMANTIC_HUMAN_TWO_TEXT_MAX_TOTAL_DELAY_MS;
   }
 
-  return INSTAGRAM_SEMANTIC_DELIVERY_SHORT_MAX_TOTAL_DELAY_MS;
+  return INSTAGRAM_SEMANTIC_HUMAN_SHORT_MAX_TOTAL_DELAY_MS;
 }
 
 function minDelayBeforeContentPart(args: {
   part: Extract<InstagramDeliveryPart, { kind: "text" | "attachment" }>;
   contentPartsSent: number;
+  pacing: InstagramDeliveryPacing;
 }) {
   if (args.contentPartsSent === 0) {
     return 0;
   }
 
   if (args.part.kind === "attachment") {
-    return INSTAGRAM_SEMANTIC_MIN_ATTACHMENT_GAP_MS;
+    return args.pacing === "slow"
+      ? INSTAGRAM_SEMANTIC_SLOW_ATTACHMENT_GAP_MS
+      : INSTAGRAM_SEMANTIC_HUMAN_MIN_ATTACHMENT_GAP_MS;
   }
 
-  return INSTAGRAM_SEMANTIC_MIN_TEXT_GAP_MS;
+  return args.pacing === "slow"
+    ? INSTAGRAM_SEMANTIC_SLOW_TEXT_GAP_MS
+    : INSTAGRAM_SEMANTIC_HUMAN_MIN_TEXT_GAP_MS;
+}
+
+function slowTypingMs(part: Extract<InstagramDeliveryPart, { kind: "text" }>) {
+  const stableSpread = Math.abs(
+    [...part.text].reduce((total, character) => total + character.charCodeAt(0), 0),
+  ) % (INSTAGRAM_SEMANTIC_SLOW_TYPING_SPREAD_MS + 1);
+
+  return INSTAGRAM_SEMANTIC_SLOW_TYPING_MIN_MS + stableSpread;
+}
+
+function effectiveTypingMsForText(args: {
+  part: Extract<InstagramDeliveryPart, { kind: "text" }>;
+  delayScale: number;
+  pacing: InstagramDeliveryPacing;
+}) {
+  if (args.pacing === "slow") {
+    return slowTypingMs(args.part);
+  }
+
+  return Math.max(
+    INSTAGRAM_SEMANTIC_HUMAN_MIN_TYPING_MS,
+    Math.round(args.part.typingMsBefore * args.delayScale),
+  );
 }
 
 async function executeInstagramDeliveryPlan(args: {
@@ -322,8 +379,9 @@ async function executeInstagramDeliveryPlan(args: {
 }) {
   const deliveries = [];
   const warnings: string[] = [];
+  const pacing = readInstagramDeliveryPacing();
   const plannedTotalDelayMs = args.plan.totalDelayMs;
-  const maxTotalDelayMs = maxTotalDelayForInstagramPlan(args.plan);
+  const maxTotalDelayMs = maxTotalDelayForInstagramPlan(args.plan, pacing);
   const delayScale =
     plannedTotalDelayMs > maxTotalDelayMs
       ? maxTotalDelayMs / plannedTotalDelayMs
@@ -352,7 +410,11 @@ async function executeInstagramDeliveryPlan(args: {
     if (part.kind === "sender_action") {
       senderActionsAttempted += 1;
       const delayMs = effectiveDelayMs(part.delayMsBefore);
-      await trackedWait(delayMs);
+      const effectiveSenderActionDelayMs =
+        pacing === "slow" && part.action === "mark_seen"
+          ? Math.max(delayMs, INSTAGRAM_SEMANTIC_SLOW_MARK_SEEN_MIN_MS)
+          : delayMs;
+      await trackedWait(effectiveSenderActionDelayMs);
 
       try {
         await sendInstagramSenderAction({
@@ -370,7 +432,7 @@ async function executeInstagramDeliveryPlan(args: {
         action: part.action,
         reason: part.reason,
         plannedDelayMs: part.delayMsBefore,
-        effectiveDelayMs: delayMs,
+        effectiveDelayMs: effectiveSenderActionDelayMs,
         sentAtMs: Date.now() - startedAtMs,
       });
       continue;
@@ -382,6 +444,7 @@ async function executeInstagramDeliveryPlan(args: {
         minDelayBeforeContentPart({
           part,
           contentPartsSent,
+          pacing,
         }),
       );
       await trackedWait(delayMs);
@@ -398,7 +461,11 @@ async function executeInstagramDeliveryPlan(args: {
         warnings.push(error instanceof Error ? error.message : "instagram_typing_action_failed");
       }
 
-      const typingMs = effectiveDelayMs(part.typingMsBefore, INSTAGRAM_SEMANTIC_MIN_TYPING_MS);
+      const typingMs = effectiveTypingMsForText({
+        part,
+        delayScale,
+        pacing,
+      });
       await trackedWait(typingMs);
 
       const payload = await sendInstagramMessage({
@@ -428,6 +495,7 @@ async function executeInstagramDeliveryPlan(args: {
       minDelayBeforeContentPart({
         part,
         contentPartsSent,
+        pacing,
       }),
     );
     await trackedWait(delayMs);
@@ -477,6 +545,7 @@ async function executeInstagramDeliveryPlan(args: {
     senderActionsAttempted,
     senderActionsFailed,
     fallbackToCanonical: false,
+    pacing,
     plannedTotalDelayMs,
     appliedTotalDelayMs,
     maxTotalDelayMs,
