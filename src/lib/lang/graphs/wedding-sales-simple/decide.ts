@@ -49,6 +49,10 @@ function getReplyObligations(
     obligations.add("portfolio");
   }
 
+  if (normalizedQuestions.includes("travel")) {
+    obligations.add("travel");
+  }
+
   return [...obligations];
 }
 
@@ -382,6 +386,20 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       handoffReason: "tool_error",
       replyType: "handoff",
       reason: "booking was attempted but the booking tool did not confirm success",
+    });
+  }
+
+  if (
+    state.bookingConfirmed &&
+    replyObligations.length > 0 &&
+    !hasUncheckedAvailability
+  ) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: state.questionsAskedByCustomer.includes("pricing")
+        ? "pricing_answer"
+        : "reply_only",
+      reason: "customer asked a known business question that should be answered without changing the flow",
     });
   }
 

@@ -20,6 +20,7 @@ function contract(update: Partial<ReplyActionContract> = {}): ReplyActionContrac
     mustMentionGuide: false,
     mustAnswerTeam: false,
     mustAnswerIdentity: false,
+    mustAnswerTravel: false,
     mentionPolicy: {
       pricing: { mode: "skip", reason: "test" },
       availability: { mode: "skip", reason: "test" },

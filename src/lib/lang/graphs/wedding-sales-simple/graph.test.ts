@@ -1265,6 +1265,78 @@ test("simple wedding sales runtime books after email when the call slot was alre
   assert.doesNotMatch(result.responseDraft ?? "", /booked the call/i);
 });
 
+test("simple wedding sales runtime answers travel question after booking without repeating booking confirmation", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Do you travel outside Tampa too?",
+    toolContext,
+    previousState: {
+      customerName: "Mark",
+      partnerName: "Rachel",
+      customerEmail: "bonkopoly@gmail.com",
+      weddingDate: "2027-06-15",
+      weddingDateText: "June 15 2027",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      availabilityCheck: {
+        date: "2027-06-15",
+        location: "Tampa",
+        status: "available",
+        checkedAt: "2026-06-25T16:50:21.160Z",
+      },
+      proposedCallTime: "tomorrow at 2pm",
+      calendarStatus: "available",
+      consultationCheck: {
+        proposedTime: "tomorrow at 2pm",
+        status: "available",
+        checkedAt: "2026-06-25T16:52:57.034Z",
+      },
+      checkedCallDate: "2026-06-26",
+      checkedCallTime: "14:00",
+      checkedCallStartTime: "2026-06-26T14:00:00-04:00",
+      checkedCallEndTime: "2026-06-26T14:30:00-04:00",
+      customerConfirmedCallSlot: true,
+      bookingConfirmed: true,
+      bookingAttempt: {
+        status: "booked",
+        attemptedAt: "2026-06-25T16:53:44.500Z",
+      },
+      replyMemory: {
+        lastRequiredQuestion: "callTime",
+        lastReplyType: "booking_confirmed",
+        lastOutboundText:
+          "Perfect - you're all set for 2:00 PM ✨\n\nYou should see the calendar invite come through at bonkopoly@gmail.com.",
+        questionMemory: {
+          lastRequiredQuestion: "callTime",
+          lastQuestionText: "Perfect, got it. Want me to lock in 2:00 PM?",
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {
+          proposedCallTime: "tomorrow at 2pm",
+        },
+        questionsAskedByCustomer: ["travel"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.equal(result.decisionTrace?.replyType, "reply_only");
+  assert.deepEqual(result.replyObligations, ["travel"]);
+  assert.equal(result.replyContract?.mustAnswerTravel, true);
+  assert.equal(result.answerContext, undefined);
+  assert.match(result.responseDraft ?? "", /travel outside Tampa/i);
+  assert.match(result.responseDraft ?? "", /roundtrip travel coverage/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess|send that one more time/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite/i);
+  assert.deepEqual(result.toolObservations, []);
+});
+
 test("simple wedding sales replies avoid known robotic phrases", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

@@ -110,6 +110,7 @@ export type SimpleWeddingSalesReplyObligation =
   | "guide"
   | "team"
   | "identity"
+  | "travel"
   | "portfolio";
 
 export type SimpleWeddingSalesReplyMemory = {
@@ -361,7 +362,11 @@ export function mergeTurnUnderstanding(
   const facts = understanding.facts;
   const customerName = facts.customerName ?? state.customerName;
   const partnerName = facts.partnerName ?? state.partnerName;
-  const callTimeCompletion = completeCallTimeFromAnswerContext(state, facts.proposedCallTime);
+  const callTimeCompletion = completeCallTimeFromAnswerContext(
+    state,
+    facts.proposedCallTime,
+    understanding.questionsAskedByCustomer,
+  );
   const proposedCallTime = callTimeCompletion.clearProposedCallTime
     ? undefined
     : callTimeCompletion.proposedCallTime ?? state.proposedCallTime;
@@ -625,7 +630,16 @@ function normalizeShortCallTimeAnswer(args: {
 function completeCallTimeFromAnswerContext(
   state: SimpleWeddingSalesState,
   proposedCallTime?: string,
+  questionsAskedByCustomer: SimpleWeddingSalesQuestion[] = [],
 ) {
+  if (questionsAskedByCustomer.length > 0 && !isCallTimeQuestion(state.latestCustomerMessage)) {
+    return {
+      proposedCallTime: undefined,
+      ambiguousChoice: false,
+      clearProposedCallTime: false,
+    };
+  }
+
   const lastQuestionText = state.replyMemory?.questionMemory?.lastQuestionText;
   const answeringCallTime = wasAnsweringCallTimeQuestion(state);
   const optionResolution = answeringCallTime
@@ -703,6 +717,12 @@ function completeCallTimeFromAnswerContext(
         }
       : undefined,
   };
+}
+
+function isCallTimeQuestion(message: string) {
+  return /\b(?:call|talk|consult|meet)\b[\s\S]{0,80}\b(?:time|when|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b/i.test(
+    message,
+  );
 }
 
 function resolveAnswerToOfferedCallTimeOptions(args: {

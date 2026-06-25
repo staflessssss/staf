@@ -363,6 +363,10 @@ function teamLine(state: SimpleWeddingSalesState) {
     : "For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.";
 }
 
+function travelLine() {
+  return "Yes, we do travel outside Tampa. Our collections include roundtrip travel coverage, and if the venue is beyond the included mileage, we can go over the exact travel details on the call 🤍";
+}
+
 function shouldAnswerTeamQuestion(state: SimpleWeddingSalesState, contract: ReplyActionContract) {
   return (
     contract.mustAnswerTeam ||
@@ -408,6 +412,7 @@ function renderSafeTemplate(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
+    args.contract.mustAnswerTravel ? travelLine() : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
@@ -435,6 +440,7 @@ function renderCompactInstagramFallback(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
+    args.contract.mustAnswerTravel ? travelLine() : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
   ]

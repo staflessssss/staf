@@ -35,6 +35,7 @@ export type ReplyActionContract = {
   mustMentionGuide: boolean;
   mustAnswerTeam: boolean;
   mustAnswerIdentity: boolean;
+  mustAnswerTravel: boolean;
   mentionPolicy: SimpleWeddingMentionPolicy;
   questionPolicy: SimpleWeddingQuestionPolicy;
   mayAskQuestion: boolean;
@@ -110,6 +111,7 @@ export function buildReplyActionContract(args: {
     mustAnswerTeam: replyObligations.includes("team") || state.decisionTrace?.replyType === "team_answer",
     mustAnswerIdentity:
       replyObligations.includes("identity") || state.decisionTrace?.replyType === "identity_answer",
+    mustAnswerTravel: replyObligations.includes("travel"),
     mentionPolicy,
     questionPolicy,
     mayAskQuestion: Boolean(requiredQuestion),
