@@ -53,6 +53,10 @@ function getReplyObligations(
     obligations.add("travel");
   }
 
+  if (normalizedQuestions.includes("raw_footage")) {
+    obligations.add("raw_footage");
+  }
+
   return [...obligations];
 }
 

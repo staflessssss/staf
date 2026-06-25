@@ -271,7 +271,7 @@ function getImageAttachments(attachments?: InstagramAttachment[]) {
   });
 }
 
-function readSemanticDeliveryPlan(value: unknown): InstagramDeliveryPlan | null {
+function readInstagramDeliveryPlan(value: unknown): InstagramDeliveryPlan | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
@@ -280,7 +280,7 @@ function readSemanticDeliveryPlan(value: unknown): InstagramDeliveryPlan | null 
 
   if (
     plan.channel !== "instagram" ||
-    plan.mode !== "semantic_split" ||
+    (plan.mode !== "semantic_split" && plan.mode !== "single_message") ||
     plan.enabled !== true ||
     !Array.isArray(plan.parts)
   ) {
@@ -391,6 +391,8 @@ async function executeInstagramDeliveryPlan(args: {
   let contentPartsSent = 0;
   let senderActionsAttempted = 0;
   let senderActionsFailed = 0;
+  let typingActionsSent = 0;
+  const actualDelaysMs: number[] = [];
   const startedAtDate = new Date();
   const startedAtMs = Date.now();
   const partTimings: Extract<WeddingSalesSimpleDeliveryExecution, { executed: true }>["parts"] = [];
@@ -402,6 +404,7 @@ async function executeInstagramDeliveryPlan(args: {
   const trackedWait = async (delayMs: number) => {
     if (delayMs > 0) {
       appliedTotalDelayMs += delayMs;
+      actualDelaysMs.push(delayMs);
       await wait(delayMs);
     }
   };
@@ -456,6 +459,7 @@ async function executeInstagramDeliveryPlan(args: {
           contactId: args.contactId,
           action: "typing_on",
         });
+        typingActionsSent += 1;
       } catch (error) {
         senderActionsFailed += 1;
         warnings.push(error instanceof Error ? error.message : "instagram_typing_action_failed");
@@ -540,14 +544,18 @@ async function executeInstagramDeliveryPlan(args: {
   const deliveryExecution: WeddingSalesSimpleDeliveryExecution = {
     enabled: true,
     executed: true,
+    usedExecutor: true,
+    mode: args.plan.mode,
     partsAttempted: args.plan.parts.length,
     partsSent,
     senderActionsAttempted,
     senderActionsFailed,
+    typingActionsSent,
     fallbackToCanonical: false,
     pacing,
     plannedTotalDelayMs,
     appliedTotalDelayMs,
+    actualDelaysMs,
     maxTotalDelayMs,
     startedAt: startedAtDate.toISOString(),
     finishedAt: finishedAtDate.toISOString(),
@@ -601,16 +609,16 @@ export const instagramAdapter = {
       throw new Error("Instagram connection is missing an access token.");
     }
 
-    const semanticPlan = readSemanticDeliveryPlan(params.channelDeliveryPlan);
+    const instagramPlan = readInstagramDeliveryPlan(params.channelDeliveryPlan);
 
     if (
-      semanticPlan &&
+      instagramPlan &&
       process.env.DISABLE_INSTAGRAM_SEMANTIC_DELIVERY_PLAN !== "true"
     ) {
       return executeInstagramDeliveryPlan({
         credentials,
         contactId: params.contactId,
-        plan: semanticPlan,
+        plan: instagramPlan,
       });
     }
 

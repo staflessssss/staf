@@ -51,14 +51,18 @@ export type WeddingSalesSimpleDeliveryExecution =
   | {
       enabled: true;
       executed: true;
+      usedExecutor: true;
+      mode: "single_message" | "semantic_split";
       partsAttempted: number;
       partsSent: number;
       senderActionsAttempted: number;
       senderActionsFailed: number;
+      typingActionsSent: number;
       fallbackToCanonical: false;
       pacing: "fast" | "human" | "slow";
       plannedTotalDelayMs: number;
       appliedTotalDelayMs: number;
+      actualDelaysMs: number[];
       maxTotalDelayMs: number;
       startedAt: string;
       finishedAt: string;
@@ -95,6 +99,7 @@ export type WeddingSalesSimpleDeliveryExecution =
 export type WeddingSalesSimpleSafetyLogEntry = {
   inboundText: string;
   outboundText: string;
+  dialogueUnderstanding?: SimpleWeddingSalesState["dialogueUnderstanding"];
   decisionTrace?: SimpleWeddingSalesDecisionTrace;
   replyContract?: ReplyActionContract;
   guardResult?: ReplyGuardResult;

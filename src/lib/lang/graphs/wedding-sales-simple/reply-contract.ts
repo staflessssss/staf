@@ -36,6 +36,8 @@ export type ReplyActionContract = {
   mustAnswerTeam: boolean;
   mustAnswerIdentity: boolean;
   mustAnswerTravel: boolean;
+  mustAnswerQuestions: SimpleWeddingSalesState["replyObligations"];
+  forbiddenPhrases: string[];
   mentionPolicy: SimpleWeddingMentionPolicy;
   questionPolicy: SimpleWeddingQuestionPolicy;
   mayAskQuestion: boolean;
@@ -112,6 +114,13 @@ export function buildReplyActionContract(args: {
     mustAnswerIdentity:
       replyObligations.includes("identity") || state.decisionTrace?.replyType === "identity_answer",
     mustAnswerTravel: replyObligations.includes("travel"),
+    mustAnswerQuestions: replyObligations,
+    forbiddenPhrases: [
+      "I don't want to guess here",
+      "Could you send that one more time?",
+      "someone from the team",
+      "I booked the call for",
+    ],
     mentionPolicy,
     questionPolicy,
     mayAskQuestion: Boolean(requiredQuestion),

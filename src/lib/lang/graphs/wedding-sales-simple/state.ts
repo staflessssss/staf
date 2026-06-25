@@ -3,6 +3,10 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 
 import type { WeddingSalesChannel } from "../wedding-sales/state";
+import {
+  buildDialogueUnderstanding,
+  type DialogueUnderstanding,
+} from "./dialogue-understanding";
 import type { ReplyActionContract } from "./reply-contract";
 import type { ReplyGuardResult } from "./reply-guards";
 
@@ -36,6 +40,7 @@ export const turnUnderstandingSchema = z.object({
       "availability",
       "portfolio",
       "travel",
+      "raw_footage",
       "package_inclusions",
       "team",
       "booking",
@@ -111,6 +116,7 @@ export type SimpleWeddingSalesReplyObligation =
   | "team"
   | "identity"
   | "travel"
+  | "raw_footage"
   | "portfolio";
 
 export type SimpleWeddingSalesReplyMemory = {
@@ -265,6 +271,7 @@ export type SimpleWeddingSalesState = {
   handoffReason?: SimpleWeddingSalesHandoffReason;
   unclearAttemptCount: number;
   questionsAskedByCustomer: SimpleWeddingSalesQuestion[];
+  dialogueUnderstanding?: DialogueUnderstanding;
   lastUnderstanding?: TurnUnderstanding;
   nextStep?: SimpleWeddingSalesNextStep;
   missingField?: "names" | "weddingDate" | "location";
@@ -341,6 +348,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     handoffReason: args.previousState?.handoffReason,
     unclearAttemptCount: args.previousState?.unclearAttemptCount ?? 0,
     questionsAskedByCustomer: [],
+    dialogueUnderstanding: undefined,
     lastUnderstanding: args.previousState?.lastUnderstanding,
     nextStep: args.previousState?.nextStep,
     missingField: args.previousState?.missingField,
@@ -360,12 +368,18 @@ export function mergeTurnUnderstanding(
   understanding: TurnUnderstanding,
 ): SimpleWeddingSalesState {
   const facts = understanding.facts;
+  const dialogueUnderstanding = buildDialogueUnderstanding({
+    state,
+    understanding,
+  });
   const customerName = facts.customerName ?? state.customerName;
   const partnerName = facts.partnerName ?? state.partnerName;
   const callTimeCompletion = completeCallTimeFromAnswerContext(
     state,
     facts.proposedCallTime,
-    understanding.questionsAskedByCustomer,
+    dialogueUnderstanding.shouldSuppressOldContext
+      ? dialogueUnderstanding.explicitQuestions
+      : understanding.questionsAskedByCustomer,
   );
   const proposedCallTime = callTimeCompletion.clearProposedCallTime
     ? undefined
@@ -380,6 +394,7 @@ export function mergeTurnUnderstanding(
     understanding,
     customerEmail,
     callTimeChanged,
+    dialogueUnderstanding,
   });
   const customerConfirmedCallSlot = Boolean(
     state.customerConfirmedCallSlot || bookingConfirmation.confirmed,
@@ -411,6 +426,7 @@ export function mergeTurnUnderstanding(
         ? state.unclearAttemptCount + 1
         : 0,
     questionsAskedByCustomer: understanding.questionsAskedByCustomer,
+    dialogueUnderstanding,
     lastUnderstanding: understanding,
     answerContext: bookingConfirmation.answerContext ?? callTimeCompletion.answerContext,
   };
@@ -421,6 +437,7 @@ function resolveBookingConfirmationAnswer(args: {
   understanding: TurnUnderstanding;
   customerEmail?: string;
   callTimeChanged: boolean;
+  dialogueUnderstanding?: DialogueUnderstanding;
 }): {
   confirmed: boolean;
   answerContext?: SimpleWeddingSalesState["answerContext"];
@@ -428,6 +445,7 @@ function resolveBookingConfirmationAnswer(args: {
   const text = args.state.latestCustomerMessage;
   const pending = args.state.replyMemory?.pendingBookingConfirmation;
   const explicitBookingRequest = isExplicitBookingRequest(text);
+  const hasExplicitBusinessQuestion = Boolean(args.dialogueUnderstanding?.shouldSuppressOldContext);
 
   if (args.callTimeChanged) {
     return {
@@ -450,6 +468,18 @@ function resolveBookingConfirmationAnswer(args: {
         originalText: text,
         resolvedValue: args.state.proposedCallTime,
         reason: "customer explicitly asked to book the currently available slot",
+      },
+    };
+  }
+
+  if (hasExplicitBusinessQuestion) {
+    return {
+      confirmed: false,
+      answerContext: {
+        applied: false,
+        source: "none",
+        originalText: text,
+        reason: "current message has an explicit business question, so stale booking confirmation context is ignored",
       },
     };
   }

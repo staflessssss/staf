@@ -544,3 +544,90 @@ test("instagram adapter ignores semantic delivery plan when kill switch is enabl
     },
   ]);
 });
+
+test("instagram adapter executes single-message delivery plan with typing and read receipt", async () => {
+  const requestBodies: unknown[] = [];
+  const delays: number[] = [];
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    requestBodies.push(body);
+
+    return {
+      ok: true,
+      json: async () =>
+        "message" in body
+          ? { recipient_id: "ig-user-1", message_id: `mid-${requestBodies.length}` }
+          : { recipient_id: "ig-user-1" },
+    } as Response;
+  }) as typeof fetch;
+  global.setTimeout = ((handler: TimerHandler, timeout?: number) => {
+    delays.push(Number(timeout ?? 0));
+
+    if (typeof handler === "function") {
+      handler();
+    }
+
+    return 0 as never;
+  }) as unknown as typeof setTimeout;
+
+  const result = await instagramAdapter.sendReply({
+    credentials: JSON.stringify({
+      instagramUserAccessToken: "ig-token",
+      igUserId: "ig-professional-account",
+      graphApiVersion: "v25.0",
+    }),
+    contactId: "ig-user-1",
+    message: "Canonical should not send",
+    channelDeliveryPlan: {
+      channel: "instagram",
+      enabled: true,
+      mode: "single_message",
+      textPartCount: 1,
+      totalDelayMs: 1_500,
+      guardResult: { ok: true },
+      parts: [
+        {
+          kind: "sender_action",
+          action: "mark_seen",
+          reason: "read_receipt",
+          delayMsBefore: 500,
+        },
+        {
+          kind: "text",
+          reason: "single_reply",
+          text: "Yes - raw footage can be added depending on the collection.",
+          delayMsBefore: 500,
+          typingMsBefore: 1_000,
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(
+    requestBodies.map((body) =>
+      typeof body === "object" && body && "sender_action" in body
+        ? (body as { sender_action: string }).sender_action
+        : (body as { message?: { text?: string } }).message?.text,
+    ),
+    [
+      "mark_seen",
+      "typing_on",
+      "Yes - raw footage can be added depending on the collection.",
+    ],
+  );
+  assert.ok(delays.some((delay) => delay >= 7_000));
+  assert.ok(result && typeof result === "object" && !Array.isArray(result));
+  const deliveryResult = result as {
+    deliveryExecution: {
+      usedExecutor: boolean;
+      mode: string;
+      typingActionsSent: number;
+      actualDelaysMs: number[];
+    };
+  };
+  assert.equal(deliveryResult.deliveryExecution.usedExecutor, true);
+  assert.equal(deliveryResult.deliveryExecution.mode, "single_message");
+  assert.equal(deliveryResult.deliveryExecution.typingActionsSent, 1);
+  assert.ok(deliveryResult.deliveryExecution.actualDelaysMs.some((delay) => delay >= 7_000));
+});

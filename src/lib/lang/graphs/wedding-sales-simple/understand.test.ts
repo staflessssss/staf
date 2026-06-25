@@ -154,3 +154,18 @@ test("deterministic understanding treats recent films as portfolio, not team", (
   assert.equal(result.customerMessageType, "business_question");
   assert.deepEqual(result.questionsAskedByCustomer, ["portfolio"]);
 });
+
+test("deterministic understanding treats raw footage as a covered business question", () => {
+  const result = understandTurnHeuristically({
+    channel: "instagram",
+    latestCustomerMessage: "Great, thank you. And yes, do you offer raw footage?",
+    bookingConfirmed: true,
+    mode: "bot_active",
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  });
+
+  assert.equal(result.customerMessageType, "business_question");
+  assert.deepEqual(result.questionsAskedByCustomer, ["raw_footage"]);
+});

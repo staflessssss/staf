@@ -53,6 +53,7 @@ Rules:
 - senderRole is who appears to be writing: bride, groom, mother, planner, friend, or unknown.
 - customerMessageType is the main intent of the latest message.
 - questionsAskedByCustomer can include multiple topics.
+- Use raw_footage for questions about raw footage, raw files, unedited footage, or all footage.
 - A request to speak with Taras, the owner, a person, or a human is an identity question because
   this assistant writes as the configured founder. Include identity; do not treat it as a handoff decision.
 `.trim();
@@ -243,6 +244,10 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
 
   if (/\b(travel|destination|travel fee)\b/.test(normalized)) {
     questions.push("travel");
+  }
+
+  if (/\b(raw footage|raw files?|unedited footage|all footage|footage files?)\b/.test(normalized)) {
+    questions.push("raw_footage");
   }
 
   if (/\b(include|included|coverage|hours|deliverables)\b/.test(normalized)) {

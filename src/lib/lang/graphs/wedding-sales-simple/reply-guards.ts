@@ -59,6 +59,12 @@ function paragraphCount(text: string) {
   return text.split(/\n{2,}/).filter((part) => part.trim()).length;
 }
 
+function containsForbiddenPhrase(text: string, phrases: string[]) {
+  const normalized = text.toLowerCase();
+
+  return phrases.find((phrase) => normalized.includes(phrase.toLowerCase()));
+}
+
 export function validateGeneratedReply(args: {
   reply: string;
   contract: ReplyActionContract;
@@ -72,6 +78,12 @@ export function validateGeneratedReply(args: {
     reasons.push("reply is empty");
   }
 
+  const forbiddenPhrase = containsForbiddenPhrase(reply, args.contract.forbiddenPhrases ?? []);
+
+  if (forbiddenPhrase) {
+    reasons.push(`reply contains forbidden phrase: ${forbiddenPhrase}`);
+  }
+
   if (
     args.contract.mustGreet &&
     (!reply.includes(args.knowledge.persona.replyStyle.greetingOpening) ||
@@ -83,6 +95,13 @@ export function validateGeneratedReply(args: {
 
   if (args.contract.mustMentionPricing && !reply.includes(args.knowledge.pricing.startPrice)) {
     reasons.push("pricing was required but start price is missing");
+  }
+
+  if (
+    args.contract.mustAnswerQuestions?.includes("raw_footage") &&
+    !/\braw footage\b/i.test(reply)
+  ) {
+    reasons.push("raw footage question was required but missing");
   }
 
   if (

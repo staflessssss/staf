@@ -60,6 +60,12 @@ export type SimpleWeddingKnowledgeContext = {
     timezone: string;
     callWindow: string;
   };
+  faq: {
+    rawFootage: {
+      answerPolicy: "covered";
+      answer: string;
+    };
+  };
   boundaries: string[];
 };
 
@@ -266,6 +272,14 @@ export function buildSimpleWeddingKnowledgeContext(input: {
     scheduling: {
       timezone: config.callBookingWindow.timezone,
       callWindow,
+    },
+    faq: {
+      rawFootage: {
+        answerPolicy: "covered",
+        answer:
+          featureText(features, /raw footage|raw files|unedited footage/i) ||
+          "Raw footage can be added depending on the collection and what they are looking for. Discuss the cleanest option on the call. Do not calculate custom fees in chat.",
+      },
     },
     boundaries: [
       "Do not confirm booking unless bookingConfirmed is true.",

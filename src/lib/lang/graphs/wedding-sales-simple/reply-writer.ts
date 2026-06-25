@@ -367,6 +367,20 @@ function travelLine() {
   return "Yes, we do travel outside Tampa. Our collections include roundtrip travel coverage, and if the venue is beyond the included mileage, we can go over the exact travel details on the call 🤍";
 }
 
+function rawFootageLine(knowledge: SimpleWeddingKnowledgeContext) {
+  const configured = knowledge.faq.rawFootage.answer;
+
+  if (configured && !/do not calculate custom fees/i.test(configured)) {
+    return configured;
+  }
+
+  return "Yes - raw footage can be added depending on the collection and what you're looking for. We can talk through the cleanest option on the call 🤍";
+}
+
+function mustAnswerRawFootage(contract: ReplyActionContract) {
+  return Boolean(contract.mustAnswerQuestions?.includes("raw_footage"));
+}
+
 function shouldAnswerTeamQuestion(state: SimpleWeddingSalesState, contract: ReplyActionContract) {
   return (
     contract.mustAnswerTeam ||
@@ -380,7 +394,7 @@ function clarificationLine() {
 }
 
 function fallbackClarificationLine() {
-  return "I don't want to guess here. Could you send that one more time?";
+  return "Sorry - I might be missing what you mean. Can you say that one more way?";
 }
 
 function handoffLine() {
@@ -413,6 +427,7 @@ function renderSafeTemplate(args: {
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
     args.contract.mustAnswerTravel ? travelLine() : undefined,
+    mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
@@ -441,6 +456,7 @@ function renderCompactInstagramFallback(args: {
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
     args.contract.mustAnswerTravel ? travelLine() : undefined,
+    mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
   ]
@@ -477,6 +493,8 @@ export function writeConstrainedWeddingReply(args: {
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
           callLogisticsLine(state),
           contract.mustAnswerIdentity ? identityLine(knowledge) : undefined,
+          contract.mustAnswerTravel ? travelLine() : undefined,
+          mustAnswerRawFootage(contract) ? rawFootageLine(knowledge) : undefined,
           shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
           contract.replyType === "clarification" ? clarificationLine() : undefined,
           questionLine({ contract, state, knowledge }),

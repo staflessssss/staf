@@ -1330,7 +1330,8 @@ test("simple wedding sales runtime answers travel question after booking without
   assert.notEqual(result.decisionTrace?.replyType, "booking_confirmed");
   assert.deepEqual(result.replyObligations, ["travel"]);
   assert.equal(result.replyContract?.mustAnswerTravel, true);
-  assert.equal(result.answerContext, undefined);
+  assert.equal(result.answerContext?.applied, false);
+  assert.match(result.answerContext?.reason ?? "", /explicit business question/i);
   assert.match(result.responseDraft ?? "", /travel outside Tampa/i);
   assert.match(result.responseDraft ?? "", /roundtrip travel coverage/i);
   assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess|send that one more time/i);
@@ -1395,7 +1396,8 @@ test("simple wedding sales runtime does not apply stale call-time context to FAQ
   });
 
   assert.equal(result.proposedCallTime, "tomorrow at 2pm");
-  assert.equal(result.answerContext, undefined);
+  assert.equal(result.answerContext?.applied, false);
+  assert.match(result.answerContext?.reason ?? "", /explicit business question/i);
   assert.deepEqual(result.replyObligations, ["travel"]);
   assert.equal(result.replyContract?.mustAnswerTravel, true);
   assert.deepEqual(result.toolObservations, []);
@@ -1452,6 +1454,64 @@ test("simple wedding sales runtime does not treat bare yes after booking as pend
   assert.deepEqual(result.toolObservations, []);
   assert.notEqual(result.answerContext?.source, "pending_booking_confirmation");
   assert.equal(result.replyMemory?.pendingBookingConfirmation, undefined);
+});
+
+test("simple wedding sales runtime answers raw footage after booking without booking-confirmed repeat", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Great, thank you. And yes, do you offer raw footage?",
+    toolContext,
+    previousState: {
+      customerName: "Mark",
+      partnerName: "Rachel",
+      customerEmail: "bonkopoly@gmail.com",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      proposedCallTime: "tomorrow at 2pm",
+      calendarStatus: "available",
+      consultationCheck: {
+        proposedTime: "tomorrow at 2pm",
+        status: "available",
+        checkedAt: "2026-06-25T16:52:57.034Z",
+      },
+      checkedCallDate: "2026-06-26",
+      checkedCallTime: "14:00",
+      customerConfirmedCallSlot: true,
+      bookingConfirmed: true,
+      replyMemory: {
+        lastReplyType: "booking_confirmed",
+        pendingBookingConfirmation: {
+          proposedCallTime: "tomorrow at 2pm",
+          email: "bonkopoly@gmail.com",
+          checkedCallDate: "2026-06-26",
+          checkedCallTime: "14:00",
+          askedAt: "2026-06-25T16:52:57.034Z",
+          source: "ask_booking_confirmation",
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["raw_footage"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.notEqual(result.decisionTrace?.replyType, "booking_confirmed");
+  assert.deepEqual(result.replyObligations, ["raw_footage"]);
+  assert.equal(result.dialogueUnderstanding?.messageAct, "mixed_ack_and_question");
+  assert.equal(result.dialogueUnderstanding?.shouldSuppressOldContext, true);
+  assert.equal(result.answerContext?.applied, false);
+  assert.match(result.responseDraft ?? "", /raw footage/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess|send that one more time/i);
+  assert.deepEqual(result.toolObservations, []);
 });
 
 test("simple wedding sales replies avoid known robotic phrases", async () => {

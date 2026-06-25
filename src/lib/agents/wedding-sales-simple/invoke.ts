@@ -203,6 +203,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
   await deps.recordSafetyLog?.({
     inboundText: args.incoming.text,
     outboundText: outbound.text,
+    dialogueUnderstanding: graphState.dialogueUnderstanding,
     decisionTrace: graphState.decisionTrace,
     replyContract: graphState.replyContract,
     guardResult: graphState.replyGuardResult,

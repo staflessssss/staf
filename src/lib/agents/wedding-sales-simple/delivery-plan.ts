@@ -68,7 +68,7 @@ export type SingleMessageDeliveryPlan = {
   fallbackFrom?: "semantic_split";
   parts: InstagramDeliveryPart[];
   textPartCount: 1;
-  totalDelayMs: 0;
+  totalDelayMs: number;
   guardResult: DeliveryPlanGuardResult;
 };
 
@@ -267,27 +267,45 @@ function singleInstagramPlan(args: {
   const textPart: InstagramDeliveryPart = {
     kind: "text",
     text: args.outboundText,
-    delayMsBefore: 0,
-    typingMsBefore: 0,
+    delayMsBefore: args.enabled ? deterministicDelayMs(`${args.outboundText}:single:delay`, 300, 900) : 0,
+    typingMsBefore: args.enabled ? typingDelayForText(`${args.outboundText}:single:typing`, args.outboundText) : 0,
     reason: reasonForText(args.outboundText, args.contract),
   };
+  const parts: InstagramDeliveryPart[] = [
+    ...(args.enabled
+      ? [
+          {
+            kind: "sender_action" as const,
+            action: "mark_seen" as const,
+            delayMsBefore: deterministicDelayMs(`${args.outboundText}:single:seen`, 300, 900),
+            reason: "read_receipt" as const,
+          },
+        ]
+      : []),
+    textPart,
+    ...(args.attachments ?? []).map<InstagramDeliveryPart>((attachment) => ({
+      kind: "attachment",
+      attachment,
+      delayMsBefore: args.enabled ? deterministicDelayMs(`${args.outboundText}:single:attachment:${attachment.url}`, 900, 1600) : 0,
+      reason: attachment.purpose,
+    })),
+  ];
+  const totalDelayMs = parts.reduce((total, part) => {
+    if (part.kind === "text") {
+      return total + part.delayMsBefore + part.typingMsBefore;
+    }
+
+    return total + part.delayMsBefore;
+  }, 0);
 
   return {
     channel: args.channel,
     enabled: args.enabled,
     mode: "single_message",
     fallbackFrom: args.fallbackFrom,
-    parts: [
-      textPart,
-      ...(args.attachments ?? []).map<InstagramDeliveryPart>((attachment) => ({
-        kind: "attachment",
-        attachment,
-        delayMsBefore: 0,
-        reason: attachment.purpose,
-      })),
-    ],
+    parts,
     textPartCount: 1,
-    totalDelayMs: 0,
+    totalDelayMs,
     guardResult: args.guardResult ?? { ok: true },
   };
 }
