@@ -204,9 +204,12 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     inboundText: args.incoming.text,
     outboundText: outbound.text,
     dialogueUnderstanding: graphState.dialogueUnderstanding,
+    pendingUserActionBefore: previousState?.pendingUserAction,
+    pendingUserActionAfter: persistedState.pendingUserAction,
     decisionTrace: graphState.decisionTrace,
     replyContract: graphState.replyContract,
     guardResult: graphState.replyGuardResult,
+    writer: graphState.writer,
     attachments: outbound.attachments,
     channelDeliveryPlan: outbound.channelDeliveryPlan,
     deliveryPlanGuard:

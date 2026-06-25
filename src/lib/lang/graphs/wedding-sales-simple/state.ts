@@ -202,6 +202,27 @@ export type SimpleWeddingSalesCallTimeContext = {
   source: "out_of_window_suggestions" | "calendar_suggestions";
 };
 
+export type SimpleWeddingSalesPendingUserAction =
+  | {
+      type: "booking_confirmation";
+      slot: string;
+      email: string;
+      expiresAfterTurn?: number;
+    }
+  | {
+      type: "call_time_choice";
+      options: string[];
+      dateContext?: string;
+      expiresAfterTurn?: number;
+    }
+  | null;
+
+export type SimpleWeddingSalesWriterTrace = {
+  mode: "deterministic_fallback";
+  fallbackReason?: string;
+  variationSeed?: string;
+};
+
 export type SimpleWeddingSalesInvariantCheck = Prisma.JsonObject & {
   name: string;
   passed: boolean;
@@ -263,6 +284,7 @@ export type SimpleWeddingSalesState = {
     timezone: string;
   };
   replyMemory?: SimpleWeddingSalesReplyMemory;
+  pendingUserAction?: SimpleWeddingSalesPendingUserAction;
   /** @deprecated Use replyMemory. Kept only to migrate live persisted simple-runtime state. */
   lastMentionedStartPrice?: string;
   /** @deprecated Use replyMemory. Kept only to migrate live persisted simple-runtime state. */
@@ -292,6 +314,7 @@ export type SimpleWeddingSalesState = {
     reason: string;
   };
   responseDraft?: string;
+  writer?: SimpleWeddingSalesWriterTrace;
   toolObservations: Array<{ toolName: string; result: string }>;
 };
 
@@ -342,6 +365,9 @@ export function createInitialSimpleWeddingSalesState(args: {
     bookedEventId: args.previousState?.bookedEventId,
     callBookingWindow: args.callBookingWindow ?? args.previousState?.callBookingWindow,
     replyMemory: args.previousState?.replyMemory,
+    pendingUserAction:
+      args.previousState?.pendingUserAction ??
+      derivePendingUserAction(args.previousState),
     lastMentionedStartPrice: args.previousState?.lastMentionedStartPrice,
     guideMentioned: args.previousState?.guideMentioned,
     mode: args.previousState?.mode ?? "bot_active",
@@ -359,8 +385,33 @@ export function createInitialSimpleWeddingSalesState(args: {
     invariantChecks: args.previousState?.invariantChecks,
     answerContext: undefined,
     responseDraft: args.previousState?.responseDraft,
+    writer: undefined,
     toolObservations: [],
   };
+}
+
+export function derivePendingUserAction(
+  state?: Partial<SimpleWeddingSalesState>,
+): SimpleWeddingSalesPendingUserAction {
+  const pendingBooking = state?.replyMemory?.pendingBookingConfirmation;
+
+  if (pendingBooking && !state?.bookingConfirmed) {
+    return {
+      type: "booking_confirmation",
+      slot: pendingBooking.proposedCallTime,
+      email: pendingBooking.email,
+    };
+  }
+
+  if (state?.callTimeContext?.options.length) {
+    return {
+      type: "call_time_choice",
+      options: state.callTimeContext.options.map((option) => option.label),
+      dateContext: state.callTimeContext.dateContext,
+    };
+  }
+
+  return null;
 }
 
 export function mergeTurnUnderstanding(
@@ -427,6 +478,9 @@ export function mergeTurnUnderstanding(
         : 0,
     questionsAskedByCustomer: understanding.questionsAskedByCustomer,
     dialogueUnderstanding,
+    pendingUserAction: dialogueUnderstanding.shouldSuppressOldContext
+      ? null
+      : derivePendingUserAction(state),
     lastUnderstanding: understanding,
     answerContext: bookingConfirmation.answerContext ?? callTimeCompletion.answerContext,
   };

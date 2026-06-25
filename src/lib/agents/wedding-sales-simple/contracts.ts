@@ -100,9 +100,12 @@ export type WeddingSalesSimpleSafetyLogEntry = {
   inboundText: string;
   outboundText: string;
   dialogueUnderstanding?: SimpleWeddingSalesState["dialogueUnderstanding"];
+  pendingUserActionBefore?: SimpleWeddingSalesState["pendingUserAction"];
+  pendingUserActionAfter?: SimpleWeddingSalesState["pendingUserAction"];
   decisionTrace?: SimpleWeddingSalesDecisionTrace;
   replyContract?: ReplyActionContract;
   guardResult?: ReplyGuardResult;
+  writer?: SimpleWeddingSalesState["writer"];
   attachments?: NormalizedWeddingSalesOutboundMessage["attachments"];
   channelDeliveryPlan?: ChannelDeliveryPlan;
   deliveryPlanGuard?: DeliveryPlanGuardResult;

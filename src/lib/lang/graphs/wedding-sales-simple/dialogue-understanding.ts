@@ -68,11 +68,11 @@ function inferPendingAnswer(args: {
     return { type: "none", appliesTo: "none" };
   }
 
-  if (args.state.replyMemory?.pendingBookingConfirmation) {
+  if (args.state.pendingUserAction?.type === "booking_confirmation") {
     return { type, appliesTo: "booking_confirmation" };
   }
 
-  if (args.state.callTimeContext?.options.length) {
+  if (args.state.pendingUserAction?.type === "call_time_choice") {
     return { type, appliesTo: "call_time_choice" };
   }
 

@@ -96,6 +96,10 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
   assert.equal(safetyLogs.length, 1);
   assert.equal(safetyLogs[0]?.runtime, "wedding-sales-simple");
   assert.deepEqual(safetyLogs[0]?.toolCalls, ["check_wedding_availability"]);
+  assert.equal(safetyLogs[0]?.dialogueUnderstanding?.messageAct, "new_business_question");
+  assert.deepEqual(safetyLogs[0]?.pendingUserActionBefore, undefined);
+  assert.equal(safetyLogs[0]?.pendingUserActionAfter, null);
+  assert.equal(safetyLogs[0]?.writer?.mode, "deterministic_fallback");
   assert.equal(result.outbound.channelDeliveryPlan?.channel, "instagram");
   assert.equal(result.outbound.channelDeliveryPlan?.mode, "single_message");
   assert.equal(safetyLogs[0]?.channelDeliveryPlan?.mode, "single_message");

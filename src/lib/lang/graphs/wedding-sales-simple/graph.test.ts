@@ -1514,6 +1514,55 @@ test("simple wedding sales runtime answers raw footage after booking without boo
   assert.deepEqual(result.toolObservations, []);
 });
 
+test("simple wedding sales runtime answers raw footage after owner handoff resume without repeating owner reply", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Great, thank you. And yes, do you offer raw footage?",
+    toolContext,
+    previousState: {
+      mode: "bot_active",
+      customerName: "Mark",
+      partnerName: "Rachel",
+      customerEmail: "bonkopoly@gmail.com",
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2027-06-15",
+      bookingConfirmed: true,
+      replyMemory: {
+        lastOutboundText: "I checked with Taras and he can talk through the details with you.",
+        manualIntervention: {
+          lastOwnerReplyText: "I checked with Taras and he can talk through the details with you.",
+          lastOwnerReplyAt: "2026-06-25T17:00:00.000Z",
+          source: "telegram_owner",
+          manualReplies: [
+            {
+              text: "I checked with Taras and he can talk through the details with you.",
+              source: "telegram_owner",
+              sentAt: "2026-06-25T17:00:00.000Z",
+            },
+          ],
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["raw_footage"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.deepEqual(result.replyObligations, ["raw_footage"]);
+  assert.match(result.responseDraft ?? "", /raw footage/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /checked with Taras/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite/i);
+  assert.equal(result.dialogueUnderstanding?.shouldSuppressOldContext, true);
+});
+
 test("simple wedding sales replies avoid known robotic phrases", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

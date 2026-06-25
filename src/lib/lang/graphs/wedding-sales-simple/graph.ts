@@ -4,6 +4,7 @@ import { decideNextStep } from "./decide";
 import { writeHumanReply } from "./reply";
 import {
   createInitialSimpleWeddingSalesState,
+  derivePendingUserAction,
   mergeTurnUnderstanding,
   type SimpleWeddingSalesChannel,
   type SimpleWeddingSalesState,
@@ -172,20 +173,27 @@ export async function invokeWeddingSalesSimpleGraph(
       }
     : state;
 
-  return {
+  const updatedReplyMemory = updateSimpleWeddingReplyMemory({
+    state: finalState,
+    contract,
+    knowledge,
+    replyText: reply.text,
+  });
+  const returnedState = {
     ...finalState,
-    replyMemory: updateSimpleWeddingReplyMemory({
-      state: finalState,
-      contract,
-      knowledge,
-      replyText: reply.text,
-    }),
+    replyMemory: updatedReplyMemory,
     replyContract: contract,
     replyGuardResult: reply.guardResult,
+    writer: reply.writer,
     responseDraft: reply.text || writeHumanReply({
       state,
       config: input.config,
     }),
+  };
+
+  return {
+    ...returnedState,
+    pendingUserAction: derivePendingUserAction(returnedState),
   };
 }
 

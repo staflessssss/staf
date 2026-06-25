@@ -474,6 +474,10 @@ export function writeConstrainedWeddingReply(args: {
 }): {
   text: string;
   guardResult: ReturnType<typeof validateGeneratedReply>;
+  writer: {
+    mode: "deterministic_fallback";
+    fallbackReason?: string;
+  };
   forceHandoff?: true;
 } {
   const { state, contract, knowledge } = args;
@@ -510,6 +514,9 @@ export function writeConstrainedWeddingReply(args: {
     return {
       text: draft,
       guardResult: guard,
+      writer: {
+        mode: "deterministic_fallback",
+      },
     };
   }
 
@@ -528,6 +535,10 @@ export function writeConstrainedWeddingReply(args: {
     return {
       text: fallback,
       guardResult: fallbackGuard,
+      writer: {
+        mode: "deterministic_fallback",
+        fallbackReason: "primary_reply_guard_failed",
+      },
     };
   }
 
@@ -543,6 +554,10 @@ export function writeConstrainedWeddingReply(args: {
     return {
       text: handoffLine(),
       guardResult: minimalGuard,
+      writer: {
+        mode: "deterministic_fallback",
+        fallbackReason: "all_reply_guards_failed",
+      },
       forceHandoff: true,
     };
   }
@@ -550,6 +565,10 @@ export function writeConstrainedWeddingReply(args: {
   return {
     text: minimal,
     guardResult: minimalGuard,
+    writer: {
+      mode: "deterministic_fallback",
+      fallbackReason: "compact_reply_guard_failed",
+    },
   };
 }
 
