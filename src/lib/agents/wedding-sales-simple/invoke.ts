@@ -208,6 +208,10 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     guardResult: graphState.replyGuardResult,
     attachments: outbound.attachments,
     channelDeliveryPlan: outbound.channelDeliveryPlan,
+    deliveryPlanGuard:
+      outbound.channelDeliveryPlan && "guardResult" in outbound.channelDeliveryPlan
+        ? outbound.channelDeliveryPlan.guardResult
+        : undefined,
     knowledgeSummary: knowledgeSummary(knowledge),
     toolCalls: graphState.toolObservations.map((observation) => observation.toolName),
     previousState,

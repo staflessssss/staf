@@ -141,6 +141,70 @@ test("wedding-sales-simple adapter normalizes Gmail thread and preserves sender 
   assert.match(result.outbound.text, /What date are you looking at/i);
 });
 
+test("wedding-sales-simple adapter logs Instagram semantic delivery plan when flag is on", async () => {
+  const incoming = normalizeInstagramWeddingSalesIncoming({
+    tenantId: "tenant-1",
+    agentId: "agent-wedding",
+    contactId: "ig-contact-1",
+    text: "Hi! Are you available June 15 2027 in Tampa? How much? Who would shoot our wedding?",
+    messageId: "mid-semantic-plan",
+  });
+  const safetyLogs: WeddingSalesSimpleSafetyLogEntry[] = [];
+  const result = await invokeWeddingSalesSimpleAdapter({
+    incoming,
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price.png",
+        fileName: "price.png",
+      },
+    },
+    channelConfig: {
+      enableInstagramSemanticDeliveryPlan: true,
+    },
+    deps: {
+      recordSafetyLog: (entry) => {
+        safetyLogs.push(entry);
+      },
+      invokeGraph: (input) =>
+        import("@/lib/lang/graphs/wedding-sales-simple/graph").then(
+          ({ invokeWeddingSalesSimpleGraph }) =>
+            invokeWeddingSalesSimpleGraph({
+              ...input,
+              understand: () => ({
+                customerMessageType: "availability_question",
+                facts: {
+                  weddingDate: "2027-06-15",
+                  weddingDateText: "June 15 2027",
+                  location: "Tampa",
+                },
+                questionsAskedByCustomer: ["availability", "pricing", "team"],
+                confidence: 0.95,
+              }),
+            }),
+        ),
+    },
+  });
+
+  assert.equal(result.status, "processed");
+  const plan = result.outbound.channelDeliveryPlan;
+
+  assert.equal(plan?.channel, "instagram");
+  assert.equal(plan?.mode, "semantic_split");
+  assert.equal(safetyLogs[0]?.channelDeliveryPlan?.mode, "semantic_split");
+  assert.equal(safetyLogs[0]?.deliveryPlanGuard?.ok, true);
+  assert.ok(plan && "parts" in plan);
+  assert.ok(plan.parts.some((part) => part.kind === "sender_action" && part.action === "mark_seen"));
+  assert.ok(plan.parts.some((part) => part.kind === "text" && part.reason === "availability"));
+  assert.ok(
+    plan.parts.some(
+      (part) => part.kind === "text" && /wedding films start|collections guide/i.test(part.text),
+    ),
+  );
+  assert.ok(plan.parts.some((part) => part.kind === "text" && /both of your names/i.test(part.text)));
+  assert.ok(plan.totalDelayMs <= 12_000);
+});
+
 test("wedding-sales-simple adapter returns pricing guide image attachment when guide is mentioned", async () => {
   const incoming = normalizeInstagramWeddingSalesIncoming({
     tenantId: "tenant-1",

@@ -42,6 +42,7 @@ export type InstagramDeliveryPlan = {
   channel: "instagram";
   enabled: boolean;
   mode: "single_message" | "semantic_split";
+  fallbackFrom?: "semantic_split";
   parts: InstagramDeliveryPart[];
   textPartCount: number;
   totalDelayMs: number;
@@ -59,8 +60,9 @@ export type GmailDeliveryPlan = {
 
 export type SingleMessageDeliveryPlan = {
   channel: "instagram" | "gmail";
-  enabled: false;
+  enabled: boolean;
   mode: "single_message";
+  fallbackFrom?: "semantic_split";
   parts: InstagramDeliveryPart[];
   textPartCount: 1;
   totalDelayMs: 0;
@@ -133,23 +135,23 @@ function reasonForText(part: string, contract: ReplyActionContract): Extract<Ins
     return "booking";
   }
 
-  if (/calendar|consult|call|lock in|all set/.test(normalized)) {
-    return "consultation";
+  if (/price|pricing|wedding films start|\$\d|collection/.test(normalized)) {
+    return "pricing";
   }
 
   if (/available|open|not open/.test(normalized)) {
     return "availability";
   }
 
-  if (/price|pricing|wedding films start|\$\d|collection/.test(normalized)) {
-    return "pricing";
+  if (/calendar|consult|call|lock in|all set/.test(normalized)) {
+    return "consultation";
   }
 
   if (/guide|image/.test(normalized)) {
     return "guide";
   }
 
-  if (/filmmaker|shooter|team|jay|taras/.test(normalized)) {
+  if (/filmmaker|shooter|team|jay/.test(normalized)) {
     return "team";
   }
 
@@ -192,6 +194,44 @@ function replyAsksRequiredQuestion(text: string, requiredQuestion: ReplyActionCo
   }
 }
 
+function splitSemanticTextParts(text: string, contract: ReplyActionContract) {
+  const expandedParts = splitParagraphs(text).flatMap((paragraph) =>
+    splitParagraphs(
+      paragraph
+        .replace(/\s+(Our\s+(?:\d+-hour\s+)?wedding films start)/i, "\n\n$1")
+        .replace(/\s+(For\s+Florida\s+weddings,)/i, "\n\n$1")
+        .replace(/\s+(And\s+what\s+are\s+both\s+of\s+your\s+names\?)/i, "\n\n$1"),
+    ),
+  );
+  const parts = [...expandedParts];
+
+  while (parts.length > MAX_TEXT_PARTS) {
+    const firstReason = reasonForText(parts[0] ?? "", contract);
+    const secondReason = reasonForText(parts[1] ?? "", contract);
+
+    if (
+      parts.length > 1 &&
+      (firstReason === "single_reply" || firstReason === "identity") &&
+      secondReason === "availability"
+    ) {
+      parts.splice(0, 2, `${parts[0]}\n\n${parts[1]}`);
+      continue;
+    }
+
+    const questionIndex = parts.findIndex((part) => replyAsksRequiredQuestion(part, contract.requiredQuestion));
+
+    if (questionIndex > 0) {
+      parts.splice(questionIndex - 1, 2, `${parts[questionIndex - 1]}\n\n${parts[questionIndex]}`);
+      continue;
+    }
+
+    const mergeIndex = parts.length - 2;
+    parts.splice(mergeIndex, 2, `${parts[mergeIndex]}\n\n${parts[mergeIndex + 1]}`);
+  }
+
+  return parts;
+}
+
 function singleInstagramPlan(args: {
   channel: "instagram";
   enabled: boolean;
@@ -199,6 +239,7 @@ function singleInstagramPlan(args: {
   attachments?: NormalizedWeddingSalesOutboundMessage["attachments"];
   contract: ReplyActionContract;
   guardResult?: DeliveryPlanGuardResult;
+  fallbackFrom?: "semantic_split";
 }): InstagramDeliveryPlan | SingleMessageDeliveryPlan {
   const textPart: InstagramDeliveryPart = {
     kind: "text",
@@ -212,6 +253,7 @@ function singleInstagramPlan(args: {
     channel: args.channel,
     enabled: args.enabled,
     mode: "single_message",
+    fallbackFrom: args.fallbackFrom,
     parts: [
       textPart,
       ...(args.attachments ?? []).map<InstagramDeliveryPart>((attachment) => ({
@@ -302,14 +344,7 @@ function buildInstagramSemanticPlan(args: {
   attachments?: NormalizedWeddingSalesOutboundMessage["attachments"];
   seed: string;
 }): InstagramDeliveryPlan {
-  const paragraphs = splitParagraphs(args.outboundText);
-  const candidateTextParts = paragraphs.length > MAX_TEXT_PARTS
-    ? [
-        paragraphs[0]!,
-        paragraphs.slice(1, -1).join("\n\n"),
-        paragraphs.at(-1)!,
-      ].filter(Boolean)
-    : paragraphs;
+  const candidateTextParts = splitSemanticTextParts(args.outboundText, args.contract);
   const parts: InstagramDeliveryPart[] = [
     {
       kind: "sender_action",
@@ -429,6 +464,7 @@ export function buildChannelDeliveryPlan(params: {
       attachments: params.attachments,
       contract: params.replyContract,
       guardResult: semanticPlan.guardResult,
+      fallbackFrom: "semantic_split",
     });
   }
 

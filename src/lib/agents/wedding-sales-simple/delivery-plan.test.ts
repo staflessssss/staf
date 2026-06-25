@@ -186,3 +186,34 @@ test("Instagram delivery plan keeps booking and handoff as single-message", () =
   assert.equal(handoffPlan.mode, "single_message");
   assert.equal(handoffPlan.textPartCount, 1);
 });
+
+test("Instagram delivery plan guard falls back to single-message without handoff", () => {
+  const plan = buildChannelDeliveryPlan({
+    channel: "instagram",
+    outboundText: [
+      "Great news - I checked June 15, 2027 in Tampa, and the date is available 🤍",
+      "Our 8-hour wedding films start at $2,950 for Florida.",
+      "For Florida weddings, Jay is our lead filmmaker in Tampa.",
+    ].join("\n\n"),
+    replyContract: contract({
+      requiredQuestion: "email",
+      mustMentionWeddingAvailability: true,
+      mustMentionPricing: true,
+      mustAnswerTeam: true,
+    }),
+    conversationId: "conversation-1",
+    turnId: "turn-fallback",
+    channelConfig: {
+      enableInstagramSemanticDeliveryPlan: true,
+    },
+  });
+
+  assert.equal(plan.channel, "instagram");
+  assert.equal(plan.mode, "single_message");
+  assert.equal(plan.fallbackFrom, "semantic_split");
+  assert.equal(plan.guardResult.ok, false);
+  assert.equal(
+    plan.guardResult.ok ? undefined : plan.guardResult.reason,
+    "missing_required_question_in_delivery_plan",
+  );
+});

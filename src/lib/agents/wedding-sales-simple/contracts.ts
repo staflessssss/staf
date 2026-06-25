@@ -5,7 +5,7 @@ import type {
 } from "@/lib/lang/graphs/wedding-sales-simple/state";
 import type { ReplyActionContract } from "@/lib/lang/graphs/wedding-sales-simple/reply-contract";
 import type { ReplyGuardResult } from "@/lib/lang/graphs/wedding-sales-simple/reply-guards";
-import type { ChannelDeliveryPlan } from "./delivery-plan";
+import type { ChannelDeliveryPlan, DeliveryPlanGuardResult } from "./delivery-plan";
 
 export type WeddingSalesSimpleRuntime = "legacy" | "wedding-sales-simple";
 
@@ -45,6 +45,7 @@ export type WeddingSalesSimpleSafetyLogEntry = {
   guardResult?: ReplyGuardResult;
   attachments?: NormalizedWeddingSalesOutboundMessage["attachments"];
   channelDeliveryPlan?: ChannelDeliveryPlan;
+  deliveryPlanGuard?: DeliveryPlanGuardResult;
   knowledgeSummary?: {
     hasPricing: boolean;
     startPrice?: string;
