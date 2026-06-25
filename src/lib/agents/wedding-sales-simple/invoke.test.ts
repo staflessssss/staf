@@ -195,12 +195,14 @@ test("wedding-sales-simple adapter logs Instagram semantic delivery plan when fl
   assert.equal(safetyLogs[0]?.deliveryPlanGuard?.ok, true);
   assert.ok(plan && "parts" in plan);
   assert.ok(plan.parts.some((part) => part.kind === "sender_action" && part.action === "mark_seen"));
-  assert.ok(plan.parts.some((part) => part.kind === "text" && part.reason === "availability"));
   assert.ok(
     plan.parts.some(
-      (part) => part.kind === "text" && /wedding films start|collections guide/i.test(part.text),
+      (part) =>
+        part.kind === "text" &&
+        (part.reason === "availability" || part.reason === "greeting_availability"),
     ),
   );
+  assert.ok(plan.parts.some((part) => part.kind === "text" && part.reason === "pricing"));
   assert.ok(plan.parts.some((part) => part.kind === "text" && /both of your names/i.test(part.text)));
   assert.ok(plan.totalDelayMs <= 12_000);
 });

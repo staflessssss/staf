@@ -135,7 +135,7 @@ test("Instagram delivery plan semantically splits mixed replies when flag is on"
   assert.ok(plan.totalDelayMs <= 12_000);
   assert.deepEqual(
     plan.parts.map((part) => part.kind),
-    ["sender_action", "text", "text", "text", "attachment"],
+    ["sender_action", "text", "text", "attachment", "text"],
   );
   assert.ok(
     plan.parts.some((part) => part.kind === "text" && part.reason === "availability"),
@@ -145,6 +145,157 @@ test("Instagram delivery plan semantically splits mixed replies when flag is on"
   assert.ok(
     plan.parts.some((part) => part.kind === "attachment" && part.reason === "pricing_guide"),
   );
+});
+
+test("Instagram delivery plan separates pricing guide and names question for availability pricing lead", () => {
+  const outboundText = [
+    "Hey there! Thank you so much for reaching out. I'm Taras, the founder of Myndful Films. Huge congratulations on your engagement - such an exciting season of life!",
+    "Great news - I checked June 15, 2027 in Tampa, and the date is available. Our 8-hour wedding films start at $2,950 for Florida. I'm sending the collections guide image here too.",
+    "And what are both of your names? I’ll keep everything organized on my side.",
+  ].join("\n\n");
+
+  const plan = buildChannelDeliveryPlan({
+    channel: "instagram",
+    outboundText,
+    replyContract: contract({
+      replyType: "availability_available",
+      mustGreet: true,
+      mustMentionWeddingAvailability: true,
+      mustMentionPricing: true,
+      mustMentionGuide: true,
+    }),
+    attachments: [
+      {
+        type: "image",
+        url: "https://example.com/guide.png",
+        label: "guide.png",
+        purpose: "pricing_guide",
+      },
+    ],
+    conversationId: "conversation-1",
+    turnId: "turn-pricing-names",
+    channelConfig: {
+      enableInstagramSemanticDeliveryPlan: true,
+    },
+  });
+
+  assert.equal(plan.channel, "instagram");
+  assert.equal(plan.mode, "semantic_split");
+  assert.equal(plan.guardResult.ok, true);
+  assert.deepEqual(
+    plan.parts.map((part) => (part.kind === "sender_action" ? `${part.kind}:${part.action}` : `${part.kind}:${part.reason}`)),
+    [
+      "sender_action:mark_seen",
+      "text:greeting_availability",
+      "text:pricing",
+      "attachment:pricing_guide",
+      "text:qualification_question",
+    ],
+  );
+
+  const pricingPart = plan.parts.find(
+    (part) => part.kind === "text" && part.reason === "pricing",
+  );
+  const questionPart = plan.parts.find(
+    (part) => part.kind === "text" && part.reason === "qualification_question",
+  );
+
+  assert.ok(pricingPart);
+  assert.ok(questionPart);
+  assert.equal(pricingPart.kind, "text");
+  assert.equal(questionPart.kind, "text");
+  assert.doesNotMatch(pricingPart.text, /both of your names/i);
+  assert.match(questionPart.text, /both of your names/i);
+});
+
+test("Instagram delivery plan combines team answer with names question for mixed team lead", () => {
+  const outboundText = [
+    "Hey there! Thank you so much for reaching out. I'm Taras, the founder of Myndful Films. Huge congratulations on your engagement - such an exciting season of life!",
+    "Great news - I checked June 15, 2027 in Tampa, and the date is available. Our 8-hour wedding films start at $2,950 for Florida. I'm sending the collections guide image here too.",
+    "For Tampa weddings, Jay is usually the lead filmmaker, and I'd be your main contact here.",
+    "What are both of your names?",
+  ].join("\n\n");
+
+  const plan = buildChannelDeliveryPlan({
+    channel: "instagram",
+    outboundText,
+    replyContract: contract({
+      replyType: "availability_available",
+      mustGreet: true,
+      mustMentionWeddingAvailability: true,
+      mustMentionPricing: true,
+      mustMentionGuide: true,
+      mustAnswerTeam: true,
+    }),
+    attachments: [
+      {
+        type: "image",
+        url: "https://example.com/guide.png",
+        label: "guide.png",
+        purpose: "pricing_guide",
+      },
+    ],
+    conversationId: "conversation-1",
+    turnId: "turn-pricing-team-names",
+    channelConfig: {
+      enableInstagramSemanticDeliveryPlan: true,
+    },
+  });
+
+  assert.equal(plan.channel, "instagram");
+  assert.equal(plan.mode, "semantic_split");
+  assert.equal(plan.guardResult.ok, true);
+  assert.deepEqual(
+    plan.parts.map((part) => (part.kind === "sender_action" ? `${part.kind}:${part.action}` : `${part.kind}:${part.reason}`)),
+    [
+      "sender_action:mark_seen",
+      "text:greeting_availability",
+      "text:pricing",
+      "attachment:pricing_guide",
+      "text:team_qualification_question",
+    ],
+  );
+
+  const teamQuestionPart = plan.parts.find(
+    (part) => part.kind === "text" && part.reason === "team_qualification_question",
+  );
+
+  assert.ok(teamQuestionPart);
+  assert.equal(teamQuestionPart.kind, "text");
+  assert.match(teamQuestionPart.text, /Jay/i);
+  assert.match(teamQuestionPart.text, /both of your names/i);
+});
+
+test("Instagram delivery plan does not label non-question text as qualification_question", () => {
+  const plan = buildChannelDeliveryPlan({
+    channel: "instagram",
+    outboundText: [
+      "Hey there! Thank you so much for reaching out.",
+      "Great news - I checked June 15, 2027 in Tampa, and the date is available.",
+      "Our 8-hour wedding films start at $2,950 for Florida.",
+      "What are both of your names?",
+    ].join("\n\n"),
+    replyContract: contract({
+      replyType: "availability_available",
+      mustGreet: true,
+      mustMentionWeddingAvailability: true,
+      mustMentionPricing: true,
+    }),
+    conversationId: "conversation-1",
+    turnId: "turn-question-label",
+    channelConfig: {
+      enableInstagramSemanticDeliveryPlan: true,
+    },
+  });
+
+  assert.equal(plan.channel, "instagram");
+  assert.equal(plan.mode, "semantic_split");
+
+  for (const part of plan.parts) {
+    if (part.kind === "text" && part.reason === "qualification_question") {
+      assert.match(part.text, /both of your names/i);
+    }
+  }
 });
 
 test("Instagram delivery plan keeps booking and handoff as single-message", () => {

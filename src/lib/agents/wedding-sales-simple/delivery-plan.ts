@@ -19,10 +19,13 @@ export type InstagramDeliveryPart =
       delayMsBefore: number;
       typingMsBefore: number;
       reason:
+        | "greeting"
+        | "greeting_availability"
         | "availability"
         | "pricing"
         | "guide"
         | "team"
+        | "team_qualification_question"
         | "identity"
         | "portfolio"
         | "qualification_question"
@@ -126,6 +129,14 @@ function typingDelayForText(seed: string, text: string) {
 
 function reasonForText(part: string, contract: ReplyActionContract): Extract<InstagramDeliveryPart, { kind: "text" }>["reason"] {
   const normalized = part.toLowerCase();
+  const asksRequiredQuestion = replyAsksRequiredQuestion(part, contract.requiredQuestion);
+  const hasQuestion = /[?]/.test(part);
+  const hasGreeting =
+    /\b(hey|hi|hello|thank you so much for reaching out|thanks for reaching out|congratulations|congrats)\b/i.test(
+      part,
+    );
+  const hasAvailability = /available|open|not open/.test(normalized);
+  const hasTeam = /filmmaker|shooter|team|jay/.test(normalized);
 
   if (contract.replyType === "handoff") {
     return "handoff";
@@ -135,11 +146,23 @@ function reasonForText(part: string, contract: ReplyActionContract): Extract<Ins
     return "booking";
   }
 
+  if (hasGreeting && hasAvailability) {
+    return "greeting_availability";
+  }
+
+  if (hasGreeting) {
+    return "greeting";
+  }
+
+  if (hasTeam && asksRequiredQuestion) {
+    return "team_qualification_question";
+  }
+
   if (/price|pricing|wedding films start|\$\d|collection/.test(normalized)) {
     return "pricing";
   }
 
-  if (/available|open|not open/.test(normalized)) {
+  if (hasAvailability) {
     return "availability";
   }
 
@@ -151,7 +174,7 @@ function reasonForText(part: string, contract: ReplyActionContract): Extract<Ins
     return "guide";
   }
 
-  if (/filmmaker|shooter|team|jay/.test(normalized)) {
+  if (hasTeam) {
     return "team";
   }
 
@@ -163,7 +186,7 @@ function reasonForText(part: string, contract: ReplyActionContract): Extract<Ins
     return "portfolio";
   }
 
-  if (/[?]/.test(part) || contract.requiredQuestion) {
+  if (hasQuestion || asksRequiredQuestion) {
     return "qualification_question";
   }
 
@@ -211,7 +234,7 @@ function splitSemanticTextParts(text: string, contract: ReplyActionContract) {
 
     if (
       parts.length > 1 &&
-      (firstReason === "single_reply" || firstReason === "identity") &&
+      (firstReason === "single_reply" || firstReason === "identity" || firstReason === "greeting") &&
       secondReason === "availability"
     ) {
       parts.splice(0, 2, `${parts[0]}\n\n${parts[1]}`);
@@ -353,24 +376,45 @@ function buildInstagramSemanticPlan(args: {
       reason: "read_receipt",
     },
   ];
+  const pricingGuideAttachments = (args.attachments ?? []).filter(
+    (attachment) => attachment.purpose === "pricing_guide",
+  );
+  const remainingAttachments = (args.attachments ?? []).filter(
+    (attachment) => attachment.purpose !== "pricing_guide",
+  );
+  const pushedAttachmentUrls = new Set<string>();
 
-  candidateTextParts.forEach((text, index) => {
-    parts.push({
-      kind: "text",
-      text,
-      delayMsBefore: index === 0 ? 0 : deterministicDelayMs(`${args.seed}:between:${index}`, 900, 2200),
-      typingMsBefore: typingDelayForText(`${args.seed}:typing:${index}`, text),
-      reason: reasonForText(text, args.contract),
-    });
-  });
-
-  for (const attachment of args.attachments ?? []) {
+  const pushAttachment = (attachment: NormalizedWeddingSalesAttachment) => {
     parts.push({
       kind: "attachment",
       attachment,
       delayMsBefore: deterministicDelayMs(`${args.seed}:attachment:${attachment.url}`, 700, 1400),
       reason: attachment.purpose,
     });
+    pushedAttachmentUrls.add(attachment.url);
+  };
+
+  candidateTextParts.forEach((text, index) => {
+    const reason = reasonForText(text, args.contract);
+    parts.push({
+      kind: "text",
+      text,
+      delayMsBefore: index === 0 ? 0 : deterministicDelayMs(`${args.seed}:between:${index}`, 900, 2200),
+      typingMsBefore: typingDelayForText(`${args.seed}:typing:${index}`, text),
+      reason,
+    });
+
+    if (reason === "pricing") {
+      pricingGuideAttachments
+        .filter((attachment) => !pushedAttachmentUrls.has(attachment.url))
+        .forEach(pushAttachment);
+    }
+  });
+
+  for (const attachment of [...pricingGuideAttachments, ...remainingAttachments]) {
+    if (!pushedAttachmentUrls.has(attachment.url)) {
+      pushAttachment(attachment);
+    }
   }
 
   const totalDelayMs = parts.reduce((total, part) => {
