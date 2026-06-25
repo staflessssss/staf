@@ -65,6 +65,7 @@ function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState 
 
   return {
     ...state,
+    ...decision.statePatch,
     nextStep: decision.nextStep,
     missingField: decision.missingField,
     mode: decision.mode ?? state.mode,

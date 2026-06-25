@@ -160,7 +160,10 @@ function questionLine(args: {
   knowledge: SimpleWeddingKnowledgeContext;
 }) {
   const callWindow = args.knowledge.scheduling.callWindow.replace("America/New_York", "Eastern");
-  const proposedTime = displayProposedCallTime(args.state.proposedCallTime);
+  const proposedTime = displayProposedCallTime(
+    args.state.proposedCallTime ?? args.state.callTimeContext?.rejected?.value,
+  );
+  const offeredCallTimes = formatOfferedCallTimeOptions(args.state);
 
   switch (args.contract.requiredQuestion) {
     case "coupleNames":
@@ -184,10 +187,10 @@ function questionLine(args: {
 
       if (args.contract.questionPolicy.mode === "invalid_answer_retry") {
         if (args.contract.replyType === "call_time_ambiguous") {
-          return "Either works - I just need one specific time to check the calendar. Would you prefer 1pm or 2pm?";
+          return `Either works - I just need one specific time to check the calendar. Would you prefer ${offeredCallTimes}?`;
         }
 
-        return `${proposedTime ?? "That time"} is just outside my consult window - I do calls ${callWindow}. Would 1pm or 2pm work?`;
+        return `${proposedTime ?? "That time"} is just outside my consult window - I do calls ${callWindow}. Would ${offeredCallTimes} work?`;
       }
 
       if (args.contract.questionPolicy.mode === "ask_after_context_change") {
@@ -211,6 +214,24 @@ function questionLine(args: {
     default:
       return undefined;
   }
+}
+
+function formatOfferedCallTimeOptions(state: SimpleWeddingSalesState) {
+  const labels = state.callTimeContext?.options.map((option) => option.label) ?? [];
+
+  if (labels.length === 0) {
+    return "1pm or 2pm";
+  }
+
+  if (labels.length === 1) {
+    return labels[0]!;
+  }
+
+  if (labels.length === 2) {
+    return `${labels[0]} or ${labels[1]}`;
+  }
+
+  return `${labels.slice(0, -1).join(", ")}, or ${labels.at(-1)}`;
 }
 
 function displayProposedCallTime(value?: string) {

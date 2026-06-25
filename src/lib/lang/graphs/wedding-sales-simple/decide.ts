@@ -149,6 +149,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   missingField?: SimpleWeddingSalesState["missingField"];
   mode?: SimpleWeddingSalesState["mode"];
   handoffReason?: SimpleWeddingSalesHandoffReason;
+  statePatch?: Partial<SimpleWeddingSalesState>;
   trace: SimpleWeddingSalesDecisionTrace;
 } {
   const traceBase = {
@@ -160,6 +161,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     missingField?: SimpleWeddingSalesState["missingField"];
     mode?: SimpleWeddingSalesState["mode"];
     handoffReason?: SimpleWeddingSalesHandoffReason;
+    statePatch?: Partial<SimpleWeddingSalesState>;
     replyType: SimpleWeddingSalesDecisionTrace["replyType"];
     reason: string;
   }) => ({
@@ -167,6 +169,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     missingField: args.missingField,
     mode: args.mode,
     handoffReason: args.handoffReason,
+    statePatch: args.statePatch,
     trace: {
       ...traceBase,
       nextStep: args.nextStep,
@@ -338,19 +341,19 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (availability === "available" && !state.proposedCallTime) {
-    return decision({
-      nextStep: "ask_call_time",
-      replyType: "ask_call_time",
-      reason: "availability is open and call time is not known",
-    });
-  }
-
   if (state.callTimeAmbiguousChoice) {
     return decision({
       nextStep: "ask_call_time",
       replyType: "call_time_ambiguous",
       reason: "customer accepted multiple suggested call times without choosing one",
+    });
+  }
+
+  if (availability === "available" && !state.proposedCallTime) {
+    return decision({
+      nextStep: "ask_call_time",
+      replyType: "ask_call_time",
+      reason: "availability is open and call time is not known",
     });
   }
 
@@ -360,10 +363,20 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     (isProposedCallTimeOutsideConsultWindow(state) ||
       proposedCallTimeViolatesBusinessDay(state))
   ) {
+    const violatesBusinessDay = proposedCallTimeViolatesBusinessDay(state);
+
     return decision({
       nextStep: "ask_call_time",
       replyType: "call_time_out_of_window",
       reason: "customer proposed a consultation time outside the configured consult window",
+      statePatch: {
+        proposedCallTime: undefined,
+        callTimeContext: buildOutOfWindowCallTimeContext({
+          proposedCallTime: state.proposedCallTime,
+          reason: violatesBusinessDay ? "business_day" : "out_of_window",
+          state,
+        }),
+      },
     });
   }
 
@@ -470,6 +483,51 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     replyType: "reply_only",
     reason: "no tool or qualification question is needed",
   });
+}
+
+function buildOutOfWindowCallTimeContext(args: {
+  proposedCallTime: string;
+  reason: "out_of_window" | "business_day";
+  state: SimpleWeddingSalesState;
+}): SimpleWeddingSalesState["callTimeContext"] {
+  const endHour = args.state.callBookingWindow?.endHour ?? 14;
+  const firstHour = Math.max(args.state.callBookingWindow?.startHour ?? 9, endHour - 1);
+
+  return {
+    requiredQuestion: "callTime",
+    rejected: {
+      value: args.proposedCallTime,
+      reason: args.reason,
+    },
+    dateContext: extractCallTimeDateContext(args.proposedCallTime),
+    options: [firstHour, endHour].map((hour) => ({
+      label: formatCallTimeOptionLabel(hour, 0),
+      hour,
+      minute: 0,
+    })),
+    source: "out_of_window_suggestions",
+  };
+}
+
+function extractCallTimeDateContext(value: string) {
+  const trimmed = value.trim();
+  const isoDate = /^(\d{4}-\d{2}-\d{2})T/.exec(trimmed)?.[1];
+
+  if (isoDate) {
+    return isoDate;
+  }
+
+  return /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday)\b/i.exec(
+    trimmed,
+  )?.[1]?.toLowerCase();
+}
+
+function formatCallTimeOptionLabel(hour: number, minute: number) {
+  const suffix = hour >= 12 ? "pm" : "am";
+  const displayHour = hour % 12 || 12;
+  const minutes = minute === 0 ? "" : `:${String(minute).padStart(2, "0")}`;
+
+  return `${displayHour}${minutes}${suffix}`;
 }
 
 function getMissingFields(state: SimpleWeddingSalesState) {

@@ -448,6 +448,12 @@ test("simple wedding sales runtime retries call time outside consult window with
   assert.equal(result.replyContract?.questionPolicy.mode, "invalid_answer_retry");
   assert.equal(result.replyGuardResult?.ok, true);
   assert.deepEqual(result.toolObservations, []);
+  assert.equal(result.proposedCallTime, undefined);
+  assert.equal(result.callTimeContext?.rejected?.value, "Tomorrow at 3pm");
+  assert.deepEqual(
+    result.callTimeContext?.options.map((option) => option.label),
+    ["1pm", "2pm"],
+  );
   assert.match(result.responseDraft ?? "", /3pm.*outside my consult window/i);
   assert.match(result.responseDraft ?? "", /9am-2pm Eastern/i);
   assert.match(result.responseDraft ?? "", /1pm or 2pm work/i);
@@ -571,7 +577,27 @@ test("simple wedding sales runtime resolves a bare numeric call time from reject
       venue: "Evergreen Park",
       availability: "available",
       availabilityContextDate: "2027-06-15",
-      proposedCallTime: "tomorrow at 3pm",
+      callTimeContext: {
+        requiredQuestion: "callTime",
+        dateContext: "tomorrow",
+        rejected: {
+          value: "tomorrow at 3pm",
+          reason: "out_of_window",
+        },
+        options: [
+          {
+            label: "1pm",
+            hour: 13,
+            minute: 0,
+          },
+          {
+            label: "2pm",
+            hour: 14,
+            minute: 0,
+          },
+        ],
+        source: "out_of_window_suggestions",
+      },
       replyMemory: {
         lastRequiredQuestion: "callTime",
         questionMemory: {
@@ -615,7 +641,27 @@ test("simple wedding sales runtime does not guess when customer accepts multiple
       venue: "Evergreen Park",
       availability: "available",
       availabilityContextDate: "2027-06-15",
-      proposedCallTime: "tomorrow at 3pm",
+      callTimeContext: {
+        requiredQuestion: "callTime",
+        dateContext: "tomorrow",
+        rejected: {
+          value: "tomorrow at 3pm",
+          reason: "out_of_window",
+        },
+        options: [
+          {
+            label: "1pm",
+            hour: 13,
+            minute: 0,
+          },
+          {
+            label: "2pm",
+            hour: 14,
+            minute: 0,
+          },
+        ],
+        source: "out_of_window_suggestions",
+      },
       replyMemory: {
         lastRequiredQuestion: "callTime",
         questionMemory: {
@@ -639,10 +685,96 @@ test("simple wedding sales runtime does not guess when customer accepts multiple
 
   assert.equal(result.nextStep, "ask_call_time");
   assert.equal(result.decisionTrace?.replyType, "call_time_ambiguous");
+  assert.notEqual(result.proposedCallTime, "tomorrow at 3pm");
+  assert.equal(result.proposedCallTime, undefined);
   assert.equal(result.replyContract?.questionPolicy.mode, "invalid_answer_retry");
   assert.deepEqual(result.toolObservations, []);
   assert.match(result.responseDraft ?? "", /one specific time/i);
   assert.match(result.responseDraft ?? "", /1pm or 2pm/i);
+});
+
+test("simple wedding sales runtime matches offered call time options before normal parsing", async () => {
+  const cases = [
+    {
+      options: [
+        { label: "1pm", hour: 13, minute: 0 },
+        { label: "2pm", hour: 14, minute: 0 },
+      ],
+      answer: "2 works",
+      expected: "tomorrow at 2pm",
+    },
+    {
+      options: [
+        { label: "10am", hour: 10, minute: 0 },
+        { label: "12pm", hour: 12, minute: 0 },
+      ],
+      answer: "10 works",
+      expected: "tomorrow at 10am",
+    },
+    {
+      options: [
+        { label: "10am", hour: 10, minute: 0 },
+        { label: "12pm", hour: 12, minute: 0 },
+      ],
+      answer: "12 works",
+      expected: "tomorrow at 12pm",
+    },
+    {
+      options: [
+        { label: "9:30am", hour: 9, minute: 30 },
+        { label: "11:30am", hour: 11, minute: 30 },
+      ],
+      answer: "11:30 works",
+      expected: "tomorrow at 11:30am",
+    },
+  ];
+
+  for (const testCase of cases) {
+    const result = await invokeWeddingSalesSimpleGraph({
+      channel: "instagram",
+      message: testCase.answer,
+      toolContext,
+      previousState: {
+        customerName: "Mike",
+        partnerName: "Sarah",
+        weddingDate: "2027-06-15",
+        location: "Tampa",
+        venue: "Evergreen Park",
+        availability: "available",
+        availabilityContextDate: "2027-06-15",
+        callTimeContext: {
+          requiredQuestion: "callTime",
+          dateContext: "tomorrow",
+          rejected: {
+            value: "tomorrow at 3pm",
+            reason: "out_of_window",
+          },
+          options: testCase.options,
+          source: "out_of_window_suggestions",
+        },
+        replyMemory: {
+          lastRequiredQuestion: "callTime",
+          questionMemory: {
+            lastRequiredQuestion: "callTime",
+            lastQuestionText: `Would ${testCase.options.map((option) => option.label).join(" or ")} work?`,
+          },
+        },
+      },
+      understand: () =>
+        understanding({
+          customerMessageType: "answer_to_question",
+          facts: {},
+        }),
+    });
+
+    assert.equal(result.proposedCallTime, testCase.expected);
+    assert.notEqual(result.proposedCallTime, "tomorrow at 3pm");
+    assert.equal(result.decisionTrace?.toolCalled, "checkCalendar");
+    assert.deepEqual(
+      result.toolObservations.map((observation) => observation.toolName),
+      ["check_consultation_calendar"],
+    );
+  }
 });
 
 test("simple wedding sales runtime treats yes after available calendar as email step when email is missing", async () => {

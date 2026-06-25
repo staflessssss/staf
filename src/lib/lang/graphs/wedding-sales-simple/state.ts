@@ -140,6 +140,23 @@ export type SimpleWeddingSalesReplyMemory = {
   lastOutboundText?: string;
 };
 
+export type SimpleWeddingSalesCallTimeOption = {
+  label: string;
+  hour: number;
+  minute: number;
+};
+
+export type SimpleWeddingSalesCallTimeContext = {
+  requiredQuestion: "callTime";
+  dateContext?: string;
+  rejected?: {
+    value: string;
+    reason: "out_of_window" | "business_day";
+  };
+  options: SimpleWeddingSalesCallTimeOption[];
+  source: "out_of_window_suggestions" | "calendar_suggestions";
+};
+
 export type SimpleWeddingSalesState = {
   tenantId?: string;
   agentId?: string;
@@ -167,6 +184,7 @@ export type SimpleWeddingSalesState = {
   };
   proposedCallTime?: string;
   callTimeAmbiguousChoice?: boolean;
+  callTimeContext?: SimpleWeddingSalesCallTimeContext;
   calendarStatus?: "available" | "busy";
   calendarContextDate?: string;
   suggestedCallTimes?: string[];
@@ -243,6 +261,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     availabilityCheck: args.previousState?.availabilityCheck,
     proposedCallTime: args.previousState?.proposedCallTime,
     callTimeAmbiguousChoice: false,
+    callTimeContext: args.previousState?.callTimeContext,
     calendarStatus: args.previousState?.calendarStatus,
     calendarContextDate: args.previousState?.calendarContextDate,
     suggestedCallTimes: args.previousState?.suggestedCallTimes,
@@ -282,7 +301,9 @@ export function mergeTurnUnderstanding(
   const customerName = facts.customerName ?? state.customerName;
   const partnerName = facts.partnerName ?? state.partnerName;
   const callTimeCompletion = completeCallTimeFromAnswerContext(state, facts.proposedCallTime);
-  const proposedCallTime = callTimeCompletion.proposedCallTime ?? state.proposedCallTime;
+  const proposedCallTime = callTimeCompletion.clearProposedCallTime
+    ? undefined
+    : callTimeCompletion.proposedCallTime ?? state.proposedCallTime;
   const customerConfirmedCallSlot = Boolean(
     state.customerConfirmedCallSlot ||
       understanding.customerMessageType === "booking_confirmation" ||
@@ -422,10 +443,31 @@ function completeCallTimeFromAnswerContext(
 ) {
   const lastQuestionText = state.replyMemory?.questionMemory?.lastQuestionText;
   const answeringCallTime = wasAnsweringCallTimeQuestion(state);
+  const optionResolution = answeringCallTime
+    ? resolveAnswerToOfferedCallTimeOptions({
+        text: state.latestCustomerMessage,
+        lastCallTimeQuestion: state.callTimeContext,
+      })
+    : { kind: "no_match" as const };
+
+  if (optionResolution.kind === "matched_option") {
+    return {
+      proposedCallTime: optionResolution.proposedCallTime,
+      ambiguousChoice: false,
+    };
+  }
+
+  if (optionResolution.kind === "ambiguous_choice") {
+    return {
+      ambiguousChoice: true,
+      clearProposedCallTime: true,
+    };
+  }
 
   if (answeringCallTime && !proposedCallTime && isAmbiguousCallTimeChoice(state.latestCustomerMessage)) {
     return {
       ambiguousChoice: true,
+      clearProposedCallTime: Boolean(state.callTimeContext?.rejected),
     };
   }
 
@@ -446,7 +488,91 @@ function completeCallTimeFromAnswerContext(
       ? resolveProposedCallTimeFromPreviousContext(candidate, state.proposedCallTime)
       : undefined,
     ambiguousChoice: false,
+    clearProposedCallTime: Boolean(answeringCallTime && !candidate && state.callTimeContext?.rejected),
   };
+}
+
+function resolveAnswerToOfferedCallTimeOptions(args: {
+  text: string;
+  lastCallTimeQuestion?: SimpleWeddingSalesCallTimeContext;
+}):
+  | {
+      kind: "matched_option";
+      proposedCallTime: string;
+      matchedLabel: string;
+    }
+  | {
+      kind: "ambiguous_choice";
+      options: string[];
+    }
+  | {
+      kind: "no_match";
+    } {
+  const options = args.lastCallTimeQuestion?.options ?? [];
+
+  if (options.length === 0) {
+    return { kind: "no_match" };
+  }
+
+  if (isAmbiguousCallTimeChoice(args.text) && options.length > 1) {
+    return {
+      kind: "ambiguous_choice",
+      options: options.map((option) => option.label),
+    };
+  }
+
+  const shortAnswer = extractShortCallTimeAnswer(args.text);
+
+  if (!shortAnswer) {
+    return { kind: "no_match" };
+  }
+
+  const hour = Number(shortAnswer.hour);
+  const minute = Number(shortAnswer.minutes ?? "0");
+  const suffix = shortAnswer.suffix?.toLowerCase();
+  const matches = options.filter((option) => {
+    const optionDisplayHour = option.hour % 12 || 12;
+    const optionSuffix = option.hour >= 12 ? "pm" : "am";
+
+    return (
+      optionDisplayHour === hour &&
+      option.minute === minute &&
+      (!suffix || optionSuffix === suffix)
+    );
+  });
+
+  if (matches.length !== 1) {
+    return { kind: "no_match" };
+  }
+
+  const matched = matches[0]!;
+
+  return {
+    kind: "matched_option",
+    matchedLabel: matched.label,
+    proposedCallTime: combineCallTimeOptionWithDateContext(
+      matched,
+      args.lastCallTimeQuestion?.dateContext,
+    ),
+  };
+}
+
+function combineCallTimeOptionWithDateContext(
+  option: SimpleWeddingSalesCallTimeOption,
+  dateContext?: string,
+) {
+  const normalizedDateContext = dateContext?.trim();
+  const time = `${String(option.hour).padStart(2, "0")}:${String(option.minute).padStart(2, "0")}`;
+
+  if (!normalizedDateContext) {
+    return option.label;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalizedDateContext)) {
+    return `${normalizedDateContext}T${time}:00`;
+  }
+
+  return `${normalizedDateContext} at ${option.label}`;
 }
 
 function resolveProposedCallTimeFromPreviousContext(
