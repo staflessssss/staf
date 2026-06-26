@@ -642,8 +642,20 @@ export function mergeTurnUnderstanding(
   const shouldSkipCallTimeContext =
     answersPendingBookingConfirmation ||
     dialogueUnderstandingWithCommands.messageAct === "acknowledgement_only";
-  const customerName = facts.customerName ?? state.customerName;
-  const partnerName = facts.partnerName ?? state.partnerName;
+  const suppressNameFactsForRequestedLocation = Boolean(
+    weddingLeadForm.requestedSlot === "location" &&
+      weddingLeadForm.slotResolution.suppressed.some(
+        (entry) =>
+          entry.source === "dialogueCommands.set_slot:customerName" ||
+          entry.source === "dialogueCommands.set_slot:partnerName",
+      ),
+  );
+  const customerName = suppressNameFactsForRequestedLocation
+    ? state.customerName
+    : facts.customerName ?? state.customerName;
+  const partnerName = suppressNameFactsForRequestedLocation
+    ? state.partnerName
+    : facts.partnerName ?? state.partnerName;
   const callTimeCompletion = shouldSkipCallTimeContext
     ? {
         proposedCallTime: undefined,

@@ -40,8 +40,15 @@ export type WeddingLeadFormSlotFailure = Prisma.JsonObject & {
   reason: string;
 };
 
+export type WeddingLeadFormSuppressedCommand = Prisma.JsonObject & {
+  source: string;
+  rawValue?: Prisma.JsonValue;
+  reason: string;
+};
+
 export type WeddingLeadFormResolution = Prisma.JsonObject & {
   active: boolean;
+  requestedSlot?: WeddingLeadRequiredSlot;
   slotPatch: Pick<
     Partial<SimpleWeddingSalesState>,
     "weddingDate" | "weddingDateText" | "weddingDateDisplay" | "location"
@@ -49,6 +56,7 @@ export type WeddingLeadFormResolution = Prisma.JsonObject & {
   slotResolution: {
     resolved: WeddingLeadFormSlotResolution[];
     failed: WeddingLeadFormSlotFailure[];
+    suppressed: WeddingLeadFormSuppressedCommand[];
   };
   canonicalSlotsBeforeDecision: {
     weddingDate?: string;
@@ -190,6 +198,86 @@ function commandSource(command: SimpleWeddingSalesDialogueCommand) {
   return command.type === "set_slot" ? `dialogueCommands.set_slot:${command.slot}` : command.type;
 }
 
+function requestedSlotForState(state: SimpleWeddingSalesState): WeddingLeadRequiredSlot | undefined {
+  const requiredQuestion =
+    state.replyMemory?.lastRequiredQuestion ??
+    state.replyMemory?.questionMemory?.lastRequiredQuestion;
+
+  if (requiredQuestion === "weddingDate" || requiredQuestion === "location") {
+    return requiredQuestion;
+  }
+
+  if (requiredQuestion === "names" || requiredQuestion === "coupleNames") {
+    return "names";
+  }
+
+  if (requiredQuestion === "email" || requiredQuestion === "callTime") {
+    return requiredQuestion;
+  }
+
+  return undefined;
+}
+
+function isExplicitNameIntroduction(text: string) {
+  const normalized = text.trim().toLowerCase().replace(/[\u2019]/g, "'");
+
+  return (
+    normalized.startsWith("i'm ") ||
+    normalized.startsWith("i am ") ||
+    normalized.startsWith("my name is ") ||
+    normalized.startsWith("we are ") ||
+    normalized.startsWith("we're ") ||
+    normalized.includes("bride is ") ||
+    normalized.includes("groom is ")
+  );
+}
+
+function isPlainSlotAnswer(text: string) {
+  const normalized = text.trim();
+
+  if (!normalized || normalized.length > 80) {
+    return false;
+  }
+
+  return !/[?]/.test(normalized);
+}
+
+function suppressConflictingNameCommands(input: {
+  requestedSlot?: WeddingLeadRequiredSlot;
+  commands: SimpleWeddingSalesDialogueCommand[];
+  latestCustomerMessage: string;
+}): {
+  commands: SimpleWeddingSalesDialogueCommand[];
+  suppressed: WeddingLeadFormSuppressedCommand[];
+} {
+  const suppressed: WeddingLeadFormSuppressedCommand[] = [];
+
+  if (input.requestedSlot !== "location") {
+    return { commands: input.commands, suppressed };
+  }
+
+  return {
+    commands: input.commands.filter((command) => {
+      if (
+        command.type === "set_slot" &&
+        (command.slot === "customerName" || command.slot === "partnerName") &&
+        !isExplicitNameIntroduction(input.latestCustomerMessage)
+      ) {
+        suppressed.push({
+          source: commandSource(command),
+          rawValue: command.value,
+          reason: "active requestedSlot=location",
+        });
+
+        return false;
+      }
+
+      return true;
+    }),
+    suppressed,
+  };
+}
+
 function missingSlotsForState(
   state: Pick<
     SimpleWeddingSalesState,
@@ -262,8 +350,14 @@ export function resolveWeddingLeadFormSlots(input: {
 }): WeddingLeadFormResolution {
   const resolved: WeddingLeadFormSlotResolution[] = [];
   const failed: WeddingLeadFormSlotFailure[] = [];
+  const requestedSlot = requestedSlotForState(input.state);
+  const commandResolution = suppressConflictingNameCommands({
+    requestedSlot,
+    commands: input.commands,
+    latestCustomerMessage: input.latestCustomerMessage,
+  });
   const patch: WeddingLeadFormResolution["slotPatch"] = {};
-  const dateCommands = input.commands.filter(
+  const dateCommands = commandResolution.commands.filter(
     (command) =>
       command.type === "set_slot" &&
       (command.slot === "weddingDate" || command.slot === "weddingDateText"),
@@ -302,7 +396,7 @@ export function resolveWeddingLeadFormSlots(input: {
     });
   }
 
-  const locationCommand = input.commands.find(
+  const locationCommand = commandResolution.commands.find(
     (command) => command.type === "set_slot" && command.slot === "location",
   );
 
@@ -313,6 +407,19 @@ export function resolveWeddingLeadFormSlots(input: {
       canonicalSlot: "location",
       rawValue: locationCommand.value,
       resolvedValue: locationCommand.value,
+    });
+  } else if (
+    requestedSlot === "location" &&
+    isPlainSlotAnswer(input.latestCustomerMessage) &&
+    !isExplicitNameIntroduction(input.latestCustomerMessage)
+  ) {
+    const location = input.latestCustomerMessage.trim();
+    patch.location = location;
+    resolved.push({
+      source: "requestedSlot:location",
+      canonicalSlot: "location",
+      rawValue: location,
+      resolvedValue: location,
     });
   }
 
@@ -329,14 +436,17 @@ export function resolveWeddingLeadFormSlots(input: {
 
   return {
     active: Boolean(
-      input.commands.some((command) => command.type === "start_flow") ||
+      requestedSlot ||
+        input.commands.some((command) => command.type === "start_flow") ||
         dateCommands.length > 0 ||
         locationCommand,
     ),
+    requestedSlot,
     slotPatch: patch,
     slotResolution: {
       resolved,
       failed,
+      suppressed: commandResolution.suppressed,
     },
     canonicalSlotsBeforeDecision,
     missingSlotsBeforeDecision: missingSlotsForState(formState),

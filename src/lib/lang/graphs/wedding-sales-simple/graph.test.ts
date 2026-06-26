@@ -232,6 +232,57 @@ test("simple wedding sales runtime fills date and location without repeating wed
   assert.doesNotMatch(second.responseDraft ?? "", /date and location|Do you already have your wedding date/i);
 });
 
+test("simple wedding sales runtime honors requested location slot over wrong name extraction", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Inquiry about wedding videography",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "July 16 2026",
+    previousState: first,
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {
+          weddingDate: "2026-07-16",
+          weddingDateText: "July 16 2026",
+        },
+      }),
+  });
+  const third = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Charlotte",
+    previousState: second,
+    toolContext,
+    understand: () =>
+      understanding({
+        customerMessageType: "unclear",
+        confidence: 0.8,
+        facts: {
+          customerName: "Charlotte",
+          weddingDate: "2026-07-16",
+          weddingDateText: "July 16 2026",
+        },
+      }),
+  });
+
+  assert.equal(third.location, "Charlotte");
+  assert.equal(third.customerName, undefined);
+  assert.equal(third.weddingLeadForm?.requestedSlot, "location");
+  assert.equal(third.weddingLeadForm?.slotResolution.suppressed.length, 1);
+  assert.equal(third.weddingLeadForm?.slotResolution.resolved.some(
+    (entry) => entry.source === "requestedSlot:location",
+  ), true);
+  assert.notEqual(third.decisionTrace?.replyType, "clarification");
+  assert.doesNotMatch(third.responseDraft ?? "", /make sure I understand/i);
+});
+
 test("simple wedding sales runtime still handoffs specific uncovered business questions", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

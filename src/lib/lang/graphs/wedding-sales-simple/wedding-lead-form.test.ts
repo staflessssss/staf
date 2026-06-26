@@ -73,3 +73,64 @@ test("wedding lead form treats numeric slash dates as ambiguous", () => {
   assert.equal(result.ok, false);
   assert.equal(result.reason, "ambiguous_numeric_date");
 });
+
+test("wedding lead form maps plain answer to requested location and suppresses wrong name", () => {
+  const result = resolveWeddingLeadFormSlots({
+    state: state({
+      weddingDate: "2026-07-16",
+      weddingDateText: "July 16 2026",
+      weddingDateDisplay: "July 16, 2026",
+      replyMemory: {
+        lastRequiredQuestion: "location",
+        questionMemory: {
+          lastRequiredQuestion: "location",
+          lastQuestionText: "Perfect, July 16, 2026. What city or venue are you planning for?",
+        },
+      },
+    }),
+    latestCustomerMessage: "Charlotte",
+    commands: [
+      {
+        type: "set_slot",
+        slot: "customerName",
+        value: "Charlotte",
+      },
+    ],
+  });
+
+  assert.equal(result.requestedSlot, "location");
+  assert.equal(result.slotPatch.location, "Charlotte");
+  assert.equal(result.selectedPromptResponseKey, "utter_ask_names_after_details");
+  assert.deepEqual(result.slotResolution.suppressed, [
+    {
+      source: "dialogueCommands.set_slot:customerName",
+      rawValue: "Charlotte",
+      reason: "active requestedSlot=location",
+    },
+  ]);
+  assert.equal(result.slotResolution.resolved.at(-1)?.source, "requestedSlot:location");
+});
+
+test("wedding lead form does not treat explicit name introduction as location", () => {
+  const result = resolveWeddingLeadFormSlots({
+    state: state({
+      weddingDate: "2026-07-16",
+      replyMemory: {
+        lastRequiredQuestion: "location",
+      },
+    }),
+    latestCustomerMessage: "My name is Charlotte",
+    commands: [
+      {
+        type: "set_slot",
+        slot: "customerName",
+        value: "Charlotte",
+      },
+    ],
+  });
+
+  assert.equal(result.requestedSlot, "location");
+  assert.equal(result.slotPatch.location, undefined);
+  assert.equal(result.slotResolution.suppressed.length, 0);
+  assert.equal(result.missingSlotsBeforeDecision.includes("location"), true);
+});
