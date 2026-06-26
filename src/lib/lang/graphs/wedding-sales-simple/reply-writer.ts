@@ -5,7 +5,7 @@ import { validateGeneratedReply } from "./reply-guards";
 import {
   missingResponseVariationSlots,
   renderResponseVariation,
-  selectResponseVariation,
+  selectResponseVariationCandidates,
 } from "./responses";
 import type {
   SimpleWeddingSalesResponseKey,
@@ -284,14 +284,43 @@ function displayCheckedCallTime(state: SimpleWeddingSalesState) {
     : displayProposedCallTime(state.proposedCallTime);
 }
 
-function buildResponseCatalogSlots(state: SimpleWeddingSalesState) {
+function coverageRegionLabel(knowledge: SimpleWeddingKnowledgeContext) {
+  if (knowledge.pricing.region === "FL") {
+    return "Florida";
+  }
+
+  if (knowledge.pricing.region === "NC_SC_GA") {
+    return "NC/SC/GA";
+  }
+
+  return knowledge.pricing.region;
+}
+
+function formatCallWindow(knowledge: SimpleWeddingKnowledgeContext) {
+  return knowledge.scheduling.callWindow.replace("America/New_York", "Eastern");
+}
+
+function buildResponseCatalogSlots(
+  state: SimpleWeddingSalesState,
+  knowledge?: SimpleWeddingKnowledgeContext,
+) {
+  const location = state.location;
+
   return {
     callTimeDisplay: displayCheckedCallTime(state),
     email: state.customerEmail,
     weddingDateDisplay: state.weddingDateDisplay ?? (
       state.weddingDate ? formatSimpleWeddingDate(state.weddingDate) : undefined
     ),
-    location: state.location,
+    location,
+    locationDisplay: location,
+    venue: state.venue,
+    startPrice: knowledge?.pricing.startPrice,
+    coverageHours: knowledge?.pricing.coverageHours
+      ? String(knowledge.pricing.coverageHours)
+      : undefined,
+    coverageRegion: knowledge ? coverageRegionLabel(knowledge) : undefined,
+    callWindow: knowledge ? formatCallWindow(knowledge) : undefined,
   };
 }
 
@@ -304,8 +333,16 @@ function compatibleResponseKeys(contract: ReplyActionContract): SimpleWeddingSal
     return ["utter_ask_booking_confirmation"];
   }
 
+  if (contract.mentionPolicy.consultation.mode === "first_available") {
+    return ["utter_calendar_available_ask_email", "utter_ask_email"];
+  }
+
   if (contract.mustAnswerQuestions?.includes("raw_footage")) {
     return ["utter_answer_raw_footage"];
+  }
+
+  if (contract.mustAnswerTravel && contract.requiredQuestion === "callTime") {
+    return ["utter_answer_travel_resume_call_time"];
   }
 
   if (contract.replyType === "acknowledgement_only") {
@@ -313,11 +350,23 @@ function compatibleResponseKeys(contract: ReplyActionContract): SimpleWeddingSal
   }
 
   if (contract.requiredQuestion === "callTime") {
-    return ["utter_ask_call_time"];
+    return ["utter_venue_collected_ask_call_time", "utter_ask_call_time"];
   }
 
   if (contract.requiredQuestion === "venue") {
     return ["utter_ask_venue"];
+  }
+
+  if (contract.requiredQuestion === "names" && contract.mustMentionWeddingAvailability) {
+    return ["utter_availability_available_ask_names", "utter_ask_names_after_details"];
+  }
+
+  if (
+    contract.requiredQuestion === "names" &&
+    contract.mustMentionPricing &&
+    contract.mentionPolicy.pricing.mode === "same_as_before"
+  ) {
+    return ["utter_pricing_repeat_send_guide_ask_names"];
   }
 
   return contract.responseKey ? [contract.responseKey] : [];
@@ -339,22 +388,38 @@ function responseKeyCompatibility(contract: ReplyActionContract) {
   };
 }
 
+const SAFE_OBLIGATION_CATALOG_KEYS = new Set<SimpleWeddingSalesResponseKey>([
+  "utter_availability_available_ask_names",
+  "utter_pricing_repeat_send_guide_ask_names",
+  "utter_venue_collected_ask_call_time",
+  "utter_answer_travel_resume_call_time",
+  "utter_calendar_available_ask_email",
+]);
+
 function catalogExclusionReason(contract: ReplyActionContract) {
+  const allowsSafeObligations = Boolean(
+    contract.responseKey && SAFE_OBLIGATION_CATALOG_KEYS.has(contract.responseKey),
+  );
+
   if (
     (contract.mustGreet && contract.responseKey !== "utter_ask_wedding_details") ||
-    contract.mustMentionWeddingAvailability ||
-    contract.mustMentionCalendarAvailability ||
-    contract.mustMentionPricing ||
-    contract.mustMentionGuide ||
+    (!allowsSafeObligations &&
+      (contract.mustMentionWeddingAvailability ||
+        contract.mustMentionCalendarAvailability ||
+        contract.mustMentionPricing ||
+        contract.mustMentionGuide ||
+        contract.mustAnswerTravel)) ||
     contract.mustAnswerTeam ||
     contract.mustAnswerIdentity ||
-    contract.mustAnswerTravel
+    contract.mustAnswerQuestions?.includes("portfolio")
   ) {
     return "responseKey_excluded" as const;
   }
 
   if (
     contract.requiredQuestion === "callTime" &&
+    contract.responseKey !== "utter_venue_collected_ask_call_time" &&
+    contract.responseKey !== "utter_answer_travel_resume_call_time" &&
     (contract.questionPolicy.mode !== "first_ask" ||
       contract.questionPolicy.allowCompliment)
   ) {
@@ -379,6 +444,7 @@ function previousVariationIdsForResponseKey(args: {
 function tryBuildResponseFromCatalog(args: {
   state: SimpleWeddingSalesState;
   contract: ReplyActionContract;
+  knowledge?: SimpleWeddingKnowledgeContext;
 }): {
   text: string;
   responseKey: SimpleWeddingSalesResponseKey;
@@ -401,7 +467,7 @@ function tryBuildResponseFromCatalog(args: {
 
   const turnIndex = args.state.replyMemory?.turnIndex ?? 0;
   const variationSeed = `${args.state.contactId ?? ""}:${turnIndex}:${responseKey}`;
-  const variation = selectResponseVariation({
+  const variations = selectResponseVariationCandidates({
     responseKey,
     contactId: args.state.contactId,
     turnIndex,
@@ -411,11 +477,12 @@ function tryBuildResponseFromCatalog(args: {
     }),
   });
 
-  if (!variation) {
+  if (variations.length === 0) {
     return null;
   }
 
-  const slots = buildResponseCatalogSlots(args.state);
+  const slots = buildResponseCatalogSlots(args.state, args.knowledge);
+  const variation = variations[0]!;
   const missingTemplateSlots = missingResponseVariationSlots(variation, slots);
 
   if (missingTemplateSlots.length > 0) {
@@ -492,6 +559,111 @@ function responseCatalogFallbackReason(
   return catalogDraft?.trace.fallbackReason === "missing_template_slot"
     ? "missing_template_slot"
     : "response_catalog_guard_failed";
+}
+
+function tryBuildGuardedResponseFromCatalog(args: {
+  state: SimpleWeddingSalesState;
+  contract: ReplyActionContract;
+  knowledge: SimpleWeddingKnowledgeContext;
+}): {
+  text: string;
+  responseKey: SimpleWeddingSalesResponseKey;
+  variationId: string;
+  variationSeed: string;
+  guardResult: ReturnType<typeof validateGeneratedReply>;
+  trace: SimpleWeddingSalesWriterCatalogTrace;
+} | null {
+  const responseKey = args.contract.responseKey;
+  const compatibility = responseKeyCompatibility(args.contract);
+
+  if (!responseKey) {
+    return null;
+  }
+
+  const exclusionReason = catalogExclusionReason(args.contract);
+
+  if (exclusionReason) {
+    return null;
+  }
+
+  const turnIndex = args.state.replyMemory?.turnIndex ?? 0;
+  const variationSeed = `${args.state.contactId ?? ""}:${turnIndex}:${responseKey}`;
+  const variations = selectResponseVariationCandidates({
+    responseKey,
+    contactId: args.state.contactId,
+    turnIndex,
+    lastVariationIds: previousVariationIdsForResponseKey({
+      state: args.state,
+      responseKey,
+    }),
+  });
+  const slots = buildResponseCatalogSlots(args.state, args.knowledge);
+  let firstFailure: SimpleWeddingSalesWriterCatalogTrace | undefined;
+
+  for (const variation of variations) {
+    const missingTemplateSlots = missingResponseVariationSlots(variation, slots);
+
+    if (missingTemplateSlots.length > 0) {
+      firstFailure ??= {
+        eligible: true,
+        reason: "missing_template_slot",
+        responseKey,
+        attemptedVariationId: variation.id,
+        guardOk: false,
+        fallbackReason: "missing_template_slot",
+        missingTemplateSlots,
+        responseKeyCompatibility: compatibility,
+      };
+      continue;
+    }
+
+    const text = renderResponseVariation(variation, slots);
+    const guardResult = validateGeneratedReply({
+      reply: text,
+      contract: args.contract,
+      knowledge: args.knowledge,
+      state: args.state,
+    });
+
+    if (guardResult.ok) {
+      return {
+        text,
+        responseKey,
+        variationId: variation.id,
+        variationSeed,
+        guardResult,
+        trace: {
+          eligible: true,
+          reason: "selected",
+          responseKey,
+          selectedVariationId: variation.id,
+          guardOk: true,
+          responseKeyCompatibility: compatibility,
+        },
+      };
+    }
+
+    firstFailure ??= {
+      eligible: true,
+      reason: "guard_failed",
+      responseKey,
+      attemptedVariationId: variation.id,
+      guardOk: false,
+      fallbackReason: "response_catalog_guard_failed",
+      responseKeyCompatibility: compatibility,
+    };
+  }
+
+  return firstFailure
+    ? {
+        text: "",
+        responseKey,
+        variationId: firstFailure.attemptedVariationId ?? variations[0]?.id ?? "",
+        variationSeed,
+        guardResult: { ok: false, reasons: [firstFailure.fallbackReason ?? "catalog_failed"] },
+        trace: firstFailure,
+      }
+    : null;
 }
 
 function formatTimeList(values: string[]) {
@@ -582,8 +754,11 @@ function teamLine(state: SimpleWeddingSalesState) {
     : "For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.";
 }
 
-function travelLine() {
-  return "Yes, we do travel outside Tampa. Our collections include roundtrip travel coverage, and if the venue is beyond the included mileage, we can go over the exact travel details on the call 🤍";
+function travelLine(knowledge: SimpleWeddingKnowledgeContext) {
+  const region = coverageRegionLabel(knowledge);
+  const regionText = region ? ` for ${region}` : "";
+
+  return `Yes, we do travel. Our collections include travel coverage${regionText}, and if the venue is beyond the included mileage, we can go over the exact travel details on the call 🤍`;
 }
 
 function rawFootageLine(knowledge: SimpleWeddingKnowledgeContext) {
@@ -649,7 +824,7 @@ function renderSafeTemplate(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
-    args.contract.mustAnswerTravel ? travelLine() : undefined,
+    args.contract.mustAnswerTravel ? travelLine(args.knowledge) : undefined,
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
@@ -679,7 +854,7 @@ function renderCompactInstagramFallback(args: {
     args.contract.mustMentionBookingConfirmation ? bookingLine(args.state) : undefined,
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
-    args.contract.mustAnswerTravel ? travelLine() : undefined,
+    args.contract.mustAnswerTravel ? travelLine(args.knowledge) : undefined,
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
@@ -704,45 +879,25 @@ export function writeConstrainedWeddingReply(args: {
   forceHandoff?: true;
 } {
   const { state, contract, knowledge } = args;
-  const catalogDraft = tryBuildResponseFromCatalog({ state, contract });
-  let writerCatalog =
-    catalogDraft?.trace ?? buildCatalogTraceForSkippedContract(contract);
+  const catalogDraft = tryBuildResponseFromCatalog({ state, contract, knowledge });
+  const guardedCatalogDraft = tryBuildGuardedResponseFromCatalog({ state, contract, knowledge });
+  const writerCatalog =
+    guardedCatalogDraft?.trace ??
+    catalogDraft?.trace ??
+    buildCatalogTraceForSkippedContract(contract);
 
-  if (catalogDraft?.text) {
-    const catalogGuard = validateGeneratedReply({
-      reply: catalogDraft.text,
-      contract,
-      knowledge,
-      state,
-    });
-    writerCatalog = {
-      ...writerCatalog,
-      reason: catalogGuard.ok ? "selected" : "guard_failed",
-      guardOk: catalogGuard.ok,
-      fallbackReason: catalogGuard.ok
-        ? undefined
-        : "response_catalog_guard_failed",
-      attemptedVariationId: catalogGuard.ok
-        ? undefined
-        : catalogDraft.variationId,
-      selectedVariationId: catalogGuard.ok
-        ? catalogDraft.variationId
-        : writerCatalog.selectedVariationId,
+  if (guardedCatalogDraft?.text && guardedCatalogDraft.guardResult.ok) {
+    return {
+      text: guardedCatalogDraft.text,
+      guardResult: guardedCatalogDraft.guardResult,
+      writer: {
+        mode: "response_catalog",
+        responseKey: guardedCatalogDraft.responseKey,
+        variationId: guardedCatalogDraft.variationId,
+        variationSeed: guardedCatalogDraft.variationSeed,
+      },
+      writerCatalog,
     };
-
-    if (catalogGuard.ok) {
-      return {
-        text: catalogDraft.text,
-        guardResult: catalogGuard,
-        writer: {
-          mode: "response_catalog",
-          responseKey: catalogDraft.responseKey,
-          variationId: catalogDraft.variationId,
-          variationSeed: catalogDraft.variationSeed,
-        },
-        writerCatalog,
-      };
-    }
   }
 
   const shouldSharePortfolio = state.questionsAskedByCustomer.includes("portfolio");
@@ -761,7 +916,7 @@ export function writeConstrainedWeddingReply(args: {
           contract.mustMentionBookingConfirmation ? bookingLine(state) : undefined,
           callLogisticsLine(state),
           contract.mustAnswerIdentity ? identityLine(knowledge) : undefined,
-          contract.mustAnswerTravel ? travelLine() : undefined,
+          contract.mustAnswerTravel ? travelLine(knowledge) : undefined,
           mustAnswerRawFootage(contract) ? rawFootageLine(knowledge) : undefined,
           shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
           contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,

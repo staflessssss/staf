@@ -94,7 +94,9 @@ function responseKeyForDecision(args: {
   }
 
   if (args.replyObligations.includes("travel")) {
-    return "utter_answer_travel";
+    return args.nextStep === "ask_call_time"
+      ? "utter_answer_travel_resume_call_time"
+      : "utter_answer_travel";
   }
 
   if (args.replyType === "availability_available" && args.replyObligations.includes("pricing")) {
@@ -118,13 +120,19 @@ function responseKeyForDecision(args: {
   }
 
   if (args.replyType === "ask_email" || args.replyType === "calendar_available") {
-    return "utter_ask_email";
+    return args.replyType === "ask_email" && args.state.calendarStatus === "available"
+      ? "utter_calendar_available_ask_email"
+      : "utter_ask_email";
   }
 
   if (args.nextStep === "ask_call_time") {
-    return args.replyType === "ask_call_time"
-      ? "utter_ask_call_time"
-      : "utter_ask_booking_confirmation";
+    if (args.replyType !== "ask_call_time") {
+      return "utter_ask_booking_confirmation";
+    }
+
+    return args.state.venue
+      ? "utter_venue_collected_ask_call_time"
+      : "utter_ask_call_time";
   }
 
   if (args.nextStep === "ask_venue" || args.replyType === "ask_venue") {
@@ -149,6 +157,18 @@ function responseKeyForDecision(args: {
     args.nextStep === "ask_missing_info" &&
     args.missingField === "names"
   ) {
+    if (
+      args.replyType === "availability_available" &&
+      args.state.availability === "available" &&
+      args.replyObligations.includes("pricing")
+    ) {
+      return "utter_availability_available_ask_names";
+    }
+
+    if (args.replyObligations.includes("pricing") && args.state.replyMemory?.mentioned?.pricing) {
+      return "utter_pricing_repeat_send_guide_ask_names";
+    }
+
     if (
       args.state.weddingDate &&
       args.state.location &&

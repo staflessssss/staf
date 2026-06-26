@@ -24,6 +24,26 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
       text: "Hey! I’d be happy to help. Do you already have your wedding date and location?",
     },
   ],
+  utter_availability_available_ask_names: [
+    {
+      id: "availability_names_v1",
+      text: "I checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWhat are both of your names?",
+    },
+    {
+      id: "availability_names_v2",
+      text: "{{weddingDateDisplay}} in {{locationDisplay}} is open for us.\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWho would I be speaking with?",
+    },
+  ],
+  utter_pricing_repeat_send_guide_ask_names: [
+    {
+      id: "pricing_repeat_names_v1",
+      text: "Yep, pricing is the same as I mentioned - {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI am sending the collections guide image here too.\n\nWhat are both of your names?",
+    },
+    {
+      id: "pricing_repeat_names_v2",
+      text: "The starting point is still {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI will send the collections guide image here too.\n\nWho would I be speaking with?",
+    },
+  ],
   utter_ask_location_only: [
     {
       id: "ask_location_only_v1",
@@ -76,6 +96,26 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
     {
       id: "ask_call_time_v3",
       text: "I’d love to hear more about what you’re planning. What time would be good for a quick consult? I do calls Monday-Friday, 9am-2pm Eastern.",
+    },
+  ],
+  utter_venue_collected_ask_call_time: [
+    {
+      id: "venue_call_time_v1",
+      text: "Beautiful - {{venue}} gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults {{callWindow}}.",
+    },
+    {
+      id: "venue_call_time_v2",
+      text: "{{venue}} gives us a helpful starting point.\n\nThe easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults {{callWindow}}.",
+    },
+  ],
+  utter_calendar_available_ask_email: [
+    {
+      id: "calendar_email_v1",
+      text: "{{callTimeDisplay}} works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    },
+    {
+      id: "calendar_email_v2",
+      text: "{{callTimeDisplay}} is open on my calendar.\n\nWhat email should I use for the calendar invite?",
     },
   ],
   utter_ask_booking_confirmation: [
@@ -132,6 +172,16 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
     {
       id: "raw_footage_v3",
       text: "We can usually add raw footage depending on what you’re looking for. I’d walk you through the cleanest option on the call.",
+    },
+  ],
+  utter_answer_travel_resume_call_time: [
+    {
+      id: "travel_resume_call_v1",
+      text: "Yes - travel is included within the collection's coverage, and if the venue is beyond the included mileage, we can go over the exact details on the call.\n\nSame next step from here: what time works best for a quick consult? I do calls {{callWindow}}.",
+    },
+    {
+      id: "travel_resume_call_v2",
+      text: "Yes, we do travel. The collection includes travel coverage, and if anything is outside the included mileage we can talk through the details on the call.\n\nWhat time would be best for a quick consult? I do calls {{callWindow}}.",
     },
   ],
 } as const;
@@ -193,4 +243,29 @@ export function selectResponseVariation(input: {
   const index = stableHash(seed) % pool.length;
 
   return pool[index] ?? null;
+}
+
+export function selectResponseVariationCandidates(input: {
+  responseKey: SimpleWeddingSalesResponseKey;
+  conversationId?: string;
+  contactId?: string;
+  turnIndex?: number;
+  lastVariationIds?: string[];
+}): SimpleWeddingSalesResponseVariation[] {
+  const variations = SIMPLE_WEDDING_RESPONSES[input.responseKey];
+
+  if (!variations?.length) {
+    return [];
+  }
+
+  const first = selectResponseVariation(input);
+  const ordered = first
+    ? [first, ...variations.filter((variation) => variation.id !== first.id)]
+    : [...variations];
+  const lastVariationIds = new Set(input.lastVariationIds ?? []);
+
+  return [
+    ...ordered.filter((variation) => !lastVariationIds.has(variation.id)),
+    ...ordered.filter((variation) => lastVariationIds.has(variation.id)),
+  ];
 }

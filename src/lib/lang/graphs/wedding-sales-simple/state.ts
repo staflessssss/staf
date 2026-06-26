@@ -129,6 +129,8 @@ export type SimpleWeddingSalesReplyObligation =
 
 export type SimpleWeddingSalesResponseKey =
   | "utter_available_with_pricing_guide"
+  | "utter_availability_available_ask_names"
+  | "utter_pricing_repeat_send_guide_ask_names"
   | "utter_ask_wedding_details"
   | "utter_ask_location_only"
   | "utter_ask_wedding_date_only"
@@ -136,12 +138,15 @@ export type SimpleWeddingSalesResponseKey =
   | "utter_ask_names"
   | "utter_ask_venue"
   | "utter_ask_call_time"
+  | "utter_venue_collected_ask_call_time"
   | "utter_call_time_out_of_window"
   | "utter_ask_email"
+  | "utter_calendar_available_ask_email"
   | "utter_ask_booking_confirmation"
   | "utter_booking_confirmed"
   | "utter_answer_raw_footage"
   | "utter_answer_travel"
+  | "utter_answer_travel_resume_call_time"
   | "utter_acknowledgement"
   | "utter_handoff_ack";
 

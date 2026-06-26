@@ -526,7 +526,7 @@ test("writer can use response catalog for acknowledgement", () => {
   assert.match(result.text, /of course|absolutely|you got it/i);
 });
 
-test("writer falls back when response catalog fails guard", () => {
+test("writer retries another catalog variation when selected variation fails guard", () => {
   const state = baseState({
     latestCustomerMessage: "mike@example.com",
     isFirstTurn: false,
@@ -560,15 +560,15 @@ test("writer falls back when response catalog fails guard", () => {
   };
   const result = writeConstrainedWeddingReply({ state, knowledge, contract });
 
-  assert.equal(result.writer.mode, "deterministic_fallback");
-  assert.equal(result.writer.fallbackReason, "response_catalog_guard_failed");
+  assert.equal(result.writer.mode, "response_catalog");
   assert.equal(result.writer.responseKey, "utter_ask_booking_confirmation");
-  assert.ok(result.writer.attemptedVariationId);
+  assert.notEqual(result.writer.variationId, catalogDraft?.variationId);
   assert.equal(result.writerCatalog.eligible, true);
-  assert.equal(result.writerCatalog.reason, "guard_failed");
-  assert.equal(result.writerCatalog.guardOk, false);
-  assert.equal(result.writerCatalog.fallbackReason, "response_catalog_guard_failed");
-  assert.match(result.text, /lock in 1:30 PM/i);
+  assert.equal(result.writerCatalog.reason, "selected");
+  assert.equal(result.writerCatalog.guardOk, true);
+  assert.equal(result.writerCatalog.fallbackReason, undefined);
+  assert.match(result.text, /1:30 PM/i);
+  assert.notEqual(result.text, catalogDraft?.text);
 });
 
 test("catalog does not output unresolved email slot", () => {

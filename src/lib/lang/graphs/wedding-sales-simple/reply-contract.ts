@@ -90,7 +90,9 @@ function responseKeyForContract(args: {
   }
 
   if (replyObligations?.includes("travel")) {
-    return "utter_answer_travel";
+    return requiredQuestion === "callTime"
+      ? "utter_answer_travel_resume_call_time"
+      : "utter_answer_travel";
   }
 
   if (state.decisionTrace?.replyType === "acknowledgement_only") {
@@ -113,12 +115,38 @@ function responseKeyForContract(args: {
     return "utter_call_time_out_of_window";
   }
 
+  if (
+    requiredQuestion === "names" &&
+    args.mustMentionWeddingAvailability &&
+    state.availability === "available" &&
+    args.mentionPolicy.pricing.mode !== "skip" &&
+    args.mentionPolicy.guide.mode !== "skip"
+  ) {
+    return "utter_availability_available_ask_names";
+  }
+
+  if (
+    requiredQuestion === "names" &&
+    args.mentionPolicy.pricing.mode === "same_as_before" &&
+    args.mentionPolicy.guide.mode !== "skip"
+  ) {
+    return "utter_pricing_repeat_send_guide_ask_names";
+  }
+
+  if (args.mustMentionWeddingAvailability) {
+    return undefined;
+  }
+
   if (requiredQuestion === "email" || args.mentionPolicy.consultation.mode === "first_available") {
-    return "utter_ask_email";
+    return args.mentionPolicy.consultation.mode === "first_available"
+      ? "utter_calendar_available_ask_email"
+      : "utter_ask_email";
   }
 
   if (requiredQuestion === "callTime") {
-    return "utter_ask_call_time";
+    return state.venue && state.decisionTrace?.replyType === "ask_call_time"
+      ? "utter_venue_collected_ask_call_time"
+      : "utter_ask_call_time";
   }
 
   if (requiredQuestion === "venue") {

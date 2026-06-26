@@ -1858,8 +1858,9 @@ test("simple wedding sales runtime answers travel question after booking without
   assert.equal(result.replyContract?.mustAnswerTravel, true);
   assert.equal(result.answerContext?.applied, false);
   assert.match(result.answerContext?.reason ?? "", /explicit business question/i);
-  assert.match(result.responseDraft ?? "", /travel outside Tampa/i);
-  assert.match(result.responseDraft ?? "", /roundtrip travel coverage/i);
+  assert.match(result.responseDraft ?? "", /do travel/i);
+  assert.match(result.responseDraft ?? "", /travel coverage/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /outside Tampa/i);
   assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess|send that one more time/i);
   assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite/i);
   assert.deepEqual(result.toolObservations, []);
@@ -1927,7 +1928,8 @@ test("simple wedding sales runtime does not apply stale call-time context to FAQ
   assert.deepEqual(result.replyObligations, ["travel"]);
   assert.equal(result.replyContract?.mustAnswerTravel, true);
   assert.deepEqual(result.toolObservations, []);
-  assert.match(result.responseDraft ?? "", /travel outside Tampa/i);
+  assert.match(result.responseDraft ?? "", /do travel|travel coverage/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /outside Tampa/i);
 });
 
 test("simple wedding sales runtime does not treat bare yes after booking as pending booking confirmation", async () => {
@@ -2361,7 +2363,7 @@ test("simple wedding sales runtime handles the live Instagram canary transcript 
   assert.equal(fourth.flowRunner?.mode, "active");
   assert.equal(fourth.flowRunner?.branch, "venue_collected");
   assert.equal(fourth.flowRunner?.usedAsFinalDecision, true);
-  assert.match(fourth.responseDraft ?? "", /Evergreen Park gives us a good starting point/i);
+  assert.match(fourth.responseDraft ?? "", /Evergreen Park gives us a (?:good|helpful) starting point/i);
   assert.match(fourth.responseDraft ?? "", /quick consult/i);
   assert.match(fourth.responseDraft ?? "", /What time works best/i);
 
