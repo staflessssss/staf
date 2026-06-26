@@ -100,6 +100,7 @@ export type WeddingSalesSimpleSafetyLogEntry = {
   inboundText: string;
   outboundText: string;
   dialogueUnderstanding?: SimpleWeddingSalesState["dialogueUnderstanding"];
+  dialogueCommands?: SimpleWeddingSalesState["dialogueCommands"];
   pendingUserActionBefore?: SimpleWeddingSalesState["pendingUserAction"];
   pendingUserActionAfter?: SimpleWeddingSalesState["pendingUserAction"];
   decisionTrace?: SimpleWeddingSalesDecisionTrace;

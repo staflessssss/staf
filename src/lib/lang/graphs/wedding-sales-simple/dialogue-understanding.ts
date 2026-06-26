@@ -1,5 +1,6 @@
 import type {
   SimpleWeddingSalesQuestion,
+  SimpleWeddingSalesDialogueCommand,
   SimpleWeddingSalesState,
   TurnUnderstanding,
 } from "./state";
@@ -24,6 +25,7 @@ export type DialogueUnderstanding = {
   explicitQuestions: SimpleWeddingSalesQuestion[];
   conversationalFiller: string[];
   shouldSuppressOldContext: boolean;
+  commands?: SimpleWeddingSalesDialogueCommand[];
   confidence: number;
 };
 

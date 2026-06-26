@@ -97,6 +97,13 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
   assert.equal(safetyLogs[0]?.runtime, "wedding-sales-simple");
   assert.deepEqual(safetyLogs[0]?.toolCalls, ["check_wedding_availability"]);
   assert.equal(safetyLogs[0]?.dialogueUnderstanding?.messageAct, "new_business_question");
+  assert.deepEqual(safetyLogs[0]?.dialogueCommands, [
+    { type: "set_slot", slot: "weddingDate", value: "2027-06-14" },
+    { type: "set_slot", slot: "weddingDateText", value: "June 14 2027" },
+    { type: "set_slot", slot: "location", value: "Tampa" },
+    { type: "answer_question", question: "pricing" },
+  ]);
+  assert.deepEqual(safetyLogs[0]?.dialogueUnderstanding?.commands, safetyLogs[0]?.dialogueCommands);
   assert.deepEqual(safetyLogs[0]?.pendingUserActionBefore, undefined);
   assert.equal(safetyLogs[0]?.pendingUserActionAfter, null);
   assert.equal(safetyLogs[0]?.writer?.mode, "deterministic_fallback");

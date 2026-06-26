@@ -7,6 +7,7 @@ import {
   buildDialogueUnderstanding,
   type DialogueUnderstanding,
 } from "./dialogue-understanding";
+import { buildDialogueCommands } from "./dialogue-commands";
 import type { ReplyActionContract } from "./reply-contract";
 import type { ReplyGuardResult } from "./reply-guards";
 
@@ -280,20 +281,28 @@ export type SimpleWeddingSalesFlowState = {
 };
 
 export type SimpleWeddingSalesDialogueCommand =
-  | { type: "set_slot"; slot: keyof SimpleWeddingSalesSlots; value: unknown }
-  | {
+  | (Prisma.JsonObject & {
+      type: "set_slot";
+      slot: keyof SimpleWeddingSalesSlots;
+      value: Prisma.JsonValue;
+    })
+  | (Prisma.JsonObject & {
       type: "answer_pending_action";
       action: "booking_confirmation";
       value: "affirmative" | "negative" | "ambiguous";
-    }
-  | {
+    })
+  | (Prisma.JsonObject & {
       type: "answer_question";
       question: "travel" | "raw_footage" | "pricing" | "team" | "portfolio";
-    }
-  | { type: "knowledge_gap"; topic: string }
-  | { type: "acknowledgement_only" }
-  | { type: "correct_slot"; slot: keyof SimpleWeddingSalesSlots; value: unknown }
-  | { type: "unclear" };
+    })
+  | (Prisma.JsonObject & { type: "knowledge_gap"; topic: string })
+  | (Prisma.JsonObject & { type: "acknowledgement_only" })
+  | (Prisma.JsonObject & {
+      type: "correct_slot";
+      slot: keyof SimpleWeddingSalesSlots;
+      value: Prisma.JsonValue;
+    })
+  | (Prisma.JsonObject & { type: "unclear" });
 
 export type SimpleWeddingSalesWriterTrace = {
   mode: "deterministic_fallback";
@@ -373,6 +382,7 @@ export type SimpleWeddingSalesState = {
   unclearAttemptCount: number;
   questionsAskedByCustomer: SimpleWeddingSalesQuestion[];
   dialogueUnderstanding?: DialogueUnderstanding;
+  dialogueCommands?: SimpleWeddingSalesDialogueCommand[];
   lastUnderstanding?: TurnUnderstanding;
   nextStep?: SimpleWeddingSalesNextStep;
   missingField?: "names" | "weddingDate" | "location";
@@ -454,6 +464,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     unclearAttemptCount: args.previousState?.unclearAttemptCount ?? 0,
     questionsAskedByCustomer: [],
     dialogueUnderstanding: undefined,
+    dialogueCommands: undefined,
     lastUnderstanding: args.previousState?.lastUnderstanding,
     nextStep: args.previousState?.nextStep,
     missingField: args.previousState?.missingField,
@@ -507,13 +518,22 @@ export function mergeTurnUnderstanding(
     understanding,
   });
   const activePendingUserAction = state.pendingUserAction ?? derivePendingUserAction(state);
+  const dialogueCommands = buildDialogueCommands({
+    understanding: dialogueUnderstanding,
+    extractedFacts: facts,
+    pendingUserAction: activePendingUserAction,
+  });
+  const dialogueUnderstandingWithCommands = {
+    ...dialogueUnderstanding,
+    commands: dialogueCommands,
+  };
   const answersPendingBookingConfirmation =
     activePendingUserAction?.type === "booking_confirmation" &&
-    dialogueUnderstanding.pendingAnswer.type === "affirmative" &&
-    dialogueUnderstanding.pendingAnswer.appliesTo === "booking_confirmation";
+    dialogueUnderstandingWithCommands.pendingAnswer.type === "affirmative" &&
+    dialogueUnderstandingWithCommands.pendingAnswer.appliesTo === "booking_confirmation";
   const shouldSkipCallTimeContext =
     answersPendingBookingConfirmation ||
-    dialogueUnderstanding.messageAct === "acknowledgement_only";
+    dialogueUnderstandingWithCommands.messageAct === "acknowledgement_only";
   const customerName = facts.customerName ?? state.customerName;
   const partnerName = facts.partnerName ?? state.partnerName;
   const callTimeCompletion = shouldSkipCallTimeContext
@@ -526,8 +546,8 @@ export function mergeTurnUnderstanding(
     : completeCallTimeFromAnswerContext(
         state,
         facts.proposedCallTime,
-        dialogueUnderstanding.shouldSuppressOldContext
-          ? dialogueUnderstanding.explicitQuestions
+        dialogueUnderstandingWithCommands.shouldSuppressOldContext
+          ? dialogueUnderstandingWithCommands.explicitQuestions
           : understanding.questionsAskedByCustomer,
       );
   const proposedCallTime = callTimeCompletion.clearProposedCallTime
@@ -543,7 +563,7 @@ export function mergeTurnUnderstanding(
     understanding,
     customerEmail,
     callTimeChanged,
-    dialogueUnderstanding,
+    dialogueUnderstanding: dialogueUnderstandingWithCommands,
   });
   const customerConfirmedCallSlot = Boolean(
     state.customerConfirmedCallSlot || bookingConfirmation.confirmed,
@@ -575,12 +595,13 @@ export function mergeTurnUnderstanding(
         ? state.unclearAttemptCount + 1
         : 0,
     questionsAskedByCustomer: understanding.questionsAskedByCustomer,
-    dialogueUnderstanding,
-    pendingUserAction: dialogueUnderstanding.shouldSuppressOldContext
+    pendingUserAction: dialogueUnderstandingWithCommands.shouldSuppressOldContext
       ? null
       : answersPendingBookingConfirmation
         ? activePendingUserAction
         : derivePendingUserAction(state),
+    dialogueUnderstanding: dialogueUnderstandingWithCommands,
+    dialogueCommands,
     lastUnderstanding: understanding,
     answerContext: bookingConfirmation.answerContext ?? callTimeCompletion.answerContext,
   };
