@@ -87,6 +87,7 @@ export type SimpleWeddingSalesDecisionTrace = {
   nextStep: SimpleWeddingSalesNextStep;
   toolCalled?: "checkAvailability" | "checkCalendar" | "bookCall";
   replyObligations?: SimpleWeddingSalesReplyObligation[];
+  responseKey?: SimpleWeddingSalesResponseKey;
   replyType:
     | "availability_available"
     | "availability_unavailable"
@@ -119,6 +120,20 @@ export type SimpleWeddingSalesReplyObligation =
   | "travel"
   | "raw_footage"
   | "portfolio";
+
+export type SimpleWeddingSalesResponseKey =
+  | "utter_available_with_pricing_guide"
+  | "utter_ask_names"
+  | "utter_ask_venue"
+  | "utter_ask_call_time"
+  | "utter_call_time_out_of_window"
+  | "utter_ask_email"
+  | "utter_ask_booking_confirmation"
+  | "utter_booking_confirmed"
+  | "utter_answer_raw_footage"
+  | "utter_answer_travel"
+  | "utter_acknowledgement"
+  | "utter_handoff_ack";
 
 export type SimpleWeddingSalesReplyMemory = {
   greeted?: boolean;
@@ -216,10 +231,73 @@ export type SimpleWeddingSalesPendingUserAction =
       dateContext?: string;
       expiresAfterTurn?: number;
     }
+  | {
+      type: "reschedule_confirmation";
+      oldSlot: string;
+      newSlot: string;
+      eventId: string;
+      expiresAfterTurn?: number;
+    }
   | null;
+
+export type SimpleWeddingSalesSlots = {
+  customerName?: string;
+  partnerName?: string;
+  weddingDate?: string;
+  weddingDateText?: string;
+  location?: string;
+  availabilityRegion?: string;
+  weddingAvailability?: "available" | "unavailable" | "unknown";
+  venue?: string;
+  proposedCallTime?: string;
+  checkedCallDate?: string;
+  checkedCallTime?: string;
+  checkedCallStartTime?: string;
+  checkedCallEndTime?: string;
+  customerEmail?: string;
+  bookingStatus?: "not_started" | "awaiting_confirmation" | "booked" | "failed";
+  bookedEventId?: string;
+};
+
+export type SimpleWeddingSalesFlowState = {
+  activeFlow: "wedding_lead_qualification" | null;
+  activeCollect:
+    | "names"
+    | "weddingDate"
+    | "location"
+    | "venue"
+    | "callTime"
+    | "email"
+    | "bookingConfirmation"
+    | null;
+  salesStage:
+    | "new_lead"
+    | "qualifying"
+    | "ready_to_schedule"
+    | "awaiting_booking_confirmation"
+    | "consult_scheduled"
+    | "escalated";
+};
+
+export type SimpleWeddingSalesDialogueCommand =
+  | { type: "set_slot"; slot: keyof SimpleWeddingSalesSlots; value: unknown }
+  | {
+      type: "answer_pending_action";
+      action: "booking_confirmation";
+      value: "affirmative" | "negative" | "ambiguous";
+    }
+  | {
+      type: "answer_question";
+      question: "travel" | "raw_footage" | "pricing" | "team" | "portfolio";
+    }
+  | { type: "knowledge_gap"; topic: string }
+  | { type: "acknowledgement_only" }
+  | { type: "correct_slot"; slot: keyof SimpleWeddingSalesSlots; value: unknown }
+  | { type: "unclear" };
 
 export type SimpleWeddingSalesWriterTrace = {
   mode: "deterministic_fallback";
+  responseKey?: SimpleWeddingSalesResponseKey;
   fallbackReason?: string;
   variationSeed?: string;
 };

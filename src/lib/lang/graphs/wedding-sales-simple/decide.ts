@@ -4,6 +4,7 @@ import type {
   SimpleWeddingSalesInvariantCheck,
   SimpleWeddingSalesNextStep,
   SimpleWeddingSalesQuestion,
+  SimpleWeddingSalesResponseKey,
   SimpleWeddingSalesReplyObligation,
   SimpleWeddingSalesState,
 } from "./state";
@@ -79,6 +80,64 @@ function normalizeQuestionsForDecision(
   }
 
   return [...normalized];
+}
+
+function responseKeyForDecision(args: {
+  replyType: SimpleWeddingSalesDecisionTrace["replyType"];
+  replyObligations: SimpleWeddingSalesReplyObligation[];
+  nextStep: SimpleWeddingSalesNextStep;
+  missingField?: SimpleWeddingSalesState["missingField"];
+}): SimpleWeddingSalesResponseKey | undefined {
+  if (args.replyObligations.includes("raw_footage")) {
+    return "utter_answer_raw_footage";
+  }
+
+  if (args.replyObligations.includes("travel")) {
+    return "utter_answer_travel";
+  }
+
+  if (args.replyType === "availability_available" && args.replyObligations.includes("pricing")) {
+    return "utter_available_with_pricing_guide";
+  }
+
+  if (args.replyType === "booking_confirmed") {
+    return "utter_booking_confirmed";
+  }
+
+  if (args.replyType === "acknowledgement_only") {
+    return "utter_acknowledgement";
+  }
+
+  if (args.replyType === "handoff") {
+    return "utter_handoff_ack";
+  }
+
+  if (args.replyType === "call_time_out_of_window") {
+    return "utter_call_time_out_of_window";
+  }
+
+  if (args.replyType === "ask_email" || args.replyType === "calendar_available") {
+    return "utter_ask_email";
+  }
+
+  if (args.nextStep === "ask_call_time") {
+    return args.replyType === "ask_call_time"
+      ? "utter_ask_call_time"
+      : "utter_ask_booking_confirmation";
+  }
+
+  if (args.nextStep === "ask_venue" || args.replyType === "ask_venue") {
+    return "utter_ask_venue";
+  }
+
+  if (
+    args.nextStep === "ask_missing_info" &&
+    (args.missingField === "names" || args.missingField === "weddingDate" || args.missingField === "location")
+  ) {
+    return "utter_ask_names";
+  }
+
+  return undefined;
 }
 
 function answeredPreviousRequiredQuestion(state: SimpleWeddingSalesState) {
@@ -252,6 +311,12 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     trace: {
       ...traceBase,
       nextStep: args.nextStep,
+      responseKey: responseKeyForDecision({
+        replyType: args.replyType,
+        replyObligations,
+        nextStep: args.nextStep,
+        missingField: args.missingField,
+      }),
       replyType: args.replyType,
       replyObligations,
       reason: args.reason,

@@ -179,12 +179,22 @@ export async function invokeWeddingSalesSimpleGraph(
     knowledge,
     replyText: reply.text,
   });
+  const finalDecisionTrace = finalState.decisionTrace
+    ? {
+        ...finalState.decisionTrace,
+        responseKey: contract.responseKey ?? finalState.decisionTrace.responseKey,
+      }
+    : undefined;
   const returnedState = {
     ...finalState,
+    decisionTrace: finalDecisionTrace,
     replyMemory: updatedReplyMemory,
     replyContract: contract,
     replyGuardResult: reply.guardResult,
-    writer: reply.writer,
+    writer: {
+      ...reply.writer,
+      responseKey: contract.responseKey,
+    },
     responseDraft: reply.text || writeHumanReply({
       state,
       config: input.config,
