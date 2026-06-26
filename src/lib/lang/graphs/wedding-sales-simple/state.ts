@@ -325,9 +325,11 @@ export type SimpleWeddingSalesFlowRunnerTrace = Prisma.JsonObject & {
 };
 
 export type SimpleWeddingSalesWriterTrace = {
-  mode: "deterministic_fallback";
+  mode: "response_catalog" | "deterministic_fallback";
   responseKey?: SimpleWeddingSalesResponseKey;
   fallbackReason?: string;
+  attemptedVariationId?: string;
+  variationId?: string;
   variationSeed?: string;
 };
 

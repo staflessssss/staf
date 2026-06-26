@@ -215,7 +215,7 @@ test("wedding-sales-simple adapter logs active flow runner decision without chan
   assert.equal(result.status, "processed");
   assert.equal(result.outbound.decisionTrace.nextStep, "reply_only");
   assert.equal(result.outbound.decisionTrace.replyType, "acknowledgement_only");
-  assert.equal(result.outbound.text, "Of course 🤍");
+  assert.match(result.outbound.text, /^(?:Of course|Absolutely|You got it)/);
   assert.equal(safetyLogs[0]?.toolCalls.length, 0);
   assert.deepEqual(safetyLogs[0]?.dialogueCommands, [
     { type: "acknowledgement_only" },

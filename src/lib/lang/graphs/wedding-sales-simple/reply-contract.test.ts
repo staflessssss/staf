@@ -8,7 +8,10 @@ import {
 } from "./knowledge";
 import { buildReplyActionContract } from "./reply-contract";
 import { validateGeneratedReply } from "./reply-guards";
-import { writeConstrainedWeddingReply } from "./reply-writer";
+import {
+  simpleWeddingReplyWriterTestHelpers,
+  writeConstrainedWeddingReply,
+} from "./reply-writer";
 import type { SimpleWeddingSalesState } from "./state";
 
 function baseState(update: Partial<SimpleWeddingSalesState> = {}): SimpleWeddingSalesState {
@@ -315,7 +318,7 @@ test("booking result contract does not repeat the previously confirmed calendar 
   assert.equal(contract.mustMentionCalendarAvailability, false);
   assert.equal(contract.mentionPolicy.consultation.mode, "booking_success");
   assert.equal(contract.mustMentionBookingConfirmation, true);
-  assert.match(reply, /all set for 10:00 AM/i);
+  assert.match(reply, /10:00 AM/i);
   assert.match(reply, /calendar invite.*mike@example\.com/i);
   assert.doesNotMatch(reply, /booked the call for Mike and Sarah/i);
   assert.doesNotMatch(reply, /works perfectly|works on my calendar/i);
@@ -368,4 +371,181 @@ test("writer reads founder greeting from structured knowledge instead of fixed c
   assert.match(reply, /I’m Elena, founder of Northlight Weddings/);
   assert.match(reply, /Congratulations on this beautiful chapter/);
   assert.doesNotMatch(reply, /Taras|Myndful/);
+});
+
+test("writer can use response catalog for ask venue", () => {
+  const state = baseState({
+    latestCustomerMessage: "Mike and Sarah",
+    isFirstTurn: false,
+    customerName: "Mike",
+    partnerName: "Sarah",
+    questionsAskedByCustomer: [],
+    nextStep: "ask_venue",
+    missingField: undefined,
+    decisionTrace: {
+      extractedFacts: { customerName: "Mike", partnerName: "Sarah" },
+      missingFields: ["venue"],
+      nextStep: "ask_venue",
+      replyType: "ask_venue",
+      responseKey: "utter_ask_venue",
+      reason: "names are known and venue is needed",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(result.writer.mode, "response_catalog");
+  assert.equal(result.writer.responseKey, "utter_ask_venue");
+  assert.match(result.text, /venue|taking place/i);
+});
+
+test("writer can use response catalog for ask call time", () => {
+  const state = baseState({
+    latestCustomerMessage: "Sounds good",
+    isFirstTurn: false,
+    customerName: "Mike",
+    partnerName: "Sarah",
+    questionsAskedByCustomer: [],
+    nextStep: "ask_call_time",
+    missingField: undefined,
+    decisionTrace: {
+      extractedFacts: {},
+      missingFields: ["callTime"],
+      nextStep: "ask_call_time",
+      replyType: "ask_call_time",
+      responseKey: "utter_ask_call_time",
+      reason: "venue is known and call time is needed",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(result.writer.mode, "response_catalog");
+  assert.equal(result.writer.responseKey, "utter_ask_call_time");
+  assert.match(result.text, /quick consult|quick consult|quick call/i);
+});
+
+test("writer can use response catalog for booking confirmed", () => {
+  const state = baseState({
+    latestCustomerMessage: "Yes book it",
+    isFirstTurn: false,
+    checkedCallTime: "13:30",
+    customerEmail: "anna@example.com",
+    bookingConfirmed: true,
+    questionsAskedByCustomer: [],
+    nextStep: "reply_only",
+    missingField: undefined,
+    decisionTrace: {
+      extractedFacts: {},
+      missingFields: [],
+      nextStep: "reply_only",
+      toolCalled: "bookCall",
+      replyType: "booking_confirmed",
+      responseKey: "utter_booking_confirmed",
+      reason: "booking has been confirmed",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(result.writer.mode, "response_catalog");
+  assert.equal(result.writer.responseKey, "utter_booking_confirmed");
+  assert.match(result.text, /1:30 PM/);
+  assert.match(result.text, /anna@example\.com/);
+});
+
+test("writer can use response catalog for raw footage FAQ", () => {
+  const state = baseState({
+    latestCustomerMessage: "Can we get raw footage?",
+    isFirstTurn: false,
+    questionsAskedByCustomer: ["raw_footage"],
+    replyObligations: ["raw_footage"],
+    nextStep: "reply_only",
+    missingField: undefined,
+    decisionTrace: {
+      extractedFacts: {},
+      missingFields: [],
+      nextStep: "reply_only",
+      replyObligations: ["raw_footage"],
+      replyType: "reply_only",
+      responseKey: "utter_answer_raw_footage",
+      reason: "customer asked raw footage FAQ",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(result.writer.mode, "response_catalog");
+  assert.equal(result.writer.responseKey, "utter_answer_raw_footage");
+  assert.match(result.text, /raw footage/i);
+});
+
+test("writer can use response catalog for acknowledgement", () => {
+  const state = baseState({
+    latestCustomerMessage: "Thank you",
+    isFirstTurn: false,
+    questionsAskedByCustomer: [],
+    nextStep: "reply_only",
+    missingField: undefined,
+    decisionTrace: {
+      extractedFacts: {},
+      missingFields: [],
+      nextStep: "reply_only",
+      replyType: "acknowledgement_only",
+      responseKey: "utter_acknowledgement",
+      reason: "customer only acknowledged",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(result.writer.mode, "response_catalog");
+  assert.equal(result.writer.responseKey, "utter_acknowledgement");
+  assert.match(result.text, /of course|absolutely|you got it/i);
+});
+
+test("writer falls back when response catalog fails guard", () => {
+  const state = baseState({
+    latestCustomerMessage: "mike@example.com",
+    isFirstTurn: false,
+    customerName: "Mike",
+    partnerName: "Sarah",
+    checkedCallTime: "13:30",
+    customerEmail: "mike@example.com",
+    questionsAskedByCustomer: [],
+    calendarStatus: "available",
+    nextStep: "ask_call_time",
+    missingField: undefined,
+    decisionTrace: {
+      extractedFacts: { email: "mike@example.com" },
+      missingFields: [],
+      nextStep: "ask_call_time",
+      replyType: "ask_call_time",
+      responseKey: "utter_ask_booking_confirmation",
+      reason: "calendar slot is available and customer must explicitly confirm before booking",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const baseContract = buildReplyActionContract({ state, knowledge });
+  const catalogDraft =
+    simpleWeddingReplyWriterTestHelpers.tryBuildResponseFromCatalog({
+      state,
+      contract: baseContract,
+    });
+  const contract = {
+    ...baseContract,
+    forbiddenPhrases: [catalogDraft?.text ?? ""],
+  };
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(result.writer.mode, "deterministic_fallback");
+  assert.equal(result.writer.fallbackReason, "response_catalog_guard_failed");
+  assert.equal(result.writer.responseKey, "utter_ask_booking_confirmation");
+  assert.ok(result.writer.attemptedVariationId);
+  assert.match(result.text, /lock in 1:30 PM/i);
 });

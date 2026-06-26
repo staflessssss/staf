@@ -2,7 +2,11 @@ import { formatSimpleWeddingDate } from "./reply";
 import type { SimpleWeddingKnowledgeContext } from "./knowledge";
 import type { ReplyActionContract } from "./reply-contract";
 import { validateGeneratedReply } from "./reply-guards";
-import type { SimpleWeddingSalesState } from "./state";
+import {
+  renderResponseVariation,
+  selectResponseVariation,
+} from "./responses";
+import type { SimpleWeddingSalesResponseKey, SimpleWeddingSalesState } from "./state";
 
 function joinLines(lines: Array<string | undefined>) {
   return lines.filter(Boolean).join("\n\n");
@@ -275,6 +279,72 @@ function displayCheckedCallTime(state: SimpleWeddingSalesState) {
     : displayProposedCallTime(state.proposedCallTime);
 }
 
+function buildResponseCatalogSlots(state: SimpleWeddingSalesState) {
+  return {
+    callTimeDisplay: displayCheckedCallTime(state),
+    email: state.customerEmail,
+  };
+}
+
+function tryBuildResponseFromCatalog(args: {
+  state: SimpleWeddingSalesState;
+  contract: ReplyActionContract;
+}): {
+  text: string;
+  responseKey: SimpleWeddingSalesResponseKey;
+  variationId: string;
+  variationSeed: string;
+} | null {
+  const responseKey = args.contract.responseKey;
+
+  if (!responseKey || !canUseResponseCatalog(args.contract)) {
+    return null;
+  }
+
+  const turnIndex = args.state.replyMemory?.turnIndex ?? 0;
+  const variationSeed = `${args.state.contactId ?? ""}:${turnIndex}:${responseKey}`;
+  const variation = selectResponseVariation({
+    responseKey,
+    contactId: args.state.contactId,
+    turnIndex,
+  });
+
+  if (!variation) {
+    return null;
+  }
+
+  return {
+    text: renderResponseVariation(variation, buildResponseCatalogSlots(args.state)),
+    responseKey,
+    variationId: variation.id,
+    variationSeed,
+  };
+}
+
+function canUseResponseCatalog(contract: ReplyActionContract) {
+  if (
+    contract.mustGreet ||
+    contract.mustMentionWeddingAvailability ||
+    contract.mustMentionCalendarAvailability ||
+    contract.mustMentionPricing ||
+    contract.mustMentionGuide ||
+    contract.mustAnswerTeam ||
+    contract.mustAnswerIdentity ||
+    contract.mustAnswerTravel
+  ) {
+    return false;
+  }
+
+  if (contract.requiredQuestion === "callTime") {
+    return (
+      contract.questionPolicy.mode === "first_ask" &&
+      !contract.questionPolicy.allowCompliment
+    );
+  }
+
+  return true;
+}
+
 function formatTimeList(values: string[]) {
   const labels = values.map(formatCallTime);
 
@@ -480,13 +550,34 @@ export function writeConstrainedWeddingReply(args: {
 }): {
   text: string;
   guardResult: ReturnType<typeof validateGeneratedReply>;
-  writer: {
-    mode: "deterministic_fallback";
-    fallbackReason?: string;
-  };
+  writer: NonNullable<SimpleWeddingSalesState["writer"]>;
   forceHandoff?: true;
 } {
   const { state, contract, knowledge } = args;
+  const catalogDraft = tryBuildResponseFromCatalog({ state, contract });
+
+  if (catalogDraft) {
+    const catalogGuard = validateGeneratedReply({
+      reply: catalogDraft.text,
+      contract,
+      knowledge,
+      state,
+    });
+
+    if (catalogGuard.ok) {
+      return {
+        text: catalogDraft.text,
+        guardResult: catalogGuard,
+        writer: {
+          mode: "response_catalog",
+          responseKey: catalogDraft.responseKey,
+          variationId: catalogDraft.variationId,
+          variationSeed: catalogDraft.variationSeed,
+        },
+      };
+    }
+  }
+
   const shouldSharePortfolio = state.questionsAskedByCustomer.includes("portfolio");
   const draft =
     state.nextStep === "handoff"
@@ -523,6 +614,9 @@ export function writeConstrainedWeddingReply(args: {
       guardResult: guard,
       writer: {
         mode: "deterministic_fallback",
+        fallbackReason: catalogDraft ? "response_catalog_guard_failed" : undefined,
+        responseKey: catalogDraft?.responseKey,
+        attemptedVariationId: catalogDraft?.variationId,
       },
     };
   }
@@ -544,7 +638,11 @@ export function writeConstrainedWeddingReply(args: {
       guardResult: fallbackGuard,
       writer: {
         mode: "deterministic_fallback",
-        fallbackReason: "primary_reply_guard_failed",
+        fallbackReason: catalogDraft
+          ? "response_catalog_guard_failed"
+          : "primary_reply_guard_failed",
+        responseKey: catalogDraft?.responseKey,
+        attemptedVariationId: catalogDraft?.variationId,
       },
     };
   }
@@ -564,6 +662,8 @@ export function writeConstrainedWeddingReply(args: {
       writer: {
         mode: "deterministic_fallback",
         fallbackReason: "all_reply_guards_failed",
+        responseKey: catalogDraft?.responseKey,
+        attemptedVariationId: catalogDraft?.variationId,
       },
       forceHandoff: true,
     };
@@ -574,7 +674,11 @@ export function writeConstrainedWeddingReply(args: {
     guardResult: minimalGuard,
     writer: {
       mode: "deterministic_fallback",
-      fallbackReason: "compact_reply_guard_failed",
+      fallbackReason: catalogDraft
+        ? "response_catalog_guard_failed"
+        : "compact_reply_guard_failed",
+      responseKey: catalogDraft?.responseKey,
+      attemptedVariationId: catalogDraft?.variationId,
     },
   };
 }
@@ -584,4 +688,5 @@ export const simpleWeddingReplyWriterTestHelpers = {
   renderCompactInstagramFallback,
   pricingLine,
   guideLine,
+  tryBuildResponseFromCatalog,
 };
