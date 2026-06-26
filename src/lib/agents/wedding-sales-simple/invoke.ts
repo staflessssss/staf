@@ -205,6 +205,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     outboundText: outbound.text,
     dialogueUnderstanding: graphState.dialogueUnderstanding,
     dialogueCommands: graphState.dialogueCommands,
+    weddingLeadForm: graphState.weddingLeadForm,
     flowRunner: graphState.flowRunner,
     pendingUserActionBefore: previousState?.pendingUserAction,
     pendingUserActionAfter: persistedState.pendingUserAction,

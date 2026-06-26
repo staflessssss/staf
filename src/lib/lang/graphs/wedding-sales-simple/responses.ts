@@ -24,6 +24,32 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
       text: "Hey! I’d be happy to help. Do you already have your wedding date and location?",
     },
   ],
+  utter_ask_location_only: [
+    {
+      id: "ask_location_only_v1",
+      text: "Perfect, {{weddingDateDisplay}} рџ¤Ќ What city or venue are you planning for?",
+    },
+    {
+      id: "ask_location_only_v2",
+      text: "Got it for {{weddingDateDisplay}}. And where will the wedding be?",
+    },
+  ],
+  utter_ask_wedding_date_only: [
+    {
+      id: "ask_date_only_v1",
+      text: "Got it - {{location}} рџ¤Ќ WhatвЂ™s your wedding date?",
+    },
+    {
+      id: "ask_date_only_v2",
+      text: "Beautiful. What date are you planning for in {{location}}?",
+    },
+  ],
+  utter_ask_names_after_details: [
+    {
+      id: "ask_names_after_details_v1",
+      text: "Perfect - {{weddingDateDisplay}} in {{location}} рџ¤Ќ What are both of your names?",
+    },
+  ],
   utter_ask_venue: [
     {
       id: "ask_venue_v1",

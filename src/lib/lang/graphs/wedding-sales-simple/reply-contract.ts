@@ -125,8 +125,24 @@ function responseKeyForContract(args: {
     return "utter_ask_venue";
   }
 
-  if (requiredQuestion === "names" || requiredQuestion === "coupleNames") {
+  if (requiredQuestion === "coupleNames") {
     return "utter_ask_names";
+  }
+
+  if (requiredQuestion === "names") {
+    if (state.weddingDate && state.location) {
+      return "utter_ask_names_after_details";
+    }
+
+    return "utter_ask_names";
+  }
+
+  if (requiredQuestion === "location") {
+    return state.weddingDate ? "utter_ask_location_only" : "utter_ask_wedding_details";
+  }
+
+  if (requiredQuestion === "weddingDate") {
+    return state.location ? "utter_ask_wedding_date_only" : "utter_ask_wedding_details";
   }
 
   if (args.mustMentionWeddingAvailability && args.mentionPolicy.pricing.mode !== "skip") {

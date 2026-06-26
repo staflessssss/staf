@@ -10,6 +10,10 @@ import {
 import { buildDialogueCommands } from "./dialogue-commands";
 import type { ReplyActionContract } from "./reply-contract";
 import type { ReplyGuardResult } from "./reply-guards";
+import {
+  resolveWeddingLeadFormSlots,
+  type WeddingLeadFormResolution,
+} from "./wedding-lead-form";
 
 export type SimpleWeddingSalesChannel = WeddingSalesChannel;
 
@@ -29,6 +33,7 @@ export const turnUnderstandingSchema = z.object({
     partnerName: z.string().trim().min(1).optional(),
     weddingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     weddingDateText: z.string().trim().min(1).optional(),
+    weddingDateDisplay: z.string().trim().min(1).optional(),
     location: z.string().trim().min(1).optional(),
     venue: z.string().trim().min(1).optional(),
     email: z.string().trim().email().optional(),
@@ -125,6 +130,9 @@ export type SimpleWeddingSalesReplyObligation =
 export type SimpleWeddingSalesResponseKey =
   | "utter_available_with_pricing_guide"
   | "utter_ask_wedding_details"
+  | "utter_ask_location_only"
+  | "utter_ask_wedding_date_only"
+  | "utter_ask_names_after_details"
   | "utter_ask_names"
   | "utter_ask_venue"
   | "utter_ask_call_time"
@@ -252,6 +260,7 @@ export type SimpleWeddingSalesSlots = {
   partnerName?: string;
   weddingDate?: string;
   weddingDateText?: string;
+  weddingDateDisplay?: string;
   location?: string;
   availabilityRegion?: string;
   weddingAvailability?: "available" | "unavailable" | "unknown";
@@ -414,6 +423,7 @@ export type SimpleWeddingSalesState = {
   partnerName?: string;
   weddingDate?: string;
   weddingDateText?: string;
+  weddingDateDisplay?: string;
   location?: string;
   venue?: string;
   customerEmail?: string;
@@ -468,6 +478,7 @@ export type SimpleWeddingSalesState = {
   questionsAskedByCustomer: SimpleWeddingSalesQuestion[];
   dialogueUnderstanding?: DialogueUnderstanding;
   dialogueCommands?: SimpleWeddingSalesDialogueCommand[];
+  weddingLeadForm?: WeddingLeadFormResolution;
   flowRunner?: SimpleWeddingSalesFlowRunnerTrace;
   lastUnderstanding?: TurnUnderstanding;
   nextStep?: SimpleWeddingSalesNextStep;
@@ -515,6 +526,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     partnerName: args.previousState?.partnerName,
     weddingDate: args.previousState?.weddingDate,
     weddingDateText: args.previousState?.weddingDateText,
+    weddingDateDisplay: args.previousState?.weddingDateDisplay,
     location: args.previousState?.location,
     venue: args.previousState?.venue,
     customerEmail: args.customerEmail ?? args.previousState?.customerEmail,
@@ -552,6 +564,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     questionsAskedByCustomer: [],
     dialogueUnderstanding: undefined,
     dialogueCommands: undefined,
+    weddingLeadForm: args.previousState?.weddingLeadForm,
     flowRunner: undefined,
     lastUnderstanding: args.previousState?.lastUnderstanding,
     nextStep: args.previousState?.nextStep,
@@ -616,6 +629,12 @@ export function mergeTurnUnderstanding(
     ...dialogueUnderstanding,
     commands: dialogueCommands,
   };
+  const weddingLeadForm = resolveWeddingLeadFormSlots({
+    state,
+    commands: dialogueCommands,
+    extractedFacts: facts,
+    latestCustomerMessage: state.latestCustomerMessage,
+  });
   const answersPendingBookingConfirmation =
     activePendingUserAction?.type === "booking_confirmation" &&
     dialogueUnderstandingWithCommands.pendingAnswer.type === "affirmative" &&
@@ -662,9 +681,11 @@ export function mergeTurnUnderstanding(
     ...state,
     customerName,
     partnerName,
-    weddingDate: facts.weddingDate ?? state.weddingDate,
-    weddingDateText: facts.weddingDateText ?? state.weddingDateText,
-    location: facts.location ?? state.location,
+    weddingDate: weddingLeadForm.slotPatch.weddingDate ?? facts.weddingDate ?? state.weddingDate,
+    weddingDateText:
+      weddingLeadForm.slotPatch.weddingDateText ?? facts.weddingDateText ?? state.weddingDateText,
+    weddingDateDisplay: weddingLeadForm.slotPatch.weddingDateDisplay ?? state.weddingDateDisplay,
+    location: weddingLeadForm.slotPatch.location ?? facts.location ?? state.location,
     venue: facts.venue ?? state.venue,
     customerEmail,
     senderRole: facts.senderRole ?? state.senderRole,
@@ -691,6 +712,7 @@ export function mergeTurnUnderstanding(
         : derivePendingUserAction(state),
     dialogueUnderstanding: dialogueUnderstandingWithCommands,
     dialogueCommands,
+    weddingLeadForm,
     lastUnderstanding: understanding,
     answerContext: bookingConfirmation.answerContext ?? callTimeCompletion.answerContext,
   };

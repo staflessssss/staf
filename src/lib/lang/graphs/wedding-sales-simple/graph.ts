@@ -125,6 +125,7 @@ function slotsForState(state: SimpleWeddingSalesState) {
     partnerName: state.partnerName,
     weddingDate: state.weddingDate,
     weddingDateText: state.weddingDateText,
+    weddingDateDisplay: state.weddingDateDisplay,
     location: state.location,
     availabilityRegion: state.availabilityRegion,
     weddingAvailability: state.availability,

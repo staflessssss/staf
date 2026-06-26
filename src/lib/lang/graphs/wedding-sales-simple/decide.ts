@@ -87,6 +87,7 @@ function responseKeyForDecision(args: {
   replyObligations: SimpleWeddingSalesReplyObligation[];
   nextStep: SimpleWeddingSalesNextStep;
   missingField?: SimpleWeddingSalesState["missingField"];
+  state: SimpleWeddingSalesState;
 }): SimpleWeddingSalesResponseKey | undefined {
   if (args.replyObligations.includes("raw_footage")) {
     return "utter_answer_raw_footage";
@@ -132,15 +133,31 @@ function responseKeyForDecision(args: {
 
   if (
     args.nextStep === "ask_missing_info" &&
-    (args.missingField === "weddingDate" || args.missingField === "location")
+    args.missingField === "weddingDate"
   ) {
-    return "utter_ask_wedding_details";
+    return args.state.location ? "utter_ask_wedding_date_only" : "utter_ask_wedding_details";
+  }
+
+  if (
+    args.nextStep === "ask_missing_info" &&
+    args.missingField === "location"
+  ) {
+    return args.state.weddingDate ? "utter_ask_location_only" : "utter_ask_wedding_details";
   }
 
   if (
     args.nextStep === "ask_missing_info" &&
     args.missingField === "names"
   ) {
+    if (
+      args.state.weddingDate &&
+      args.state.location &&
+      args.state.senderRole !== "mother" &&
+      args.state.senderRole !== "planner"
+    ) {
+      return "utter_ask_names_after_details";
+    }
+
     return "utter_ask_names";
   }
 
@@ -323,6 +340,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
         replyObligations,
         nextStep: args.nextStep,
         missingField: args.missingField,
+        state,
       }),
       replyType: args.replyType,
       replyObligations,

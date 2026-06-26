@@ -288,6 +288,10 @@ function buildResponseCatalogSlots(state: SimpleWeddingSalesState) {
   return {
     callTimeDisplay: displayCheckedCallTime(state),
     email: state.customerEmail,
+    weddingDateDisplay: state.weddingDateDisplay ?? (
+      state.weddingDate ? formatSimpleWeddingDate(state.weddingDate) : undefined
+    ),
+    location: state.location,
   };
 }
 

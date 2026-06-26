@@ -1,0 +1,345 @@
+import type { Prisma } from "@prisma/client";
+
+import type {
+  SimpleWeddingSalesDialogueCommand,
+  SimpleWeddingSalesResponseKey,
+  SimpleWeddingSalesState,
+  TurnUnderstanding,
+} from "./state";
+
+export type WeddingLeadRequiredSlot =
+  | "weddingDate"
+  | "location"
+  | "names"
+  | "email"
+  | "callTime";
+
+export const WEDDING_LEAD_REQUIRED_SLOTS: WeddingLeadRequiredSlot[] = [
+  "weddingDate",
+  "location",
+  "names",
+  "email",
+  "callTime",
+];
+
+export type WeddingLeadFormSlotResolution = Prisma.JsonObject & {
+  source: string;
+  canonicalSlot: keyof Pick<
+    SimpleWeddingSalesState,
+    "weddingDate" | "weddingDateText" | "weddingDateDisplay" | "location"
+  >;
+  rawValue: Prisma.JsonValue;
+  resolvedValue: string;
+  displayValue?: string;
+};
+
+export type WeddingLeadFormSlotFailure = Prisma.JsonObject & {
+  source: string;
+  canonicalSlot: "weddingDate";
+  rawValue: Prisma.JsonValue;
+  reason: string;
+};
+
+export type WeddingLeadFormResolution = Prisma.JsonObject & {
+  active: boolean;
+  slotPatch: Pick<
+    Partial<SimpleWeddingSalesState>,
+    "weddingDate" | "weddingDateText" | "weddingDateDisplay" | "location"
+  >;
+  slotResolution: {
+    resolved: WeddingLeadFormSlotResolution[];
+    failed: WeddingLeadFormSlotFailure[];
+  };
+  canonicalSlotsBeforeDecision: {
+    weddingDate?: string;
+    weddingDateText?: string;
+    weddingDateDisplay?: string;
+    location?: string;
+  };
+  missingSlotsBeforeDecision: WeddingLeadRequiredSlot[];
+  selectedPromptResponseKey?: SimpleWeddingSalesResponseKey;
+};
+
+const MONTHS: Record<string, { number: string; display: string }> = {
+  jan: { number: "01", display: "January" },
+  january: { number: "01", display: "January" },
+  feb: { number: "02", display: "February" },
+  february: { number: "02", display: "February" },
+  mar: { number: "03", display: "March" },
+  march: { number: "03", display: "March" },
+  apr: { number: "04", display: "April" },
+  april: { number: "04", display: "April" },
+  may: { number: "05", display: "May" },
+  jun: { number: "06", display: "June" },
+  june: { number: "06", display: "June" },
+  jul: { number: "07", display: "July" },
+  july: { number: "07", display: "July" },
+  aug: { number: "08", display: "August" },
+  august: { number: "08", display: "August" },
+  sep: { number: "09", display: "September" },
+  sept: { number: "09", display: "September" },
+  september: { number: "09", display: "September" },
+  oct: { number: "10", display: "October" },
+  october: { number: "10", display: "October" },
+  nov: { number: "11", display: "November" },
+  november: { number: "11", display: "November" },
+  dec: { number: "12", display: "December" },
+  december: { number: "12", display: "December" },
+};
+
+function isValidDay(day: number) {
+  return Number.isInteger(day) && day >= 1 && day <= 31;
+}
+
+function buildDate(args: {
+  year: string;
+  monthKey: string;
+  day: string;
+  rawText: string;
+}) {
+  const month = MONTHS[args.monthKey.toLowerCase()];
+  const dayNumber = Number(args.day);
+
+  if (!month || !isValidDay(dayNumber)) {
+    return {
+      ok: false as const,
+      rawText: args.rawText,
+      reason: "invalid_month_or_day",
+    };
+  }
+
+  const normalizedDay = String(dayNumber).padStart(2, "0");
+
+  return {
+    ok: true as const,
+    isoDate: `${args.year}-${month.number}-${normalizedDay}`,
+    display: `${month.display} ${dayNumber}, ${args.year}`,
+    rawText: args.rawText,
+  };
+}
+
+export function resolveWeddingDate(rawValue: unknown): {
+  ok: boolean;
+  isoDate?: string;
+  display?: string;
+  rawText?: string;
+  reason?: string;
+} {
+  if (typeof rawValue !== "string") {
+    return { ok: false, reason: "date_value_not_string" };
+  }
+
+  const rawText = rawValue.trim();
+
+  if (!rawText) {
+    return { ok: false, rawText, reason: "date_value_empty" };
+  }
+
+  const iso = /\b(20\d{2})-(\d{2})-(\d{2})\b/.exec(rawText);
+
+  if (iso) {
+    const year = iso[1]!;
+    const monthNumber = iso[2]!;
+    const dayNumber = Number(iso[3]);
+    const month = Object.values(MONTHS).find((candidate) => candidate.number === monthNumber);
+
+    if (!month || !isValidDay(dayNumber)) {
+      return { ok: false, rawText, reason: "invalid_iso_date" };
+    }
+
+    return {
+      ok: true,
+      isoDate: `${year}-${monthNumber}-${String(dayNumber).padStart(2, "0")}`,
+      display: `${month.display} ${dayNumber}, ${year}`,
+      rawText,
+    };
+  }
+
+  const monthFirst =
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,)?\s+(20\d{2})\b/i.exec(rawText);
+
+  if (monthFirst) {
+    return buildDate({
+      monthKey: monthFirst[1]!,
+      day: monthFirst[2]!,
+      year: monthFirst[3]!,
+      rawText,
+    });
+  }
+
+  const dayFirst =
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(20\d{2})\b/i.exec(rawText);
+
+  if (dayFirst) {
+    return buildDate({
+      day: dayFirst[1]!,
+      monthKey: dayFirst[2]!,
+      year: dayFirst[3]!,
+      rawText,
+    });
+  }
+
+  if (/\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b/.test(rawText)) {
+    return { ok: false, rawText, reason: "ambiguous_numeric_date" };
+  }
+
+  return { ok: false, rawText, reason: "date_pattern_not_supported" };
+}
+
+function commandSource(command: SimpleWeddingSalesDialogueCommand) {
+  return command.type === "set_slot" ? `dialogueCommands.set_slot:${command.slot}` : command.type;
+}
+
+function missingSlotsForState(
+  state: Pick<
+    SimpleWeddingSalesState,
+    "weddingDate" | "location" | "customerName" | "partnerName" | "customerEmail" | "proposedCallTime"
+  >,
+) {
+  const missing: WeddingLeadRequiredSlot[] = [];
+
+  if (!state.weddingDate) {
+    missing.push("weddingDate");
+  }
+
+  if (!state.location) {
+    missing.push("location");
+  }
+
+  if (!state.customerName || !state.partnerName) {
+    missing.push("names");
+  }
+
+  if (!state.customerEmail) {
+    missing.push("email");
+  }
+
+  if (!state.proposedCallTime) {
+    missing.push("callTime");
+  }
+
+  return missing;
+}
+
+function selectedPromptResponseKey(
+  state: Pick<SimpleWeddingSalesState, "weddingDate" | "location" | "customerName" | "partnerName">,
+) {
+  if (!state.weddingDate && !state.location) {
+    return "utter_ask_wedding_details" as const;
+  }
+
+  if (state.weddingDate && !state.location) {
+    return "utter_ask_location_only" as const;
+  }
+
+  if (!state.weddingDate && state.location) {
+    return "utter_ask_wedding_date_only" as const;
+  }
+
+  if (state.weddingDate && state.location && (!state.customerName || !state.partnerName)) {
+    return "utter_ask_names_after_details" as const;
+  }
+
+  return undefined;
+}
+
+export function getWeddingLeadFormStatus(state: SimpleWeddingSalesState) {
+  return {
+    hasWeddingDate: Boolean(state.weddingDate),
+    hasLocation: Boolean(state.location),
+    hasNames: Boolean(state.customerName && state.partnerName),
+    hasEmail: Boolean(state.customerEmail),
+    hasCallTime: Boolean(state.proposedCallTime),
+    missingSlots: missingSlotsForState(state),
+  };
+}
+
+export function resolveWeddingLeadFormSlots(input: {
+  state: SimpleWeddingSalesState;
+  commands: SimpleWeddingSalesDialogueCommand[];
+  extractedFacts?: TurnUnderstanding["facts"] | Record<string, unknown>;
+  latestCustomerMessage: string;
+}): WeddingLeadFormResolution {
+  const resolved: WeddingLeadFormSlotResolution[] = [];
+  const failed: WeddingLeadFormSlotFailure[] = [];
+  const patch: WeddingLeadFormResolution["slotPatch"] = {};
+  const dateCommands = input.commands.filter(
+    (command) =>
+      command.type === "set_slot" &&
+      (command.slot === "weddingDate" || command.slot === "weddingDateText"),
+  );
+
+  for (const command of dateCommands) {
+    if (command.type !== "set_slot") {
+      continue;
+    }
+
+    const date = resolveWeddingDate(command.value);
+
+    if (date.ok && date.isoDate) {
+      patch.weddingDate = date.isoDate;
+      patch.weddingDateText = date.rawText ?? String(command.value);
+      patch.weddingDateDisplay = date.display;
+      resolved.push({
+        source: commandSource(command),
+        canonicalSlot: "weddingDate",
+        rawValue: command.value,
+        resolvedValue: date.isoDate,
+        displayValue: date.display,
+      });
+      continue;
+    }
+
+    if (command.slot === "weddingDateText" && typeof command.value === "string") {
+      patch.weddingDateText = command.value;
+    }
+
+    failed.push({
+      source: commandSource(command),
+      canonicalSlot: "weddingDate",
+      rawValue: command.value,
+      reason: date.reason ?? "date_resolution_failed",
+    });
+  }
+
+  const locationCommand = input.commands.find(
+    (command) => command.type === "set_slot" && command.slot === "location",
+  );
+
+  if (locationCommand?.type === "set_slot" && typeof locationCommand.value === "string") {
+    patch.location = locationCommand.value;
+    resolved.push({
+      source: commandSource(locationCommand),
+      canonicalSlot: "location",
+      rawValue: locationCommand.value,
+      resolvedValue: locationCommand.value,
+    });
+  }
+
+  const canonicalSlotsBeforeDecision = {
+    weddingDate: patch.weddingDate ?? input.state.weddingDate,
+    weddingDateText: patch.weddingDateText ?? input.state.weddingDateText,
+    weddingDateDisplay: patch.weddingDateDisplay ?? input.state.weddingDateDisplay,
+    location: patch.location ?? input.state.location,
+  };
+  const formState = {
+    ...input.state,
+    ...canonicalSlotsBeforeDecision,
+  };
+
+  return {
+    active: Boolean(
+      input.commands.some((command) => command.type === "start_flow") ||
+        dateCommands.length > 0 ||
+        locationCommand,
+    ),
+    slotPatch: patch,
+    slotResolution: {
+      resolved,
+      failed,
+    },
+    canonicalSlotsBeforeDecision,
+    missingSlotsBeforeDecision: missingSlotsForState(formState),
+    selectedPromptResponseKey: selectedPromptResponseKey(formState),
+  };
+}

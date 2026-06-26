@@ -166,6 +166,72 @@ test("simple wedding sales runtime does not pause bot after generic inquiry", as
   assert.match(second.responseDraft ?? "", /wedding films start/i);
 });
 
+test("simple wedding sales runtime maps date text and asks only for location", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Inquiry about wedding videography",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "We planning wedding on 15 October 2027",
+    previousState: first,
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {
+          weddingDateText: "15 October 2027",
+        },
+      }),
+  });
+
+  assert.equal(second.weddingDate, "2027-10-15");
+  assert.equal(second.weddingDateText, "15 October 2027");
+  assert.equal(second.weddingDateDisplay, "October 15, 2027");
+  assert.equal(second.missingField, "location");
+  assert.equal(second.decisionTrace?.responseKey, "utter_ask_location_only");
+  assert.equal(second.weddingLeadForm?.selectedPromptResponseKey, "utter_ask_location_only");
+  assert.doesNotMatch(second.responseDraft ?? "", /date and location|thanks for reaching out/i);
+  assert.match(second.responseDraft ?? "", /October 15, 2027/i);
+});
+
+test("simple wedding sales runtime fills date and location without repeating wedding details prompt", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Inquiry about wedding videography",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "15 October 2027 in Charlotte",
+    previousState: first,
+    toolContext,
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {
+          weddingDateText: "15 October 2027",
+          location: "Charlotte",
+        },
+      }),
+  });
+
+  assert.equal(second.weddingDate, "2027-10-15");
+  assert.equal(second.location, "Charlotte");
+  assert.equal(second.weddingLeadForm?.missingSlotsBeforeDecision.includes("weddingDate"), false);
+  assert.equal(second.weddingLeadForm?.missingSlotsBeforeDecision.includes("location"), false);
+  assert.notEqual(second.decisionTrace?.responseKey, "utter_ask_wedding_details");
+  assert.doesNotMatch(second.responseDraft ?? "", /date and location|Do you already have your wedding date/i);
+});
+
 test("simple wedding sales runtime still handoffs specific uncovered business questions", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
