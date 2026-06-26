@@ -229,6 +229,14 @@ test("wedding-sales-simple adapter logs active flow runner decision without chan
   assert.equal(safetyLogs[0]?.flowRunner?.matchedLegacy, true);
   assert.equal(safetyLogs[0]?.flowRunner?.usedAsFinalDecision, true);
   assert.equal(safetyLogs[0]?.flowRunner?.fallbackToLegacy, false);
+  assert.equal(safetyLogs[0]?.writerCatalog?.eligible, true);
+  assert.equal(safetyLogs[0]?.writerCatalog?.guardOk, true);
+  assert.equal(safetyLogs[0]?.writerCatalog?.responseKey, "utter_acknowledgement");
+  assert.equal(result.state.replyMemory?.responseVariations?.at(-1)?.responseKey, "utter_acknowledgement");
+  assert.equal(
+    result.state.replyMemory?.responseVariations?.at(-1)?.variationId,
+    safetyLogs[0]?.writer?.variationId,
+  );
 });
 
 test("wedding-sales-simple adapter logs Instagram semantic delivery plan when flag is on", async () => {

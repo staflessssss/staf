@@ -207,6 +207,7 @@ export async function invokeWeddingSalesSimpleGraph(
     contract,
     knowledge,
     replyText: reply.text,
+    writer: reply.writer,
   });
   const finalDecisionTrace = finalState.decisionTrace
     ? {
@@ -224,6 +225,7 @@ export async function invokeWeddingSalesSimpleGraph(
       ...reply.writer,
       responseKey: contract.responseKey,
     },
+    writerCatalog: reply.writerCatalog,
     responseDraft: reply.text || writeHumanReply({
       state,
       config: input.config,

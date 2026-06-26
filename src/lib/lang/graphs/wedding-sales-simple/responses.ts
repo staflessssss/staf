@@ -117,6 +117,19 @@ export function renderResponseVariation(
   ).trim();
 }
 
+export function missingResponseVariationSlots(
+  variation: SimpleWeddingSalesResponseVariation,
+  slots: Record<string, string | undefined>,
+) {
+  const requiredSlots = new Set(
+    Array.from(variation.text.matchAll(/{{\s*([a-zA-Z0-9_]+)\s*}}/g)).map(
+      (match) => match[1]!,
+    ),
+  );
+
+  return Array.from(requiredSlots).filter((slot) => !slots[slot]);
+}
+
 export function selectResponseVariation(input: {
   responseKey: SimpleWeddingSalesResponseKey;
   conversationId?: string;

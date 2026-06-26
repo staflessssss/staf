@@ -139,6 +139,11 @@ export type SimpleWeddingSalesResponseKey =
 export type SimpleWeddingSalesReplyMemory = {
   greeted?: boolean;
   turnIndex?: number;
+  responseVariations?: Array<{
+    responseKey: SimpleWeddingSalesResponseKey;
+    variationId: string;
+    turnId: string;
+  }>;
   pendingBookingConfirmation?: {
     proposedCallTime: string;
     email: string;
@@ -333,6 +338,34 @@ export type SimpleWeddingSalesWriterTrace = {
   variationSeed?: string;
 };
 
+export type SimpleWeddingSalesWriterCatalogTrace = {
+  eligible: boolean;
+  reason?:
+    | "responseKey_missing"
+    | "responseKey_not_in_catalog"
+    | "responseKey_excluded"
+    | "missing_template_slot"
+    | "guard_failed"
+    | "selected";
+  responseKey?: SimpleWeddingSalesResponseKey;
+  selectedVariationId?: string;
+  attemptedVariationId?: string;
+  guardOk?: boolean;
+  fallbackReason?:
+    | "responseKey_missing"
+    | "responseKey_not_in_catalog"
+    | "responseKey_excluded"
+    | "missing_template_slot"
+    | "response_catalog_guard_failed";
+  missingTemplateSlots?: string[];
+  responseKeyCompatibility?: {
+    ok: boolean;
+    replyType?: SimpleWeddingSalesDecisionTrace["replyType"];
+    responseKey?: SimpleWeddingSalesResponseKey;
+    expectedResponseKeys?: SimpleWeddingSalesResponseKey[];
+  };
+};
+
 export type SimpleWeddingSalesInvariantCheck = Prisma.JsonObject & {
   name: string;
   passed: boolean;
@@ -427,6 +460,7 @@ export type SimpleWeddingSalesState = {
   };
   responseDraft?: string;
   writer?: SimpleWeddingSalesWriterTrace;
+  writerCatalog?: SimpleWeddingSalesWriterCatalogTrace;
   toolObservations: Array<{ toolName: string; result: string }>;
 };
 
@@ -500,6 +534,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     answerContext: undefined,
     responseDraft: args.previousState?.responseDraft,
     writer: undefined,
+    writerCatalog: undefined,
     toolObservations: [],
   };
 }

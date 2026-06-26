@@ -108,6 +108,7 @@ export type WeddingSalesSimpleSafetyLogEntry = {
   replyContract?: ReplyActionContract;
   guardResult?: ReplyGuardResult;
   writer?: SimpleWeddingSalesState["writer"];
+  writerCatalog?: SimpleWeddingSalesState["writerCatalog"];
   attachments?: NormalizedWeddingSalesOutboundMessage["attachments"];
   channelDeliveryPlan?: ChannelDeliveryPlan;
   deliveryPlanGuard?: DeliveryPlanGuardResult;

@@ -86,6 +86,7 @@ export function updateSimpleWeddingReplyMemory(args: {
   contract: ReplyActionContract;
   knowledge: SimpleWeddingKnowledgeContext;
   replyText: string;
+  writer?: SimpleWeddingSalesState["writer"];
   now?: Date;
 }): SimpleWeddingSalesReplyMemory {
   const { state, contract, knowledge, replyText } = args;
@@ -118,11 +119,25 @@ export function updateSimpleWeddingReplyMemory(args: {
           now,
         })
       : undefined;
+  const responseVariations =
+    args.writer?.mode === "response_catalog" &&
+    args.writer.responseKey &&
+    args.writer.variationId
+      ? [
+          ...(previous.responseVariations ?? []),
+          {
+            responseKey: args.writer.responseKey,
+            variationId: args.writer.variationId,
+            turnId,
+          },
+        ].slice(-20)
+      : previous.responseVariations;
 
   return {
     ...previous,
     greeted: previous.greeted || contract.mentionPolicy.greeting.mode === "first_turn",
     turnIndex,
+    responseVariations,
     pendingBookingConfirmation,
     mentioned: {
       ...previousMentioned,

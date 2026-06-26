@@ -212,6 +212,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     replyContract: graphState.replyContract,
     guardResult: graphState.replyGuardResult,
     writer: graphState.writer,
+    writerCatalog: graphState.writerCatalog,
     attachments: outbound.attachments,
     channelDeliveryPlan: outbound.channelDeliveryPlan,
     deliveryPlanGuard:
