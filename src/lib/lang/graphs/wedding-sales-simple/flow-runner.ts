@@ -8,6 +8,16 @@ import type {
   SimpleWeddingSalesState,
 } from "./state";
 
+export type FlowRunnerBranch = SimpleWeddingSalesFlowRunnerTrace["branch"];
+
+const ACTIVE_FLOW_BRANCHES = new Set<FlowRunnerBranch>([
+  "booking_confirmation_affirmative",
+  "faq_raw_footage",
+  "acknowledgement_only",
+  "names_collected",
+  "venue_collected",
+]);
+
 function hasCommand(
   commands: SimpleWeddingSalesDialogueCommand[],
   predicate: (command: SimpleWeddingSalesDialogueCommand) => boolean,
@@ -23,7 +33,7 @@ function knownFaqCommand(commands: SimpleWeddingSalesDialogueCommand[]) {
   return commands.find(
     (command) =>
       command.type === "answer_question" &&
-      (command.question === "raw_footage" || command.question === "travel"),
+      command.question === "raw_footage",
   ) as Extract<SimpleWeddingSalesDialogueCommand, { type: "answer_question" }> | undefined;
 }
 
@@ -35,6 +45,7 @@ function hasSlotCommand(commands: SimpleWeddingSalesDialogueCommand[], slot: str
 }
 
 function buildTrace(args: {
+  branch: FlowRunnerBranch;
   predictedNextStep: SimpleWeddingSalesNextStep;
   predictedResponseKey: SimpleWeddingSalesResponseKey;
   legacyDecision?: SimpleWeddingSalesDecisionTrace;
@@ -48,6 +59,7 @@ function buildTrace(args: {
 
   return {
     mode: "shadow",
+    branch: args.branch,
     predictedNextStep: args.predictedNextStep,
     predictedResponseKey: args.predictedResponseKey,
     legacyReplyType,
@@ -61,6 +73,30 @@ function buildTrace(args: {
         args.legacyDecision.replyType === legacyReplyType ||
         args.legacyDecision.responseKey === args.predictedResponseKey,
     ),
+    usedAsFinalDecision: false,
+    fallbackToLegacy: true,
+  };
+}
+
+export function shouldActivateFlowDecision(
+  decision: SimpleWeddingSalesFlowRunnerTrace | undefined,
+) {
+  return Boolean(decision?.matchedLegacy && ACTIVE_FLOW_BRANCHES.has(decision.branch));
+}
+
+export function markFlowDecisionSelection(
+  decision: SimpleWeddingSalesFlowRunnerTrace | undefined,
+  useAsFinalDecision: boolean,
+): SimpleWeddingSalesFlowRunnerTrace | undefined {
+  if (!decision) {
+    return undefined;
+  }
+
+  return {
+    ...decision,
+    mode: useAsFinalDecision ? "active" : "shadow",
+    usedAsFinalDecision: useAsFinalDecision,
+    fallbackToLegacy: !useAsFinalDecision,
   };
 }
 
@@ -83,6 +119,7 @@ export function runWeddingLeadFlowShadow(input: {
     )
   ) {
     return buildTrace({
+      branch: "booking_confirmation_affirmative",
       predictedNextStep: "book_call",
       predictedResponseKey: "utter_booking_confirmed",
       legacyDecision: input.legacyDecision,
@@ -97,11 +134,9 @@ export function runWeddingLeadFlowShadow(input: {
 
   if (faqCommand) {
     return buildTrace({
+      branch: "faq_raw_footage",
       predictedNextStep: "reply_only",
-      predictedResponseKey:
-        faqCommand.question === "raw_footage"
-          ? "utter_answer_raw_footage"
-          : "utter_answer_travel",
+      predictedResponseKey: "utter_answer_raw_footage",
       legacyDecision: input.legacyDecision,
       legacyReplyType: "reply_only",
       preserveFlow: true,
@@ -111,6 +146,7 @@ export function runWeddingLeadFlowShadow(input: {
 
   if (isOnlyAcknowledgement(commands)) {
     return buildTrace({
+      branch: "acknowledgement_only",
       predictedNextStep: "reply_only",
       predictedResponseKey: "utter_acknowledgement",
       legacyDecision: input.legacyDecision,
@@ -126,6 +162,7 @@ export function runWeddingLeadFlowShadow(input: {
     !input.state.proposedCallTime
   ) {
     return buildTrace({
+      branch: "venue_collected",
       predictedNextStep: "ask_call_time",
       predictedResponseKey: "utter_ask_call_time",
       legacyDecision: input.legacyDecision,
@@ -141,6 +178,7 @@ export function runWeddingLeadFlowShadow(input: {
     !input.state.venue
   ) {
     return buildTrace({
+      branch: "names_collected",
       predictedNextStep: "ask_venue",
       predictedResponseKey: "utter_ask_venue",
       legacyDecision: input.legacyDecision,

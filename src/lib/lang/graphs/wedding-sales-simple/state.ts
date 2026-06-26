@@ -306,6 +306,12 @@ export type SimpleWeddingSalesDialogueCommand =
 
 export type SimpleWeddingSalesFlowRunnerTrace = Prisma.JsonObject & {
   mode: "shadow" | "active";
+  branch:
+    | "booking_confirmation_affirmative"
+    | "faq_raw_footage"
+    | "acknowledgement_only"
+    | "names_collected"
+    | "venue_collected";
   predictedNextStep: SimpleWeddingSalesNextStep;
   predictedResponseKey: SimpleWeddingSalesResponseKey;
   legacyReplyType?: SimpleWeddingSalesDecisionTrace["replyType"];
@@ -314,6 +320,8 @@ export type SimpleWeddingSalesFlowRunnerTrace = Prisma.JsonObject & {
   toolName?: "check_wedding_availability" | "check_consultation_calendar" | "book_consultation";
   preserveFlow?: boolean;
   matchedLegacy: boolean;
+  usedAsFinalDecision: boolean;
+  fallbackToLegacy: boolean;
 };
 
 export type SimpleWeddingSalesWriterTrace = {

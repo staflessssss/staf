@@ -152,7 +152,7 @@ test("wedding-sales-simple adapter normalizes Gmail thread and preserves sender 
   assert.match(result.outbound.text, /What date are you looking at/i);
 });
 
-test("wedding-sales-simple adapter logs flow runner shadow decision without changing behavior", async () => {
+test("wedding-sales-simple adapter logs active flow runner decision without changing behavior", async () => {
   const incoming = normalizeInstagramWeddingSalesIncoming({
     tenantId: "tenant-1",
     agentId: "agent-wedding",
@@ -221,11 +221,14 @@ test("wedding-sales-simple adapter logs flow runner shadow decision without chan
     { type: "acknowledgement_only" },
   ]);
   assert.equal(safetyLogs[0]?.dialogueUnderstanding?.messageAct, "acknowledgement_only");
-  assert.equal(safetyLogs[0]?.flowRunner?.mode, "shadow");
+  assert.equal(safetyLogs[0]?.flowRunner?.mode, "active");
+  assert.equal(safetyLogs[0]?.flowRunner?.branch, "acknowledgement_only");
   assert.equal(safetyLogs[0]?.flowRunner?.predictedNextStep, "reply_only");
   assert.equal(safetyLogs[0]?.flowRunner?.predictedResponseKey, "utter_acknowledgement");
   assert.equal(safetyLogs[0]?.flowRunner?.preserveFlow, true);
   assert.equal(safetyLogs[0]?.flowRunner?.matchedLegacy, true);
+  assert.equal(safetyLogs[0]?.flowRunner?.usedAsFinalDecision, true);
+  assert.equal(safetyLogs[0]?.flowRunner?.fallbackToLegacy, false);
 });
 
 test("wedding-sales-simple adapter logs Instagram semantic delivery plan when flag is on", async () => {

@@ -1217,6 +1217,9 @@ test("simple wedding sales runtime books when yes please answers the pending loc
     assert.equal(result.nextStep, "reply_only", message);
     assert.equal(result.bookingConfirmed, true, message);
     assert.equal(result.decisionTrace?.toolCalled, "bookCall", message);
+    assert.equal(result.flowRunner?.mode, "active", message);
+    assert.equal(result.flowRunner?.branch, "booking_confirmation_affirmative", message);
+    assert.equal(result.flowRunner?.usedAsFinalDecision, true, message);
     assert.equal(result.answerContext?.source, "pending_booking_confirmation", message);
     assert.equal(result.pendingUserAction, null, message);
     assert.equal(result.callTimeContext, undefined, message);
@@ -1586,6 +1589,9 @@ test("simple wedding sales runtime treats thank you after booking as acknowledge
 
   assert.equal(result.nextStep, "reply_only");
   assert.equal(result.decisionTrace?.replyType, "acknowledgement_only");
+  assert.equal(result.flowRunner?.mode, "active");
+  assert.equal(result.flowRunner?.branch, "acknowledgement_only");
+  assert.equal(result.flowRunner?.usedAsFinalDecision, true);
   assert.equal(result.dialogueUnderstanding?.messageAct, "acknowledgement_only");
   assert.equal(result.answerContext, undefined);
   assert.equal(result.pendingUserAction, null);
@@ -1642,6 +1648,9 @@ test("simple wedding sales runtime answers raw footage after booking without boo
 
   assert.equal(result.nextStep, "reply_only");
   assert.notEqual(result.decisionTrace?.replyType, "booking_confirmed");
+  assert.equal(result.flowRunner?.mode, "active");
+  assert.equal(result.flowRunner?.branch, "faq_raw_footage");
+  assert.equal(result.flowRunner?.usedAsFinalDecision, true);
   assert.deepEqual(result.replyObligations, ["raw_footage"]);
   assert.equal(result.dialogueUnderstanding?.messageAct, "mixed_ack_and_question");
   assert.equal(result.dialogueUnderstanding?.shouldSuppressOldContext, true);
@@ -1857,6 +1866,9 @@ test("simple wedding sales runtime handles the live Instagram canary transcript 
 
   assert.equal(second.nextStep, "ask_venue");
   assert.equal(second.decisionTrace?.replyType, "ask_venue");
+  assert.equal(second.flowRunner?.mode, "active");
+  assert.equal(second.flowRunner?.branch, "names_collected");
+  assert.equal(second.flowRunner?.usedAsFinalDecision, true);
   assert.doesNotMatch(second.responseDraft ?? "", /make sure I understand/i);
   assert.doesNotMatch(second.responseDraft ?? "", /both of your names/i);
   assert.match(second.responseDraft ?? "", /venue/i);
@@ -1893,6 +1905,9 @@ test("simple wedding sales runtime handles the live Instagram canary transcript 
   });
 
   assert.equal(fourth.nextStep, "ask_call_time");
+  assert.equal(fourth.flowRunner?.mode, "active");
+  assert.equal(fourth.flowRunner?.branch, "venue_collected");
+  assert.equal(fourth.flowRunner?.usedAsFinalDecision, true);
   assert.match(fourth.responseDraft ?? "", /Evergreen Park gives us a good starting point/i);
   assert.match(fourth.responseDraft ?? "", /quick consult/i);
   assert.match(fourth.responseDraft ?? "", /What time works best/i);

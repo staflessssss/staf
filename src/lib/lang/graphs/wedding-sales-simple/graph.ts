@@ -9,7 +9,11 @@ import {
   type SimpleWeddingSalesChannel,
   type SimpleWeddingSalesState,
 } from "./state";
-import { runWeddingLeadFlowShadow } from "./flow-runner";
+import {
+  markFlowDecisionSelection,
+  runWeddingLeadFlowShadow,
+  shouldActivateFlowDecision,
+} from "./flow-runner";
 import { maybeRunSimpleWeddingSalesTool } from "./tools";
 import { understandTurn, type SimpleWeddingSalesUnderstandTurn } from "./understand";
 import type { WeddingSalesConfig } from "../wedding-sales/config";
@@ -64,7 +68,7 @@ export type InvokeWeddingSalesSimpleGraphInput = {
 
 function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState {
   const decision = decideNextStep(state);
-  const decidedState = {
+  const legacyState = {
     ...state,
     ...decision.statePatch,
     nextStep: decision.nextStep,
@@ -74,15 +78,29 @@ function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState 
     decisionTrace: decision.trace,
   };
   const flowRunner = runWeddingLeadFlowShadow({
-    state: decidedState,
-    dialogueCommands: decidedState.dialogueCommands,
-    pendingUserAction: decidedState.pendingUserAction ?? null,
+    state: legacyState,
+    dialogueCommands: legacyState.dialogueCommands,
+    pendingUserAction: legacyState.pendingUserAction ?? null,
     legacyDecision: decision.trace,
   });
+  const useFlowRunnerDecision = shouldActivateFlowDecision(flowRunner);
+  const selectedFlowRunner = markFlowDecisionSelection(flowRunner, useFlowRunnerDecision);
+  const finalDecisionTrace =
+    useFlowRunnerDecision && selectedFlowRunner
+      ? {
+          ...decision.trace,
+          nextStep: selectedFlowRunner.predictedNextStep,
+          responseKey: selectedFlowRunner.predictedResponseKey,
+          replyType: selectedFlowRunner.legacyReplyType ?? decision.trace.replyType,
+          reason: selectedFlowRunner.reason,
+        }
+      : decision.trace;
 
   return {
-    ...decidedState,
-    flowRunner: flowRunner ?? state.flowRunner,
+    ...legacyState,
+    nextStep: finalDecisionTrace.nextStep,
+    decisionTrace: finalDecisionTrace,
+    flowRunner: selectedFlowRunner ?? state.flowRunner,
   };
 }
 

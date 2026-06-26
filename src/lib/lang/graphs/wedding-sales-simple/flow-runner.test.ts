@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runWeddingLeadFlowShadow } from "./flow-runner";
+import {
+  markFlowDecisionSelection,
+  runWeddingLeadFlowShadow,
+  shouldActivateFlowDecision,
+} from "./flow-runner";
 import type {
   SimpleWeddingSalesDialogueCommand,
   SimpleWeddingSalesState,
@@ -57,6 +61,9 @@ test("flow runner predicts booking when pending confirmation is affirmed", () =>
   assert.equal(result?.predictedResponseKey, "utter_booking_confirmed");
   assert.equal(result?.toolName, "book_consultation");
   assert.equal(result?.shouldCallTool, true);
+  assert.equal(shouldActivateFlowDecision(result), true);
+  assert.equal(markFlowDecisionSelection(result, true)?.mode, "active");
+  assert.equal(markFlowDecisionSelection(result, true)?.usedAsFinalDecision, true);
 });
 
 test("flow runner predicts raw footage FAQ interruption and preserves flow", () => {
@@ -68,6 +75,7 @@ test("flow runner predicts raw footage FAQ interruption and preserves flow", () 
   assert.equal(result?.predictedNextStep, "reply_only");
   assert.equal(result?.predictedResponseKey, "utter_answer_raw_footage");
   assert.equal(result?.preserveFlow, true);
+  assert.equal(shouldActivateFlowDecision(result), true);
 });
 
 test("flow runner predicts acknowledgement-only reply", () => {
@@ -78,6 +86,7 @@ test("flow runner predicts acknowledgement-only reply", () => {
   assert.equal(result?.predictedNextStep, "reply_only");
   assert.equal(result?.predictedResponseKey, "utter_acknowledgement");
   assert.equal(result?.preserveFlow, true);
+  assert.equal(shouldActivateFlowDecision(result), true);
 });
 
 test("flow runner predicts call time after venue is collected", () => {
@@ -93,6 +102,7 @@ test("flow runner predicts call time after venue is collected", () => {
 
   assert.equal(result?.predictedNextStep, "ask_call_time");
   assert.equal(result?.predictedResponseKey, "utter_ask_call_time");
+  assert.equal(shouldActivateFlowDecision(result), true);
 });
 
 test("flow runner predicts venue after couple names are collected", () => {
@@ -110,4 +120,43 @@ test("flow runner predicts venue after couple names are collected", () => {
 
   assert.equal(result?.predictedNextStep, "ask_venue");
   assert.equal(result?.predictedResponseKey, "utter_ask_venue");
+  assert.equal(shouldActivateFlowDecision(result), true);
+});
+
+test("flow runner falls back to legacy when a prediction does not match legacy", () => {
+  const result = runWeddingLeadFlowShadow({
+    state: state({
+      pendingUserAction: {
+        type: "booking_confirmation",
+        slot: "Monday at 1:30pm",
+        email: "anna@example.com",
+      },
+    }),
+    dialogueCommands: [
+      {
+        type: "answer_pending_action",
+        action: "booking_confirmation",
+        value: "affirmative",
+      },
+    ],
+    pendingUserAction: {
+      type: "booking_confirmation",
+      slot: "Monday at 1:30pm",
+      email: "anna@example.com",
+    },
+    legacyDecision: {
+      extractedFacts: {},
+      missingFields: [],
+      nextStep: "handoff",
+      replyType: "handoff",
+      reason: "legacy selected a non-allowlisted fallback",
+    },
+  });
+  const selected = markFlowDecisionSelection(result, shouldActivateFlowDecision(result));
+
+  assert.equal(result?.matchedLegacy, false);
+  assert.equal(shouldActivateFlowDecision(result), false);
+  assert.equal(selected?.mode, "shadow");
+  assert.equal(selected?.usedAsFinalDecision, false);
+  assert.equal(selected?.fallbackToLegacy, true);
 });
