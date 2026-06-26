@@ -132,7 +132,14 @@ function responseKeyForDecision(args: {
 
   if (
     args.nextStep === "ask_missing_info" &&
-    (args.missingField === "names" || args.missingField === "weddingDate" || args.missingField === "location")
+    (args.missingField === "weddingDate" || args.missingField === "location")
+  ) {
+    return "utter_ask_wedding_details";
+  }
+
+  if (
+    args.nextStep === "ask_missing_info" &&
+    args.missingField === "names"
   ) {
     return "utter_ask_names";
   }
@@ -338,9 +345,25 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     state.weddingDate && state.location && !isAvailabilityContextCurrent(state),
   );
   const hasActionableCallTime = Boolean(state.proposedCallTime);
+  const hasStartFlowCommand = Boolean(
+    state.dialogueCommands?.some(
+      (command) =>
+        command.type === "start_flow" &&
+        command.flow === "wedding_lead_qualification",
+    ),
+  );
   const checkedAvailabilityThisTurn = state.toolObservations.some(
     (observation) => observation.toolName === "check_wedding_availability",
   );
+
+  if (hasStartFlowCommand && !state.weddingDate) {
+    return decision({
+      nextStep: "ask_missing_info",
+      missingField: "weddingDate",
+      replyType: "missing_info",
+      reason: "generic wedding lead inquiry starts qualification flow",
+    });
+  }
 
   if (checkedAvailabilityThisTurn && availability === "available") {
     const missingFields = getMissingFields(state);
@@ -438,7 +461,12 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
 
   const hasKnownQuestion = state.questionsAskedByCustomer.some((question) => question !== "other");
 
-  if (state.questionsAskedByCustomer.includes("other") && !hasKnownQuestion && !state.proposedCallTime) {
+  if (
+    state.questionsAskedByCustomer.includes("other") &&
+    !hasKnownQuestion &&
+    !state.proposedCallTime &&
+    !hasStartFlowCommand
+  ) {
     return decision({
       nextStep: "handoff",
       mode: "human_needed",

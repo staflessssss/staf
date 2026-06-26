@@ -41,6 +41,14 @@ export function buildDialogueCommands(input: {
   const commands: SimpleWeddingSalesDialogueCommand[] = [];
   const { extractedFacts } = input;
 
+  if (input.understanding.messageAct === "generic_lead_inquiry") {
+    commands.push({
+      type: "start_flow",
+      flow: "wedding_lead_qualification",
+      reason: "generic_lead_inquiry",
+    });
+  }
+
   if (extractedFacts.customerName) {
     commands.push({ type: "set_slot", slot: "customerName", value: extractedFacts.customerName });
   }

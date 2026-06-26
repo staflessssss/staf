@@ -110,3 +110,19 @@ test("dialogue commands map venue fact to set slot", () => {
     },
   ]);
 });
+
+test("dialogue commands start lead qualification flow for generic wedding inquiry", () => {
+  const result = commands({
+    understanding: understanding({
+      messageAct: "generic_lead_inquiry",
+    }),
+  });
+
+  assert.deepEqual(result, [
+    {
+      type: "start_flow",
+      flow: "wedding_lead_qualification",
+      reason: "generic_lead_inquiry",
+    },
+  ]);
+});

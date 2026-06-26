@@ -11,6 +11,7 @@ import type {
 export type FlowRunnerBranch = SimpleWeddingSalesFlowRunnerTrace["branch"];
 
 const ACTIVE_FLOW_BRANCHES = new Set<FlowRunnerBranch>([
+  "start_wedding_lead_qualification",
   "booking_confirmation_affirmative",
   "faq_raw_footage",
   "acknowledgement_only",
@@ -107,6 +108,25 @@ export function runWeddingLeadFlowShadow(input: {
   legacyDecision?: SimpleWeddingSalesDecisionTrace;
 }): SimpleWeddingSalesFlowRunnerTrace | undefined {
   const commands = input.dialogueCommands ?? [];
+
+  if (
+    hasCommand(
+      commands,
+      (command) =>
+        command.type === "start_flow" &&
+        command.flow === "wedding_lead_qualification",
+    )
+  ) {
+    return buildTrace({
+      branch: "start_wedding_lead_qualification",
+      predictedNextStep: "ask_missing_info",
+      predictedResponseKey: "utter_ask_wedding_details",
+      legacyDecision: input.legacyDecision,
+      legacyReplyType: "missing_info",
+      preserveFlow: false,
+      reason: "generic wedding lead inquiry starts qualification flow",
+    });
+  }
 
   if (
     input.pendingUserAction?.type === "booking_confirmation" &&

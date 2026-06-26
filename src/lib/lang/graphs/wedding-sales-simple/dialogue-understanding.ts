@@ -4,12 +4,14 @@ import type {
   SimpleWeddingSalesState,
   TurnUnderstanding,
 } from "./state";
+import { isGenericWeddingLeadInquiry } from "./lead-inquiry";
 
 export type DialogueUnderstanding = {
   messageAct:
     | "acknowledgement_only"
     | "answer_pending_question"
     | "new_business_question"
+    | "generic_lead_inquiry"
     | "mixed_ack_and_question"
     | "new_fact"
     | "unclear";
@@ -114,8 +116,11 @@ export function buildDialogueUnderstanding(args: {
     explicitQuestions,
   });
   const hasFacts = Object.values(args.understanding.facts).some(Boolean);
+  const isGenericLead = isGenericWeddingLeadInquiry(args.state.latestCustomerMessage);
   const messageAct: DialogueUnderstanding["messageAct"] =
-    pendingAnswer.type === "none" && explicitQuestions.length === 0 && isAcknowledgementOnly(args.state.latestCustomerMessage)
+    isGenericLead
+      ? "generic_lead_inquiry"
+      : pendingAnswer.type === "none" && explicitQuestions.length === 0 && isAcknowledgementOnly(args.state.latestCustomerMessage)
       ? "acknowledgement_only"
       : explicitQuestions.length > 0 && conversationalFiller.length > 0
       ? "mixed_ack_and_question"

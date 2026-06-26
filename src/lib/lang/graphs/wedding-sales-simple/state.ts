@@ -124,6 +124,7 @@ export type SimpleWeddingSalesReplyObligation =
 
 export type SimpleWeddingSalesResponseKey =
   | "utter_available_with_pricing_guide"
+  | "utter_ask_wedding_details"
   | "utter_ask_names"
   | "utter_ask_venue"
   | "utter_ask_call_time"
@@ -287,6 +288,11 @@ export type SimpleWeddingSalesFlowState = {
 
 export type SimpleWeddingSalesDialogueCommand =
   | (Prisma.JsonObject & {
+      type: "start_flow";
+      flow: "wedding_lead_qualification";
+      reason: "generic_lead_inquiry";
+    })
+  | (Prisma.JsonObject & {
       type: "set_slot";
       slot: keyof SimpleWeddingSalesSlots;
       value: Prisma.JsonValue;
@@ -312,6 +318,7 @@ export type SimpleWeddingSalesDialogueCommand =
 export type SimpleWeddingSalesFlowRunnerTrace = Prisma.JsonObject & {
   mode: "shadow" | "active";
   branch:
+    | "start_wedding_lead_qualification"
     | "booking_confirmation_affirmative"
     | "faq_raw_footage"
     | "acknowledgement_only"

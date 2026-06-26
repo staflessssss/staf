@@ -106,6 +106,85 @@ test("simple wedding sales runtime checks availability before asking for names",
   assert.match(result.responseDraft ?? "", /both of your names/i);
 });
 
+test("simple wedding sales runtime starts qualification for generic Instagram inquiry", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Inquiry about wedding videography",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+
+  assert.notEqual(result.nextStep, "handoff");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.handoffReason, undefined);
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.missingField, "weddingDate");
+  assert.equal(result.decisionTrace?.responseKey, "utter_ask_wedding_details");
+  assert.equal(result.flowRunner?.mode, "active");
+  assert.equal(result.flowRunner?.branch, "start_wedding_lead_qualification");
+  assert.equal(result.flowRunner?.usedAsFinalDecision, true);
+  assert.ok(
+    result.dialogueCommands?.some(
+      (command) =>
+        command.type === "start_flow" &&
+        command.flow === "wedding_lead_qualification",
+    ),
+  );
+  assert.match(result.responseDraft ?? "", /wedding date/i);
+  assert.match(result.responseDraft ?? "", /location/i);
+});
+
+test("simple wedding sales runtime does not pause bot after generic inquiry", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Inquiry about wedding videography",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "What’s your price?",
+    previousState: first,
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        questionsAskedByCustomer: ["pricing"],
+      }),
+  });
+
+  assert.equal(first.mode, "bot_active");
+  assert.notEqual(first.nextStep, "handoff");
+  assert.equal(second.mode, "bot_active");
+  assert.notEqual(second.nextStep, "handoff");
+  assert.equal(second.decisionTrace?.replyType, "pricing_answer");
+  assert.match(second.responseDraft ?? "", /wedding films start/i);
+});
+
+test("simple wedding sales runtime still handoffs specific uncovered business questions", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can you change contract terms if our planner sends an addendum?",
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+
+  assert.equal(result.nextStep, "handoff");
+  assert.equal(result.mode, "human_needed");
+  assert.equal(result.handoffReason, "unanswered_business_question");
+  assert.equal(result.decisionTrace?.responseKey, "utter_handoff_ack");
+  assert.match(result.responseDraft ?? "", /double-check/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Huge congratulations|founder of Myndful Films/i);
+});
+
 test("simple wedding sales runtime logs rephraser shadow without changing outbound text", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

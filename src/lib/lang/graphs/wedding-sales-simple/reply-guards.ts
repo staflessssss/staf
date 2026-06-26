@@ -86,6 +86,7 @@ export function validateGeneratedReply(args: {
 
   if (
     args.contract.mustGreet &&
+    args.contract.responseKey !== "utter_ask_wedding_details" &&
     (!reply.includes(args.knowledge.persona.replyStyle.greetingOpening) ||
       !reply.includes(args.knowledge.persona.name) ||
       !reply.includes(args.knowledge.persona.company))

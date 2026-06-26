@@ -10,6 +10,20 @@ export type SimpleWeddingSalesResponseVariation = {
 export const SIMPLE_WEDDING_RESPONSES: Partial<
   Record<SimpleWeddingSalesResponseKey, readonly SimpleWeddingSalesResponseVariation[]>
 > = {
+  utter_ask_wedding_details: [
+    {
+      id: "ask_wedding_details_v1",
+      text: "Hey there - thanks for reaching out 🤍 Do you already have a wedding date and location in mind?",
+    },
+    {
+      id: "ask_wedding_details_v2",
+      text: "Hi! Happy you reached out 🤍 What date and location are you planning for?",
+    },
+    {
+      id: "ask_wedding_details_v3",
+      text: "Hey! I’d be happy to help. Do you already have your wedding date and location?",
+    },
+  ],
   utter_ask_venue: [
     {
       id: "ask_venue_v1",

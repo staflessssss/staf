@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { SimpleWeddingSalesState, TurnUnderstanding } from "./state";
 import { turnUnderstandingSchema } from "./state";
+import { isGenericWeddingLeadInquiry } from "./lead-inquiry";
 
 const DEFAULT_UNDERSTANDING_MODEL = "gpt-4.1-mini";
 
@@ -290,6 +291,11 @@ function normalizeQuestionTypes(
 ): TurnUnderstanding["questionsAskedByCustomer"] {
   const normalized = new Set(types);
   const lower = text.toLowerCase();
+
+  if (isGenericWeddingLeadInquiry(text)) {
+    normalized.delete("other");
+  }
+
   const isShooterQuestion =
     /\bwho\b[\s\S]{0,60}\b(?:shoot|shoots|shooter|filming|film|films|filmmaker|videographer)\b/.test(
       lower,

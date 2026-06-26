@@ -66,6 +66,24 @@ test("flow runner predicts booking when pending confirmation is affirmed", () =>
   assert.equal(markFlowDecisionSelection(result, true)?.usedAsFinalDecision, true);
 });
 
+test("flow runner starts wedding lead qualification from generic inquiry", () => {
+  const result = run({
+    commands: [
+      {
+        type: "start_flow",
+        flow: "wedding_lead_qualification",
+        reason: "generic_lead_inquiry",
+      },
+    ],
+  });
+
+  assert.equal(result?.branch, "start_wedding_lead_qualification");
+  assert.equal(result?.predictedNextStep, "ask_missing_info");
+  assert.equal(result?.predictedResponseKey, "utter_ask_wedding_details");
+  assert.equal(result?.preserveFlow, false);
+  assert.equal(shouldActivateFlowDecision(result), true);
+});
+
 test("flow runner predicts raw footage FAQ interruption and preserves flow", () => {
   const result = run({
     state: { bookingConfirmed: true },

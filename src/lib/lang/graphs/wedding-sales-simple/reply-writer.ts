@@ -337,7 +337,7 @@ function responseKeyCompatibility(contract: ReplyActionContract) {
 
 function catalogExclusionReason(contract: ReplyActionContract) {
   if (
-    contract.mustGreet ||
+    (contract.mustGreet && contract.responseKey !== "utter_ask_wedding_details") ||
     contract.mustMentionWeddingAvailability ||
     contract.mustMentionCalendarAvailability ||
     contract.mustMentionPricing ||

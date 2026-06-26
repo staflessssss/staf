@@ -171,7 +171,7 @@ export function buildReplyActionContract(args: {
       mentionPolicy,
     }),
     requiredQuestion,
-    mustGreet: Boolean(state.isFirstTurn),
+    mustGreet: Boolean(state.isFirstTurn && state.nextStep !== "handoff"),
     mustMentionWeddingAvailability,
     mustMentionCalendarAvailability,
     mustMentionBookingConfirmation,
