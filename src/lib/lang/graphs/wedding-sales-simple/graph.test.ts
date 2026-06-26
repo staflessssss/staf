@@ -77,6 +77,48 @@ test("simple wedding sales runtime checks availability before asking for names",
   assert.match(result.responseDraft ?? "", /both of your names/i);
 });
 
+test("simple wedding sales runtime logs rephraser shadow without changing outbound text", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Mike and Sarah",
+    previousState: {
+      weddingDate: "2027-06-15",
+      location: "Tampa",
+      availability: "available",
+      availabilityCheck: {
+        date: "2027-06-15",
+        location: "Tampa",
+        status: "available",
+        checkedAt: "2026-06-24T00:00:00.000Z",
+      },
+      replyMemory: {
+        turnIndex: 1,
+      },
+    },
+    understand: () =>
+      understanding({
+        facts: {
+          customerName: "Mike",
+          partnerName: "Sarah",
+        },
+      }),
+    rephrase: () => "Love it — what venue are you two planning for? 🤍",
+  });
+
+  assert.equal(result.nextStep, "ask_venue");
+  assert.equal(result.writer?.mode, "response_catalog");
+  assert.equal(result.writer?.rephraser?.mode, "shadow");
+  assert.equal(result.writer?.rephraser?.eligible, true);
+  assert.equal(result.writer?.rephraser?.guardOk, true);
+  assert.equal(result.writer?.rephraser?.wouldUse, true);
+  assert.equal(
+    result.writer?.rephraser?.draftText,
+    "Love it — what venue are you two planning for? 🤍",
+  );
+  assert.notEqual(result.responseDraft, result.writer?.rephraser?.draftText);
+  assert.match(result.responseDraft ?? "", /venue|taking place/i);
+});
+
 test("simple wedding sales runtime hands off instead of treating unknown availability as available", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

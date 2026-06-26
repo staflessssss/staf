@@ -26,6 +26,11 @@ import { buildReplyActionContract } from "./reply-contract";
 import { updateSimpleWeddingReplyMemory } from "./reply-memory";
 import { writeConstrainedWeddingReply } from "./reply-writer";
 import { defaultWeddingSalesConfig } from "../wedding-sales/config";
+import {
+  runContextualRephraserShadow,
+  type ContextualRephraserInput,
+  type ContextualRephraserResult,
+} from "./contextual-rephraser";
 
 function toolNameForStep(state: SimpleWeddingSalesState) {
   if (state.nextStep === "check_availability") {
@@ -64,6 +69,7 @@ export type InvokeWeddingSalesSimpleGraphInput = {
   knowledge?: SimpleWeddingKnowledgeContext;
   toolContext?: WeddingSalesToolContext | null;
   understand?: SimpleWeddingSalesUnderstandTurn;
+  rephrase?: (input: ContextualRephraserInput) => Promise<string> | string;
 };
 
 function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState {
@@ -110,6 +116,76 @@ function isToolStep(state: SimpleWeddingSalesState) {
     state.nextStep === "check_calendar" ||
     state.nextStep === "book_call"
   );
+}
+
+function slotsForState(state: SimpleWeddingSalesState) {
+  return {
+    customerName: state.customerName,
+    partnerName: state.partnerName,
+    weddingDate: state.weddingDate,
+    weddingDateText: state.weddingDateText,
+    location: state.location,
+    availabilityRegion: state.availabilityRegion,
+    weddingAvailability: state.availability,
+    venue: state.venue,
+    proposedCallTime: state.proposedCallTime,
+    checkedCallDate: state.checkedCallDate,
+    checkedCallTime: state.checkedCallTime,
+    checkedCallStartTime: state.checkedCallStartTime,
+    checkedCallEndTime: state.checkedCallEndTime,
+    customerEmail: state.customerEmail,
+    bookingStatus: state.bookingConfirmed
+      ? "booked" as const
+      : state.pendingUserAction?.type === "booking_confirmation"
+        ? "awaiting_confirmation" as const
+        : "not_started" as const,
+    bookedEventId: state.bookedEventId,
+  };
+}
+
+function recentTurnsForState(state: SimpleWeddingSalesState) {
+  return [
+    state.replyMemory?.lastOutboundText
+      ? {
+          role: "assistant" as const,
+          text: state.replyMemory.lastOutboundText,
+        }
+      : undefined,
+    {
+      role: "customer" as const,
+      text: state.latestCustomerMessage,
+    },
+  ].filter((turn): turn is { role: "customer" | "assistant"; text: string } => Boolean(turn));
+}
+
+async function runRephraserForReply(args: {
+  state: SimpleWeddingSalesState;
+  contract: NonNullable<SimpleWeddingSalesState["replyContract"]>;
+  knowledge: SimpleWeddingKnowledgeContext;
+  reply: ReturnType<typeof writeConstrainedWeddingReply>;
+  rephrase?: InvokeWeddingSalesSimpleGraphInput["rephrase"];
+}): Promise<ContextualRephraserResult | undefined> {
+  const writer = args.reply.writer;
+
+  if (writer.mode !== "response_catalog" || !writer.responseKey || !writer.variationId) {
+    return undefined;
+  }
+
+  return runContextualRephraserShadow({
+    responseKey: writer.responseKey,
+    baseText: args.reply.text,
+    variationId: writer.variationId,
+    latestCustomerMessage: args.state.latestCustomerMessage,
+    recentTurns: recentTurnsForState(args.state),
+    slots: slotsForState(args.state),
+    replyContract: args.contract,
+    forbiddenPhrases: args.contract.forbiddenPhrases,
+    allowedEmojis: ["🤍", "✨"],
+    maxEmojis: 1,
+    state: args.state,
+    knowledge: args.knowledge,
+    generateDraft: args.rephrase,
+  });
 }
 
 export async function invokeWeddingSalesSimpleGraph(
@@ -185,6 +261,19 @@ export async function invokeWeddingSalesSimpleGraph(
     contract,
     knowledge,
   });
+  const rephraser = await runRephraserForReply({
+    state,
+    contract,
+    knowledge,
+    reply,
+    rephrase: input.rephrase,
+  });
+  const writer = rephraser
+    ? {
+        ...reply.writer,
+        rephraser,
+      }
+    : reply.writer;
   const finalState: SimpleWeddingSalesState = reply.forceHandoff
     ? {
         ...state,
@@ -207,7 +296,7 @@ export async function invokeWeddingSalesSimpleGraph(
     contract,
     knowledge,
     replyText: reply.text,
-    writer: reply.writer,
+    writer,
   });
   const finalDecisionTrace = finalState.decisionTrace
     ? {
@@ -222,7 +311,7 @@ export async function invokeWeddingSalesSimpleGraph(
     replyContract: contract,
     replyGuardResult: reply.guardResult,
     writer: {
-      ...reply.writer,
+      ...writer,
       responseKey: contract.responseKey,
     },
     writerCatalog: reply.writerCatalog,

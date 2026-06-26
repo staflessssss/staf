@@ -336,6 +336,7 @@ export type SimpleWeddingSalesWriterTrace = {
   attemptedVariationId?: string;
   variationId?: string;
   variationSeed?: string;
+  rephraser?: SimpleWeddingSalesRephraserTrace;
 };
 
 export type SimpleWeddingSalesWriterCatalogTrace = {
@@ -364,6 +365,23 @@ export type SimpleWeddingSalesWriterCatalogTrace = {
     responseKey?: SimpleWeddingSalesResponseKey;
     expectedResponseKeys?: SimpleWeddingSalesResponseKey[];
   };
+};
+
+export type SimpleWeddingSalesRephraserTrace = {
+  mode: "shadow";
+  eligible: boolean;
+  baseText: string;
+  baseVariationId?: string;
+  draftText?: string;
+  guardOk?: boolean;
+  wouldUse?: boolean;
+  fallbackReason?:
+    | "response_key_not_allowed"
+    | "shadow_disabled"
+    | "missing_openai_key"
+    | "model_failed"
+    | "guard_failed";
+  guardErrors?: string[];
 };
 
 export type SimpleWeddingSalesInvariantCheck = Prisma.JsonObject & {
