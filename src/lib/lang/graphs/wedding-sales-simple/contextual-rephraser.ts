@@ -88,7 +88,8 @@ function isAllowlisted(value: string | undefined, allowlist: string[]) {
 }
 
 function resolveRephraserActivation(input: ContextualRephraserInput) {
-  const activeRequested = process.env.WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE === "true";
+  const activeRequested =
+    process.env.WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE?.trim() === "true";
   const contactAllowlist = parseAllowlist(
     process.env.WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS,
   );
