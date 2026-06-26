@@ -120,7 +120,7 @@ export function updateSimpleWeddingReplyMemory(args: {
         })
       : undefined;
   const responseVariations =
-    args.writer?.mode === "response_catalog" &&
+    (args.writer?.mode === "response_catalog" || args.writer?.mode === "contextual_rephrase") &&
     args.writer.responseKey &&
     args.writer.variationId
       ? [

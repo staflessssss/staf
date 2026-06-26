@@ -330,7 +330,7 @@ export type SimpleWeddingSalesFlowRunnerTrace = Prisma.JsonObject & {
 };
 
 export type SimpleWeddingSalesWriterTrace = {
-  mode: "response_catalog" | "deterministic_fallback";
+  mode: "response_catalog" | "contextual_rephrase" | "deterministic_fallback";
   responseKey?: SimpleWeddingSalesResponseKey;
   fallbackReason?: string;
   attemptedVariationId?: string;
@@ -368,15 +368,20 @@ export type SimpleWeddingSalesWriterCatalogTrace = {
 };
 
 export type SimpleWeddingSalesRephraserTrace = {
-  mode: "shadow";
+  mode: "shadow" | "active";
   eligible: boolean;
+  activeAllowed?: boolean;
   baseText: string;
   baseVariationId?: string;
   draftText?: string;
   guardOk?: boolean;
   wouldUse?: boolean;
+  usedAsOutbound?: boolean;
+  fallbackToCatalog?: boolean;
   fallbackReason?:
     | "response_key_not_allowed"
+    | "contact_not_allowlisted"
+    | "agent_not_allowlisted"
     | "shadow_disabled"
     | "missing_openai_key"
     | "model_failed"

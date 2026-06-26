@@ -40,6 +40,35 @@ const unavailableToolContext = {
   testMode: false,
 };
 
+async function withRephraserEnv<T>(
+  env: Record<string, string | undefined>,
+  run: () => Promise<T>,
+) {
+  const previous = new Map<string, string | undefined>();
+
+  for (const key of Object.keys(env)) {
+    previous.set(key, process.env[key]);
+
+    if (env[key] === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = env[key];
+    }
+  }
+
+  try {
+    return await run();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
 test("simple wedding sales runtime checks availability before asking for names", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
@@ -117,6 +146,192 @@ test("simple wedding sales runtime logs rephraser shadow without changing outbou
   );
   assert.notEqual(result.responseDraft, result.writer?.rephraser?.draftText);
   assert.match(result.responseDraft ?? "", /venue|taking place/i);
+});
+
+test("simple wedding sales runtime sends active rephrase for allowlisted contact when guard passes", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: "agent-1",
+    },
+    async () => {
+      const draft = "Love it - what venue are you two planning for?";
+      const result = await invokeWeddingSalesSimpleGraph({
+        channel: "instagram",
+        agentId: "agent-1",
+        contactId: "contact-1",
+        message: "Mike and Sarah",
+        previousState: {
+          agentId: "agent-1",
+          contactId: "contact-1",
+          weddingDate: "2027-06-15",
+          location: "Tampa",
+          availability: "available",
+          availabilityCheck: {
+            date: "2027-06-15",
+            location: "Tampa",
+            status: "available",
+            checkedAt: "2026-06-24T00:00:00.000Z",
+          },
+          replyMemory: {
+            turnIndex: 1,
+          },
+        },
+        understand: () =>
+          understanding({
+            facts: {
+              customerName: "Mike",
+              partnerName: "Sarah",
+            },
+          }),
+        rephrase: () => draft,
+      });
+
+      assert.equal(result.nextStep, "ask_venue");
+      assert.equal(result.writer?.mode, "contextual_rephrase");
+      assert.equal(result.writer?.rephraser?.mode, "active");
+      assert.equal(result.writer?.rephraser?.activeAllowed, true);
+      assert.equal(result.writer?.rephraser?.guardOk, true);
+      assert.equal(result.writer?.rephraser?.usedAsOutbound, true);
+      assert.equal(result.writer?.rephraser?.fallbackToCatalog, false);
+      assert.equal(result.responseDraft, draft);
+      assert.equal(result.replyMemory?.lastOutboundText, draft);
+      assert.equal(result.replyMemory?.responseVariations?.at(-1)?.responseKey, "utter_ask_venue");
+    },
+  );
+});
+
+test("simple wedding sales runtime falls back to catalog when active rephrase guard fails", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: undefined,
+    },
+    async () => {
+      const result = await invokeWeddingSalesSimpleGraph({
+        channel: "instagram",
+        contactId: "contact-1",
+        message: "Mike and Sarah",
+        previousState: {
+          contactId: "contact-1",
+          weddingDate: "2027-06-15",
+          location: "Tampa",
+          availability: "available",
+          availabilityCheck: {
+            date: "2027-06-15",
+            location: "Tampa",
+            status: "available",
+            checkedAt: "2026-06-24T00:00:00.000Z",
+          },
+        },
+        understand: () =>
+          understanding({
+            facts: {
+              customerName: "Mike",
+              partnerName: "Sarah",
+            },
+          }),
+        rephrase: () => "Love it.",
+      });
+
+      assert.equal(result.nextStep, "ask_venue");
+      assert.equal(result.writer?.mode, "response_catalog");
+      assert.equal(result.writer?.rephraser?.mode, "active");
+      assert.equal(result.writer?.rephraser?.activeAllowed, true);
+      assert.equal(result.writer?.rephraser?.guardOk, false);
+      assert.equal(result.writer?.rephraser?.usedAsOutbound, false);
+      assert.equal(result.writer?.rephraser?.fallbackToCatalog, true);
+      assert.ok(
+        result.writer?.rephraser?.guardErrors?.some((error) =>
+          /venue question was required/i.test(error),
+        ),
+      );
+      assert.notEqual(result.responseDraft, "Love it.");
+      assert.match(result.responseDraft ?? "", /venue|taking place/i);
+    },
+  );
+});
+
+test("simple wedding sales runtime does not send active rephrase for non-allowlisted contact", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: undefined,
+    },
+    async () => {
+      const result = await invokeWeddingSalesSimpleGraph({
+        channel: "instagram",
+        contactId: "contact-2",
+        message: "Mike and Sarah",
+        previousState: {
+          contactId: "contact-2",
+          weddingDate: "2027-06-15",
+          location: "Tampa",
+          availability: "available",
+          availabilityCheck: {
+            date: "2027-06-15",
+            location: "Tampa",
+            status: "available",
+            checkedAt: "2026-06-24T00:00:00.000Z",
+          },
+        },
+        understand: () =>
+          understanding({
+            facts: {
+              customerName: "Mike",
+              partnerName: "Sarah",
+            },
+          }),
+        rephrase: () => "Love it - what venue are you two planning for?",
+      });
+
+      assert.equal(result.nextStep, "ask_venue");
+      assert.equal(result.writer?.mode, "response_catalog");
+      assert.equal(result.writer?.rephraser?.mode, "shadow");
+      assert.equal(result.writer?.rephraser?.activeAllowed, false);
+      assert.equal(result.writer?.rephraser?.fallbackReason, "contact_not_allowlisted");
+      assert.equal(result.writer?.rephraser?.usedAsOutbound, false);
+      assert.equal(result.responseDraft, result.writer?.rephraser?.baseText);
+    },
+  );
+});
+
+test("simple wedding sales runtime does not run active rephrase for excluded pricing availability reply", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: undefined,
+    },
+    async () => {
+      const result = await invokeWeddingSalesSimpleGraph({
+        channel: "instagram",
+        contactId: "contact-1",
+        message: "Are you available June 15 2027 in Tampa? How much?",
+        toolContext,
+        understand: () =>
+          understanding({
+            customerMessageType: "availability_question",
+            facts: {
+              weddingDate: "2027-06-15",
+              weddingDateText: "June 15 2027",
+              location: "Tampa",
+            },
+            questionsAskedByCustomer: ["availability", "pricing"],
+          }),
+        rephrase: () => "I changed the availability and price.",
+      });
+
+      assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
+      assert.equal(result.writer?.mode, "deterministic_fallback");
+      assert.equal(result.writer?.rephraser, undefined);
+      assert.doesNotMatch(result.responseDraft ?? "", /I changed the availability and price/i);
+      assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+    },
+  );
 });
 
 test("simple wedding sales runtime hands off instead of treating unknown availability as available", async () => {

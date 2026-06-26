@@ -17,7 +17,7 @@ const rephraserOutputSchema = z.object({
   text: z.string().trim().min(1),
 });
 
-const ALLOWED_REPHRASER_KEYS = new Set<SimpleWeddingSalesResponseKey>([
+const ACTIVE_REPHRASER_KEYS = new Set<SimpleWeddingSalesResponseKey>([
   "utter_ask_venue",
   "utter_ask_call_time",
   "utter_ask_email",
@@ -31,6 +31,8 @@ export type ContextualRephraserInput = {
   responseKey: SimpleWeddingSalesResponseKey;
   baseText: string;
   variationId: string;
+  agentId?: string;
+  contactId?: string;
   latestCustomerMessage: string;
   recentTurns: Array<{
     role: "customer" | "assistant";
@@ -47,15 +49,20 @@ export type ContextualRephraserInput = {
 };
 
 export type ContextualRephraserResult = {
-  mode: "shadow";
+  mode: "shadow" | "active";
   eligible: boolean;
+  activeAllowed?: boolean;
   baseText: string;
   baseVariationId?: string;
   draftText?: string;
   guardOk?: boolean;
   wouldUse?: boolean;
+  usedAsOutbound?: boolean;
+  fallbackToCatalog?: boolean;
   fallbackReason?:
     | "response_key_not_allowed"
+    | "contact_not_allowlisted"
+    | "agent_not_allowlisted"
     | "shadow_disabled"
     | "missing_openai_key"
     | "model_failed"
@@ -67,6 +74,57 @@ function compact(value: string, maxLength: number) {
   const trimmed = value.trim();
 
   return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
+}
+
+function parseAllowlist(value?: string) {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function isAllowlisted(value: string | undefined, allowlist: string[]) {
+  return Boolean(value && allowlist.includes(value));
+}
+
+function resolveRephraserActivation(input: ContextualRephraserInput) {
+  const activeRequested = process.env.WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE === "true";
+  const contactAllowlist = parseAllowlist(
+    process.env.WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS,
+  );
+  const agentAllowlist = parseAllowlist(
+    process.env.WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS,
+  );
+
+  if (!activeRequested) {
+    return {
+      mode: "shadow" as const,
+      activeAllowed: false,
+      fallbackReason: undefined,
+    };
+  }
+
+  if (!isAllowlisted(input.contactId, contactAllowlist)) {
+    return {
+      mode: "shadow" as const,
+      activeAllowed: false,
+      fallbackReason: "contact_not_allowlisted" as const,
+    };
+  }
+
+  if (agentAllowlist.length > 0 && !isAllowlisted(input.agentId, agentAllowlist)) {
+    return {
+      mode: "shadow" as const,
+      activeAllowed: false,
+      fallbackReason: "agent_not_allowlisted" as const,
+    };
+  }
+
+  return {
+    mode: "active" as const,
+    activeAllowed: true,
+    fallbackReason: undefined,
+  };
 }
 
 function extractEmails(text: string) {
@@ -269,22 +327,39 @@ async function generateRephraseDraft(input: ContextualRephraserInput) {
 export async function runContextualRephraserShadow(
   input: ContextualRephraserInput,
 ): Promise<ContextualRephraserResult> {
+  const activation = resolveRephraserActivation(input);
   const baseResult = {
-    mode: "shadow" as const,
+    mode: activation.mode,
+    activeAllowed: activation.activeAllowed,
     baseText: input.baseText,
     baseVariationId: input.variationId,
   };
 
-  if (!ALLOWED_REPHRASER_KEYS.has(input.responseKey)) {
+  if (!ACTIVE_REPHRASER_KEYS.has(input.responseKey)) {
     return {
       ...baseResult,
+      mode: "shadow",
+      activeAllowed: false,
       eligible: false,
       wouldUse: false,
       fallbackReason: "response_key_not_allowed",
     };
   }
 
-  if (!input.generateDraft && process.env.WEDDING_SALES_SIMPLE_REPHRASER_SHADOW !== "true") {
+  if (activation.fallbackReason && !input.generateDraft) {
+    return {
+      ...baseResult,
+      eligible: true,
+      wouldUse: false,
+      fallbackReason: activation.fallbackReason,
+    };
+  }
+
+  if (
+    activation.mode !== "active" &&
+    !input.generateDraft &&
+    process.env.WEDDING_SALES_SIMPLE_REPHRASER_SHADOW !== "true"
+  ) {
     return {
       ...baseResult,
       eligible: true,
@@ -321,7 +396,7 @@ export async function runContextualRephraserShadow(
       draftText,
       guardOk: guard.ok,
       wouldUse: guard.ok,
-      fallbackReason: guard.ok ? undefined : "guard_failed",
+      fallbackReason: guard.ok ? activation.fallbackReason : "guard_failed",
       guardErrors: guard.ok ? undefined : guard.errors,
     };
   } catch (error) {
@@ -336,7 +411,9 @@ export async function runContextualRephraserShadow(
 }
 
 export const contextualRephraserTestHelpers = {
-  ALLOWED_REPHRASER_KEYS,
+  ACTIVE_REPHRASER_KEYS,
+  parseAllowlist,
+  resolveRephraserActivation,
   rephraserOutputSchema,
   validateContextualRephrase,
 };

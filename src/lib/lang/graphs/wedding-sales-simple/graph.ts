@@ -26,6 +26,7 @@ import { buildReplyActionContract } from "./reply-contract";
 import { updateSimpleWeddingReplyMemory } from "./reply-memory";
 import { writeConstrainedWeddingReply } from "./reply-writer";
 import { defaultWeddingSalesConfig } from "../wedding-sales/config";
+import { validateGeneratedReply } from "./reply-guards";
 import {
   runContextualRephraserShadow,
   type ContextualRephraserInput,
@@ -175,6 +176,8 @@ async function runRephraserForReply(args: {
     responseKey: writer.responseKey,
     baseText: args.reply.text,
     variationId: writer.variationId,
+    agentId: args.state.agentId,
+    contactId: args.state.contactId,
     latestCustomerMessage: args.state.latestCustomerMessage,
     recentTurns: recentTurnsForState(args.state),
     slots: slotsForState(args.state),
@@ -268,12 +271,60 @@ export async function invokeWeddingSalesSimpleGraph(
     reply,
     rephrase: input.rephrase,
   });
-  const writer = rephraser
+  let responseDraft = reply.text;
+  let replyGuardResult = reply.guardResult;
+  let writer: NonNullable<SimpleWeddingSalesState["writer"]> = rephraser
     ? {
         ...reply.writer,
-        rephraser,
+        rephraser: {
+          ...rephraser,
+          usedAsOutbound: false,
+          fallbackToCatalog: rephraser.mode === "active",
+        },
       }
     : reply.writer;
+
+  if (
+    rephraser?.mode === "active" &&
+    rephraser.guardOk &&
+    rephraser.draftText
+  ) {
+    const finalRephraseGuard = validateGeneratedReply({
+      reply: rephraser.draftText,
+      contract,
+      knowledge,
+      state,
+    });
+
+    if (finalRephraseGuard.ok) {
+      responseDraft = rephraser.draftText;
+      replyGuardResult = finalRephraseGuard;
+      writer = {
+        ...reply.writer,
+        mode: "contextual_rephrase",
+        rephraser: {
+          ...rephraser,
+          usedAsOutbound: true,
+          fallbackToCatalog: false,
+        },
+      };
+    } else {
+      writer = {
+        ...reply.writer,
+        rephraser: {
+          ...rephraser,
+          guardOk: false,
+          usedAsOutbound: false,
+          fallbackToCatalog: true,
+          fallbackReason: "guard_failed",
+          guardErrors: [
+            ...(rephraser.guardErrors ?? []),
+            ...finalRephraseGuard.reasons,
+          ],
+        },
+      };
+    }
+  }
   const finalState: SimpleWeddingSalesState = reply.forceHandoff
     ? {
         ...state,
@@ -295,7 +346,7 @@ export async function invokeWeddingSalesSimpleGraph(
     state: finalState,
     contract,
     knowledge,
-    replyText: reply.text,
+    replyText: responseDraft,
     writer,
   });
   const finalDecisionTrace = finalState.decisionTrace
@@ -309,13 +360,13 @@ export async function invokeWeddingSalesSimpleGraph(
     decisionTrace: finalDecisionTrace,
     replyMemory: updatedReplyMemory,
     replyContract: contract,
-    replyGuardResult: reply.guardResult,
+    replyGuardResult,
     writer: {
       ...writer,
       responseKey: contract.responseKey,
     },
     writerCatalog: reply.writerCatalog,
-    responseDraft: reply.text || writeHumanReply({
+    responseDraft: responseDraft || writeHumanReply({
       state,
       config: input.config,
     }),

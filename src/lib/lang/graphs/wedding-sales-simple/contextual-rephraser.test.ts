@@ -68,6 +68,35 @@ function baseInput(update: Partial<Parameters<typeof runContextualRephraserShado
   };
 }
 
+async function withRephraserEnv<T>(
+  env: Record<string, string | undefined>,
+  run: () => Promise<T>,
+) {
+  const previous = new Map<string, string | undefined>();
+
+  for (const key of Object.keys(env)) {
+    previous.set(key, process.env[key]);
+
+    if (env[key] === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = env[key];
+    }
+  }
+
+  try {
+    return await run();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
 test("eligible safe responseKey runs shadow rephraser", async () => {
   const result = await runContextualRephraserShadow(
     baseInput({
@@ -82,6 +111,79 @@ test("eligible safe responseKey runs shadow rephraser", async () => {
   assert.equal(result.draftText, "Absolutely 🤍");
 });
 
+test("allowlisted contact can run active rephraser", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: "agent-1",
+    },
+    async () => {
+      const result = await runContextualRephraserShadow(
+        baseInput({
+          agentId: "agent-1",
+          contactId: "contact-1",
+          generateDraft: () => "Absolutely рџ¤Ќ",
+        }),
+      );
+
+      assert.equal(result.mode, "active");
+      assert.equal(result.activeAllowed, true);
+      assert.equal(result.eligible, true);
+      assert.equal(result.guardOk, true);
+      assert.equal(result.wouldUse, true);
+      assert.equal(result.draftText, "Absolutely рџ¤Ќ");
+    },
+  );
+});
+
+test("active env without contact allowlist stays shadow", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: undefined,
+    },
+    async () => {
+      const result = await runContextualRephraserShadow(
+        baseInput({
+          contactId: "contact-2",
+        }),
+      );
+
+      assert.equal(result.mode, "shadow");
+      assert.equal(result.activeAllowed, false);
+      assert.equal(result.eligible, true);
+      assert.equal(result.wouldUse, false);
+      assert.equal(result.fallbackReason, "contact_not_allowlisted");
+    },
+  );
+});
+
+test("active env with unmatched agent allowlist stays shadow", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: "agent-1",
+    },
+    async () => {
+      const result = await runContextualRephraserShadow(
+        baseInput({
+          agentId: "agent-2",
+          contactId: "contact-1",
+        }),
+      );
+
+      assert.equal(result.mode, "shadow");
+      assert.equal(result.activeAllowed, false);
+      assert.equal(result.eligible, true);
+      assert.equal(result.wouldUse, false);
+      assert.equal(result.fallbackReason, "agent_not_allowlisted");
+    },
+  );
+});
+
 test("ineligible responseKey skips rephraser", async () => {
   const result = await runContextualRephraserShadow(
     baseInput({
@@ -93,6 +195,31 @@ test("ineligible responseKey skips rephraser", async () => {
   assert.equal(result.eligible, false);
   assert.equal(result.wouldUse, false);
   assert.equal(result.fallbackReason, "response_key_not_allowed");
+});
+
+test("unsafe responseKey is not active even for allowlisted contact", async () => {
+  await withRephraserEnv(
+    {
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE: "true",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_CONTACT_IDS: "contact-1",
+      WEDDING_SALES_SIMPLE_REPHRASER_ACTIVE_AGENT_IDS: undefined,
+    },
+    async () => {
+      const result = await runContextualRephraserShadow(
+        baseInput({
+          responseKey: "utter_available_with_pricing_guide",
+          contactId: "contact-1",
+          generateDraft: () => "Anything",
+        }),
+      );
+
+      assert.equal(result.mode, "shadow");
+      assert.equal(result.activeAllowed, false);
+      assert.equal(result.eligible, false);
+      assert.equal(result.wouldUse, false);
+      assert.equal(result.fallbackReason, "response_key_not_allowed");
+    },
+  );
 });
 
 test("guard blocks changed email", () => {
