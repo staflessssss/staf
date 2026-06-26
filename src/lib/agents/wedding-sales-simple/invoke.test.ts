@@ -152,6 +152,82 @@ test("wedding-sales-simple adapter normalizes Gmail thread and preserves sender 
   assert.match(result.outbound.text, /What date are you looking at/i);
 });
 
+test("wedding-sales-simple adapter logs flow runner shadow decision without changing behavior", async () => {
+  const incoming = normalizeInstagramWeddingSalesIncoming({
+    tenantId: "tenant-1",
+    agentId: "agent-wedding",
+    entry: [
+      {
+        messaging: [
+          {
+            sender: { id: "ig-contact-1", username: "anna" },
+            message: {
+              mid: "mid-flow-shadow",
+              text: "Thank you",
+            },
+            timestamp: Date.parse("2026-06-23T12:00:00.000Z"),
+          },
+        ],
+      },
+    ],
+  });
+  const safetyLogs: WeddingSalesSimpleSafetyLogEntry[] = [];
+  const previousState: Partial<SimpleWeddingSalesState> = {
+    customerName: "Mark",
+    partnerName: "Rachel",
+    customerEmail: "anna@example.com",
+    weddingDate: "2027-06-15",
+    location: "Tampa",
+    venue: "Evergreen Park",
+    availability: "available",
+    proposedCallTime: "Monday at 1:30pm",
+    bookingConfirmed: true,
+    customerConfirmedCallSlot: true,
+    mode: "bot_active",
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  };
+
+  const result = await invokeWeddingSalesSimpleAdapter({
+    incoming,
+    deps: {
+      loadState: () => previousState,
+      recordSafetyLog: (entry) => {
+        safetyLogs.push(entry);
+      },
+      invokeGraph: (input) =>
+        import("@/lib/lang/graphs/wedding-sales-simple/graph").then(
+          ({ invokeWeddingSalesSimpleGraph }) =>
+            invokeWeddingSalesSimpleGraph({
+              ...input,
+              understand: () => ({
+                customerMessageType: "answer_to_question",
+                facts: {},
+                questionsAskedByCustomer: [],
+                confidence: 0.95,
+              }),
+            }),
+        ),
+    },
+  });
+
+  assert.equal(result.status, "processed");
+  assert.equal(result.outbound.decisionTrace.nextStep, "reply_only");
+  assert.equal(result.outbound.decisionTrace.replyType, "acknowledgement_only");
+  assert.equal(result.outbound.text, "Of course 🤍");
+  assert.equal(safetyLogs[0]?.toolCalls.length, 0);
+  assert.deepEqual(safetyLogs[0]?.dialogueCommands, [
+    { type: "acknowledgement_only" },
+  ]);
+  assert.equal(safetyLogs[0]?.dialogueUnderstanding?.messageAct, "acknowledgement_only");
+  assert.equal(safetyLogs[0]?.flowRunner?.mode, "shadow");
+  assert.equal(safetyLogs[0]?.flowRunner?.predictedNextStep, "reply_only");
+  assert.equal(safetyLogs[0]?.flowRunner?.predictedResponseKey, "utter_acknowledgement");
+  assert.equal(safetyLogs[0]?.flowRunner?.preserveFlow, true);
+  assert.equal(safetyLogs[0]?.flowRunner?.matchedLegacy, true);
+});
+
 test("wedding-sales-simple adapter logs Instagram semantic delivery plan when flag is on", async () => {
   const incoming = normalizeInstagramWeddingSalesIncoming({
     tenantId: "tenant-1",

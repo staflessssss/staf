@@ -9,6 +9,7 @@ import {
   type SimpleWeddingSalesChannel,
   type SimpleWeddingSalesState,
 } from "./state";
+import { runWeddingLeadFlowShadow } from "./flow-runner";
 import { maybeRunSimpleWeddingSalesTool } from "./tools";
 import { understandTurn, type SimpleWeddingSalesUnderstandTurn } from "./understand";
 import type { WeddingSalesConfig } from "../wedding-sales/config";
@@ -63,8 +64,7 @@ export type InvokeWeddingSalesSimpleGraphInput = {
 
 function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState {
   const decision = decideNextStep(state);
-
-  return {
+  const decidedState = {
     ...state,
     ...decision.statePatch,
     nextStep: decision.nextStep,
@@ -72,6 +72,17 @@ function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState 
     mode: decision.mode ?? state.mode,
     handoffReason: decision.handoffReason,
     decisionTrace: decision.trace,
+  };
+  const flowRunner = runWeddingLeadFlowShadow({
+    state: decidedState,
+    dialogueCommands: decidedState.dialogueCommands,
+    pendingUserAction: decidedState.pendingUserAction ?? null,
+    legacyDecision: decision.trace,
+  });
+
+  return {
+    ...decidedState,
+    flowRunner: flowRunner ?? state.flowRunner,
   };
 }
 

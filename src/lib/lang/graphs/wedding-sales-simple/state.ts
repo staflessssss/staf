@@ -304,6 +304,18 @@ export type SimpleWeddingSalesDialogueCommand =
     })
   | (Prisma.JsonObject & { type: "unclear" });
 
+export type SimpleWeddingSalesFlowRunnerTrace = Prisma.JsonObject & {
+  mode: "shadow" | "active";
+  predictedNextStep: SimpleWeddingSalesNextStep;
+  predictedResponseKey: SimpleWeddingSalesResponseKey;
+  legacyReplyType?: SimpleWeddingSalesDecisionTrace["replyType"];
+  reason: string;
+  shouldCallTool?: boolean;
+  toolName?: "check_wedding_availability" | "check_consultation_calendar" | "book_consultation";
+  preserveFlow?: boolean;
+  matchedLegacy: boolean;
+};
+
 export type SimpleWeddingSalesWriterTrace = {
   mode: "deterministic_fallback";
   responseKey?: SimpleWeddingSalesResponseKey;
@@ -383,6 +395,7 @@ export type SimpleWeddingSalesState = {
   questionsAskedByCustomer: SimpleWeddingSalesQuestion[];
   dialogueUnderstanding?: DialogueUnderstanding;
   dialogueCommands?: SimpleWeddingSalesDialogueCommand[];
+  flowRunner?: SimpleWeddingSalesFlowRunnerTrace;
   lastUnderstanding?: TurnUnderstanding;
   nextStep?: SimpleWeddingSalesNextStep;
   missingField?: "names" | "weddingDate" | "location";
@@ -465,6 +478,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     questionsAskedByCustomer: [],
     dialogueUnderstanding: undefined,
     dialogueCommands: undefined,
+    flowRunner: undefined,
     lastUnderstanding: args.previousState?.lastUnderstanding,
     nextStep: args.previousState?.nextStep,
     missingField: args.previousState?.missingField,
