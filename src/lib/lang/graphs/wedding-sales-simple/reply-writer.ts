@@ -393,6 +393,10 @@ function clarificationLine() {
   return "I want to make sure I understand you correctly. Could you tell me a little more about what you'd like to know?";
 }
 
+function acknowledgementLine() {
+  return "Of course 🤍";
+}
+
 function fallbackClarificationLine() {
   return "Sorry - I might be missing what you mean. Can you say that one more way?";
 }
@@ -429,6 +433,7 @@ function renderSafeTemplate(args: {
     args.contract.mustAnswerTravel ? travelLine() : undefined,
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
+    args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
     questionLine(args),
   ]) || questionLine(args) || fallbackClarificationLine();
@@ -458,6 +463,7 @@ function renderCompactInstagramFallback(args: {
     args.contract.mustAnswerTravel ? travelLine() : undefined,
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
+    args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
   ]
     .filter(Boolean)
@@ -500,6 +506,7 @@ export function writeConstrainedWeddingReply(args: {
           contract.mustAnswerTravel ? travelLine() : undefined,
           mustAnswerRawFootage(contract) ? rawFootageLine(knowledge) : undefined,
           shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
+          contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
           contract.replyType === "clarification" ? clarificationLine() : undefined,
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);

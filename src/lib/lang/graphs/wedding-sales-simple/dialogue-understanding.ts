@@ -6,6 +6,7 @@ import type {
 
 export type DialogueUnderstanding = {
   messageAct:
+    | "acknowledgement_only"
     | "answer_pending_question"
     | "new_business_question"
     | "mixed_ack_and_question"
@@ -27,7 +28,7 @@ export type DialogueUnderstanding = {
 };
 
 function isBareAffirmative(text: string) {
-  return /^\s*(?:yes|yes please|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect)\s*[.!]*\s*$/i.test(
+  return /^\s*(?:yes(?:\s*,?\s*please)?|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect)\s*[.!]*\s*$/i.test(
     text,
   );
 }
@@ -49,6 +50,12 @@ function readConversationalFiller(text: string) {
   return [...new Set(filler)];
 }
 
+function isAcknowledgementOnly(text: string) {
+  return /^\s*(?:thank you|thanks|great thanks|okay thank you|ok thank you|got it(?:,\s*)?(?:thank you|thanks)?|appreciate it|of course)\s*[.!]*\s*$/i.test(
+    text,
+  );
+}
+
 function inferPendingAnswer(args: {
   state: SimpleWeddingSalesState;
   text: string;
@@ -68,11 +75,23 @@ function inferPendingAnswer(args: {
     return { type: "none", appliesTo: "none" };
   }
 
-  if (args.state.pendingUserAction?.type === "booking_confirmation") {
+  const pendingUserAction =
+    args.state.pendingUserAction ??
+    (args.state.bookingConfirmed
+      ? null
+      : args.state.replyMemory?.pendingBookingConfirmation
+        ? {
+            type: "booking_confirmation" as const,
+            slot: args.state.replyMemory.pendingBookingConfirmation.proposedCallTime,
+            email: args.state.replyMemory.pendingBookingConfirmation.email,
+          }
+        : null);
+
+  if (pendingUserAction?.type === "booking_confirmation") {
     return { type, appliesTo: "booking_confirmation" };
   }
 
-  if (args.state.pendingUserAction?.type === "call_time_choice") {
+  if (pendingUserAction?.type === "call_time_choice") {
     return { type, appliesTo: "call_time_choice" };
   }
 
@@ -94,7 +113,9 @@ export function buildDialogueUnderstanding(args: {
   });
   const hasFacts = Object.values(args.understanding.facts).some(Boolean);
   const messageAct: DialogueUnderstanding["messageAct"] =
-    explicitQuestions.length > 0 && conversationalFiller.length > 0
+    pendingAnswer.type === "none" && explicitQuestions.length === 0 && isAcknowledgementOnly(args.state.latestCustomerMessage)
+      ? "acknowledgement_only"
+      : explicitQuestions.length > 0 && conversationalFiller.length > 0
       ? "mixed_ack_and_question"
       : explicitQuestions.length > 0
         ? "new_business_question"

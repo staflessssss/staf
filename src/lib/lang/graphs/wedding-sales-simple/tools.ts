@@ -274,6 +274,9 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
       {
         ...state,
         bookingConfirmed,
+        pendingUserAction: bookingConfirmed ? null : state.pendingUserAction,
+        callTimeContext: bookingConfirmed ? undefined : state.callTimeContext,
+        callTimeAmbiguousChoice: bookingConfirmed ? false : state.callTimeAmbiguousChoice,
         bookingAttempt: {
           status: bookingConfirmed ? "booked" : "failed",
           attemptedAt: new Date().toISOString(),

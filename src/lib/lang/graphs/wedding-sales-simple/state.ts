@@ -103,6 +103,7 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "team_answer"
     | "booking_confirmed"
     | "identity_answer"
+    | "acknowledgement_only"
     | "clarification"
     | "handoff"
     | "reply_only";
@@ -393,6 +394,10 @@ export function createInitialSimpleWeddingSalesState(args: {
 export function derivePendingUserAction(
   state?: Partial<SimpleWeddingSalesState>,
 ): SimpleWeddingSalesPendingUserAction {
+  if (state?.bookingConfirmed) {
+    return null;
+  }
+
   const pendingBooking = state?.replyMemory?.pendingBookingConfirmation;
 
   if (pendingBooking && !state?.bookingConfirmed) {
@@ -423,15 +428,30 @@ export function mergeTurnUnderstanding(
     state,
     understanding,
   });
+  const activePendingUserAction = state.pendingUserAction ?? derivePendingUserAction(state);
+  const answersPendingBookingConfirmation =
+    activePendingUserAction?.type === "booking_confirmation" &&
+    dialogueUnderstanding.pendingAnswer.type === "affirmative" &&
+    dialogueUnderstanding.pendingAnswer.appliesTo === "booking_confirmation";
+  const shouldSkipCallTimeContext =
+    answersPendingBookingConfirmation ||
+    dialogueUnderstanding.messageAct === "acknowledgement_only";
   const customerName = facts.customerName ?? state.customerName;
   const partnerName = facts.partnerName ?? state.partnerName;
-  const callTimeCompletion = completeCallTimeFromAnswerContext(
-    state,
-    facts.proposedCallTime,
-    dialogueUnderstanding.shouldSuppressOldContext
-      ? dialogueUnderstanding.explicitQuestions
-      : understanding.questionsAskedByCustomer,
-  );
+  const callTimeCompletion = shouldSkipCallTimeContext
+    ? {
+        proposedCallTime: undefined,
+        ambiguousChoice: false,
+        clearProposedCallTime: false,
+        answerContext: undefined,
+      }
+    : completeCallTimeFromAnswerContext(
+        state,
+        facts.proposedCallTime,
+        dialogueUnderstanding.shouldSuppressOldContext
+          ? dialogueUnderstanding.explicitQuestions
+          : understanding.questionsAskedByCustomer,
+      );
   const proposedCallTime = callTimeCompletion.clearProposedCallTime
     ? undefined
     : callTimeCompletion.proposedCallTime ?? state.proposedCallTime;
@@ -480,7 +500,9 @@ export function mergeTurnUnderstanding(
     dialogueUnderstanding,
     pendingUserAction: dialogueUnderstanding.shouldSuppressOldContext
       ? null
-      : derivePendingUserAction(state),
+      : answersPendingBookingConfirmation
+        ? activePendingUserAction
+        : derivePendingUserAction(state),
     lastUnderstanding: understanding,
     answerContext: bookingConfirmation.answerContext ?? callTimeCompletion.answerContext,
   };
@@ -498,8 +520,26 @@ function resolveBookingConfirmationAnswer(args: {
 } {
   const text = args.state.latestCustomerMessage;
   const pending = args.state.replyMemory?.pendingBookingConfirmation;
+  const activePendingUserAction = args.state.pendingUserAction ?? derivePendingUserAction(args.state);
   const explicitBookingRequest = isExplicitBookingRequest(text);
   const hasExplicitBusinessQuestion = Boolean(args.dialogueUnderstanding?.shouldSuppressOldContext);
+  const answersPendingBookingConfirmation =
+    activePendingUserAction?.type === "booking_confirmation" &&
+    args.dialogueUnderstanding?.pendingAnswer.type === "affirmative" &&
+    args.dialogueUnderstanding.pendingAnswer.appliesTo === "booking_confirmation";
+
+  if (answersPendingBookingConfirmation && pending && isPendingBookingConfirmationCurrent(args.state, pending, args.customerEmail)) {
+    return {
+      confirmed: true,
+      answerContext: {
+        applied: true,
+        source: "pending_booking_confirmation",
+        originalText: text,
+        resolvedValue: pending.proposedCallTime,
+        reason: "affirmative answer applies to the active pending booking confirmation",
+      },
+    };
+  }
 
   if (args.callTimeChanged) {
     return {
@@ -580,7 +620,7 @@ function resolveBookingConfirmationAnswer(args: {
 }
 
 function isBareAffirmative(text: string) {
-  return /^\s*(?:yes|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect)\s*[.!]*\s*$/i.test(
+  return /^\s*(?:yes(?:\s*,?\s*please)?|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect)\s*[.!]*\s*$/i.test(
     text,
   );
 }

@@ -393,6 +393,14 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  if (state.dialogueUnderstanding?.messageAct === "acknowledgement_only") {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "acknowledgement_only",
+      reason: "customer only acknowledged the previous message",
+    });
+  }
+
   if (
     state.bookingConfirmed &&
     replyObligations.length > 0 &&
