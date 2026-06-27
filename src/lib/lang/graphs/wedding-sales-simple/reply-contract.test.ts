@@ -518,7 +518,7 @@ test("available Florida date uses regional price and promotion copy", () => {
     channel: "instagram",
     channelConfig: {
       pricing: {
-        startPrice: "$4,600",
+        startPrice: "$3,600",
         currency: "USD",
         coverageHours: 8,
         promotionText: "Also, we are running a 20% discount through June 30.",
@@ -531,7 +531,7 @@ test("available Florida date uses regional price and promotion copy", () => {
           promotionText: "Also, we are running a 20% discount through June 30.",
         },
         NC_SC_GA: {
-          startPrice: "$4,600",
+          startPrice: "$3,600",
           currency: "USD",
           coverageHours: 8,
           promotionText: "Also, we are running a 20% discount through June 30.",
@@ -555,7 +555,7 @@ test("available Florida date uses regional price and promotion copy", () => {
   assert.equal(result.writer.responseKey, "utter_availability_available_ask_names");
   assert.match(result.text, /\$2,800/);
   assert.match(result.text, /20% discount through June 30/i);
-  assert.doesNotMatch(result.text, /\$4,600/);
+  assert.doesNotMatch(result.text, /\$3,600/);
 });
 
 test("writer can use response catalog for ask venue", () => {
