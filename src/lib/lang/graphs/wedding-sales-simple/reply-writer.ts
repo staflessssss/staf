@@ -1,5 +1,5 @@
 import { formatSimpleWeddingDate } from "./reply";
-import type { SimpleWeddingKnowledgeContext } from "./knowledge";
+import { getPostBookingFaqAnswer, type SimpleWeddingKnowledgeContext } from "./knowledge";
 import type { ReplyActionContract } from "./reply-contract";
 import { validateGeneratedReply } from "./reply-guards";
 import {
@@ -830,6 +830,70 @@ function rawFootageLine(knowledge: SimpleWeddingKnowledgeContext) {
   return "Yes - raw footage can be added depending on the collection and what you're looking for. We can talk through the cleanest option on the call 🤍";
 }
 
+function postBookingFaqLine(args: {
+  state: SimpleWeddingSalesState;
+  knowledge: SimpleWeddingKnowledgeContext;
+}) {
+  const command = args.state.dialogueCommands?.find(
+    (
+      item,
+    ): item is Extract<
+      NonNullable<SimpleWeddingSalesState["dialogueCommands"]>[number],
+      { type: "answer_question" }
+    > => item.type === "answer_question",
+  );
+
+  if (!command) {
+    return undefined;
+  }
+
+  const result = getPostBookingFaqAnswer({
+    question: command.question,
+    knowledge: args.knowledge,
+  });
+
+  return result.exists ? result.answer : undefined;
+}
+
+function bookingDetailsLine(state: SimpleWeddingSalesState) {
+  const command = state.dialogueCommands?.find(
+    (
+      item,
+    ): item is Extract<
+      NonNullable<SimpleWeddingSalesState["dialogueCommands"]>[number],
+      { type: "ask_booking_details" }
+    > => item.type === "ask_booking_details",
+  );
+  const detail = command?.detail;
+  const time = displayCheckedCallTime(state);
+
+  if (detail === "time") {
+    return time
+      ? `It's set for ${time} 🤍`
+      : "The exact call time should be in the calendar invite. If anything looks off, I can have Taras double-check it.";
+  }
+
+  if (detail === "email") {
+    return state.customerEmail
+      ? `The invite should come through at ${state.customerEmail}.`
+      : "I don't have the email in front of me here, so I'll have Taras double-check the invite details.";
+  }
+
+  if (detail === "invite") {
+    if (state.customerEmail && time) {
+      return `The calendar invite should come through at ${state.customerEmail} for ${time}.`;
+    }
+
+    if (state.customerEmail) {
+      return `The calendar invite should come through at ${state.customerEmail}.`;
+    }
+
+    return "The invite should be in your calendar/email. If you don't see it, I can have Taras double-check it.";
+  }
+
+  return undefined;
+}
+
 function mustAnswerRawFootage(contract: ReplyActionContract) {
   return Boolean(contract.mustAnswerQuestions?.includes("raw_footage"));
 }
@@ -938,6 +1002,34 @@ export function writeConstrainedWeddingReply(args: {
   forceHandoff?: true;
 } {
   const { state, contract, knowledge } = args;
+
+  if (contract.replyType === "post_booking_faq" || contract.replyType === "answer_booking_details") {
+    const directDraft =
+      contract.replyType === "post_booking_faq"
+        ? postBookingFaqLine({ state, knowledge })
+        : bookingDetailsLine(state);
+
+    if (directDraft) {
+      const directGuard = validateGeneratedReply({
+        reply: directDraft,
+        contract,
+        knowledge,
+        state,
+      });
+
+      return {
+        text: directDraft,
+        guardResult: directGuard,
+        writer: {
+          mode: "deterministic_fallback",
+          responseKey: contract.responseKey,
+          fallbackReason: directGuard.ok ? undefined : "response_catalog_guard_failed",
+        },
+        writerCatalog: buildCatalogTraceForSkippedContract(contract),
+      };
+    }
+  }
+
   const catalogDraft = tryBuildResponseFromCatalog({ state, contract, knowledge });
   const guardedCatalogDraft = tryBuildGuardedResponseFromCatalog({ state, contract, knowledge });
   const writerCatalog =

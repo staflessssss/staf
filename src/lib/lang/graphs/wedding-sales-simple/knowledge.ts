@@ -7,7 +7,11 @@ import {
   type WeddingSalesConfig,
 } from "../wedding-sales/config";
 import { buildWeddingSalesConfigFromChannelConfig } from "../wedding-sales/config-from-agent";
-import type { SimpleWeddingSalesChannel, SimpleWeddingSalesState } from "./state";
+import type {
+  SimpleWeddingSalesChannel,
+  SimpleWeddingSalesQuestion,
+  SimpleWeddingSalesState,
+} from "./state";
 
 export type SimpleWeddingKnowledgeFeature = {
   name?: string | null;
@@ -170,6 +174,10 @@ function readString(record: Record<string, unknown> | undefined, key: string, fa
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function coverageRegionLabel(knowledge: Pick<SimpleWeddingKnowledgeContext, "pricing">) {
+  return knowledge.pricing.region ?? "your area";
+}
+
 function readPersonaIdentity(channelConfig: unknown) {
   const root = asRecord(channelConfig);
   const prompting = asRecord(root?.prompting);
@@ -287,5 +295,55 @@ export function buildSimpleWeddingKnowledgeContext(input: {
       "Do not say the guide or price image is unavailable when guide.imageUrl or guide.link exists.",
       "Instagram replies must not include an email signature.",
     ],
+  };
+}
+
+export function getPostBookingFaqAnswer(input: {
+  question: SimpleWeddingSalesQuestion;
+  knowledge: SimpleWeddingKnowledgeContext;
+}): { exists: true; answer: string } | { exists: false; reason: "unsupported_topic" | "missing_knowledge" } {
+  const { question, knowledge } = input;
+
+  if (question === "delivery_timeline") {
+    return {
+      exists: true,
+      answer:
+        "Final films are typically delivered in about 4 months, and sneak peeks usually come around 2 weeks after the wedding 🤍",
+    };
+  }
+
+  if (question === "sneak_peek") {
+    return {
+      exists: true,
+      answer: "Sneak peeks usually come around 2 weeks after the wedding 🤍",
+    };
+  }
+
+  if (question === "raw_footage") {
+    const configured = knowledge.faq.rawFootage.answer;
+
+    return {
+      exists: true,
+      answer: /do not calculate custom fees/i.test(configured)
+        ? "Yes - raw footage can be added depending on the collection and what you're looking for. We can talk through the cleanest option on the call 🤍"
+        : configured,
+    };
+  }
+
+  if (question === "travel") {
+    const region = coverageRegionLabel(knowledge);
+
+    return {
+      exists: true,
+      answer: `Yes, we do travel. Our collections include travel coverage for ${region}, and if the venue is beyond the included mileage, we can go over the exact travel details on the call 🤍`,
+    };
+  }
+
+  return {
+    exists: false,
+    reason:
+      question === "music_choice" || question === "style" || question === "coi"
+        ? "missing_knowledge"
+        : "unsupported_topic",
   };
 }

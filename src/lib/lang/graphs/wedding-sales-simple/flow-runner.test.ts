@@ -90,9 +90,10 @@ test("flow runner predicts raw footage FAQ interruption and preserves flow", () 
     commands: [{ type: "answer_question", question: "raw_footage" }],
   });
 
+  assert.equal(result?.branch, "post_booking_faq");
   assert.equal(result?.predictedNextStep, "reply_only");
-  assert.equal(result?.predictedResponseKey, "utter_answer_raw_footage");
-  assert.equal(result?.preserveFlow, true);
+  assert.equal(result?.predictedResponseKey, "utter_answer_faq_after_booking");
+  assert.equal(result?.preserveFlow, false);
   assert.equal(shouldActivateFlowDecision(result), true);
 });
 

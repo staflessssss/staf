@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { invokeWeddingSalesSimpleGraph } from "./graph";
-import type { TurnUnderstanding } from "./state";
+import type { SimpleWeddingSalesState, TurnUnderstanding } from "./state";
 import { understandTurnHeuristically } from "./understand";
 
 function understanding(update: Partial<TurnUnderstanding>): TurnUnderstanding {
@@ -2023,7 +2023,8 @@ test("simple wedding sales runtime answers travel question after booking without
   });
 
   assert.equal(result.nextStep, "reply_only");
-  assert.equal(result.decisionTrace?.replyType, "reply_only");
+  assert.equal(result.decisionTrace?.replyType, "post_booking_faq");
+  assert.equal(result.decisionTrace?.responseKey, "utter_answer_faq_after_booking");
   assert.notEqual(result.decisionTrace?.replyType, "booking_confirmed");
   assert.deepEqual(result.replyObligations, ["travel"]);
   assert.equal(result.replyContract?.mustAnswerTravel, true);
@@ -2205,6 +2206,46 @@ test("simple wedding sales runtime does not treat bare yes after booking as pend
   assert.equal(result.replyMemory?.pendingBookingConfirmation, undefined);
 });
 
+function bookedConsultState(
+  overrides: Partial<SimpleWeddingSalesState> = {},
+): Partial<SimpleWeddingSalesState> {
+  return {
+    customerName: "Mark",
+    partnerName: "Rachel",
+    customerEmail: "bonkopoly@gmail.com",
+    weddingDate: "2027-06-15",
+    location: "Tampa",
+    venue: "Evergreen Park",
+    availability: "available",
+    availabilityContextDate: "2027-06-15",
+    proposedCallTime: "Monday at 1:30pm",
+    calendarStatus: "available",
+    consultationCheck: {
+      proposedTime: "Monday at 1:30pm",
+      status: "available",
+      checkedAt: "2026-06-26T14:37:15.722Z",
+    },
+    checkedCallDate: "2026-06-29",
+    checkedCallTime: "13:30",
+    checkedCallStartTime: "2026-06-29T13:30:00-04:00",
+    checkedCallEndTime: "2026-06-29T14:00:00-04:00",
+    customerConfirmedCallSlot: true,
+    bookingConfirmed: true,
+    bookingAttempt: {
+      status: "booked",
+      attemptedAt: "2026-06-26T14:39:12.672Z",
+    },
+    bookedEventId: "event-1",
+    pendingUserAction: null,
+    replyMemory: {
+      lastReplyType: "booking_confirmed",
+      lastOutboundText:
+        "Perfect - you're all set for 1:30 PM ✨\n\nYou should see the calendar invite come through at bonkopoly@gmail.com.",
+    },
+    ...overrides,
+  };
+}
+
 test("simple wedding sales runtime treats thank you and farewell after booking as acknowledgement only", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
@@ -2333,15 +2374,155 @@ test("simple wedding sales runtime answers raw footage after booking without boo
   assert.equal(result.nextStep, "reply_only");
   assert.notEqual(result.decisionTrace?.replyType, "booking_confirmed");
   assert.equal(result.flowRunner?.mode, "active");
-  assert.equal(result.flowRunner?.branch, "faq_raw_footage");
+  assert.equal(result.flowRunner?.branch, "post_booking_faq");
   assert.equal(result.flowRunner?.usedAsFinalDecision, true);
   assert.deepEqual(result.replyObligations, ["raw_footage"]);
+  assert.equal(result.decisionTrace?.replyType, "post_booking_faq");
+  assert.equal(result.decisionTrace?.responseKey, "utter_answer_faq_after_booking");
   assert.equal(result.dialogueUnderstanding?.messageAct, "mixed_ack_and_question");
   assert.equal(result.dialogueUnderstanding?.shouldSuppressOldContext, true);
   assert.equal(result.answerContext?.applied, false);
   assert.match(result.responseDraft ?? "", /raw footage/i);
   assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite/i);
   assert.doesNotMatch(result.responseDraft ?? "", /don't want to guess|send that one more time/i);
+  assert.deepEqual(result.toolObservations, []);
+});
+
+test("simple wedding sales runtime answers delivery timeline after booking without booking repeat", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "How long does it take to get the film?",
+    toolContext,
+    previousState: bookedConsultState(),
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["delivery_timeline"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.equal(result.decisionTrace?.replyType, "post_booking_faq");
+  assert.equal(result.decisionTrace?.responseKey, "utter_answer_faq_after_booking");
+  assert.equal(result.domainDecision?.nextDomainAction, "answer_faq_after_booking");
+  assert.equal(result.domainDecision?.matchedRule, "post_booking_known_faq");
+  assert.equal(result.replyContract?.responseKey, "utter_answer_faq_after_booking");
+  assert.match(result.responseDraft ?? "", /4 months/i);
+  assert.match(result.responseDraft ?? "", /2 weeks/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite|what are both of your names|venue|what time works/i);
+  assert.deepEqual(result.toolObservations, []);
+});
+
+test("simple wedding sales runtime answers sneak peek after booking", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "When do we get sneak peeks?",
+    toolContext,
+    previousState: bookedConsultState(),
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["sneak_peek"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.decisionTrace?.replyType, "post_booking_faq");
+  assert.match(result.responseDraft ?? "", /2 weeks/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /all set|calendar invite|what are both of your names/i);
+  assert.deepEqual(result.toolObservations, []);
+});
+
+test("simple wedding sales runtime hands off post-booking reschedule requests", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can we move the call to Tuesday?",
+    toolContext,
+    previousState: bookedConsultState(),
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: [],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "handoff");
+  assert.equal(result.decisionTrace?.replyType, "handoff");
+  assert.equal(result.domainDecision?.nextDomainAction, "handoff_after_booking");
+  assert.equal(result.domainDecision?.matchedRule, "post_booking_reschedule_handoff");
+  assert.deepEqual(result.toolObservations, []);
+});
+
+test("simple wedding sales runtime hands off post-booking cancellation requests", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can we cancel?",
+    toolContext,
+    previousState: bookedConsultState(),
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: [],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "handoff");
+  assert.equal(result.decisionTrace?.replyType, "handoff");
+  assert.equal(result.domainDecision?.nextDomainAction, "handoff_after_booking");
+  assert.equal(result.domainDecision?.matchedRule, "post_booking_reschedule_handoff");
+  assert.deepEqual(result.toolObservations, []);
+});
+
+test("simple wedding sales runtime answers confirmed call time details without tool calls", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "What time is our call again?",
+    toolContext,
+    previousState: bookedConsultState(),
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["booking"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "reply_only");
+  assert.equal(result.decisionTrace?.replyType, "answer_booking_details");
+  assert.equal(result.decisionTrace?.responseKey, "utter_answer_booking_details");
+  assert.equal(result.domainDecision?.nextDomainAction, "answer_booking_details");
+  assert.match(result.responseDraft ?? "", /1:30 PM/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /want me to lock|what time works|what are both of your names/i);
+  assert.deepEqual(result.toolObservations, []);
+});
+
+test("simple wedding sales runtime hands off unknown post-booking business questions", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Can you guarantee the exact same shooter no matter what happens?",
+    toolContext,
+    previousState: bookedConsultState(),
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["other"],
+        confidence: 0.9,
+      }),
+  });
+
+  assert.equal(result.nextStep, "handoff");
+  assert.equal(result.decisionTrace?.replyType, "handoff");
+  assert.equal(result.domainDecision?.nextDomainAction, "handoff_after_booking");
+  assert.equal(result.domainDecision?.matchedRule, "post_booking_unknown_question_handoff");
   assert.deepEqual(result.toolObservations, []);
 });
 

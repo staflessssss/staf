@@ -267,6 +267,26 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
     questions.push("raw_footage");
   }
 
+  if (/\b(?:how long|when|timeline|turnaround|deliver|delivery|receive|get)\b[\s\S]{0,80}\b(?:film|films|video|videos|wedding film|final)\b/.test(normalized)) {
+    questions.push("delivery_timeline");
+  }
+
+  if (/\b(?:sneak peek|sneak peeks|preview|teaser)\b/.test(normalized)) {
+    questions.push("sneak_peek");
+  }
+
+  if (/\b(?:music|song|songs|choose the music|pick the music|music choice)\b/.test(normalized)) {
+    questions.push("music_choice");
+  }
+
+  if (/\b(?:style|cinematic|documentary|vibe|look and feel|editing style)\b/.test(normalized)) {
+    questions.push("style");
+  }
+
+  if (/\b(?:certificate of insurance|coi|insurance certificate|venue insurance)\b/.test(normalized)) {
+    questions.push("coi");
+  }
+
   if (/\b(include|included|coverage|hours|deliverables)\b/.test(normalized)) {
     questions.push("package_inclusions");
   }

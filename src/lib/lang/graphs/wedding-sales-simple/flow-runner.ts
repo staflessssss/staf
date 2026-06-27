@@ -14,6 +14,7 @@ const ACTIVE_FLOW_BRANCHES = new Set<FlowRunnerBranch>([
   "start_wedding_lead_qualification",
   "booking_confirmation_affirmative",
   "faq_raw_footage",
+  "post_booking_faq",
   "acknowledgement_only",
   "names_collected",
   "venue_collected",
@@ -35,6 +36,19 @@ function knownFaqCommand(commands: SimpleWeddingSalesDialogueCommand[]) {
     (command) =>
       command.type === "answer_question" &&
       command.question === "raw_footage",
+  ) as Extract<SimpleWeddingSalesDialogueCommand, { type: "answer_question" }> | undefined;
+}
+
+function knownPostBookingFaqCommand(commands: SimpleWeddingSalesDialogueCommand[]) {
+  return commands.find(
+    (command) =>
+      command.type === "answer_question" &&
+      (
+        command.question === "raw_footage" ||
+        command.question === "travel" ||
+        command.question === "delivery_timeline" ||
+        command.question === "sneak_peek"
+      ),
   ) as Extract<SimpleWeddingSalesDialogueCommand, { type: "answer_question" }> | undefined;
 }
 
@@ -151,6 +165,18 @@ export function runWeddingLeadFlowShadow(input: {
   }
 
   const faqCommand = knownFaqCommand(commands);
+
+  if (input.state.bookingConfirmed && knownPostBookingFaqCommand(commands)) {
+    return buildTrace({
+      branch: "post_booking_faq",
+      predictedNextStep: "reply_only",
+      predictedResponseKey: "utter_answer_faq_after_booking",
+      legacyDecision: input.legacyDecision,
+      legacyReplyType: "post_booking_faq",
+      preserveFlow: false,
+      reason: "customer asked a known post-booking FAQ",
+    });
+  }
 
   if (faqCommand) {
     return buildTrace({

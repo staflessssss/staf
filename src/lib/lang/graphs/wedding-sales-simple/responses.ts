@@ -160,6 +160,22 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
       text: "You got it — talk soon ✨",
     },
   ],
+  utter_answer_booking_details: [
+    {
+      id: "booking_details_time_v1",
+      text: "It’s set for {{callTimeDisplay}} 🤍",
+    },
+    {
+      id: "booking_details_email_v1",
+      text: "The invite should come through at {{email}}.",
+    },
+  ],
+  utter_answer_faq_after_booking: [
+    {
+      id: "post_booking_faq_v1",
+      text: "{{faqAnswer}}",
+    },
+  ],
   utter_answer_raw_footage: [
     {
       id: "raw_footage_v1",

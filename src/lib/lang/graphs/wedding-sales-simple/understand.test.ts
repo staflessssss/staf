@@ -201,3 +201,28 @@ test("deterministic understanding treats raw footage as a covered business quest
   assert.equal(result.customerMessageType, "business_question");
   assert.deepEqual(result.questionsAskedByCustomer, ["raw_footage"]);
 });
+
+test("deterministic understanding detects post-booking support FAQ topics", () => {
+  const cases = [
+    ["How long does it take to get the film?", "delivery_timeline"],
+    ["When do we get sneak peeks?", "sneak_peek"],
+    ["Can we choose the music?", "music_choice"],
+    ["What editing style do you use?", "style"],
+    ["Can you provide a COI for the venue?", "coi"],
+  ] as const;
+
+  for (const [message, question] of cases) {
+    const result = understandTurnHeuristically({
+      channel: "instagram",
+      latestCustomerMessage: message,
+      bookingConfirmed: true,
+      mode: "bot_active",
+      unclearAttemptCount: 0,
+      questionsAskedByCustomer: [],
+      toolObservations: [],
+    });
+
+    assert.equal(result.customerMessageType, "business_question");
+    assert.ok(result.questionsAskedByCustomer.includes(question), message);
+  }
+});

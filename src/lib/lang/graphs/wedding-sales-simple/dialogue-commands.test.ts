@@ -22,6 +22,8 @@ function understanding(
 function commands(args: {
   understanding: DialogueUnderstanding;
   facts?: TurnUnderstanding["facts"];
+  state?: Parameters<typeof buildDialogueCommands>[0]["state"];
+  message?: string;
 }) {
   return buildDialogueCommands({
     understanding: args.understanding,
@@ -31,6 +33,8 @@ function commands(args: {
       slot: "Monday at 1:30pm",
       email: "anna@example.com",
     },
+    state: args.state,
+    latestCustomerMessage: args.message,
   });
 }
 
@@ -125,4 +129,34 @@ test("dialogue commands start lead qualification flow for generic wedding inquir
       reason: "generic_lead_inquiry",
     },
   ]);
+});
+
+test("dialogue commands detect post-booking details request", () => {
+  const result = commands({
+    message: "What time is our call again?",
+    state: {
+      bookingConfirmed: true,
+      latestCustomerMessage: "What time is our call again?",
+    } as Parameters<typeof buildDialogueCommands>[0]["state"],
+    understanding: understanding({
+      messageAct: "new_business_question",
+    }),
+  });
+
+  assert.deepEqual(result, [{ type: "ask_booking_details", detail: "time" }]);
+});
+
+test("dialogue commands detect post-booking reschedule request", () => {
+  const result = commands({
+    message: "Can we move the call to Tuesday?",
+    state: {
+      bookingConfirmed: true,
+      latestCustomerMessage: "Can we move the call to Tuesday?",
+    } as Parameters<typeof buildDialogueCommands>[0]["state"],
+    understanding: understanding({
+      messageAct: "new_business_question",
+    }),
+  });
+
+  assert.deepEqual(result, [{ type: "reschedule_request" }]);
 });

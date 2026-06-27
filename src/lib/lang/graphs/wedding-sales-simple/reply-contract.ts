@@ -85,6 +85,14 @@ function responseKeyForContract(args: {
 }): SimpleWeddingSalesResponseKey | undefined {
   const { state, requiredQuestion, replyObligations } = args;
 
+  if (state.decisionTrace?.replyType === "post_booking_faq") {
+    return "utter_answer_faq_after_booking";
+  }
+
+  if (state.decisionTrace?.replyType === "answer_booking_details") {
+    return "utter_answer_booking_details";
+  }
+
   if (replyObligations?.includes("raw_footage")) {
     return "utter_answer_raw_footage";
   }

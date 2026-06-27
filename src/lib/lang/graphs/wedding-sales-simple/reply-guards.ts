@@ -77,6 +77,12 @@ function hasWeddingAvailabilityResult(text: string) {
   return /\b(?:date is available|is available in|date is not available|is not open for us|is open for us)\b/i.test(text);
 }
 
+function hasQualificationQuestion(text: string) {
+  return /\b(?:what date and location|what are both of your names|have you chosen your venue|do you already have a venue|what time works|what time would be good|want me to lock)\b/i.test(
+    text,
+  );
+}
+
 function hasCalendarAvailabilityResult(text: string) {
   return /\b(?:works perfectly for a call|works for a call|works on my calendar|time is already taken)\b/i.test(text);
 }
@@ -202,6 +208,33 @@ export function validateGeneratedReply(args: {
 
     if (mentionsSpecificCallTime(reply)) {
       reasons.push("acknowledgement repeated call time");
+    }
+  }
+
+  if (
+    args.contract.replyType === "post_booking_faq" ||
+    args.contract.replyType === "answer_booking_details"
+  ) {
+    if (hasQualificationQuestion(reply)) {
+      reasons.push("post-booking reply included a qualification question");
+    }
+
+    if (/\b(?:want me to lock|i booked)\b/i.test(reply)) {
+      reasons.push("post-booking reply repeated booking action language");
+    }
+  }
+
+  if (args.contract.replyType === "post_booking_faq") {
+    if (/\b(?:all set|locked in|calendar invite)\b/i.test(reply)) {
+      reasons.push("post-booking FAQ repeated booking confirmation details");
+    }
+
+    if (args.state.customerEmail && reply.includes(args.state.customerEmail)) {
+      reasons.push("post-booking FAQ repeated customer email");
+    }
+
+    if (mentionsSpecificCallTime(reply)) {
+      reasons.push("post-booking FAQ repeated call time");
     }
   }
 

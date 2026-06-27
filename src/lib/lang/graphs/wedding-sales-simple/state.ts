@@ -48,6 +48,11 @@ export const turnUnderstandingSchema = z.object({
       "portfolio",
       "travel",
       "raw_footage",
+      "delivery_timeline",
+      "sneak_peek",
+      "music_choice",
+      "style",
+      "coi",
       "package_inclusions",
       "team",
       "booking",
@@ -112,6 +117,8 @@ export type SimpleWeddingSalesDecisionTrace = {
     | "booking_confirmed"
     | "identity_answer"
     | "acknowledgement_only"
+    | "post_booking_faq"
+    | "answer_booking_details"
     | "clarification"
     | "handoff"
     | "reply_only";
@@ -148,6 +155,8 @@ export type SimpleWeddingSalesResponseKey =
   | "utter_answer_raw_footage"
   | "utter_answer_travel"
   | "utter_answer_travel_resume_call_time"
+  | "utter_answer_faq_after_booking"
+  | "utter_answer_booking_details"
   | "utter_acknowledgement"
   | "utter_handoff_ack";
 
@@ -321,8 +330,24 @@ export type SimpleWeddingSalesDialogueCommand =
     })
   | (Prisma.JsonObject & {
       type: "answer_question";
-      question: "travel" | "raw_footage" | "pricing" | "team" | "portfolio";
+      question:
+        | "travel"
+        | "raw_footage"
+        | "pricing"
+        | "team"
+        | "portfolio"
+        | "delivery_timeline"
+        | "sneak_peek"
+        | "music_choice"
+        | "style"
+        | "coi";
     })
+  | (Prisma.JsonObject & {
+      type: "ask_booking_details";
+      detail: "time" | "email" | "invite";
+    })
+  | (Prisma.JsonObject & { type: "reschedule_request" })
+  | (Prisma.JsonObject & { type: "cancel_request" })
   | (Prisma.JsonObject & { type: "knowledge_gap"; topic: string })
   | (Prisma.JsonObject & { type: "acknowledgement_only" })
   | (Prisma.JsonObject & {
@@ -338,6 +363,7 @@ export type SimpleWeddingSalesFlowRunnerTrace = Prisma.JsonObject & {
     | "start_wedding_lead_qualification"
     | "booking_confirmation_affirmative"
     | "faq_raw_footage"
+    | "post_booking_faq"
     | "acknowledgement_only"
     | "names_collected"
     | "venue_collected";
@@ -634,6 +660,8 @@ export function mergeTurnUnderstanding(
     understanding: dialogueUnderstanding,
     extractedFacts: facts,
     pendingUserAction: activePendingUserAction,
+    state,
+    latestCustomerMessage: state.latestCustomerMessage,
   });
   const dialogueUnderstandingWithCommands = {
     ...dialogueUnderstanding,

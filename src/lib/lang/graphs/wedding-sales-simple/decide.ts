@@ -1,5 +1,6 @@
 import type {
   SimpleWeddingSalesDecisionTrace,
+  SimpleWeddingSalesDialogueCommand,
   SimpleWeddingSalesHandoffReason,
   SimpleWeddingSalesInvariantCheck,
   SimpleWeddingSalesNextStep,
@@ -8,6 +9,39 @@ import type {
   SimpleWeddingSalesReplyObligation,
   SimpleWeddingSalesState,
 } from "./state";
+
+function hasCommand(
+  commands: SimpleWeddingSalesDialogueCommand[] | undefined,
+  predicate: (command: SimpleWeddingSalesDialogueCommand) => boolean,
+) {
+  return Boolean(commands?.some(predicate));
+}
+
+function getCommand<T extends SimpleWeddingSalesDialogueCommand>(
+  commands: SimpleWeddingSalesDialogueCommand[] | undefined,
+  predicate: (command: SimpleWeddingSalesDialogueCommand) => command is T,
+) {
+  return commands?.find(predicate);
+}
+
+function getAnswerQuestionCommand(
+  commands: SimpleWeddingSalesDialogueCommand[] | undefined,
+) {
+  return getCommand(
+    commands,
+    (command): command is Extract<SimpleWeddingSalesDialogueCommand, { type: "answer_question" }> =>
+      command.type === "answer_question",
+  );
+}
+
+function isKnownPostBookingFaq(question: SimpleWeddingSalesQuestion | undefined) {
+  return (
+    question === "delivery_timeline" ||
+    question === "sneak_peek" ||
+    question === "raw_footage" ||
+    question === "travel"
+  );
+}
 
 function hasNames(state: SimpleWeddingSalesState) {
   return Boolean(state.customerName && state.partnerName);
@@ -109,6 +143,14 @@ function responseKeyForDecision(args: {
 
   if (args.replyType === "acknowledgement_only") {
     return "utter_acknowledgement";
+  }
+
+  if (args.replyType === "post_booking_faq") {
+    return "utter_answer_faq_after_booking";
+  }
+
+  if (args.replyType === "answer_booking_details") {
+    return "utter_answer_booking_details";
   }
 
   if (args.replyType === "handoff") {
@@ -339,6 +381,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     statePatch?: Partial<SimpleWeddingSalesState>;
     invariantCheck?: SimpleWeddingSalesInvariantCheck;
     replyType: SimpleWeddingSalesDecisionTrace["replyType"];
+    responseKey?: SimpleWeddingSalesResponseKey;
     reason: string;
   }) => ({
     nextStep: args.nextStep,
@@ -355,13 +398,15 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     trace: {
       ...traceBase,
       nextStep: args.nextStep,
-      responseKey: responseKeyForDecision({
-        replyType: args.replyType,
-        replyObligations,
-        nextStep: args.nextStep,
-        missingField: args.missingField,
-        state,
-      }),
+      responseKey:
+        args.responseKey ??
+        responseKeyForDecision({
+          replyType: args.replyType,
+          replyObligations,
+          nextStep: args.nextStep,
+          missingField: args.missingField,
+          state,
+        }),
       replyType: args.replyType,
       replyObligations,
       reason: args.reason,
@@ -522,6 +567,63 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       replyType: "handoff",
       reason: "booking was attempted but the booking tool did not confirm success",
     });
+  }
+
+  if (state.bookingConfirmed && !state.pendingUserAction) {
+    const answerQuestion = getAnswerQuestionCommand(state.dialogueCommands);
+
+    if (
+      hasCommand(
+        state.dialogueCommands,
+        (command) => command.type === "reschedule_request" || command.type === "cancel_request",
+      )
+    ) {
+      return decision({
+        nextStep: "handoff",
+        mode: "human_needed",
+        handoffReason: "customer_requests_human",
+        replyType: "handoff",
+        reason: "customer asked to change or cancel a confirmed consultation",
+      });
+    }
+
+    if (hasCommand(state.dialogueCommands, (command) => command.type === "ask_booking_details")) {
+      return decision({
+        nextStep: "reply_only",
+        replyType: "answer_booking_details",
+        responseKey: "utter_answer_booking_details",
+        reason: "customer asked for details about the confirmed consultation",
+      });
+    }
+
+    if (answerQuestion) {
+      if (isKnownPostBookingFaq(answerQuestion.question)) {
+        return decision({
+          nextStep: "reply_only",
+          replyType: "post_booking_faq",
+          responseKey: "utter_answer_faq_after_booking",
+          reason: "customer asked a known FAQ after booking was confirmed",
+        });
+      }
+
+      return decision({
+        nextStep: "handoff",
+        mode: "human_needed",
+        handoffReason: "unanswered_business_question",
+        replyType: "handoff",
+        reason: "customer asked a post-booking question without an exact configured answer",
+      });
+    }
+
+    if (state.dialogueUnderstanding?.messageAct === "new_business_question" || state.questionsAskedByCustomer.includes("other")) {
+      return decision({
+        nextStep: "handoff",
+        mode: "human_needed",
+        handoffReason: "unanswered_business_question",
+        replyType: "handoff",
+        reason: "customer asked an unknown post-booking business question",
+      });
+    }
   }
 
   if (state.dialogueUnderstanding?.messageAct === "acknowledgement_only") {

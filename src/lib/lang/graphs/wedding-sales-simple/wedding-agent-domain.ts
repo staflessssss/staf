@@ -25,6 +25,9 @@ export type WeddingAgentDomainAction =
   | "book_call"
   | "booking_confirmed"
   | "acknowledge_after_booking"
+  | "answer_faq_after_booking"
+  | "answer_booking_details"
+  | "handoff_after_booking"
   | "acknowledgement"
   | "handoff"
   | "reply_only";
@@ -42,6 +45,10 @@ export type WeddingAgentDomainRule =
   | "booking_confirmation_affirmative"
   | "booking_tool_confirmed"
   | "post_booking_acknowledgement"
+  | "post_booking_known_faq"
+  | "post_booking_unknown_question_handoff"
+  | "post_booking_reschedule_handoff"
+  | "post_booking_booking_details"
   | "customer_acknowledgement"
   | "handoff_required"
   | "legacy_or_reply_only";
@@ -147,6 +154,9 @@ export const WeddingAgentDomain = {
     book_call: [],
     booking_confirmed: ["utter_booking_confirmed"],
     acknowledge_after_booking: ["utter_acknowledgement"],
+    answer_faq_after_booking: ["utter_answer_faq_after_booking"],
+    answer_booking_details: ["utter_answer_booking_details"],
+    handoff_after_booking: ["utter_handoff_ack"],
     acknowledgement: ["utter_acknowledgement"],
     handoff: ["utter_handoff_ack"],
     reply_only: [],
@@ -188,6 +198,33 @@ function actionFromDecision(state: SimpleWeddingSalesState): {
   rule: WeddingAgentDomainRule;
 } {
   const decision = state.decisionTrace;
+
+  if (decision?.replyType === "post_booking_faq") {
+    return {
+      action: "answer_faq_after_booking",
+      rule: "post_booking_known_faq",
+    };
+  }
+
+  if (decision?.replyType === "answer_booking_details") {
+    return {
+      action: "answer_booking_details",
+      rule: "post_booking_booking_details",
+    };
+  }
+
+  if (state.bookingConfirmed && decision?.replyType === "handoff") {
+    const hasChangeRequest = state.dialogueCommands?.some(
+      (command) => command.type === "reschedule_request" || command.type === "cancel_request",
+    );
+
+    return {
+      action: "handoff_after_booking",
+      rule: hasChangeRequest
+        ? "post_booking_reschedule_handoff"
+        : "post_booking_unknown_question_handoff",
+    };
+  }
 
   if (state.nextStep === "handoff" || decision?.replyType === "handoff") {
     return { action: "handoff", rule: "handoff_required" };

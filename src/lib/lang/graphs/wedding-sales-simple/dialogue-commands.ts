@@ -3,6 +3,7 @@ import type {
   SimpleWeddingSalesDialogueCommand,
   SimpleWeddingSalesPendingUserAction,
   SimpleWeddingSalesQuestion,
+  SimpleWeddingSalesState,
   TurnUnderstanding,
 } from "./state";
 
@@ -11,6 +12,11 @@ const ANSWERABLE_QUESTIONS = new Set<SimpleWeddingSalesQuestion>([
   "portfolio",
   "travel",
   "raw_footage",
+  "delivery_timeline",
+  "sneak_peek",
+  "music_choice",
+  "style",
+  "coi",
   "package_inclusions",
   "team",
 ]);
@@ -26,7 +32,18 @@ function answerQuestionCommand(
     return undefined;
   }
 
-  if (question === "pricing" || question === "team" || question === "portfolio" || question === "travel" || question === "raw_footage") {
+  if (
+    question === "pricing" ||
+    question === "team" ||
+    question === "portfolio" ||
+    question === "travel" ||
+    question === "raw_footage" ||
+    question === "delivery_timeline" ||
+    question === "sneak_peek" ||
+    question === "music_choice" ||
+    question === "style" ||
+    question === "coi"
+  ) {
     return { type: "answer_question", question };
   }
 
@@ -37,9 +54,13 @@ export function buildDialogueCommands(input: {
   understanding: DialogueUnderstanding;
   extractedFacts: TurnUnderstanding["facts"];
   pendingUserAction: SimpleWeddingSalesPendingUserAction;
+  state?: SimpleWeddingSalesState;
+  latestCustomerMessage?: string;
 }): SimpleWeddingSalesDialogueCommand[] {
   const commands: SimpleWeddingSalesDialogueCommand[] = [];
   const { extractedFacts } = input;
+  const latestCustomerMessage = input.latestCustomerMessage ?? input.state?.latestCustomerMessage ?? "";
+  const normalizedMessage = latestCustomerMessage.toLowerCase();
 
   if (input.understanding.messageAct === "generic_lead_inquiry") {
     commands.push({
@@ -100,6 +121,28 @@ export function buildDialogueCommands(input: {
     )
   ) {
     commands.push({ type: "acknowledgement_only" });
+  }
+
+  if (input.state?.bookingConfirmed) {
+    if (/\b(?:reschedule|move|change|switch|another time|different time|different day|new time)\b/.test(normalizedMessage)) {
+      commands.push({ type: "reschedule_request" });
+    }
+
+    if (/\b(?:cancel|call off|remove|delete)\b/.test(normalizedMessage)) {
+      commands.push({ type: "cancel_request" });
+    }
+
+    if (/\b(?:what time|when)\b[\s\S]{0,80}\b(?:call|consult|meeting)|\bcall\b[\s\S]{0,80}\b(?:time|again)\b/.test(normalizedMessage)) {
+      commands.push({ type: "ask_booking_details", detail: "time" });
+    }
+
+    if (/\b(?:what email|which email|email)\b[\s\S]{0,80}\b(?:invite|calendar|use|sent|come through)\b/.test(normalizedMessage)) {
+      commands.push({ type: "ask_booking_details", detail: "email" });
+    }
+
+    if (/\b(?:invite|calendar invite|where is the invite|did you send)\b/.test(normalizedMessage)) {
+      commands.push({ type: "ask_booking_details", detail: "invite" });
+    }
   }
 
   for (const question of input.understanding.explicitQuestions) {
