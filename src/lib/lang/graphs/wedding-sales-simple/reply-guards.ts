@@ -43,6 +43,10 @@ function saysGuideUnavailable(text: string) {
   );
 }
 
+function mentionsGuideAsset(text: string) {
+  return /\b(?:collections? guide|guide image|price image)\b/i.test(text);
+}
+
 function hasSignature(text: string) {
   return /\bTaras Mynd\b|\bFounder & Creative Director\b|\bMYNDFUL FILMS LLC\b/i.test(text);
 }
@@ -158,6 +162,10 @@ export function validateGeneratedReply(args: {
     saysGuideUnavailable(reply)
   ) {
     reasons.push("reply says guide/image is unavailable even though it exists");
+  }
+
+  if (args.contract.mentionPolicy.guide.mode === "skip" && mentionsGuideAsset(reply)) {
+    reasons.push("guide asset was mentioned without a guide obligation");
   }
 
   if (args.knowledge.channel === "instagram") {

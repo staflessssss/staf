@@ -33,6 +33,10 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
       id: "availability_names_v2",
       text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\n{{weddingDateDisplay}} in {{locationDisplay}} is open for us.\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWho would I be speaking with?",
     },
+    {
+      id: "availability_names_v3",
+      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\nI checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\n\nWhat are both of your names?",
+    },
   ],
   utter_pricing_repeat_send_guide_ask_names: [
     {

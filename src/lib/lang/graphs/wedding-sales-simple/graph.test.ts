@@ -229,6 +229,16 @@ test("simple wedding sales runtime fills date and location without repeating wed
   assert.equal(second.weddingLeadForm?.missingSlotsBeforeDecision.includes("weddingDate"), false);
   assert.equal(second.weddingLeadForm?.missingSlotsBeforeDecision.includes("location"), false);
   assert.notEqual(second.decisionTrace?.responseKey, "utter_ask_wedding_details");
+  assert.equal(second.domainDecision?.nextDomainAction, "ask_names_after_available_date");
+  assert.ok(
+    second.domainDecision?.allowedResponseKeys.includes("utter_availability_available_ask_names"),
+  );
+  assert.equal(second.replyContract?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(second.decisionTrace?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(second.writer?.mode, "response_catalog");
+  assert.equal(second.writer?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(second.writerCatalog?.guardOk, true);
+  assert.notEqual(second.writerCatalog?.reason, "responseKey_missing");
   assert.doesNotMatch(second.responseDraft ?? "", /date and location|Do you already have your wedding date/i);
 });
 

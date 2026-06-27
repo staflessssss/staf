@@ -22,7 +22,7 @@ import {
   type SimpleWeddingKnowledgeFeature,
   type SimpleWeddingKnowledgeContext,
 } from "./knowledge";
-import { buildReplyActionContract } from "./reply-contract";
+import { buildReplyActionContract, type ReplyActionContract } from "./reply-contract";
 import { updateSimpleWeddingReplyMemory } from "./reply-memory";
 import { writeConstrainedWeddingReply } from "./reply-writer";
 import { defaultWeddingSalesConfig } from "../wedding-sales/config";
@@ -193,6 +193,78 @@ async function runRephraserForReply(args: {
   });
 }
 
+function selectDomainResponseKey(args: {
+  contract: ReplyActionContract;
+  domainDecision: ReturnType<typeof buildWeddingAgentDomainDecision>;
+}) {
+  const currentResponseKey = args.contract.responseKey;
+
+  if (
+    currentResponseKey &&
+    args.domainDecision.allowedResponseKeys.includes(currentResponseKey)
+  ) {
+    return currentResponseKey;
+  }
+
+  if (currentResponseKey) {
+    return currentResponseKey;
+  }
+
+  return args.domainDecision.allowedResponseKeys[0];
+}
+
+function applyDomainResponseKey(args: {
+  state: SimpleWeddingSalesState;
+  contract: ReplyActionContract;
+}) {
+  const initialDomainState = {
+    ...args.state,
+    replyContract: args.contract,
+  };
+  const initialDomainDecision = buildWeddingAgentDomainDecision(initialDomainState);
+  const selectedResponseKey = selectDomainResponseKey({
+    contract: args.contract,
+    domainDecision: initialDomainDecision,
+  });
+
+  if (!selectedResponseKey) {
+    return {
+      state: {
+        ...initialDomainState,
+        domainDecision: initialDomainDecision,
+      },
+      contract: args.contract,
+      domainDecision: initialDomainDecision,
+    };
+  }
+
+  const contract = {
+    ...args.contract,
+    responseKey: selectedResponseKey,
+  };
+  const decisionTrace = args.state.decisionTrace
+    ? {
+        ...args.state.decisionTrace,
+        responseKey: selectedResponseKey,
+      }
+    : undefined;
+  const domainState = {
+    ...args.state,
+    decisionTrace,
+    replyContract: contract,
+  };
+  const domainDecision = buildWeddingAgentDomainDecision(domainState);
+
+  return {
+    state: {
+      ...domainState,
+      domainDecision,
+    },
+    contract,
+    domainDecision,
+  };
+}
+
 export async function invokeWeddingSalesSimpleGraph(
   input: InvokeWeddingSalesSimpleGraphInput,
 ): Promise<SimpleWeddingSalesState> {
@@ -257,10 +329,16 @@ export async function invokeWeddingSalesSimpleGraph(
       config: input.config,
       state,
     });
-  const contract = buildReplyActionContract({
+  const baseContract = buildReplyActionContract({
     state,
     knowledge,
   });
+  const domainApplied = applyDomainResponseKey({
+    state,
+    contract: baseContract,
+  });
+  state = domainApplied.state;
+  const contract = domainApplied.contract;
   const reply = writeConstrainedWeddingReply({
     state,
     contract,
