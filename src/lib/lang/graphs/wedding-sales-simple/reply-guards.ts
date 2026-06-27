@@ -34,9 +34,13 @@ function hasBookingConfirmation(text: string) {
 }
 
 function repeatsBookingLogistics(text: string) {
-  return /\b(?:all set for|locked in|booked|calendar invite|you(?:'ll| will) get the calendar invite)\b/i.test(
+  return /\b(?:all set for|locked in|locked us in|booked|calendar invite|you(?:'ll| will) (?:get|see) the calendar invite|i locked us in)\b/i.test(
     text,
   );
+}
+
+function mentionsSpecificCallTime(text: string) {
+  return /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(text);
 }
 
 function hasCrmStyleBookingConfirmation(text: string) {
@@ -194,6 +198,10 @@ export function validateGeneratedReply(args: {
 
     if (args.state.customerEmail && reply.includes(args.state.customerEmail)) {
       reasons.push("acknowledgement repeated customer email");
+    }
+
+    if (mentionsSpecificCallTime(reply)) {
+      reasons.push("acknowledgement repeated call time");
     }
   }
 

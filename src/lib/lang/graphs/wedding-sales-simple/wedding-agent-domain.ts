@@ -24,6 +24,7 @@ export type WeddingAgentDomainAction =
   | "ask_booking_confirmation"
   | "book_call"
   | "booking_confirmed"
+  | "acknowledge_after_booking"
   | "acknowledgement"
   | "handoff"
   | "reply_only";
@@ -40,6 +41,7 @@ export type WeddingAgentDomainRule =
   | "calendar_available_email_known_needs_confirmation"
   | "booking_confirmation_affirmative"
   | "booking_tool_confirmed"
+  | "post_booking_acknowledgement"
   | "customer_acknowledgement"
   | "handoff_required"
   | "legacy_or_reply_only";
@@ -144,6 +146,7 @@ export const WeddingAgentDomain = {
     ask_booking_confirmation: ["utter_ask_booking_confirmation"],
     book_call: [],
     booking_confirmed: ["utter_booking_confirmed"],
+    acknowledge_after_booking: ["utter_acknowledgement"],
     acknowledgement: ["utter_acknowledgement"],
     handoff: ["utter_handoff_ack"],
     reply_only: [],
@@ -251,6 +254,13 @@ function actionFromDecision(state: SimpleWeddingSalesState): {
   }
 
   if (decision?.replyType === "acknowledgement_only") {
+    if (state.bookingConfirmed && !state.pendingUserAction) {
+      return {
+        action: "acknowledge_after_booking",
+        rule: "post_booking_acknowledgement",
+      };
+    }
+
     return { action: "acknowledgement", rule: "customer_acknowledgement" };
   }
 

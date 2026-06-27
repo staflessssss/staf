@@ -24,10 +24,14 @@ const ACTIVE_REPHRASER_KEYS = new Set<SimpleWeddingSalesResponseKey>([
   "utter_ask_email",
   "utter_calendar_available_ask_email",
   "utter_ask_booking_confirmation",
-  "utter_booking_confirmed",
   "utter_answer_raw_footage",
   "utter_answer_travel_resume_call_time",
+]);
+
+const REPHRASER_DISABLED_KEYS = new Set<SimpleWeddingSalesResponseKey>([
+  "utter_booking_confirmed",
   "utter_acknowledgement",
+  "utter_availability_available_ask_names",
 ]);
 
 export type ContextualRephraserInput = {
@@ -339,7 +343,10 @@ export async function runContextualRephraserShadow(
     baseVariationId: input.variationId,
   };
 
-  if (!ACTIVE_REPHRASER_KEYS.has(input.responseKey)) {
+  if (
+    REPHRASER_DISABLED_KEYS.has(input.responseKey) ||
+    !ACTIVE_REPHRASER_KEYS.has(input.responseKey)
+  ) {
     return {
       ...baseResult,
       mode: "shadow",
@@ -416,6 +423,7 @@ export async function runContextualRephraserShadow(
 
 export const contextualRephraserTestHelpers = {
   ACTIVE_REPHRASER_KEYS,
+  REPHRASER_DISABLED_KEYS,
   parseAllowlist,
   resolveRephraserActivation,
   rephraserOutputSchema,

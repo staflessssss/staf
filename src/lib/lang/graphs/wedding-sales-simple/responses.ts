@@ -157,7 +157,7 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
     },
     {
       id: "ack_v3",
-      text: "You got it — looking forward to it ✨",
+      text: "You got it — talk soon ✨",
     },
   ],
   utter_answer_raw_footage: [

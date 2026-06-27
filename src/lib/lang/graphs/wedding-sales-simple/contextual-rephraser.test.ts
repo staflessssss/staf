@@ -21,14 +21,14 @@ function baseState(update: Partial<SimpleWeddingSalesState> = {}): SimpleWedding
     unclearAttemptCount: 0,
     questionsAskedByCustomer: [],
     toolObservations: [],
-    nextStep: "reply_only",
+    nextStep: "ask_venue",
     decisionTrace: {
       extractedFacts: {},
       missingFields: [],
-      nextStep: "reply_only",
-      replyType: "acknowledgement_only",
-      responseKey: "utter_acknowledgement",
-      reason: "customer only acknowledged",
+      nextStep: "ask_venue",
+      replyType: "ask_venue",
+      responseKey: "utter_ask_venue",
+      reason: "venue is needed",
     },
     ...update,
   };
@@ -47,9 +47,9 @@ function baseInput(update: Partial<Parameters<typeof runContextualRephraserShado
   const contract = buildReplyActionContract({ state, knowledge: context });
 
   return {
-    responseKey: "utter_acknowledgement" as const,
-    baseText: "Of course 🤍",
-    variationId: "ack_v1",
+    responseKey: "utter_ask_venue" as const,
+    baseText: "So nice to meet you both. Do you already have a venue picked out?",
+    variationId: "ask_venue_v1",
     latestCustomerMessage: state.latestCustomerMessage,
     recentTurns: [
       {
@@ -100,7 +100,7 @@ async function withRephraserEnv<T>(
 test("eligible safe responseKey runs shadow rephraser", async () => {
   const result = await runContextualRephraserShadow(
     baseInput({
-      generateDraft: () => "Absolutely 🤍",
+      generateDraft: () => "Love that - do you already have a venue picked out?",
     }),
   );
 
@@ -108,7 +108,7 @@ test("eligible safe responseKey runs shadow rephraser", async () => {
   assert.equal(result.eligible, true);
   assert.equal(result.guardOk, true);
   assert.equal(result.wouldUse, true);
-  assert.equal(result.draftText, "Absolutely 🤍");
+  assert.equal(result.draftText, "Love that - do you already have a venue picked out?");
 });
 
 test("allowlisted contact can run active rephraser", async () => {
@@ -123,7 +123,7 @@ test("allowlisted contact can run active rephraser", async () => {
         baseInput({
           agentId: "agent-1",
           contactId: "contact-1",
-          generateDraft: () => "Absolutely рџ¤Ќ",
+          generateDraft: () => "Love that - do you already have a venue picked out?",
         }),
       );
 
@@ -132,7 +132,7 @@ test("allowlisted contact can run active rephraser", async () => {
       assert.equal(result.eligible, true);
       assert.equal(result.guardOk, true);
       assert.equal(result.wouldUse, true);
-      assert.equal(result.draftText, "Absolutely рџ¤Ќ");
+      assert.equal(result.draftText, "Love that - do you already have a venue picked out?");
     },
   );
 });
@@ -302,7 +302,9 @@ test("guard blocks forbidden phrase", async () => {
 test("guard blocks too many emojis", async () => {
   const result = await runContextualRephraserShadow(
     baseInput({
-      generateDraft: () => "Absolutely 🤍✨",
+      allowedEmojis: ["OK"],
+      maxEmojis: 1,
+      generateDraft: () => "OK OK do you already have a venue picked out?",
     }),
   );
 
@@ -313,7 +315,7 @@ test("guard blocks too many emojis", async () => {
 test("guard blocks unresolved template variable", async () => {
   const result = await runContextualRephraserShadow(
     baseInput({
-      generateDraft: () => "Absolutely {{name}} 🤍",
+      generateDraft: () => "Do you already have {{venue}} picked out?",
     }),
   );
 
