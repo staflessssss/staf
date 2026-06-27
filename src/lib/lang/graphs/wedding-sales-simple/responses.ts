@@ -27,21 +27,21 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_availability_available_ask_names: [
     {
       id: "availability_names_v1",
-      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\n{{promotionText}}\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
     },
     {
       id: "availability_names_v2",
-      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\n{{promotionText}}\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
     },
   ],
   utter_pricing_repeat_send_guide_ask_names: [
     {
       id: "pricing_repeat_names_v1",
-      text: "Yep, pricing is the same as I mentioned - {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI’ll include the collections guide here so you can look through the options.\n\nWhat are both of your names?",
+      text: "Yep, pricing is the same as I mentioned - {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n{{promotionText}}\n\nI’ll include the collections guide here so you can look through the options.\n\nWhat are both of your names?",
     },
     {
       id: "pricing_repeat_names_v2",
-      text: "The starting point is still {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI’ll send the collections guide over for you.\n\nWho would I be speaking with?",
+      text: "The starting point is still {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n{{promotionText}}\n\nI’ll send the collections guide over for you.\n\nWho would I be speaking with?",
     },
   ],
   utter_ask_location_only: [
@@ -227,13 +227,14 @@ export function missingResponseVariationSlots(
   variation: SimpleWeddingSalesResponseVariation,
   slots: Record<string, string | undefined>,
 ) {
+  const optionalSlots = new Set(["promotionText"]);
   const requiredSlots = new Set(
     Array.from(variation.text.matchAll(/{{\s*([a-zA-Z0-9_]+)\s*}}/g)).map(
       (match) => match[1]!,
     ),
   );
 
-  return Array.from(requiredSlots).filter((slot) => !slots[slot]);
+  return Array.from(requiredSlots).filter((slot) => !optionalSlots.has(slot) && !slots[slot]);
 }
 
 export function selectResponseVariation(input: {

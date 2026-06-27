@@ -488,6 +488,76 @@ test("writer infers safe availability response key and avoids deterministic fall
   assert.match(result.text, /both of your names|speaking with/i);
 });
 
+test("available Florida date uses regional price and promotion copy", () => {
+  const state = baseState({
+    latestCustomerMessage: "Hi! Are you available October 7 2026 in Tampa?",
+    isFirstTurn: true,
+    weddingDate: "2026-10-07",
+    weddingDateDisplay: "October 7, 2026",
+    location: "Tampa",
+    availabilityRegion: "FL",
+    availability: "available",
+    questionsAskedByCustomer: ["availability"],
+    nextStep: "ask_missing_info",
+    missingField: "names",
+    decisionTrace: {
+      extractedFacts: {
+        weddingDate: "2026-10-07",
+        weddingDateText: "October 7 2026",
+        location: "Tampa",
+      },
+      missingFields: ["names"],
+      nextStep: "ask_missing_info",
+      toolCalled: "checkAvailability",
+      replyType: "availability_available",
+      responseKey: "utter_availability_available_ask_names",
+      reason: "date is available and names are needed",
+    },
+  });
+  const knowledge = buildSimpleWeddingKnowledgeContext({
+    channel: "instagram",
+    channelConfig: {
+      pricing: {
+        startPrice: "$4,600",
+        currency: "USD",
+        coverageHours: 8,
+        promotionText: "Also, we are running a 20% discount through June 30.",
+      },
+      pricingByRegion: {
+        FL: {
+          startPrice: "$2,800",
+          currency: "USD",
+          coverageHours: 8,
+          promotionText: "Also, we are running a 20% discount through June 30.",
+        },
+        NC_SC_GA: {
+          startPrice: "$4,600",
+          currency: "USD",
+          coverageHours: 8,
+          promotionText: "Also, we are running a 20% discount through June 30.",
+        },
+      },
+      priceAttachmentsByRegion: {
+        FL: {
+          imageUrl: "https://example.com/fl-guide.png",
+          fileName: "fl-guide.png",
+        },
+      },
+    },
+    state,
+  });
+  const contract = buildReplyActionContract({ state, knowledge });
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(knowledge.pricing.startPrice, "$2,800");
+  assert.equal(knowledge.pricing.promotionText, "Also, we are running a 20% discount through June 30.");
+  assert.equal(result.writer.mode, "response_catalog");
+  assert.equal(result.writer.responseKey, "utter_availability_available_ask_names");
+  assert.match(result.text, /\$2,800/);
+  assert.match(result.text, /20% discount through June 30/i);
+  assert.doesNotMatch(result.text, /\$4,600/);
+});
+
 test("writer can use response catalog for ask venue", () => {
   const state = baseState({
     latestCustomerMessage: "Mike and Sarah",

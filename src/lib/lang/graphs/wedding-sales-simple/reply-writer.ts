@@ -124,6 +124,20 @@ function pricingLine(args: {
   return `Our ${coverage}wedding films start at ${args.knowledge.pricing.startPrice}${regionText}.`;
 }
 
+function promotionLine(args: {
+  contract: ReplyActionContract;
+  knowledge: SimpleWeddingKnowledgeContext;
+}) {
+  if (
+    !args.knowledge.pricing.promotionText ||
+    (!args.contract.mustMentionPricing && args.contract.mentionPolicy.guide.mode === "skip")
+  ) {
+    return undefined;
+  }
+
+  return args.knowledge.pricing.promotionText;
+}
+
 function guideLine(args: {
   contract: ReplyActionContract;
   knowledge: SimpleWeddingKnowledgeContext;
@@ -333,6 +347,7 @@ function buildResponseCatalogSlots(
       ? String(knowledge.pricing.coverageHours)
       : undefined,
     coverageRegion: knowledge ? coverageRegionLabel(knowledge) : undefined,
+    promotionText: knowledge?.pricing.promotionText ?? "",
     callWindow: knowledge ? formatCallWindow(knowledge) : undefined,
   };
 }
@@ -937,6 +952,7 @@ function renderSafeTemplate(args: {
       ? availabilityLine({ state: args.state, contract: args.contract })
       : undefined,
     pricingLine(args),
+    promotionLine(args),
     guideLine(args),
     args.contract.mustMentionCalendarAvailability
       ? calendarLine(args.state, args.knowledge, args.contract)
@@ -967,6 +983,7 @@ function renderCompactInstagramFallback(args: {
       ? availabilityLine({ state: args.state, contract: args.contract })
       : undefined,
     pricingLine(args),
+    promotionLine(args),
     guideLine(args),
     args.contract.mustMentionCalendarAvailability
       ? calendarLine(args.state, args.knowledge, args.contract)

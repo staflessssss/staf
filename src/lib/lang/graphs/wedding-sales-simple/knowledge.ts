@@ -40,6 +40,7 @@ export type SimpleWeddingKnowledgeContext = {
     currency?: string;
     coverageHours?: number;
     region?: string;
+    promotionText?: string;
     packages: Array<{
       name: string;
       price: string;
@@ -174,6 +175,11 @@ function readString(record: Record<string, unknown> | undefined, key: string, fa
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
+function readOptionalString(record: Record<string, unknown> | undefined, key: string) {
+  const value = record?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
 function coverageRegionLabel(knowledge: Pick<SimpleWeddingKnowledgeContext, "pricing">) {
   return knowledge.pricing.region ?? "your area";
 }
@@ -209,6 +215,15 @@ export function buildSimpleWeddingKnowledgeContext(input: {
   const region =
     resolveWeddingSalesRegion(input.state) ??
     normalizeWeddingSalesRegionKey(input.state?.availabilityRegion);
+  const root = asRecord(input.channelConfig);
+  const pricingConfig = asRecord(root?.pricing);
+  const selectedRegionPricing =
+    region && root
+      ? asRecord(asRecord(root.pricingByRegion)?.[region])
+      : undefined;
+  const promotionText =
+    readOptionalString(selectedRegionPricing, "promotionText") ??
+    readOptionalString(pricingConfig, "promotionText");
   const callWindow = `${formatBusinessDays(config.callBookingWindow.businessDays)}, ${formatHour(
     config.callBookingWindow.startHour,
   )}-${formatHour(config.callBookingWindow.endHour)} ${config.callBookingWindow.timezone}`;
@@ -267,6 +282,7 @@ export function buildSimpleWeddingKnowledgeContext(input: {
       currency: pricing.currency,
       coverageHours: pricing.coverageHours,
       region,
+      promotionText,
       packages: readPackages(features),
     },
     guide: {
