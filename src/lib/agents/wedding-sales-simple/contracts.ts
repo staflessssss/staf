@@ -84,13 +84,20 @@ export type WeddingSalesSimpleDeliveryExecution =
             plannedTypingMs: number;
             effectiveTypingMs: number;
             sentAtMs: number;
+            sent?: boolean;
           }
         | {
             kind: "attachment";
             reason: string;
+            purpose?: "pricing_guide" | "portfolio" | "reviews";
+            label?: string;
             plannedDelayMs: number;
             effectiveDelayMs: number;
             sentAtMs: number;
+            sent?: boolean;
+            error?: string;
+            fallbackSent?: boolean;
+            fallbackMessageId?: string;
           }
       >;
       warnings?: string[];

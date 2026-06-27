@@ -545,6 +545,131 @@ test("instagram adapter ignores semantic delivery plan when kill switch is enabl
   ]);
 });
 
+test("instagram semantic delivery plan falls back to guide link when image attachment send fails", async () => {
+  const requestBodies: unknown[] = [];
+  const originalPacing = process.env.INSTAGRAM_DELIVERY_PACING;
+  process.env.INSTAGRAM_DELIVERY_PACING = "fast";
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    requestBodies.push(body);
+    const message = (body as { message?: { attachment?: unknown } }).message;
+
+    if (message?.attachment) {
+      return {
+        ok: false,
+        json: async () => ({ error: { message: "Invalid image url" } }),
+      } as Response;
+    }
+
+    return {
+      ok: true,
+      json: async () =>
+        "message" in body
+          ? { recipient_id: "ig-user-1", message_id: `mid-${requestBodies.length}` }
+          : { recipient_id: "ig-user-1" },
+    } as Response;
+  }) as typeof fetch;
+  global.setTimeout = ((handler: TimerHandler) => {
+    if (typeof handler === "function") {
+      handler();
+    }
+
+    return 0 as never;
+  }) as unknown as typeof setTimeout;
+
+  try {
+    const result = await instagramAdapter.sendReply({
+      credentials: JSON.stringify({
+        instagramUserAccessToken: "ig-token",
+        igUserId: "ig-professional-account",
+        graphApiVersion: "v25.0",
+      }),
+      contactId: "ig-user-1",
+      message: "Canonical should not send",
+      channelDeliveryPlan: {
+        channel: "instagram",
+        enabled: true,
+        mode: "semantic_split",
+        textPartCount: 2,
+        totalDelayMs: 1_000,
+        guardResult: { ok: true },
+        parts: [
+          {
+            kind: "text",
+            reason: "pricing",
+            text: "Pricing",
+            delayMsBefore: 0,
+            typingMsBefore: 0,
+          },
+          {
+            kind: "attachment",
+            reason: "pricing_guide",
+            delayMsBefore: 0,
+            attachment: {
+              type: "image",
+              url: "https://drive.google.com/uc?export=download&id=guide",
+              label: "price-fl.png",
+              purpose: "pricing_guide",
+            },
+          },
+          {
+            kind: "text",
+            reason: "qualification_question",
+            text: "What are both of your names?",
+            delayMsBefore: 0,
+            typingMsBefore: 0,
+          },
+        ],
+      },
+    });
+
+    assert.deepEqual(
+      requestBodies.map((body) =>
+        typeof body === "object" && body && "sender_action" in body
+          ? (body as { sender_action: string }).sender_action
+          : (body as { message?: { text?: string; attachment?: unknown } }).message?.text ??
+            "attachment",
+      ),
+      [
+        "typing_on",
+        "Pricing",
+        "attachment",
+        "Here is the collections guide: https://drive.google.com/uc?export=download&id=guide",
+        "typing_on",
+        "What are both of your names?",
+      ],
+    );
+
+    assert.ok(result && typeof result === "object" && !Array.isArray(result));
+    const deliveryResult = result as {
+      deliveries: unknown[];
+      deliveryExecution: {
+        partsSent: number;
+        warnings?: string[];
+        parts: Array<Record<string, unknown>>;
+      };
+    };
+    const attachmentPart = deliveryResult.deliveryExecution.parts.find(
+      (part) => part.kind === "attachment",
+    );
+
+    assert.equal(deliveryResult.deliveries.length, 3);
+    assert.equal(deliveryResult.deliveryExecution.partsSent, 3);
+    assert.equal(attachmentPart?.purpose, "pricing_guide");
+    assert.equal(attachmentPart?.sent, false);
+    assert.equal(attachmentPart?.fallbackSent, true);
+    assert.match(String(attachmentPart?.error), /Invalid image url/);
+    assert.ok(
+      deliveryResult.deliveryExecution.warnings?.includes(
+        "pricing_guide_attachment_fallback_to_link",
+      ),
+    );
+  } finally {
+    process.env.INSTAGRAM_DELIVERY_PACING = originalPacing;
+  }
+});
+
 test("instagram adapter executes single-message delivery plan with typing and read receipt", async () => {
   const requestBodies: unknown[] = [];
   const delays: number[] = [];
