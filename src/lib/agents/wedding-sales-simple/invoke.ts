@@ -207,6 +207,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
     dialogueCommands: graphState.dialogueCommands,
     weddingLeadForm: graphState.weddingLeadForm,
     flowRunner: graphState.flowRunner,
+    domainDecision: graphState.domainDecision,
     pendingUserActionBefore: previousState?.pendingUserAction,
     pendingUserActionAfter: persistedState.pendingUserAction,
     decisionTrace: graphState.decisionTrace,

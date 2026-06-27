@@ -32,6 +32,7 @@ import {
   type ContextualRephraserInput,
   type ContextualRephraserResult,
 } from "./contextual-rephraser";
+import { buildWeddingAgentDomainDecision } from "./wedding-agent-domain";
 
 function toolNameForStep(state: SimpleWeddingSalesState) {
   if (state.nextStep === "check_availability") {
@@ -356,8 +357,14 @@ export async function invokeWeddingSalesSimpleGraph(
         responseKey: contract.responseKey ?? finalState.decisionTrace.responseKey,
       }
     : undefined;
-  const returnedState = {
+  const domainState = {
     ...finalState,
+    decisionTrace: finalDecisionTrace,
+    replyContract: contract,
+  };
+  const returnedState = {
+    ...domainState,
+    domainDecision: buildWeddingAgentDomainDecision(domainState),
     decisionTrace: finalDecisionTrace,
     replyMemory: updatedReplyMemory,
     replyContract: contract,

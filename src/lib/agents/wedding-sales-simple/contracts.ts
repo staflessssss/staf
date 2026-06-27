@@ -103,6 +103,7 @@ export type WeddingSalesSimpleSafetyLogEntry = {
   dialogueCommands?: SimpleWeddingSalesState["dialogueCommands"];
   weddingLeadForm?: SimpleWeddingSalesState["weddingLeadForm"];
   flowRunner?: SimpleWeddingSalesState["flowRunner"];
+  domainDecision?: SimpleWeddingSalesState["domainDecision"];
   pendingUserActionBefore?: SimpleWeddingSalesState["pendingUserAction"];
   pendingUserActionAfter?: SimpleWeddingSalesState["pendingUserAction"];
   decisionTrace?: SimpleWeddingSalesDecisionTrace;

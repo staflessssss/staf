@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getWeddingLeadFormStatus,
   resolveWeddingDate,
   resolveWeddingLeadFormSlots,
+  WEDDING_LEAD_REQUIRED_SLOTS,
 } from "./wedding-lead-form";
+import { WeddingAgentDomain } from "./wedding-agent-domain";
 import type { SimpleWeddingSalesState } from "./state";
 
 function state(update: Partial<SimpleWeddingSalesState> = {}): SimpleWeddingSalesState {
@@ -27,6 +30,22 @@ test("wedding lead form maps date text to canonical wedding date", () => {
   assert.equal(result.isoDate, "2027-10-15");
   assert.equal(result.rawText, "15 October 2027");
   assert.equal(result.display, "October 15, 2027");
+});
+
+test("wedding lead form slot order follows the wedding agent domain", () => {
+  const domainSlots = WeddingAgentDomain.slotOrder.filter(
+    (slot) => slot !== "bookingConfirmation",
+  );
+  const result = getWeddingLeadFormStatus(
+    state({
+      weddingDate: "2027-10-27",
+      location: "Charlotte",
+      availability: "available",
+    }),
+  );
+
+  assert.deepEqual(WEDDING_LEAD_REQUIRED_SLOTS, domainSlots);
+  assert.deepEqual(result.missingSlots, ["names", "venue", "callTime", "email"]);
 });
 
 test("wedding lead form maps weddingDateText command to canonical slots", () => {

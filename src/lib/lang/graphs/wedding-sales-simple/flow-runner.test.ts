@@ -119,7 +119,7 @@ test("flow runner predicts call time after venue is collected", () => {
   });
 
   assert.equal(result?.predictedNextStep, "ask_call_time");
-  assert.equal(result?.predictedResponseKey, "utter_ask_call_time");
+  assert.equal(result?.predictedResponseKey, "utter_venue_collected_ask_call_time");
   assert.equal(shouldActivateFlowDecision(result), true);
 });
 

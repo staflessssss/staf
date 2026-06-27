@@ -6,21 +6,14 @@ import type {
   SimpleWeddingSalesState,
   TurnUnderstanding,
 } from "./state";
+import { WeddingAgentDomain, type WeddingAgentDomainSlot } from "./wedding-agent-domain";
 
-export type WeddingLeadRequiredSlot =
-  | "weddingDate"
-  | "location"
-  | "names"
-  | "email"
-  | "callTime";
+export type WeddingLeadRequiredSlot = Exclude<WeddingAgentDomainSlot, "bookingConfirmation">;
 
-export const WEDDING_LEAD_REQUIRED_SLOTS: WeddingLeadRequiredSlot[] = [
-  "weddingDate",
-  "location",
-  "names",
-  "email",
-  "callTime",
-];
+export const WEDDING_LEAD_REQUIRED_SLOTS: WeddingLeadRequiredSlot[] =
+  WeddingAgentDomain.slotOrder.filter(
+    (slot): slot is WeddingLeadRequiredSlot => slot !== "bookingConfirmation",
+  );
 
 export type WeddingLeadFormSlotResolution = Prisma.JsonObject & {
   source: string;
@@ -281,32 +274,43 @@ function suppressConflictingNameCommands(input: {
 function missingSlotsForState(
   state: Pick<
     SimpleWeddingSalesState,
-    "weddingDate" | "location" | "customerName" | "partnerName" | "customerEmail" | "proposedCallTime"
+    | "weddingDate"
+    | "location"
+    | "customerName"
+    | "partnerName"
+    | "venue"
+    | "availability"
+    | "customerEmail"
+    | "proposedCallTime"
   >,
 ) {
-  const missing: WeddingLeadRequiredSlot[] = [];
+  const missing = new Set<WeddingLeadRequiredSlot>();
 
   if (!state.weddingDate) {
-    missing.push("weddingDate");
+    missing.add("weddingDate");
   }
 
   if (!state.location) {
-    missing.push("location");
+    missing.add("location");
   }
 
   if (!state.customerName || !state.partnerName) {
-    missing.push("names");
+    missing.add("names");
+  }
+
+  if (state.availability === "available" && !state.venue) {
+    missing.add("venue");
   }
 
   if (!state.customerEmail) {
-    missing.push("email");
+    missing.add("email");
   }
 
   if (!state.proposedCallTime) {
-    missing.push("callTime");
+    missing.add("callTime");
   }
 
-  return missing;
+  return WEDDING_LEAD_REQUIRED_SLOTS.filter((slot) => missing.has(slot));
 }
 
 function selectedPromptResponseKey(

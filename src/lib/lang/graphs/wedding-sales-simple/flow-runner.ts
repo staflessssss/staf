@@ -184,7 +184,7 @@ export function runWeddingLeadFlowShadow(input: {
     return buildTrace({
       branch: "venue_collected",
       predictedNextStep: "ask_call_time",
-      predictedResponseKey: "utter_ask_call_time",
+      predictedResponseKey: "utter_venue_collected_ask_call_time",
       legacyDecision: input.legacyDecision,
       legacyReplyType: "ask_call_time",
       preserveFlow: true,

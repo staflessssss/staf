@@ -10,6 +10,7 @@ import {
 import { buildDialogueCommands } from "./dialogue-commands";
 import type { ReplyActionContract } from "./reply-contract";
 import type { ReplyGuardResult } from "./reply-guards";
+import type { WeddingAgentDomainDecision } from "./wedding-agent-domain";
 import {
   resolveWeddingLeadFormSlots,
   type WeddingLeadFormResolution,
@@ -485,6 +486,7 @@ export type SimpleWeddingSalesState = {
   dialogueCommands?: SimpleWeddingSalesDialogueCommand[];
   weddingLeadForm?: WeddingLeadFormResolution;
   flowRunner?: SimpleWeddingSalesFlowRunnerTrace;
+  domainDecision?: WeddingAgentDomainDecision;
   lastUnderstanding?: TurnUnderstanding;
   nextStep?: SimpleWeddingSalesNextStep;
   missingField?: "names" | "weddingDate" | "location";
@@ -571,6 +573,7 @@ export function createInitialSimpleWeddingSalesState(args: {
     dialogueCommands: undefined,
     weddingLeadForm: args.previousState?.weddingLeadForm,
     flowRunner: undefined,
+    domainDecision: undefined,
     lastUnderstanding: args.previousState?.lastUnderstanding,
     nextStep: args.previousState?.nextStep,
     missingField: args.previousState?.missingField,
