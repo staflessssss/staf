@@ -376,6 +376,43 @@ test("writer reads founder greeting from structured knowledge instead of fixed c
   assert.doesNotMatch(reply, /Taras|Myndful/);
 });
 
+test("writer infers safe availability response key and avoids deterministic fallback", () => {
+  const state = baseState({
+    latestCustomerMessage: "Hi! Are you available June 14 2027 in Tampa? How much?",
+    isFirstTurn: true,
+    weddingDate: "2027-06-14",
+    weddingDateDisplay: "June 14, 2027",
+    location: "Tampa",
+    availability: "available",
+    questionsAskedByCustomer: ["availability", "pricing"],
+    nextStep: "ask_missing_info",
+    missingField: "names",
+    decisionTrace: {
+      extractedFacts: {
+        weddingDate: "2027-06-14",
+        weddingDateText: "June 14 2027",
+        location: "Tampa",
+      },
+      missingFields: ["names"],
+      nextStep: "ask_missing_info",
+      toolCalled: "checkAvailability",
+      replyType: "availability_available",
+      reason: "date is available and names are needed",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+  const result = writeConstrainedWeddingReply({ state, knowledge, contract });
+
+  assert.equal(result.writer.mode, "response_catalog");
+  assert.equal(result.writer.responseKey, "utter_availability_available_ask_names");
+  assert.equal(result.writerCatalog.eligible, true);
+  assert.equal(result.writerCatalog.guardOk, true);
+  assert.match(result.text, /Taras/);
+  assert.match(result.text, /Myndful Films/);
+  assert.match(result.text, /both of your names|speaking with/i);
+});
+
 test("writer can use response catalog for ask venue", () => {
   const state = baseState({
     latestCustomerMessage: "Mike and Sarah",

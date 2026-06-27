@@ -58,6 +58,12 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
   const result = await invokeWeddingSalesSimpleAdapter({
     incoming,
     toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+    },
     deps: {
       recordSafetyLog: (entry) => {
         safetyLogs.push(entry);
@@ -106,7 +112,9 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
   assert.deepEqual(safetyLogs[0]?.dialogueUnderstanding?.commands, safetyLogs[0]?.dialogueCommands);
   assert.deepEqual(safetyLogs[0]?.pendingUserActionBefore, undefined);
   assert.equal(safetyLogs[0]?.pendingUserActionAfter, null);
-  assert.equal(safetyLogs[0]?.writer?.mode, "deterministic_fallback");
+  assert.match(safetyLogs[0]?.writer?.mode ?? "", /response_catalog|contextual_rephrase/);
+  assert.equal(safetyLogs[0]?.writer?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(safetyLogs[0]?.writerCatalog?.guardOk, true);
   assert.equal(safetyLogs[0]?.domainDecision?.activeFlow, "wedding_lead_qualification");
   assert.equal(safetyLogs[0]?.domainDecision?.currentRequestedSlot, "names");
   assert.equal(safetyLogs[0]?.domainDecision?.nextDomainAction, "ask_names_after_available_date");

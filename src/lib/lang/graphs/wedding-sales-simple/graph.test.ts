@@ -508,6 +508,12 @@ test("simple wedding sales runtime does not run active rephrase for excluded pri
         contactId: "contact-1",
         message: "Are you available June 15 2027 in Tampa? How much?",
         toolContext,
+        config: {
+          guide: {
+            imageUrl: "https://example.com/price-fl.png",
+            link: "https://example.com/guide",
+          },
+        },
         understand: () =>
           understanding({
             customerMessageType: "availability_question",
@@ -522,8 +528,12 @@ test("simple wedding sales runtime does not run active rephrase for excluded pri
       });
 
       assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
-      assert.equal(result.writer?.mode, "deterministic_fallback");
-      assert.equal(result.writer?.rephraser, undefined);
+      assert.equal(result.writer?.mode, "response_catalog");
+      assert.equal(result.writer?.responseKey, "utter_availability_available_ask_names");
+      assert.equal(result.writer?.rephraser?.mode, "shadow");
+      assert.equal(result.writer?.rephraser?.activeAllowed, false);
+      assert.equal(result.writer?.rephraser?.fallbackReason, "response_key_not_allowed");
+      assert.equal(result.writer?.rephraser?.usedAsOutbound, false);
       assert.doesNotMatch(result.responseDraft ?? "", /I changed the availability and price/i);
       assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
     },

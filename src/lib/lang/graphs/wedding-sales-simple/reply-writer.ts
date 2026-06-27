@@ -305,8 +305,21 @@ function buildResponseCatalogSlots(
   knowledge?: SimpleWeddingKnowledgeContext,
 ) {
   const location = state.location;
+  const greetingIntroduction = knowledge
+    ? renderCopy(knowledge.persona.replyStyle.greetingIntroduction, {
+        name: knowledge.persona.name,
+        company: knowledge.persona.company,
+      })
+    : undefined;
+  const greetingCelebration =
+    state.senderRole === "mother" || state.senderRole === "planner"
+      ? ""
+      : knowledge?.persona.replyStyle.greetingCelebration;
 
   return {
+    greetingOpening: knowledge?.persona.replyStyle.greetingOpening,
+    greetingIntroduction,
+    greetingCelebration,
     callTimeDisplay: displayCheckedCallTime(state),
     email: state.customerEmail,
     weddingDateDisplay: state.weddingDateDisplay ?? (
@@ -357,7 +370,12 @@ function compatibleResponseKeys(contract: ReplyActionContract): SimpleWeddingSal
     return ["utter_ask_venue"];
   }
 
-  if (contract.requiredQuestion === "names" && contract.mustMentionWeddingAvailability) {
+  if (
+    contract.requiredQuestion === "names" &&
+    contract.mustMentionWeddingAvailability &&
+    contract.mustMentionPricing &&
+    contract.mentionPolicy.guide.mode !== "skip"
+  ) {
     return ["utter_availability_available_ask_names", "utter_ask_names_after_details"];
   }
 
@@ -388,6 +406,12 @@ function responseKeyCompatibility(contract: ReplyActionContract) {
   };
 }
 
+function catalogResponseKeyForContract(
+  contract: ReplyActionContract,
+): SimpleWeddingSalesResponseKey | undefined {
+  return contract.responseKey ?? compatibleResponseKeys(contract)[0];
+}
+
 const SAFE_OBLIGATION_CATALOG_KEYS = new Set<SimpleWeddingSalesResponseKey>([
   "utter_availability_available_ask_names",
   "utter_pricing_repeat_send_guide_ask_names",
@@ -396,19 +420,27 @@ const SAFE_OBLIGATION_CATALOG_KEYS = new Set<SimpleWeddingSalesResponseKey>([
   "utter_calendar_available_ask_email",
 ]);
 
-function catalogExclusionReason(contract: ReplyActionContract) {
-  const allowsSafeObligations = Boolean(
-    contract.responseKey && SAFE_OBLIGATION_CATALOG_KEYS.has(contract.responseKey),
-  );
+function catalogExclusionReason(
+  contract: ReplyActionContract,
+  responseKey = catalogResponseKeyForContract(contract),
+) {
+  const allowsWeddingAvailability =
+    responseKey === "utter_availability_available_ask_names" && contract.mustMentionPricing;
+  const allowsPricing =
+    responseKey === "utter_availability_available_ask_names" ||
+    responseKey === "utter_pricing_repeat_send_guide_ask_names";
+  const allowsCalendarAvailability = responseKey === "utter_calendar_available_ask_email";
+  const allowsTravel = responseKey === "utter_answer_travel_resume_call_time";
+  const allowsSafeObligations = Boolean(responseKey && SAFE_OBLIGATION_CATALOG_KEYS.has(responseKey));
 
   if (
-    (contract.mustGreet && contract.responseKey !== "utter_ask_wedding_details") ||
     (!allowsSafeObligations &&
-      (contract.mustMentionWeddingAvailability ||
-        contract.mustMentionCalendarAvailability ||
-        contract.mustMentionPricing ||
-        contract.mustMentionGuide ||
-        contract.mustAnswerTravel)) ||
+      contract.mustGreet &&
+      responseKey !== "utter_ask_wedding_details") ||
+    (contract.mustMentionWeddingAvailability && !allowsWeddingAvailability) ||
+    (contract.mustMentionCalendarAvailability && !allowsCalendarAvailability) ||
+    ((contract.mustMentionPricing || contract.mustMentionGuide) && !allowsPricing) ||
+    (contract.mustAnswerTravel && !allowsTravel) ||
     contract.mustAnswerTeam ||
     contract.mustAnswerIdentity ||
     contract.mustAnswerQuestions?.includes("portfolio")
@@ -418,8 +450,8 @@ function catalogExclusionReason(contract: ReplyActionContract) {
 
   if (
     contract.requiredQuestion === "callTime" &&
-    contract.responseKey !== "utter_venue_collected_ask_call_time" &&
-    contract.responseKey !== "utter_answer_travel_resume_call_time" &&
+    responseKey !== "utter_venue_collected_ask_call_time" &&
+    responseKey !== "utter_answer_travel_resume_call_time" &&
     (contract.questionPolicy.mode !== "first_ask" ||
       contract.questionPolicy.allowCompliment)
   ) {
@@ -452,28 +484,28 @@ function tryBuildResponseFromCatalog(args: {
   variationSeed: string;
   trace: SimpleWeddingSalesWriterCatalogTrace;
 } | null {
-  const responseKey = args.contract.responseKey;
+  const catalogResponseKey = catalogResponseKeyForContract(args.contract);
   const compatibility = responseKeyCompatibility(args.contract);
 
-  if (!responseKey) {
+  if (!catalogResponseKey) {
     return null;
   }
 
-  const exclusionReason = catalogExclusionReason(args.contract);
+  const exclusionReason = catalogExclusionReason(args.contract, catalogResponseKey);
 
   if (exclusionReason) {
     return null;
   }
 
   const turnIndex = args.state.replyMemory?.turnIndex ?? 0;
-  const variationSeed = `${args.state.contactId ?? ""}:${turnIndex}:${responseKey}`;
+  const variationSeed = `${args.state.contactId ?? ""}:${turnIndex}:${catalogResponseKey}`;
   const variations = selectResponseVariationCandidates({
-    responseKey,
+    responseKey: catalogResponseKey,
     contactId: args.state.contactId,
     turnIndex,
     lastVariationIds: previousVariationIdsForResponseKey({
       state: args.state,
-      responseKey,
+      responseKey: catalogResponseKey,
     }),
   });
 
@@ -488,13 +520,13 @@ function tryBuildResponseFromCatalog(args: {
   if (missingTemplateSlots.length > 0) {
     return {
       text: "",
-      responseKey,
+      responseKey: catalogResponseKey,
       variationId: variation.id,
       variationSeed,
       trace: {
         eligible: true,
         reason: "missing_template_slot",
-        responseKey,
+        responseKey: catalogResponseKey,
         attemptedVariationId: variation.id,
         guardOk: false,
         fallbackReason: "missing_template_slot",
@@ -506,12 +538,12 @@ function tryBuildResponseFromCatalog(args: {
 
   return {
     text: renderResponseVariation(variation, slots),
-    responseKey,
+    responseKey: catalogResponseKey,
     variationId: variation.id,
     variationSeed,
     trace: {
       eligible: true,
-      responseKey,
+      responseKey: catalogResponseKey,
       selectedVariationId: variation.id,
       responseKeyCompatibility: compatibility,
     },
@@ -522,8 +554,9 @@ function buildCatalogTraceForSkippedContract(
   contract: ReplyActionContract,
 ): SimpleWeddingSalesWriterCatalogTrace {
   const compatibility = responseKeyCompatibility(contract);
+  const responseKey = catalogResponseKeyForContract(contract);
 
-  if (!contract.responseKey) {
+  if (!responseKey) {
     return {
       eligible: false,
       reason: "responseKey_missing",
@@ -532,13 +565,13 @@ function buildCatalogTraceForSkippedContract(
     };
   }
 
-  const exclusionReason = catalogExclusionReason(contract);
+  const exclusionReason = catalogExclusionReason(contract, responseKey);
 
   if (exclusionReason) {
     return {
       eligible: false,
       reason: exclusionReason,
-      responseKey: contract.responseKey,
+      responseKey,
       fallbackReason: exclusionReason,
       responseKeyCompatibility: compatibility,
     };
@@ -547,7 +580,7 @@ function buildCatalogTraceForSkippedContract(
   return {
     eligible: false,
     reason: "responseKey_not_in_catalog",
-    responseKey: contract.responseKey,
+    responseKey,
     fallbackReason: "responseKey_not_in_catalog",
     responseKeyCompatibility: compatibility,
   };
@@ -573,28 +606,28 @@ function tryBuildGuardedResponseFromCatalog(args: {
   guardResult: ReturnType<typeof validateGeneratedReply>;
   trace: SimpleWeddingSalesWriterCatalogTrace;
 } | null {
-  const responseKey = args.contract.responseKey;
+  const catalogResponseKey = catalogResponseKeyForContract(args.contract);
   const compatibility = responseKeyCompatibility(args.contract);
 
-  if (!responseKey) {
+  if (!catalogResponseKey) {
     return null;
   }
 
-  const exclusionReason = catalogExclusionReason(args.contract);
+  const exclusionReason = catalogExclusionReason(args.contract, catalogResponseKey);
 
   if (exclusionReason) {
     return null;
   }
 
   const turnIndex = args.state.replyMemory?.turnIndex ?? 0;
-  const variationSeed = `${args.state.contactId ?? ""}:${turnIndex}:${responseKey}`;
+  const variationSeed = `${args.state.contactId ?? ""}:${turnIndex}:${catalogResponseKey}`;
   const variations = selectResponseVariationCandidates({
-    responseKey,
+    responseKey: catalogResponseKey,
     contactId: args.state.contactId,
     turnIndex,
     lastVariationIds: previousVariationIdsForResponseKey({
       state: args.state,
-      responseKey,
+      responseKey: catalogResponseKey,
     }),
   });
   const slots = buildResponseCatalogSlots(args.state, args.knowledge);
@@ -607,7 +640,7 @@ function tryBuildGuardedResponseFromCatalog(args: {
       firstFailure ??= {
         eligible: true,
         reason: "missing_template_slot",
-        responseKey,
+        responseKey: catalogResponseKey,
         attemptedVariationId: variation.id,
         guardOk: false,
         fallbackReason: "missing_template_slot",
@@ -628,14 +661,14 @@ function tryBuildGuardedResponseFromCatalog(args: {
     if (guardResult.ok) {
       return {
         text,
-        responseKey,
+        responseKey: catalogResponseKey,
         variationId: variation.id,
         variationSeed,
         guardResult,
         trace: {
           eligible: true,
           reason: "selected",
-          responseKey,
+          responseKey: catalogResponseKey,
           selectedVariationId: variation.id,
           guardOk: true,
           responseKeyCompatibility: compatibility,
@@ -646,7 +679,7 @@ function tryBuildGuardedResponseFromCatalog(args: {
     firstFailure ??= {
       eligible: true,
       reason: "guard_failed",
-      responseKey,
+      responseKey: catalogResponseKey,
       attemptedVariationId: variation.id,
       guardOk: false,
       fallbackReason: "response_catalog_guard_failed",
@@ -657,7 +690,7 @@ function tryBuildGuardedResponseFromCatalog(args: {
   return firstFailure
     ? {
         text: "",
-        responseKey,
+        responseKey: catalogResponseKey,
         variationId: firstFailure.attemptedVariationId ?? variations[0]?.id ?? "",
         variationSeed,
         guardResult: { ok: false, reasons: [firstFailure.fallbackReason ?? "catalog_failed"] },

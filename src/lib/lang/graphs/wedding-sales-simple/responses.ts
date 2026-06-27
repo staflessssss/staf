@@ -21,17 +21,17 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
     },
     {
       id: "ask_wedding_details_v3",
-      text: "Hey! I’d be happy to help. Do you already have your wedding date and location?",
+      text: "Hey! I'd be happy to help. Do you already have your wedding date and location?",
     },
   ],
   utter_availability_available_ask_names: [
     {
       id: "availability_names_v1",
-      text: "I checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWhat are both of your names?",
+      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\nI checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWhat are both of your names?",
     },
     {
       id: "availability_names_v2",
-      text: "{{weddingDateDisplay}} in {{locationDisplay}} is open for us.\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWho would I be speaking with?",
+      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\n{{weddingDateDisplay}} in {{locationDisplay}} is open for us.\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWho would I be speaking with?",
     },
   ],
   utter_pricing_repeat_send_guide_ask_names: [
@@ -47,7 +47,7 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_ask_location_only: [
     {
       id: "ask_location_only_v1",
-      text: "Perfect, {{weddingDateDisplay}} рџ¤Ќ What city or venue are you planning for?",
+      text: "Perfect, {{weddingDateDisplay}} 🤍 What city or venue are you planning for?",
     },
     {
       id: "ask_location_only_v2",
@@ -57,7 +57,7 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_ask_wedding_date_only: [
     {
       id: "ask_date_only_v1",
-      text: "Got it - {{location}} рџ¤Ќ WhatвЂ™s your wedding date?",
+      text: "Got it — {{location}} 🤍 What's your wedding date?",
     },
     {
       id: "ask_date_only_v2",
@@ -67,7 +67,7 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_ask_names_after_details: [
     {
       id: "ask_names_after_details_v1",
-      text: "Perfect - {{weddingDateDisplay}} in {{location}} рџ¤Ќ What are both of your names?",
+      text: "Perfect — {{weddingDateDisplay}} in {{location}} 🤍 What are both of your names?",
     },
   ],
   utter_ask_venue: [
@@ -81,7 +81,7 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
     },
     {
       id: "ask_venue_v3",
-      text: "Beautiful — and where’s the wedding taking place?",
+      text: "Beautiful — and where's the wedding taking place?",
     },
   ],
   utter_ask_call_time: [
@@ -91,11 +91,11 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
     },
     {
       id: "ask_call_time_v2",
-      text: "The next best step would be a quick consult so I can learn a little more about the day. What time works best for you? I’m usually available Monday-Friday, 9am-2pm Eastern.",
+      text: "The next best step would be a quick consult so I can learn a little more about the day. What time works best for you? I'm usually available Monday-Friday, 9am-2pm Eastern.",
     },
     {
       id: "ask_call_time_v3",
-      text: "I’d love to hear more about what you’re planning. What time would be good for a quick consult? I do calls Monday-Friday, 9am-2pm Eastern.",
+      text: "I'd love to hear more about what you're planning. What time would be good for a quick consult? I do calls Monday-Friday, 9am-2pm Eastern.",
     },
   ],
   utter_venue_collected_ask_call_time: [
@@ -167,11 +167,11 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
     },
     {
       id: "raw_footage_v2",
-      text: "Yes, that’s something we can talk through. It depends a bit on the collection and what kind of raw footage you’re hoping to have.",
+      text: "Yes, that's something we can talk through. It depends a bit on the collection and what kind of raw footage you're hoping to have.",
     },
     {
       id: "raw_footage_v3",
-      text: "We can usually add raw footage depending on what you’re looking for. I’d walk you through the cleanest option on the call.",
+      text: "We can usually add raw footage depending on what you're looking for. I'd walk you through the cleanest option on the call.",
     },
   ],
   utter_answer_travel_resume_call_time: [

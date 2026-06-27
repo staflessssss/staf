@@ -371,7 +371,7 @@ export async function invokeWeddingSalesSimpleGraph(
     replyGuardResult,
     writer: {
       ...writer,
-      responseKey: contract.responseKey,
+      responseKey: contract.responseKey ?? writer.responseKey,
     },
     writerCatalog: reply.writerCatalog,
     responseDraft: responseDraft || writeHumanReply({

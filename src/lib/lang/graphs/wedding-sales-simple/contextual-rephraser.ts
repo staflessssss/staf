@@ -18,8 +18,6 @@ const rephraserOutputSchema = z.object({
 });
 
 const ACTIVE_REPHRASER_KEYS = new Set<SimpleWeddingSalesResponseKey>([
-  "utter_availability_available_ask_names",
-  "utter_pricing_repeat_send_guide_ask_names",
   "utter_ask_venue",
   "utter_ask_call_time",
   "utter_venue_collected_ask_call_time",

@@ -119,7 +119,8 @@ function responseKeyForContract(args: {
     requiredQuestion === "names" &&
     args.mustMentionWeddingAvailability &&
     state.availability === "available" &&
-    args.mentionPolicy.pricing.mode !== "skip" &&
+    (args.mentionPolicy.pricing.mode === "full" ||
+      args.mentionPolicy.pricing.mode === "same_as_before") &&
     args.mentionPolicy.guide.mode !== "skip"
   ) {
     return "utter_availability_available_ask_names";

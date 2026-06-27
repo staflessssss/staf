@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  SIMPLE_WEDDING_RESPONSES,
   renderResponseVariation,
   selectResponseVariation,
 } from "./responses";
@@ -83,4 +84,13 @@ test("response catalog returns null for unknown responseKey", () => {
     }),
     null,
   );
+});
+
+test("response catalog texts do not contain mojibake", () => {
+  const catalogText = Object.values(SIMPLE_WEDDING_RESPONSES)
+    .flatMap((variations) => variations ?? [])
+    .map((variation) => variation.text)
+    .join("\n");
+
+  assert.doesNotMatch(catalogText, /СЂСџ|РІР‚|пїЅ|�/);
 });
