@@ -32,6 +32,25 @@ test("wedding lead form maps date text to canonical wedding date", () => {
   assert.equal(result.display, "October 15, 2027");
 });
 
+test("wedding lead form canonicalizes common spoken wedding date formats", () => {
+  const cases = [
+    ["7 of October 2026", "2026-10-07", "October 7, 2026"],
+    ["7 October 2026", "2026-10-07", "October 7, 2026"],
+    ["October 7 2026", "2026-10-07", "October 7, 2026"],
+    ["October 7, 2026", "2026-10-07", "October 7, 2026"],
+    ["27 of October 2027", "2027-10-27", "October 27, 2027"],
+  ] as const;
+
+  for (const [rawText, isoDate, display] of cases) {
+    const result = resolveWeddingDate(rawText);
+
+    assert.equal(result.ok, true, rawText);
+    assert.equal(result.isoDate, isoDate, rawText);
+    assert.equal(result.rawText, rawText, rawText);
+    assert.equal(result.display, display, rawText);
+  }
+});
+
 test("wedding lead form slot order follows the wedding agent domain", () => {
   const domainSlots = WeddingAgentDomain.slotOrder.filter(
     (slot) => slot !== "bookingConfirmation",

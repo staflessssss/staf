@@ -63,8 +63,14 @@ function hasSignature(text: string) {
   return /\bTaras Mynd\b|\bFounder & Creative Director\b|\bMYNDFUL FILMS LLC\b/i.test(text);
 }
 
+function hasFounderGreetingOrCongratulation(text: string) {
+  return /\b(?:hey there|thank you so much for reaching out|i(?:'|вЂ™)?m Taras|founder of Myndful Films|huge congratulations|such an exciting season of life)\b/i.test(
+    text,
+  );
+}
+
 function hasWeddingAvailabilityResult(text: string) {
-  return /\b(?:date is available|date is not available|is not open for us|is open for us)\b/i.test(text);
+  return /\b(?:date is available|is available in|date is not available|is not open for us|is open for us)\b/i.test(text);
 }
 
 function hasCalendarAvailabilityResult(text: string) {
@@ -103,11 +109,19 @@ export function validateGeneratedReply(args: {
   if (
     args.contract.mustGreet &&
     args.contract.responseKey !== "utter_ask_wedding_details" &&
+    args.contract.responseKey !== "utter_availability_available_ask_names" &&
     (!reply.includes(args.knowledge.persona.replyStyle.greetingOpening) ||
       !reply.includes(args.knowledge.persona.name) ||
       !reply.includes(args.knowledge.persona.company))
   ) {
     reasons.push("first-turn founder greeting is incomplete");
+  }
+
+  if (
+    (args.state.replyMemory?.greeted || !args.contract.mustGreet) &&
+    hasFounderGreetingOrCongratulation(reply)
+  ) {
+    reasons.push("reply repeated founder greeting/persona after greeting was not allowed");
   }
 
   if (args.contract.mustMentionPricing && !reply.includes(args.knowledge.pricing.startPrice)) {

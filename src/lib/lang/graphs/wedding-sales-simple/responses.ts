@@ -27,15 +27,11 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_availability_available_ask_names: [
     {
       id: "availability_names_v1",
-      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\nI checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}, and I’ll include the collections guide here so you can look through the options.\n\nWhat are both of your names?",
+      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\n\nWhat are both of your names?",
     },
     {
       id: "availability_names_v2",
-      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\n{{weddingDateDisplay}} in {{locationDisplay}} is open for us.\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}, and I’ll send the collections guide over for you.\n\nWho would I be speaking with?",
-    },
-    {
-      id: "availability_names_v3",
-      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\nI checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\n\nWhat are both of your names?",
+      text: "{{weddingDateDisplay}} is open for {{locationDisplay}} 🤍\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}.\n\nWho would I be speaking with?",
     },
   ],
   utter_pricing_repeat_send_guide_ask_names: [

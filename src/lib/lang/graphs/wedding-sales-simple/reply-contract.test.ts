@@ -409,8 +409,11 @@ test("writer infers safe availability response key and avoids deterministic fall
   assert.equal(result.writer.responseKey, "utter_availability_available_ask_names");
   assert.equal(result.writerCatalog.eligible, true);
   assert.equal(result.writerCatalog.guardOk, true);
-  assert.match(result.text, /Taras/);
-  assert.match(result.text, /Myndful Films/);
+  assert.doesNotMatch(
+    result.text,
+    /Hey there|Thank you so much for reaching out|I’m Taras|I'm Taras|founder of Myndful Films|Huge congratulations|such an exciting season of life/i,
+  );
+  assert.match(result.text, /June 14, 2027 is available in Tampa/i);
   assert.match(result.text, /both of your names|speaking with/i);
 });
 

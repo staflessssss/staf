@@ -79,6 +79,38 @@ test("LLM understanding restores a complete date from deterministic extraction",
   assert.equal(result.facts.weddingDate, "2027-06-14");
 });
 
+test("LLM understanding restores day-of-month date text from deterministic extraction", () => {
+  const state = {
+    channel: "instagram" as const,
+    latestCustomerMessage: "Hello! We thinking about Charlotte and date is 7 of October 2026",
+    bookingConfirmed: false,
+    mode: "bot_active" as const,
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  };
+  const result = weddingSalesSimpleUnderstandTestHelpers.normalizeLlmUnderstanding(state, {
+    customerMessageType: "answer_to_question",
+    facts: {
+      customerName: null,
+      partnerName: null,
+      weddingDate: null,
+      weddingDateText: null,
+      location: "Charlotte",
+      venue: null,
+      email: null,
+      proposedCallTime: null,
+      senderRole: "unknown",
+    },
+    questionsAskedByCustomer: [],
+    confidence: 0.9,
+  });
+
+  assert.equal(result.facts.weddingDate, "2026-10-07");
+  assert.equal(result.facts.weddingDateText, "7 of October 2026");
+  assert.equal(result.facts.location, "Charlotte");
+});
+
 test("LLM understanding splits a combined couple name", () => {
   const state = {
     channel: "instagram" as const,

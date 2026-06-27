@@ -68,11 +68,16 @@ function extractIsoDate(message: string) {
 }
 
 function extractMonthDate(message: string) {
-  const match = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?\b/i.exec(
-    message,
-  );
+  const monthFirst =
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d{2}))?\b/i.exec(
+      message,
+    );
+  const dayFirst =
+    /\b(\d{1,2})(?:st|nd|rd|th)?(?:\s+of)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:,?\s+(20\d{2}))?\b/i.exec(
+      message,
+    );
 
-  if (!match) {
+  if (!monthFirst && !dayFirst) {
     return {};
   }
 
@@ -101,18 +106,21 @@ function extractMonthDate(message: string) {
     dec: "12",
     december: "12",
   };
-  const month = months[match[1]?.toLowerCase() ?? ""];
-  const day = match[2]?.padStart(2, "0");
-  const year = match[3];
+  const monthKey = monthFirst?.[1] ?? dayFirst?.[2];
+  const dayValue = monthFirst?.[2] ?? dayFirst?.[1];
+  const year = monthFirst?.[3] ?? dayFirst?.[3];
+  const rawText = monthFirst?.[0] ?? dayFirst?.[0];
+  const month = months[monthKey?.toLowerCase() ?? ""];
+  const day = dayValue?.padStart(2, "0");
 
   if (month && day && year) {
     return {
       weddingDate: `${year}-${month}-${day}`,
-      weddingDateText: match[0],
+      weddingDateText: rawText,
     };
   }
 
-  return { weddingDateText: match[0] };
+  return rawText ? { weddingDateText: rawText } : {};
 }
 
 function extractNames(message: string) {
@@ -176,7 +184,15 @@ function extractLocation(message: string) {
     message,
   );
 
-  return match?.[1]?.trim();
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+
+  const aboutLocation = /\b(?:about|for)\s+([A-Z][A-Za-z .'-]+?)(?:[?.!,]|$|\s+(?:and|date|on|at)\b)/.exec(
+    message,
+  );
+
+  return aboutLocation?.[1]?.trim();
 }
 
 function normalizeSuggestedTimeLabel(value: string) {

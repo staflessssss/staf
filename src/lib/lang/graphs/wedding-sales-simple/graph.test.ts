@@ -101,7 +101,7 @@ test("simple wedding sales runtime checks availability before asking for names",
     result.toolObservations.map((observation) => observation.toolName),
     ["check_wedding_availability"],
   );
-  assert.match(result.responseDraft ?? "", /June 14, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /June 14, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(result.responseDraft ?? "", /wedding films start at/i);
   assert.match(result.responseDraft ?? "", /both of your names/i);
 });
@@ -240,6 +240,92 @@ test("simple wedding sales runtime fills date and location without repeating wed
   assert.equal(second.writerCatalog?.guardOk, true);
   assert.notEqual(second.writerCatalog?.reason, "responseKey_missing");
   assert.doesNotMatch(second.responseDraft ?? "", /date and location|Do you already have your wedding date/i);
+});
+
+test("simple wedding sales runtime resolves spoken date and location without asking date again", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Inquiry about wedding videography",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Hello! We thinking about Charlotte and date is 7 of October 2026",
+    previousState: first,
+    toolContext,
+    understand: understandTurnHeuristically,
+  });
+
+  assert.equal(second.weddingDate, "2026-10-07");
+  assert.equal(second.weddingDateDisplay, "October 7, 2026");
+  assert.equal(second.location, "Charlotte");
+  assert.equal(second.decisionTrace?.toolCalled, "checkAvailability");
+  assert.equal(second.decisionTrace?.responseKey, "utter_availability_available_ask_names");
+  assert.doesNotMatch(second.responseDraft ?? "", /what'?s your wedding date|what date are you planning/i);
+});
+
+test("simple wedding sales runtime resolves requested wedding date answer without asking date again", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "I say 7 of October 2026",
+    previousState: {
+      channel: "instagram",
+      latestCustomerMessage: "previous",
+      bookingConfirmed: false,
+      mode: "bot_active",
+      unclearAttemptCount: 0,
+      questionsAskedByCustomer: [],
+      toolObservations: [],
+      replyMemory: {
+        greeted: true,
+        lastRequiredQuestion: "weddingDate",
+        questionMemory: {
+          lastRequiredQuestion: "weddingDate",
+          lastQuestionText: "What's your wedding date?",
+        },
+      },
+    },
+    understand: understandTurnHeuristically,
+  });
+
+  assert.equal(result.weddingDate, "2026-10-07");
+  assert.equal(result.weddingDateDisplay, "October 7, 2026");
+  assert.equal(result.missingField, "location");
+  assert.equal(result.decisionTrace?.responseKey, "utter_ask_location_only");
+  assert.doesNotMatch(result.responseDraft ?? "", /what'?s your wedding date|what date are you planning/i);
+});
+
+test("simple wedding sales runtime availability catalog does not repeat founder greeting after first turn", async () => {
+  const first = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Inquiry about wedding videography",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+  const second = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Hello! We thinking about Charlotte and date is 7 of October 2026",
+    previousState: first,
+    toolContext,
+    understand: understandTurnHeuristically,
+  });
+
+  assert.equal(second.replyContract?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(second.writer?.mode, "response_catalog");
+  assert.equal(second.writer?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(second.writerCatalog?.guardOk, true);
+  assert.doesNotMatch(
+    second.responseDraft ?? "",
+    /Hey there|Thank you so much for reaching out|I’m Taras|I'm Taras|founder of Myndful Films|Huge congratulations|such an exciting season of life/i,
+  );
+  assert.match(second.responseDraft ?? "", /Great news[\s\S]*October 7, 2026[\s\S]*available in Charlotte/i);
 });
 
 test("simple wedding sales runtime honors requested location slot over wrong name extraction", async () => {
@@ -545,7 +631,7 @@ test("simple wedding sales runtime does not run active rephrase for excluded pri
       assert.equal(result.writer?.rephraser?.fallbackReason, "response_key_not_allowed");
       assert.equal(result.writer?.rephraser?.usedAsOutbound, false);
       assert.doesNotMatch(result.responseDraft ?? "", /I changed the availability and price/i);
-      assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+      assert.match(result.responseDraft ?? "", /June 15, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
     },
   );
 });
@@ -650,7 +736,7 @@ test("simple wedding sales runtime handles availability pricing and shooter ques
     result.toolObservations.map((observation) => observation.toolName),
     ["check_wedding_availability"],
   );
-  assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /June 15, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(result.responseDraft ?? "", /wedding films start at/i);
   assert.match(result.responseDraft ?? "", /collections guide/i);
   assert.doesNotMatch(result.responseDraft ?? "", /image here too|guide image/i);
@@ -703,7 +789,7 @@ test("simple wedding sales runtime keeps names question after availability prici
     result.decisionTrace?.reason ?? "",
     /invariant: reply_only cannot override missing qualification fields/i,
   );
-  assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /June 15, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(result.responseDraft ?? "", /\$2,950|wedding films start/i);
   assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
   assert.doesNotMatch(result.responseDraft ?? "", /speaking with me here/i);
@@ -747,7 +833,7 @@ test("simple wedding sales runtime keeps large mixed Instagram reply compact and
     first.toolObservations.map((observation) => observation.toolName),
     ["check_wedding_availability"],
   );
-  assert.match(first.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(first.responseDraft ?? "", /June 15, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(first.responseDraft ?? "", /wedding films start at/i);
   assert.match(first.responseDraft ?? "", /collections guide/i);
   assert.doesNotMatch(first.responseDraft ?? "", /image here too|guide image/i);
@@ -812,7 +898,7 @@ test("simple wedding sales runtime does not add portfolio when mixed message onl
 
   assert.equal(result.nextStep, "ask_missing_info");
   assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
-  assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /June 15, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(result.responseDraft ?? "", /wedding films start at/i);
   assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
   assert.match(result.responseDraft ?? "", /both of your names/i);
@@ -850,7 +936,7 @@ test("simple wedding sales runtime does not invent team answer when mixed messag
 
   assert.equal(result.nextStep, "ask_missing_info");
   assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
-  assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /June 15, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(result.responseDraft ?? "", /wedding films start at/i);
   assert.match(result.responseDraft ?? "", /recent films.*Recent Film: https:\/\/galleries\.example\/recent/i);
   assert.match(result.responseDraft ?? "", /both of your names/i);
@@ -870,9 +956,11 @@ test("simple wedding sales runtime greets once and does not repeat availability 
     toolContext,
   });
 
-  assert.match(first.responseDraft ?? "", /^Hey there! Thank you so much for reaching out 🤍✨/i);
-  assert.match(first.responseDraft ?? "", /I’m Taras, the founder of Myndful Films/i);
-  assert.match(first.responseDraft ?? "", /June 14, 2027 in Tampa.*date is available/i);
+  assert.doesNotMatch(
+    first.responseDraft ?? "",
+    /Hey there|Thank you so much for reaching out|I(?:\u2019|\'|\u2018)?m Taras|founder of Myndful Films|Huge congratulations|such an exciting season of life/i,
+  );
+  assert.match(first.responseDraft ?? "", /June 14, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.doesNotMatch(first.responseDraft ?? "", /open for us/i);
 
   const second = await invokeWeddingSalesSimpleGraph({
@@ -2375,7 +2463,7 @@ test("simple wedding sales runtime handles the live Instagram canary transcript 
   });
 
   assert.equal(first.replyGuardResult?.ok, true);
-  assert.match(first.responseDraft ?? "", /June 14, 2027 in Tampa.*date is available/i);
+  assert.match(first.responseDraft ?? "", /June 14, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(first.responseDraft ?? "", /both of your names/i);
 
   const second = await invokeWeddingSalesSimpleGraph({
@@ -2459,7 +2547,7 @@ test("simple wedding sales runtime handles the live Instagram canary transcript 
 
   assert.equal(fifth.nextStep, "ask_call_time");
   assert.equal(fifth.availabilityCheck?.date, "2027-06-15");
-  assert.match(fifth.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
+  assert.match(fifth.responseDraft ?? "", /June 15, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.doesNotMatch(fifth.responseDraft ?? "", /Evergreen Park gives us a good starting point/i);
   assert.doesNotMatch(fifth.responseDraft ?? "", /sounds like such a beautiful setting/i);
   assert.match(fifth.responseDraft ?? "", /Same next step from here/i);
@@ -2630,7 +2718,7 @@ test("simple wedding sales runtime formats Gmail with a compact recap", async ()
       }),
   });
 
-  assert.match(result.responseDraft ?? "", /June 14, 2027 in Tampa.*date is available/i);
+  assert.match(result.responseDraft ?? "", /June 14, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.match(result.responseDraft ?? "", /Do you already have a venue picked out/i);
 });
 
