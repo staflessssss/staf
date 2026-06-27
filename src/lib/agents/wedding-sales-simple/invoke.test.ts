@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
+import { buildSimpleWeddingKnowledgeContext } from "@/lib/lang/graphs/wedding-sales-simple/knowledge";
 
 import type { WeddingSalesSimpleSafetyLogEntry } from "./contracts";
 import {
@@ -130,6 +131,155 @@ test("wedding-sales-simple adapter normalizes Instagram, invokes graph, and retu
   assert.equal(result.outbound.channelDeliveryPlan?.channel, "instagram");
   assert.equal(result.outbound.channelDeliveryPlan?.mode, "single_message");
   assert.equal(safetyLogs[0]?.channelDeliveryPlan?.mode, "single_message");
+});
+
+test("wedding-sales-simple adapter auto-sends guide image after fresh available date", async () => {
+  const incoming = normalizeInstagramWeddingSalesIncoming({
+    tenantId: "tenant-1",
+    agentId: "agent-wedding",
+    contactId: "ig-contact-1",
+    text: "Hello! We are thinking about Charlotte and date is 7 of October 2026",
+    messageId: "mid-available-guide",
+  });
+  const safetyLogs: WeddingSalesSimpleSafetyLogEntry[] = [];
+  let savedState: SimpleWeddingSalesState | undefined;
+  const knowledge = buildSimpleWeddingKnowledgeContext({
+    channel: "instagram",
+    state: {
+      location: "Charlotte",
+    },
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price.png",
+        fileName: "price.png",
+      },
+      guidesByRegion: {
+        NC_SC_GA: {
+          imageUrl: "https://example.com/price.png",
+          fileName: "price.png",
+        },
+      },
+    },
+  });
+
+  const result = await invokeWeddingSalesSimpleAdapter({
+    incoming,
+    toolContext,
+    channelConfig: {
+      enableInstagramSemanticDeliveryPlan: true,
+    },
+    knowledge,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price.png",
+        fileName: "price.png",
+      },
+      guidesByRegion: {
+        NC_SC_GA: {
+          imageUrl: "https://example.com/price.png",
+          fileName: "price.png",
+        },
+      },
+    },
+    deps: {
+      recordSafetyLog: (entry) => {
+        safetyLogs.push(entry);
+      },
+      saveState: ({ state }) => {
+        savedState = state;
+      },
+    },
+  });
+
+  assert.equal(result.status, "processed");
+  assert.equal(result.state.replyContract?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(result.state.replyContract?.mustMentionPricing, true);
+  assert.equal(result.state.replyContract?.mustMentionGuide, true);
+  assert.equal(result.state.replyContract?.mentionPolicy.guide.mode, "send_attachment");
+  assert.equal(
+    result.state.replyContract?.mentionPolicy.guide.reason,
+    "fresh available date should include collections guide image",
+  );
+  assert.match(result.outbound.text, /collections guide/i);
+  assert.doesNotMatch(result.outbound.text, /image here too/i);
+  assert.match(result.outbound.text, /both of your names/i);
+  assert.deepEqual(result.outbound.attachments, [
+    {
+      type: "image",
+      url: "https://example.com/price.png",
+      label: "price.png",
+      purpose: "pricing_guide",
+    },
+  ]);
+  assert.equal(result.outbound.channelDeliveryPlan?.mode, "semantic_split");
+  assert.ok(
+    result.outbound.channelDeliveryPlan?.mode === "semantic_split" &&
+      result.outbound.channelDeliveryPlan.parts.some(
+        (part) => part.kind === "attachment" && part.reason === "pricing_guide",
+      ),
+  );
+  assert.equal(savedState?.replyMemory?.mentioned?.guide?.mode, "image");
+  assert.equal(savedState?.replyMemory?.mentioned?.guide?.reason, "availability_available");
+  assert.deepEqual(safetyLogs[0]?.attachments, result.outbound.attachments);
+  assert.equal(safetyLogs[0]?.channelDeliveryPlan?.mode, "semantic_split");
+});
+
+test("wedding-sales-simple adapter does not auto-send duplicate guide after available date", async () => {
+  const incoming = normalizeInstagramWeddingSalesIncoming({
+    tenantId: "tenant-1",
+    agentId: "agent-wedding",
+    contactId: "ig-contact-1",
+    text: "Actually maybe June 15 2027",
+    messageId: "mid-available-guide-duplicate",
+  });
+
+  const result = await invokeWeddingSalesSimpleAdapter({
+    incoming,
+    toolContext,
+    channelConfig: {
+      enableInstagramSemanticDeliveryPlan: true,
+    },
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price.png",
+        fileName: "price.png",
+      },
+      guidesByRegion: {
+        FL: {
+          imageUrl: "https://example.com/price.png",
+          fileName: "price.png",
+        },
+      },
+    },
+    deps: {
+      loadState: () => ({
+        weddingDate: "2027-06-14",
+        location: "Tampa",
+        availability: "available",
+        replyMemory: {
+          mentioned: {
+            guide: {
+              imageUrl: "https://example.com/price.png",
+              mode: "image",
+              reason: "availability_available",
+              turnId: "turn-1",
+              lastMentionedAt: "2026-06-24T00:00:00.000Z",
+            },
+          },
+        },
+      }),
+    },
+  });
+
+  assert.equal(result.status, "processed");
+  assert.equal(result.state.replyContract?.mentionPolicy.guide.mode, "skip");
+  assert.equal(result.outbound.attachments, undefined);
+  assert.ok(
+    result.outbound.channelDeliveryPlan?.mode !== "semantic_split" ||
+      !result.outbound.channelDeliveryPlan.parts.some(
+        (part) => part.kind === "attachment" && part.reason === "pricing_guide",
+      ),
+  );
 });
 
 test("wedding-sales-simple adapter normalizes Gmail thread and preserves sender email", async () => {

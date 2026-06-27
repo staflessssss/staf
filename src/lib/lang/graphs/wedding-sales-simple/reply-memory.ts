@@ -103,6 +103,12 @@ export function updateSimpleWeddingReplyMemory(args: {
     contract.mentionPolicy.availability.mode !== "skip" &&
     Boolean(state.availability && state.weddingDate);
   const mentionedGuide = mentionsGuide(replyText);
+  const guideMentionReason =
+    contract.mentionPolicy.guide.mode === "send_attachment" &&
+    contract.responseKey === "utter_availability_available_ask_names"
+      ? "availability_available"
+      : "explicit_request";
+  const guideMentionMode = knowledge.guide.imageUrl ? "image" : "link";
   const consultationSlot = currentConsultationSlot(state);
   const mentionedConsultation =
     Boolean(consultationSlot) &&
@@ -167,6 +173,8 @@ export function updateSimpleWeddingReplyMemory(args: {
         ? {
             imageUrl: knowledge.guide.imageUrl,
             link: knowledge.guide.link,
+            mode: guideMentionMode,
+            reason: guideMentionReason,
             turnId,
             lastMentionedAt: now,
           }
@@ -175,6 +183,8 @@ export function updateSimpleWeddingReplyMemory(args: {
             ? {
                 imageUrl: knowledge.guide.imageUrl,
                 link: knowledge.guide.link,
+                mode: guideMentionMode,
+                reason: "explicit_request",
                 lastMentionedAt: now,
               }
             : undefined),

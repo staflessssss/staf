@@ -665,7 +665,7 @@ test("simple wedding sales runtime hands off instead of treating unknown availab
   assert.doesNotMatch(result.responseDraft ?? "", /date is available|open/i);
 });
 
-test("simple wedding sales runtime does not send price guide for availability-only checks", async () => {
+test("simple wedding sales runtime auto-sends guide for a fresh available date", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
     message: "Tampa, Florida",
@@ -696,8 +696,66 @@ test("simple wedding sales runtime does not send price guide for availability-on
 
   assert.equal(result.nextStep, "ask_missing_info");
   assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
-  assert.doesNotMatch(result.responseDraft ?? "", /collections guide|guide image/i);
+  assert.equal(result.decisionTrace?.replyType, "availability_available");
+  assert.equal(result.replyContract?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(result.replyContract?.mustMentionPricing, true);
+  assert.equal(result.replyContract?.mustMentionGuide, true);
+  assert.equal(result.replyContract?.mentionPolicy.guide.mode, "send_attachment");
+  assert.equal(
+    result.replyContract?.mentionPolicy.guide.reason,
+    "fresh available date should include collections guide image",
+  );
+  assert.match(result.responseDraft ?? "", /collections guide/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /image here too|guide image/i);
+  assert.match(result.responseDraft ?? "", /both of your names/i);
+  assert.equal(result.replyMemory?.mentioned?.guide?.mode, "image");
+  assert.equal(result.replyMemory?.mentioned?.guide?.reason, "availability_available");
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
+});
+
+test("simple wedding sales runtime does not auto-send guide twice after available date", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Actually, we may move it to June 15 2027",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+    },
+    previousState: {
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      availability: "available",
+      replyMemory: {
+        mentioned: {
+          guide: {
+            imageUrl: "https://example.com/price-fl.png",
+            link: "https://example.com/guide",
+            mode: "image",
+            reason: "availability_available",
+            turnId: "turn-1",
+            lastMentionedAt: "2026-06-24T00:00:00.000Z",
+          },
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {
+          weddingDate: "2027-06-15",
+          weddingDateText: "June 15 2027",
+        },
+      }),
+  });
+
+  assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
+  assert.equal(result.decisionTrace?.replyType, "availability_available");
+  assert.equal(result.replyContract?.mentionPolicy.guide.mode, "skip");
+  assert.equal(result.replyContract?.mustMentionGuide, false);
+  assert.doesNotMatch(result.responseDraft ?? "", /collections guide|guide image/i);
 });
 
 test("simple wedding sales runtime handles availability pricing and shooter question in one DM", async () => {

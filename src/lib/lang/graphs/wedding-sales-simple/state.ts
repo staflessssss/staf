@@ -186,6 +186,8 @@ export type SimpleWeddingSalesReplyMemory = {
     guide?: {
       imageUrl?: string;
       link?: string;
+      mode?: "image" | "link";
+      reason?: "availability_available" | "explicit_request";
       turnId?: string;
       lastMentionedAt: string;
     };

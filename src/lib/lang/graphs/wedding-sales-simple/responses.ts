@@ -27,11 +27,11 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_availability_available_ask_names: [
     {
       id: "availability_names_v1",
-      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\n\nWhat are both of your names?",
+      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
     },
     {
       id: "availability_names_v2",
-      text: "{{weddingDateDisplay}} is open for {{locationDisplay}} 🤍\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}.\n\nWho would I be speaking with?",
+      text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
     },
   ],
   utter_pricing_repeat_send_guide_ask_names: [

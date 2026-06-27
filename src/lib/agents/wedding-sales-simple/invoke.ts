@@ -9,6 +9,9 @@ import {
   type SimpleWeddingKnowledgeContext,
   type SimpleWeddingKnowledgeFeature,
 } from "@/lib/lang/graphs/wedding-sales-simple/knowledge";
+import { buildReplyActionContract } from "@/lib/lang/graphs/wedding-sales-simple/reply-contract";
+import { updateSimpleWeddingReplyMemory } from "@/lib/lang/graphs/wedding-sales-simple/reply-memory";
+import { writeConstrainedWeddingReply } from "@/lib/lang/graphs/wedding-sales-simple/reply-writer";
 import type { WeddingSalesConfig } from "@/lib/lang/graphs/wedding-sales/config";
 
 import type {
@@ -143,6 +146,61 @@ function knowledgeSummary(knowledge?: SimpleWeddingKnowledgeContext) {
   };
 }
 
+function reconcileFreshAvailabilityGuide(args: {
+  state: SimpleWeddingSalesState;
+  knowledge: SimpleWeddingKnowledgeContext;
+}): SimpleWeddingSalesState {
+  const hasGuide = Boolean(args.knowledge.guide.imageUrl || args.knowledge.guide.link);
+  const shouldReconcile =
+    hasGuide &&
+    args.state.availability === "available" &&
+    args.state.decisionTrace?.toolCalled === "checkAvailability" &&
+    args.state.decisionTrace.replyType === "availability_available" &&
+    args.state.decisionTrace.responseKey === "utter_availability_available_ask_names" &&
+    args.state.replyContract?.mentionPolicy.guide.mode === "skip";
+
+  if (!shouldReconcile) {
+    return args.state;
+  }
+
+  const contract = buildReplyActionContract({
+    state: args.state,
+    knowledge: args.knowledge,
+  });
+
+  if (contract.mentionPolicy.guide.mode !== "send_attachment") {
+    return args.state;
+  }
+
+  const stateWithContract = {
+    ...args.state,
+    replyContract: contract,
+  };
+  const reply = writeConstrainedWeddingReply({
+    state: stateWithContract,
+    contract,
+    knowledge: args.knowledge,
+  });
+  const reconciledState = {
+    ...stateWithContract,
+    responseDraft: reply.text,
+    replyGuardResult: reply.guardResult,
+    writer: reply.writer,
+    writerCatalog: reply.writerCatalog,
+  };
+
+  return {
+    ...reconciledState,
+    replyMemory: updateSimpleWeddingReplyMemory({
+      state: reconciledState,
+      contract,
+      knowledge: args.knowledge,
+      replyText: reply.text,
+      writer: reply.writer,
+    }),
+  };
+}
+
 export async function invokeWeddingSalesSimpleAdapter(args: {
   incoming: NormalizedWeddingSalesIncomingMessage;
   toolContext?: WeddingSalesToolContext | null;
@@ -188,33 +246,37 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
       config: args.config,
       state: graphState,
     });
+  const finalGraphState = reconcileFreshAvailabilityGuide({
+    state: graphState,
+    knowledge,
+  });
   const outbound = buildWeddingSalesSimpleOutbound({
     incoming: args.incoming,
-    state: graphState,
+    state: finalGraphState,
     attachments: outboundAttachments({
-      text: graphState.responseDraft ?? "",
+      text: finalGraphState.responseDraft ?? "",
       knowledge,
-      state: graphState,
+      state: finalGraphState,
     }),
     channelConfig: args.channelConfig,
   });
-  const persistedState = stateForPersistence(graphState);
+  const persistedState = stateForPersistence(finalGraphState);
 
   await deps.recordSafetyLog?.({
     inboundText: args.incoming.text,
     outboundText: outbound.text,
-    dialogueUnderstanding: graphState.dialogueUnderstanding,
-    dialogueCommands: graphState.dialogueCommands,
-    weddingLeadForm: graphState.weddingLeadForm,
-    flowRunner: graphState.flowRunner,
-    domainDecision: graphState.domainDecision,
+    dialogueUnderstanding: finalGraphState.dialogueUnderstanding,
+    dialogueCommands: finalGraphState.dialogueCommands,
+    weddingLeadForm: finalGraphState.weddingLeadForm,
+    flowRunner: finalGraphState.flowRunner,
+    domainDecision: finalGraphState.domainDecision,
     pendingUserActionBefore: previousState?.pendingUserAction,
     pendingUserActionAfter: persistedState.pendingUserAction,
-    decisionTrace: graphState.decisionTrace,
-    replyContract: graphState.replyContract,
-    guardResult: graphState.replyGuardResult,
-    writer: graphState.writer,
-    writerCatalog: graphState.writerCatalog,
+    decisionTrace: finalGraphState.decisionTrace,
+    replyContract: finalGraphState.replyContract,
+    guardResult: finalGraphState.replyGuardResult,
+    writer: finalGraphState.writer,
+    writerCatalog: finalGraphState.writerCatalog,
     attachments: outbound.attachments,
     channelDeliveryPlan: outbound.channelDeliveryPlan,
     deliveryPlanGuard:
@@ -222,7 +284,7 @@ export async function invokeWeddingSalesSimpleAdapter(args: {
         ? outbound.channelDeliveryPlan.guardResult
         : undefined,
     knowledgeSummary: knowledgeSummary(knowledge),
-    toolCalls: graphState.toolObservations.map((observation) => observation.toolName),
+    toolCalls: finalGraphState.toolObservations.map((observation) => observation.toolName),
     previousState,
     nextState: persistedState,
     runtime: "wedding-sales-simple",

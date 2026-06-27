@@ -92,6 +92,77 @@ test("reply contract requires price and names after pricing question", () => {
   assert.match(reply, /both of your names/i);
 });
 
+test("reply contract auto-sends guide for fresh available date", () => {
+  const state = baseState({
+    latestCustomerMessage: "Tampa, Florida",
+    questionsAskedByCustomer: ["availability"],
+    weddingDate: "2026-10-07",
+    weddingDateText: "7 of October 2026",
+    weddingDateDisplay: "October 7, 2026",
+    location: "Charlotte",
+    availability: "available",
+    availabilityCheck: {
+      date: "2026-10-07",
+      location: "Charlotte",
+      status: "available",
+      checkedAt: "2026-06-24T00:00:00.000Z",
+    },
+    decisionTrace: {
+      extractedFacts: {},
+      missingFields: ["names"],
+      nextStep: "ask_missing_info",
+      replyType: "availability_available",
+      responseKey: "utter_availability_available_ask_names",
+      toolCalled: "checkAvailability",
+      reason: "availability is open and names are the next qualification field",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+
+  assert.equal(contract.responseKey, "utter_availability_available_ask_names");
+  assert.equal(contract.mustMentionPricing, true);
+  assert.equal(contract.mustMentionGuide, true);
+  assert.equal(contract.mentionPolicy.guide.mode, "send_attachment");
+  assert.equal(
+    contract.mentionPolicy.guide.reason,
+    "fresh available date should include collections guide image",
+  );
+});
+
+test("reply contract does not auto-send guide for unavailable date", () => {
+  const state = baseState({
+    latestCustomerMessage: "Are you available October 7 2026 in Charlotte?",
+    questionsAskedByCustomer: ["availability"],
+    weddingDate: "2026-10-07",
+    weddingDateText: "October 7 2026",
+    weddingDateDisplay: "October 7, 2026",
+    location: "Charlotte",
+    availability: "unavailable",
+    availabilityCheck: {
+      date: "2026-10-07",
+      location: "Charlotte",
+      status: "unavailable",
+      checkedAt: "2026-06-24T00:00:00.000Z",
+    },
+    nextStep: "reply_only",
+    missingField: undefined,
+    decisionTrace: {
+      extractedFacts: {},
+      missingFields: [],
+      nextStep: "reply_only",
+      replyType: "availability_unavailable",
+      toolCalled: "checkAvailability",
+      reason: "availability was checked and date is unavailable",
+    },
+  });
+  const knowledge = guideKnowledge();
+  const contract = buildReplyActionContract({ state, knowledge });
+
+  assert.equal(contract.mustMentionGuide, false);
+  assert.equal(contract.mentionPolicy.guide.mode, "skip");
+});
+
 test("reply contract uses same-as-before pricing when customer asks again", () => {
   const state = baseState({
     replyMemory: {

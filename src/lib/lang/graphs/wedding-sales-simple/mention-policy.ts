@@ -177,6 +177,18 @@ export function buildSimpleWeddingMentionPolicy(args: {
       };
     }
 
+    if (
+      justCheckedAvailability &&
+      state.availability === "available" &&
+      state.decisionTrace?.replyType === "availability_available" &&
+      !guideMentioned
+    ) {
+      return {
+        mode: "send_attachment" as const,
+        reason: "fresh available date should include collections guide image",
+      };
+    }
+
     if ((askedGuide || askedPricing || askedPackageInclusions) && !guideMentioned) {
       return {
         mode: "send_attachment" as const,
