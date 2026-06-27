@@ -370,7 +370,8 @@ test("wedding-sales-simple adapter returns pricing guide image attachment when g
   });
 
   assert.equal(result.status, "processed");
-  assert.match(result.outbound.text, /guide image/i);
+  assert.match(result.outbound.text, /collections guide/i);
+  assert.doesNotMatch(result.outbound.text, /image here too|guide image/i);
   assert.deepEqual(result.outbound.attachments, [
     {
       type: "image",

@@ -150,7 +150,8 @@ test("instagram guide image and link prefer image attachment without long link t
   assert.equal(contract.mustMentionGuide, true);
   assert.equal(contract.mentionPolicy.guide.mode, "send_attachment");
   assert.equal(guard.ok, true);
-  assert.match(reply, /guide image/i);
+  assert.match(reply, /collections guide/i);
+  assert.doesNotMatch(reply, /image here too|guide image/i);
   assert.doesNotMatch(reply, /example\.com\/guide/i);
   assert.doesNotMatch(reply, /don'?t have|cannot|can't|unable/i);
   assert.deepEqual(outbound.attachments, [

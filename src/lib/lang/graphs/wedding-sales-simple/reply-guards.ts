@@ -33,6 +33,12 @@ function hasBookingConfirmation(text: string) {
   );
 }
 
+function repeatsBookingLogistics(text: string) {
+  return /\b(?:all set for|locked in|booked|calendar invite|you(?:'ll| will) get the calendar invite)\b/i.test(
+    text,
+  );
+}
+
 function hasCrmStyleBookingConfirmation(text: string) {
   return /\b(?:i booked|booked) the call for\b/i.test(text);
 }
@@ -45,6 +51,12 @@ function saysGuideUnavailable(text: string) {
 
 function mentionsGuideAsset(text: string) {
   return /\b(?:collections? guide|guide image|price image)\b/i.test(text);
+}
+
+function hasMechanicalGuideCopy(text: string) {
+  return /\b(?:image here too|here too\s*🎥|i(?:'|’)?m sending the collections guide image|i am sending the collections guide image)\b/i.test(
+    text,
+  );
 }
 
 function hasSignature(text: string) {
@@ -102,6 +114,10 @@ export function validateGeneratedReply(args: {
     reasons.push("pricing was required but start price is missing");
   }
 
+  if (hasMechanicalGuideCopy(reply)) {
+    reasons.push("reply uses mechanical guide attachment wording");
+  }
+
   if (
     args.contract.mustAnswerQuestions?.includes("raw_footage") &&
     !/\braw footage\b/i.test(reply)
@@ -155,6 +171,16 @@ export function validateGeneratedReply(args: {
     hasBookingConfirmation(reply)
   ) {
     reasons.push("stale booking confirmation was repeated");
+  }
+
+  if (args.contract.responseKey === "utter_acknowledgement") {
+    if (hasBookingConfirmation(reply) || repeatsBookingLogistics(reply)) {
+      reasons.push("acknowledgement repeated booking confirmation");
+    }
+
+    if (args.state.customerEmail && reply.includes(args.state.customerEmail)) {
+      reasons.push("acknowledgement repeated customer email");
+    }
   }
 
   if (

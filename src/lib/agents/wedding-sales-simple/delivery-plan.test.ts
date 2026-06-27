@@ -46,7 +46,7 @@ function contract(update: Partial<ReplyActionContract> = {}): ReplyActionContrac
 
 const mixedReply = [
   "Great news - I checked June 15, 2027 in Tampa, and the date is available 🤍",
-  "Our 8-hour wedding films start at $2,950 for Florida. I’m sending the collections guide image here too 🎥",
+  "Our 8-hour wedding films start at $2,950 for Florida. I'll include the collections guide here so you can look through the options",
   "For Florida weddings, Jay is our lead filmmaker in Tampa. And what are both of your names?",
 ].join("\n\n");
 
@@ -153,7 +153,7 @@ test("Instagram delivery plan semantically splits mixed replies when flag is on"
 test("Instagram delivery plan separates pricing guide and names question for availability pricing lead", () => {
   const outboundText = [
     "Hey there! Thank you so much for reaching out. I'm Taras, the founder of Myndful Films. Huge congratulations on your engagement - such an exciting season of life!",
-    "Great news - I checked June 15, 2027 in Tampa, and the date is available. Our 8-hour wedding films start at $2,950 for Florida. I'm sending the collections guide image here too.",
+    "Great news - I checked June 15, 2027 in Tampa, and the date is available. Our 8-hour wedding films start at $2,950 for Florida. I'll include the collections guide here so you can look through the options",
     "And what are both of your names? I’ll keep everything organized on my side.",
   ].join("\n\n");
 
@@ -213,10 +213,9 @@ test("Instagram delivery plan separates pricing guide and names question for ava
 
 test("Instagram delivery plan combines team answer with names question for mixed team lead", () => {
   const outboundText = [
-    "Hey there! Thank you so much for reaching out. I'm Taras, the founder of Myndful Films. Huge congratulations on your engagement - such an exciting season of life!",
-    "Great news - I checked June 15, 2027 in Tampa, and the date is available. Our 8-hour wedding films start at $2,950 for Florida. I'm sending the collections guide image here too.",
-    "For Tampa weddings, Jay is usually the lead filmmaker, and I'd be your main contact here.",
-    "What are both of your names?",
+    "Hey! June 15, 2027 is available for Tampa.",
+    "Our 8-hour wedding films start at $2,950 for Florida. I'll include the collections guide here so you can look through the options.",
+    "For Tampa weddings, Jay is usually the lead filmmaker. What are both of your names?",
   ].join("\n\n");
 
   const plan = buildChannelDeliveryPlan({

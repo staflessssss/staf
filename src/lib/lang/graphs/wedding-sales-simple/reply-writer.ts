@@ -137,15 +137,15 @@ function guideLine(args: {
   }
 
   if (args.knowledge.channel === "instagram" && args.knowledge.guide.imageUrl) {
-    return "I’m sending the collections guide image here too 🎥";
+    return "I’ll include the collections guide here so you can look through the options 🎥";
   }
 
   if (args.knowledge.guide.link) {
-    return `I’m sending the collections guide here too 🎥 ${args.knowledge.guide.link}`;
+    return `I’ll include the collections guide here so you can look through the options 🎥 ${args.knowledge.guide.link}`;
   }
 
   if (args.knowledge.guide.imageUrl) {
-    return "I’m sending the collections guide image here too 🎥";
+    return "I’ll include the collections guide here so you can look through the options 🎥";
   }
 
   return undefined;

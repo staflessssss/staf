@@ -13,25 +13,25 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_ask_wedding_details: [
     {
       id: "ask_wedding_details_v1",
-      text: "Hey there - thanks for reaching out 🤍 Do you already have a wedding date and location in mind?",
+      text: "Hi! So happy you reached out 🤍 What wedding date and city are you planning for?",
     },
     {
       id: "ask_wedding_details_v2",
-      text: "Hi! Happy you reached out 🤍 What date and location are you planning for?",
+      text: "Hi, happy you’re here 🤍 What date and location are you thinking for the wedding?",
     },
     {
       id: "ask_wedding_details_v3",
-      text: "Hey! I'd be happy to help. Do you already have your wedding date and location?",
+      text: "Hi! I’d love to hear a little more 🤍 What’s your wedding date and location?",
     },
   ],
   utter_availability_available_ask_names: [
     {
       id: "availability_names_v1",
-      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\nI checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWhat are both of your names?",
+      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\nI checked {{weddingDateDisplay}} in {{locationDisplay}}, and that date is available.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}, and I’ll include the collections guide here so you can look through the options.\n\nWhat are both of your names?",
     },
     {
       id: "availability_names_v2",
-      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\n{{weddingDateDisplay}} in {{locationDisplay}} is open for us.\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}, and I will send the collections guide image here too.\n\nWho would I be speaking with?",
+      text: "{{greetingOpening}}\n\n{{greetingIntroduction}} {{greetingCelebration}}\n\n{{weddingDateDisplay}} in {{locationDisplay}} is open for us.\n\nThe {{coverageHours}}-hour collection starts at {{startPrice}} for {{coverageRegion}}, and I’ll send the collections guide over for you.\n\nWho would I be speaking with?",
     },
     {
       id: "availability_names_v3",
@@ -41,11 +41,11 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_pricing_repeat_send_guide_ask_names: [
     {
       id: "pricing_repeat_names_v1",
-      text: "Yep, pricing is the same as I mentioned - {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI am sending the collections guide image here too.\n\nWhat are both of your names?",
+      text: "Yep, pricing is the same as I mentioned - {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI’ll include the collections guide here so you can look through the options.\n\nWhat are both of your names?",
     },
     {
       id: "pricing_repeat_names_v2",
-      text: "The starting point is still {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI will send the collections guide image here too.\n\nWho would I be speaking with?",
+      text: "The starting point is still {{startPrice}} for the {{coverageHours}}-hour collection for {{coverageRegion}}.\n\nI’ll send the collections guide over for you.\n\nWho would I be speaking with?",
     },
   ],
   utter_ask_location_only: [
@@ -153,15 +153,15 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_acknowledgement: [
     {
       id: "ack_v1",
-      text: "Of course 🤍",
+      text: "Of course — talk soon 🤍",
     },
     {
       id: "ack_v2",
-      text: "Absolutely 🤍",
+      text: "Absolutely, see you then 🤍",
     },
     {
       id: "ack_v3",
-      text: "You got it ✨",
+      text: "You got it — looking forward to it ✨",
     },
   ],
   utter_answer_raw_footage: [

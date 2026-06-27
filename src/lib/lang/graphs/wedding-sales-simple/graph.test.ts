@@ -610,7 +610,7 @@ test("simple wedding sales runtime does not send price guide for availability-on
 
   assert.equal(result.nextStep, "ask_missing_info");
   assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
-  assert.doesNotMatch(result.responseDraft ?? "", /collections guide image/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /collections guide|guide image/i);
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
 });
 
@@ -652,7 +652,8 @@ test("simple wedding sales runtime handles availability pricing and shooter ques
   );
   assert.match(result.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
   assert.match(result.responseDraft ?? "", /wedding films start at/i);
-  assert.match(result.responseDraft ?? "", /collections guide image/i);
+  assert.match(result.responseDraft ?? "", /collections guide/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /image here too|guide image/i);
   assert.match(result.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
   assert.match(result.responseDraft ?? "", /both of your names/i);
   assert.doesNotMatch(result.responseDraft ?? "", /recent films|galleries\.example/i);
@@ -748,7 +749,8 @@ test("simple wedding sales runtime keeps large mixed Instagram reply compact and
   );
   assert.match(first.responseDraft ?? "", /June 15, 2027 in Tampa.*date is available/i);
   assert.match(first.responseDraft ?? "", /wedding films start at/i);
-  assert.match(first.responseDraft ?? "", /collections guide image/i);
+  assert.match(first.responseDraft ?? "", /collections guide/i);
+  assert.doesNotMatch(first.responseDraft ?? "", /image here too|guide image/i);
   assert.match(first.responseDraft ?? "", /Jay.*lead filmmaker.*Tampa/i);
   assert.match(first.responseDraft ?? "", /recent films.*Recent Film: https:\/\/galleries\.example\/recent/i);
   assert.match(first.responseDraft ?? "", /both of your names/i);
@@ -1952,6 +1954,56 @@ test("simple wedding sales runtime does not apply stale call-time context to FAQ
   assert.doesNotMatch(result.responseDraft ?? "", /outside Tampa/i);
 });
 
+test("simple wedding sales runtime answers travel and pricing while resuming call time without mechanical guide copy", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Any travel fee to Tampa? And can you send price?",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/price-fl.png",
+        link: "https://example.com/guide",
+      },
+    },
+    previousState: {
+      customerName: "Rick",
+      partnerName: "Rachel",
+      weddingDate: "2026-10-11",
+      location: "Tampa",
+      venue: "Evergreen Park",
+      availability: "available",
+      availabilityContextDate: "2026-10-11",
+      replyMemory: {
+        lastRequiredQuestion: "callTime",
+        questionMemory: {
+          lastRequiredQuestion: "callTime",
+          lastQuestionText:
+            "From here, the easiest next step is a quick consult. What time works best?",
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "business_question",
+        facts: {},
+        questionsAskedByCustomer: ["travel", "pricing"],
+        confidence: 0.95,
+      }),
+  });
+
+  assert.equal(result.nextStep, "ask_call_time");
+  assert.deepEqual(result.replyObligations, ["pricing", "guide", "travel"]);
+  assert.equal(result.replyContract?.mustMentionPricing, true);
+  assert.equal(result.replyContract?.mustMentionGuide, true);
+  assert.equal(result.replyContract?.mustAnswerTravel, true);
+  assert.equal(result.replyContract?.requiredQuestion, "callTime");
+  assert.match(result.responseDraft ?? "", /\$2,950|wedding films start/i);
+  assert.match(result.responseDraft ?? "", /collections guide/i);
+  assert.match(result.responseDraft ?? "", /do travel|travel coverage/i);
+  assert.match(result.responseDraft ?? "", /what time|time works|quick consult/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /image here too|guide image/i);
+});
+
 test("simple wedding sales runtime does not treat bare yes after booking as pending booking confirmation", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
@@ -2004,10 +2056,10 @@ test("simple wedding sales runtime does not treat bare yes after booking as pend
   assert.equal(result.replyMemory?.pendingBookingConfirmation, undefined);
 });
 
-test("simple wedding sales runtime treats thank you after booking as acknowledgement only", async () => {
+test("simple wedding sales runtime treats thank you and farewell after booking as acknowledgement only", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
-    message: "Thank you",
+    message: "Thank you, see you later!",
     toolContext,
     previousState: {
       customerName: "Mark",
@@ -2070,8 +2122,11 @@ test("simple wedding sales runtime treats thank you after booking as acknowledge
   assert.equal(result.dialogueUnderstanding?.messageAct, "acknowledgement_only");
   assert.equal(result.answerContext, undefined);
   assert.equal(result.pendingUserAction, null);
-  assert.match(result.responseDraft ?? "", /Of course/i);
-  assert.doesNotMatch(result.responseDraft ?? "", /missing what you mean|Want me to lock in|calendar invite/i);
+  assert.match(result.responseDraft ?? "", /talk soon|see you then|looking forward/i);
+  assert.doesNotMatch(
+    result.responseDraft ?? "",
+    /missing what you mean|Want me to lock in|calendar invite|bonkopoly@gmail\.com|1:00 PM|all set|locked in/i,
+  );
   assert.deepEqual(result.toolObservations, []);
 });
 
@@ -2283,7 +2338,7 @@ test("simple wedding sales runtime does not resend the same price guide after fo
         checkedAt: "2026-06-23T00:00:00.000Z",
       },
       responseDraft:
-        "Our 8-hour wedding films start at $2,950 for Florida.\n\nI’m sending the collections guide image here too 🎥",
+        "Our 8-hour wedding films start at $2,950 for Florida.\n\nI'll include the collections guide here so you can look through the options",
     },
     toolContext,
     understand: () =>
@@ -2299,7 +2354,7 @@ test("simple wedding sales runtime does not resend the same price guide after fo
   assert.equal(result.availabilityCheck?.date, "2027-06-15");
   assert.match(result.responseDraft ?? "", /I checked June 15, 2027 in Tampa too/i);
   assert.doesNotMatch(result.responseDraft ?? "", /Our 8-hour wedding films start/i);
-  assert.doesNotMatch(result.responseDraft ?? "", /collections guide image/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /collections guide|guide image/i);
 });
 
 test("simple wedding sales runtime handles the live Instagram canary transcript without clarification or repeated CTA", async () => {
@@ -3061,7 +3116,8 @@ test("simple wedding sales runtime mentions guide image availability when price 
   });
 
   assert.match(result.responseDraft ?? "", /\$2,950/i);
-  assert.match(result.responseDraft ?? "", /guide image/i);
+  assert.match(result.responseDraft ?? "", /collections guide/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /image here too|guide image/i);
   assert.doesNotMatch(result.responseDraft ?? "", /don'?t have|cannot|can't|unable/i);
 });
 

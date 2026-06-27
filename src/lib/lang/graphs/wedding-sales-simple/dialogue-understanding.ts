@@ -55,7 +55,7 @@ function readConversationalFiller(text: string) {
 }
 
 function isAcknowledgementOnly(text: string) {
-  return /^\s*(?:thank you|thanks|great thanks|okay thank you|ok thank you|got it(?:,\s*)?(?:thank you|thanks)?|appreciate it|of course)\s*[.!]*\s*$/i.test(
+  return /^\s*(?:(?:thank you|thanks|great thanks|okay thank you|ok thank you|got it(?:,\s*)?(?:thank you|thanks)?|appreciate it|of course)(?:,\s*)?(?:see you(?: later| then)?|talk soon|sounds good)?|see you(?: later| then)?|talk soon)\s*[.!]*\s*$/i.test(
     text,
   );
 }
