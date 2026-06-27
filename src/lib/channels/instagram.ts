@@ -271,6 +271,25 @@ function getImageAttachments(attachments?: InstagramAttachment[]) {
   });
 }
 
+async function sendInstagramImageAttachment(args: {
+  credentials: InstagramCredentials;
+  contactId: string;
+  publicUrl: string;
+}) {
+  return sendInstagramMessage({
+    credentials: args.credentials,
+    contactId: args.contactId,
+    message: {
+      attachment: {
+        type: "image",
+        payload: {
+          url: args.publicUrl.trim(),
+        },
+      },
+    },
+  });
+}
+
 function readInstagramDeliveryPlan(value: unknown): InstagramDeliveryPlan | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -372,22 +391,8 @@ function effectiveTypingMsForText(args: {
   );
 }
 
-function readAttachmentFallbackUrl(part: Extract<InstagramDeliveryPart, { kind: "attachment" }>) {
-  const attachment = part.attachment as typeof part.attachment & { link?: string };
-
-  return attachment.link?.trim() || part.attachment.url.trim();
-}
-
 function isLikelyDirectPublicImageUrl(url: string) {
   return /^https:\/\/.+\.(?:png|jpe?g|webp|gif)(?:[?#].*)?$/i.test(url);
-}
-
-function pricingGuideFallbackText(part: Extract<InstagramDeliveryPart, { kind: "attachment" }>) {
-  const fallbackUrl = readAttachmentFallbackUrl(part);
-
-  return fallbackUrl
-    ? `Here is the collections guide: ${fallbackUrl}`
-    : undefined;
 }
 
 async function executeInstagramDeliveryPlan(args: {
@@ -545,17 +550,10 @@ async function executeInstagramDeliveryPlan(args: {
     }
 
     try {
-      const payload = await sendInstagramMessage({
+      const payload = await sendInstagramImageAttachment({
         credentials: args.credentials,
         contactId: args.contactId,
-        message: {
-          attachment: {
-            type: "image",
-            payload: {
-              url: part.attachment.url,
-            },
-          },
-        },
+        publicUrl: part.attachment.url,
       });
       deliveries.push(payload);
       partsSent += 1;
@@ -572,30 +570,9 @@ async function executeInstagramDeliveryPlan(args: {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "instagram_attachment_send_failed";
-      const fallbackText = pricingGuideFallbackText(part);
-      let fallbackSent = false;
-      let fallbackMessageId: string | undefined;
 
       warnings.push(`pricing_guide_attachment_failed:${errorMessage}`);
-
-      if (fallbackText) {
-        const fallbackPayload = await sendInstagramMessage({
-          credentials: args.credentials,
-          contactId: args.contactId,
-          message: {
-            text: fallbackText,
-          },
-        });
-        deliveries.push(fallbackPayload);
-        partsSent += 1;
-        contentPartsSent += 1;
-        fallbackSent = true;
-        fallbackMessageId =
-          fallbackPayload && typeof fallbackPayload === "object" && "message_id" in fallbackPayload
-            ? String(fallbackPayload.message_id ?? "")
-            : undefined;
-        warnings.push("pricing_guide_attachment_fallback_to_link");
-      }
+      warnings.push("pricing_guide_attachment_url_fallback_suppressed");
 
       partTimings.push({
         kind: "attachment",
@@ -604,8 +581,7 @@ async function executeInstagramDeliveryPlan(args: {
         label: part.attachment.label,
         sent: false,
         error: errorMessage,
-        fallbackSent,
-        fallbackMessageId,
+        fallbackSent: false,
         plannedDelayMs: part.delayMsBefore,
         effectiveDelayMs: delayMs,
         sentAtMs: Date.now() - startedAtMs,
@@ -739,17 +715,10 @@ export const instagramAdapter = {
           await wait(splitDelayMs);
         }
 
-        const payload = await sendInstagramMessage({
+        const payload = await sendInstagramImageAttachment({
           credentials,
           contactId: params.contactId,
-          message: {
-            attachment: {
-              type: "image",
-              payload: {
-                url: attachment.publicUrl?.trim() ?? "",
-              },
-            },
-          },
+          publicUrl: attachment.publicUrl ?? "",
         });
         deliveries.push(payload);
       } catch (error) {

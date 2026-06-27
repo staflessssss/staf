@@ -545,7 +545,7 @@ test("instagram adapter ignores semantic delivery plan when kill switch is enabl
   ]);
 });
 
-test("instagram semantic delivery plan falls back to guide link when image attachment send fails", async () => {
+test("instagram semantic delivery plan suppresses guide URL fallback when image attachment send fails", async () => {
   const requestBodies: unknown[] = [];
   const originalPacing = process.env.INSTAGRAM_DELIVERY_PACING;
   process.env.INSTAGRAM_DELIVERY_PACING = "fast";
@@ -635,7 +635,6 @@ test("instagram semantic delivery plan falls back to guide link when image attac
         "typing_on",
         "Pricing",
         "attachment",
-        "Here is the collections guide: https://drive.google.com/uc?export=download&id=guide",
         "typing_on",
         "What are both of your names?",
       ],
@@ -654,15 +653,15 @@ test("instagram semantic delivery plan falls back to guide link when image attac
       (part) => part.kind === "attachment",
     );
 
-    assert.equal(deliveryResult.deliveries.length, 3);
-    assert.equal(deliveryResult.deliveryExecution.partsSent, 3);
+    assert.equal(deliveryResult.deliveries.length, 2);
+    assert.equal(deliveryResult.deliveryExecution.partsSent, 2);
     assert.equal(attachmentPart?.purpose, "pricing_guide");
     assert.equal(attachmentPart?.sent, false);
-    assert.equal(attachmentPart?.fallbackSent, true);
+    assert.equal(attachmentPart?.fallbackSent, false);
     assert.match(String(attachmentPart?.error), /Invalid image url/);
     assert.ok(
       deliveryResult.deliveryExecution.warnings?.includes(
-        "pricing_guide_attachment_fallback_to_link",
+        "pricing_guide_attachment_url_fallback_suppressed",
       ),
     );
   } finally {
