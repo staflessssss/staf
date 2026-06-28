@@ -57,11 +57,11 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_ask_wedding_date_only: [
     {
       id: "ask_date_only_v1",
-      text: "Got it — {{location}} 🤍 What's your wedding date?",
+      text: "Hi {{customerFirstName}}, thanks so much for reaching out 🤍\n\n{{knownLeadContext}}\n\n{{pricingGuideBlock}}\n\n{{weddingDateQuestion}}",
     },
     {
       id: "ask_date_only_v2",
-      text: "Beautiful. What date are you planning for in {{location}}?",
+      text: "Thanks {{customerFirstName}} 🤍\n\n{{knownLeadContext}}\n\n{{pricingGuideBlock}}\n\n{{weddingDateQuestion}}",
     },
   ],
   utter_ask_names_after_details: [
@@ -220,14 +220,14 @@ export function renderResponseVariation(
   return Object.entries(slots).reduce(
     (result, [key, value]) => result.replaceAll(`{{${key}}}`, value ?? ""),
     variation.text,
-  ).trim();
+  ).replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export function missingResponseVariationSlots(
   variation: SimpleWeddingSalesResponseVariation,
   slots: Record<string, string | undefined>,
 ) {
-  const optionalSlots = new Set(["promotionText"]);
+  const optionalSlots = new Set(["promotionText", "pricingGuideBlock", "knownLeadContext"]);
   const requiredSlots = new Set(
     Array.from(variation.text.matchAll(/{{\s*([a-zA-Z0-9_]+)\s*}}/g)).map(
       (match) => match[1]!,

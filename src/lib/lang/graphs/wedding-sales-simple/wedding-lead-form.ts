@@ -180,6 +180,25 @@ export function resolveWeddingDate(rawValue: unknown): {
     });
   }
 
+  const partialMonthFirst =
+    /\b(?:on\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i.exec(rawText);
+
+  if (partialMonthFirst) {
+    const month = MONTHS[partialMonthFirst[1]!.toLowerCase()];
+    const dayNumber = Number(partialMonthFirst[2]);
+
+    if (!month || !isValidDay(dayNumber)) {
+      return { ok: false, rawText, reason: "invalid_month_or_day" };
+    }
+
+    return {
+      ok: false,
+      rawText: partialMonthFirst[0]!.replace(/^on\s+/i, ""),
+      display: `${month.display} ${dayNumber}`,
+      reason: "missing_year",
+    };
+  }
+
   if (/\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b/.test(rawText)) {
     return { ok: false, rawText, reason: "ambiguous_numeric_date" };
   }
@@ -389,7 +408,7 @@ export function resolveWeddingLeadFormSlots(input: {
     }
 
     if (command.slot === "weddingDateText" && typeof command.value === "string") {
-      patch.weddingDateText = command.value;
+      patch.weddingDateText = date.rawText ?? command.value;
     }
 
     failed.push({

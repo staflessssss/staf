@@ -106,10 +106,11 @@ function extractMonthDate(message: string) {
     dec: "12",
     december: "12",
   };
-  const monthKey = monthFirst?.[1] ?? dayFirst?.[2];
-  const dayValue = monthFirst?.[2] ?? dayFirst?.[1];
-  const year = monthFirst?.[3] ?? dayFirst?.[3];
-  const rawText = monthFirst?.[0] ?? dayFirst?.[0];
+  const preferredDayFirst = Boolean(dayFirst);
+  const monthKey = preferredDayFirst ? dayFirst?.[2] : monthFirst?.[1];
+  const dayValue = preferredDayFirst ? dayFirst?.[1] : monthFirst?.[2];
+  const year = preferredDayFirst ? dayFirst?.[3] : monthFirst?.[3];
+  const rawText = preferredDayFirst ? dayFirst?.[0] : monthFirst?.[0];
   const month = months[monthKey?.toLowerCase() ?? ""];
   const day = dayValue?.padStart(2, "0");
 

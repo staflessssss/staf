@@ -317,8 +317,33 @@ function formatCallWindow(knowledge: SimpleWeddingKnowledgeContext) {
 function buildResponseCatalogSlots(
   state: SimpleWeddingSalesState,
   knowledge?: SimpleWeddingKnowledgeContext,
+  contract?: ReplyActionContract,
 ) {
   const location = state.location;
+  const customerFirstName = state.customerName?.trim().split(/\s+/)[0] || "there";
+  const knownLeadParts = [
+    state.venue && location
+      ? `${state.venue} in ${location}`
+      : state.venue ?? location,
+    !state.weddingDate && state.weddingDateText ? state.weddingDateText : undefined,
+  ].filter(Boolean);
+  const knownLeadContext = knownLeadParts.length > 0
+    ? `I have ${knownLeadParts.join(" and ")}.`
+    : undefined;
+  const weddingDateQuestion =
+    !state.weddingDate && state.weddingDateText
+      ? "Just to confirm - what year is the wedding?"
+      : "What date are you looking at?";
+  const pricingGuideBlock =
+    knowledge && contract && (contract.mustMentionPricing || contract.mustMentionGuide)
+      ? [
+          contract.mustMentionPricing ? pricingLine({ contract, knowledge }) : undefined,
+          promotionLine({ contract, knowledge }),
+          contract.mentionPolicy.guide.mode !== "skip"
+            ? "I'll send the collections guide here so you can look through the options 🎥"
+            : undefined,
+        ].filter(Boolean).join("\n")
+      : undefined;
   const greetingIntroduction = knowledge
     ? renderCopy(knowledge.persona.replyStyle.greetingIntroduction, {
         name: knowledge.persona.name,
@@ -334,6 +359,10 @@ function buildResponseCatalogSlots(
     greetingOpening: knowledge?.persona.replyStyle.greetingOpening,
     greetingIntroduction,
     greetingCelebration,
+    customerFirstName,
+    knownLeadContext,
+    weddingDateQuestion,
+    pricingGuideBlock,
     callTimeDisplay: displayCheckedCallTime(state),
     email: state.customerEmail,
     weddingDateDisplay: state.weddingDateDisplay ?? (
@@ -448,6 +477,7 @@ function normalizeCatalogTextForContract(args: {
 const SAFE_OBLIGATION_CATALOG_KEYS = new Set<SimpleWeddingSalesResponseKey>([
   "utter_availability_available_ask_names",
   "utter_pricing_repeat_send_guide_ask_names",
+  "utter_ask_wedding_date_only",
   "utter_venue_collected_ask_call_time",
   "utter_answer_travel_resume_call_time",
   "utter_calendar_available_ask_email",
@@ -461,7 +491,8 @@ function catalogExclusionReason(
     responseKey === "utter_availability_available_ask_names" && contract.mustMentionPricing;
   const allowsPricing =
     responseKey === "utter_availability_available_ask_names" ||
-    responseKey === "utter_pricing_repeat_send_guide_ask_names";
+    responseKey === "utter_pricing_repeat_send_guide_ask_names" ||
+    responseKey === "utter_ask_wedding_date_only";
   const allowsCalendarAvailability = responseKey === "utter_calendar_available_ask_email";
   const allowsTravel = responseKey === "utter_answer_travel_resume_call_time";
   const allowsSafeObligations = Boolean(responseKey && SAFE_OBLIGATION_CATALOG_KEYS.has(responseKey));
@@ -546,7 +577,7 @@ function tryBuildResponseFromCatalog(args: {
     return null;
   }
 
-  const slots = buildResponseCatalogSlots(args.state, args.knowledge);
+  const slots = buildResponseCatalogSlots(args.state, args.knowledge, args.contract);
   const variation = variations[0]!;
   const missingTemplateSlots = missingResponseVariationSlots(variation, slots);
 
@@ -667,7 +698,7 @@ function tryBuildGuardedResponseFromCatalog(args: {
       responseKey: catalogResponseKey,
     }),
   });
-  const slots = buildResponseCatalogSlots(args.state, args.knowledge);
+  const slots = buildResponseCatalogSlots(args.state, args.knowledge, args.contract);
   let firstFailure: SimpleWeddingSalesWriterCatalogTrace | undefined;
 
   for (const variation of variations) {

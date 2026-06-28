@@ -120,11 +120,19 @@ export function validateGeneratedReply(args: {
     args.contract.mustGreet &&
     args.contract.responseKey !== "utter_ask_wedding_details" &&
     args.contract.responseKey !== "utter_availability_available_ask_names" &&
+    args.contract.responseKey !== "utter_ask_wedding_date_only" &&
     (!reply.includes(args.knowledge.persona.replyStyle.greetingOpening) ||
       !reply.includes(args.knowledge.persona.name) ||
       !reply.includes(args.knowledge.persona.company))
   ) {
     reasons.push("first-turn founder greeting is incomplete");
+  }
+
+  if (
+    args.contract.responseKey === "utter_ask_wedding_date_only" &&
+    hasFounderGreetingOrCongratulation(reply)
+  ) {
+    reasons.push("date-year prompt used founder greeting/persona copy");
   }
 
   if (

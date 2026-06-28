@@ -51,6 +51,24 @@ test("wedding lead form canonicalizes common spoken wedding date formats", () =>
   }
 });
 
+test("wedding lead form keeps month-day date as partial when year is missing", () => {
+  const cases = [
+    ["August 15th", "August 15th"],
+    ["August 15", "August 15"],
+    ["Aug 15", "Aug 15"],
+    ["on August 15th", "August 15th"],
+  ] as const;
+
+  for (const [rawText, expectedRawText] of cases) {
+    const result = resolveWeddingDate(rawText);
+
+    assert.equal(result.ok, false, rawText);
+    assert.equal(result.reason, "missing_year", rawText);
+    assert.equal(result.rawText, expectedRawText, rawText);
+    assert.equal(result.display, "August 15", rawText);
+  }
+});
+
 test("wedding lead form slot order follows the wedding agent domain", () => {
   const domainSlots = WeddingAgentDomain.slotOrder.filter(
     (slot) => slot !== "bookingConfirmation",

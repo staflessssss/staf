@@ -299,6 +299,71 @@ test("simple wedding sales runtime resolves requested wedding date answer withou
   assert.doesNotMatch(result.responseDraft ?? "", /what'?s your wedding date|what date are you planning/i);
 });
 
+test("simple wedding sales runtime asks only for year when first message has partial wedding date", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message:
+      "Hi just checking on pricing for videography and saw the 20% off. Checking to see if you have availability for my son’s wedding at Bakersmill in Salisbury NC on August 15th. Just checking on pricing of packages. My name is Genia Goldston and my email is Geniagoldston@yahoo.com. Thanks so much for any info.",
+    toolContext,
+    channelConfig: {
+      pricing: {
+        startPrice: "$3,600",
+        currency: "USD",
+        coverageHours: 8,
+        promotionText: "Also, we are running a 20% discount through June 30.",
+      },
+      pricingByRegion: {
+        NC_SC_GA: {
+          startPrice: "$3,600",
+          currency: "USD",
+          coverageHours: 8,
+          promotionText: "Also, we are running a 20% discount through June 30.",
+        },
+      },
+      priceAttachmentsByRegion: {
+        NC_SC_GA: {
+          imageUrl: "https://example.com/nc-sc-ga-guide.png",
+          fileName: "nc-sc-ga-guide.png",
+        },
+      },
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        facts: {
+          customerName: "Genia Goldston",
+          email: "Geniagoldston@yahoo.com",
+          venue: "Bakersmill",
+          location: "Salisbury NC",
+          weddingDateText: "August 15th",
+        },
+        questionsAskedByCustomer: ["availability", "pricing"],
+      }),
+  });
+
+  assert.equal(result.customerName, "Genia Goldston");
+  assert.equal(result.customerEmail, "Geniagoldston@yahoo.com");
+  assert.equal(result.venue, "Bakersmill");
+  assert.equal(result.location, "Salisbury NC");
+  assert.equal(result.weddingDate, undefined);
+  assert.equal(result.weddingDateText, "August 15th");
+  assert.equal(result.decisionTrace?.toolCalled, undefined);
+  assert.deepEqual(result.toolObservations, []);
+  assert.equal(result.decisionTrace?.responseKey, "utter_ask_wedding_date_only");
+  assert.equal(result.writer?.mode, "response_catalog");
+  assert.equal(result.writer?.responseKey, "utter_ask_wedding_date_only");
+  assert.equal(result.writerCatalog?.guardOk, true);
+  assert.match(result.responseDraft ?? "", /Genia/i);
+  assert.match(result.responseDraft ?? "", /Bakersmill[\s\S]*Salisbury NC[\s\S]*August 15th/i);
+  assert.match(result.responseDraft ?? "", /\$3,600/);
+  assert.match(result.responseDraft ?? "", /20% discount through June 30/i);
+  assert.match(result.responseDraft ?? "", /what year is the wedding/i);
+  assert.doesNotMatch(
+    result.responseDraft ?? "",
+    /IвЂ™m Taras|I'm Taras|founder of Myndful Films|Huge congratulations|such an exciting season of life|What date are you looking at/i,
+  );
+});
+
 test("simple wedding sales runtime availability catalog does not repeat founder greeting after first turn", async () => {
   const first = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
