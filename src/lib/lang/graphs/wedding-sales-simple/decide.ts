@@ -17,6 +17,12 @@ function hasCommand(
   return Boolean(commands?.some(predicate));
 }
 
+function bookingWasConfirmedThisTurn(state: SimpleWeddingSalesState) {
+  return state.toolObservations.some(
+    (observation) => observation.toolName === "book_consultation",
+  );
+}
+
 function getCommand<T extends SimpleWeddingSalesDialogueCommand>(
   commands: SimpleWeddingSalesDialogueCommand[] | undefined,
   predicate: (command: SimpleWeddingSalesDialogueCommand) => command is T,
@@ -615,6 +621,18 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       });
     }
 
+    if (
+      state.dialogueUnderstanding?.messageAct === "acknowledgement_only" ||
+      hasCommand(state.dialogueCommands, (command) => command.type === "acknowledgement_only")
+    ) {
+      return decision({
+        nextStep: "reply_only",
+        replyType: "acknowledgement_only",
+        responseKey: "utter_acknowledgement",
+        reason: "customer only acknowledged after booking was already confirmed",
+      });
+    }
+
     if (state.dialogueUnderstanding?.messageAct === "new_business_question" || state.questionsAskedByCustomer.includes("other")) {
       return decision({
         nextStep: "handoff",
@@ -648,11 +666,20 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (state.bookingConfirmed) {
+  if (state.bookingConfirmed && bookingWasConfirmedThisTurn(state)) {
     return decision({
       nextStep: "reply_only",
       replyType: "booking_confirmed",
-      reason: "booking has already been confirmed",
+      reason: "booking was confirmed by the booking tool in this turn",
+    });
+  }
+
+  if (state.bookingConfirmed) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "acknowledgement_only",
+      responseKey: "utter_acknowledgement",
+      reason: "booking was already confirmed earlier and there is no new actionable request",
     });
   }
 

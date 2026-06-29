@@ -1841,7 +1841,17 @@ test("simple wedding sales runtime books when bare yes answers the pending lock-
 });
 
 test("simple wedding sales runtime books when yes please answers the pending lock-in question", async () => {
-  for (const message of ["Yes please", "Yes, please"]) {
+  for (const message of [
+    "Yes please",
+    "Yes, please",
+    "Yes, please, sorry",
+    "sorry yes that works",
+    "Yeah that works",
+    "That works",
+    "Sounds good",
+    "Go ahead",
+    "Please lock it in",
+  ]) {
     const result = await invokeWeddingSalesSimpleGraph({
       channel: "instagram",
       message,
@@ -1914,6 +1924,45 @@ test("simple wedding sales runtime books when yes please answers the pending loc
     assert.equal(result.callTimeContext, undefined, message);
     assert.doesNotMatch(result.responseDraft ?? "", /Want me to lock in/i, message);
   }
+});
+
+test("simple wedding sales runtime does not book mixed affirmative without pending booking confirmation", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Yes, please, sorry",
+    toolContext,
+    previousState: {
+      customerName: "Anna",
+      partnerName: "Mark",
+      customerEmail: "anna@example.com",
+      weddingDate: "2027-06-14",
+      location: "Tampa",
+      venue: "Oxford Exchange",
+      availability: "available",
+      availabilityContextDate: "2027-06-14",
+      proposedCallTime: "2026-06-24T13:00:00-04:00",
+      calendarStatus: "available",
+      consultationCheck: {
+        proposedTime: "2026-06-24T13:00:00-04:00",
+        status: "available",
+        checkedAt: "2026-06-23T00:00:00.000Z",
+      },
+      checkedCallDate: "2026-06-24",
+      checkedCallTime: "13:00",
+      checkedCallStartTime: "2026-06-24T13:00:00-04:00",
+      checkedCallEndTime: "2026-06-24T13:30:00-04:00",
+    },
+    understand: () =>
+      understanding({
+        customerMessageType: "answer_to_question",
+        facts: {},
+      }),
+  });
+
+  assert.equal(result.bookingConfirmed, false);
+  assert.notEqual(result.decisionTrace?.toolCalled, "bookCall");
+  assert.deepEqual(result.toolObservations, []);
+  assert.match(result.responseDraft ?? "", /Want me to lock in|lock in 1:00 PM/i);
 });
 
 test("simple wedding sales runtime clears pending booking confirmation when customer changes time", async () => {
@@ -2312,9 +2361,10 @@ function bookedConsultState(
 }
 
 test("simple wedding sales runtime treats thank you and farewell after booking as acknowledgement only", async () => {
+  for (const message of ["Thank you!\nSee you later", "Thanks, see you later!"]) {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
-    message: "Thank you!\nSee you later",
+    message,
     toolContext,
     previousState: {
       customerName: "Mark",
@@ -2369,25 +2419,27 @@ test("simple wedding sales runtime treats thank you and farewell after booking a
       }),
   });
 
-  assert.equal(result.nextStep, "reply_only");
-  assert.equal(result.decisionTrace?.replyType, "acknowledgement_only");
-  assert.equal(result.decisionTrace?.responseKey, "utter_acknowledgement");
-  assert.equal(result.domainDecision?.nextDomainAction, "acknowledge_after_booking");
-  assert.equal(result.domainDecision?.matchedRule, "post_booking_acknowledgement");
-  assert.equal(result.replyContract?.responseKey, "utter_acknowledgement");
-  assert.equal(result.writer?.responseKey, "utter_acknowledgement");
-  assert.equal(result.flowRunner?.mode, "active");
-  assert.equal(result.flowRunner?.branch, "acknowledgement_only");
-  assert.equal(result.flowRunner?.usedAsFinalDecision, true);
-  assert.equal(result.dialogueUnderstanding?.messageAct, "acknowledgement_only");
-  assert.equal(result.answerContext, undefined);
-  assert.equal(result.pendingUserAction, null);
-  assert.match(result.responseDraft ?? "", /talk soon|see you then/i);
-  assert.doesNotMatch(
-    result.responseDraft ?? "",
-    /missing what you mean|Want me to lock in|calendar invite|bonkopoly@gmail\.com|1:00 PM|1pm|all set|locked in|locked us in|booked/i,
-  );
-  assert.deepEqual(result.toolObservations, []);
+    assert.equal(result.nextStep, "reply_only", message);
+    assert.equal(result.decisionTrace?.replyType, "acknowledgement_only", message);
+    assert.equal(result.decisionTrace?.responseKey, "utter_acknowledgement", message);
+    assert.equal(result.domainDecision?.nextDomainAction, "acknowledge_after_booking", message);
+    assert.equal(result.domainDecision?.matchedRule, "post_booking_acknowledgement", message);
+    assert.equal(result.replyContract?.responseKey, "utter_acknowledgement", message);
+    assert.equal(result.writer?.responseKey, "utter_acknowledgement", message);
+    assert.equal(result.flowRunner?.mode, "active", message);
+    assert.equal(result.flowRunner?.branch, "acknowledgement_only", message);
+    assert.equal(result.flowRunner?.usedAsFinalDecision, true, message);
+    assert.equal(result.dialogueUnderstanding?.messageAct, "acknowledgement_only", message);
+    assert.equal(result.answerContext, undefined, message);
+    assert.equal(result.pendingUserAction, null, message);
+    assert.match(result.responseDraft ?? "", /talk soon|see you then/i, message);
+    assert.doesNotMatch(
+      result.responseDraft ?? "",
+      /missing what you mean|Want me to lock in|calendar invite|bonkopoly@gmail\.com|1:00 PM|1pm|all set|locked in|locked us in|booked/i,
+      message,
+    );
+    assert.deepEqual(result.toolObservations, [], message);
+  }
 });
 
 test("simple wedding sales runtime answers raw footage after booking without booking-confirmed repeat", async () => {

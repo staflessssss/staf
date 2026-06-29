@@ -880,8 +880,24 @@ function resolveBookingConfirmationAnswer(args: {
 }
 
 function isBareAffirmative(text: string) {
-  return /^\s*(?:yes(?:\s*,?\s*please)?|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect)\s*[.!]*\s*$/i.test(
-    text,
+  const normalized = text
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+/g, " ")
+    .replace(/[,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const withoutFiller = normalized
+    .replace(/\b(?:sorry|apologies|please|thanks|thank you)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const affirmativePattern =
+    /^(?:yes|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect|go ahead|lock it in|that sounds good)$/i;
+
+  return (
+    affirmativePattern.test(normalized) ||
+    affirmativePattern.test(withoutFiller) ||
+    /^(?:yes|yeah|yep|yup)\b[\s\S]{0,40}\b(?:that works|works|sounds good|go ahead|lock it in)?$/i.test(withoutFiller)
   );
 }
 
