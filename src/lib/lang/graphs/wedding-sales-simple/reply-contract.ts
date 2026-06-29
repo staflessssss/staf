@@ -72,6 +72,52 @@ function requiredQuestionForState(
     return "email";
   }
 
+  if (
+    state.nextStep === "reply_only" &&
+    (state.isFirstTurn || !state.replyMemory?.turnIndex) &&
+    state.questionsAskedByCustomer.some((question) => question !== "other")
+  ) {
+    if (!state.weddingDate) {
+      return "weddingDate";
+    }
+
+    if (!state.location) {
+      return "location";
+    }
+  }
+
+  if (state.nextStep === "reply_only" && state.replyObligations?.length) {
+    const lastQuestion =
+      state.replyMemory?.lastRequiredQuestion ??
+      state.replyMemory?.questionMemory?.lastRequiredQuestion;
+
+    if (lastQuestion === "names" && !(state.customerName && state.partnerName)) {
+      return state.senderRole === "mother" || state.senderRole === "planner"
+        ? "coupleNames"
+        : "names";
+    }
+
+    if (lastQuestion === "venue" && !state.venue) {
+      return "venue";
+    }
+
+    if (lastQuestion === "callTime" && !state.proposedCallTime) {
+      return "callTime";
+    }
+
+    if (lastQuestion === "email" && !state.customerEmail) {
+      return "email";
+    }
+
+    if (lastQuestion === "weddingDate" && !state.weddingDate) {
+      return "weddingDate";
+    }
+
+    if (lastQuestion === "location" && !state.location) {
+      return "location";
+    }
+  }
+
   return undefined;
 }
 
@@ -210,7 +256,10 @@ export function buildReplyActionContract(args: {
   const mustMentionBookingConfirmation = Boolean(
     state.bookingConfirmed && state.decisionTrace?.toolCalled === "bookCall",
   );
-  const replyObligations = state.replyObligations ?? state.decisionTrace?.replyObligations ?? [];
+  const replyObligations =
+    state.replyObligations?.length
+      ? state.replyObligations
+      : state.decisionTrace?.replyObligations ?? [];
 
   return {
     nextStep: state.nextStep,

@@ -637,6 +637,28 @@ function newestFollowUpLog(db: InMemoryDialogueDb, event?: string) {
   return logs[0];
 }
 
+function findFollowUpLog(args: {
+  db: InMemoryDialogueDb;
+  event: string;
+  slot?: string;
+  stage?: string;
+}) {
+  return args.db.messages
+    .filter((message) => message.toolName === WEDDING_SALES_SIMPLE_FOLLOW_UP_LOG_TOOL_NAME)
+    .filter((message) => (message.toolResult as { event?: string } | undefined)?.event === args.event)
+    .filter((message) => {
+      const payload = (message.toolResult as { payload?: WeddingSalesSimpleSlotFollowUpPayload } | undefined)?.payload;
+      if (args.slot && payload?.slot !== args.slot) {
+        return false;
+      }
+      if (args.stage && payload?.stage !== args.stage) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+}
+
 function assertStep(args: {
   scenarioName: string;
   stepIndex: number;
@@ -711,7 +733,11 @@ function assertStep(args: {
     assert.equal(args.state.bookingConfirmed, assertion.bookingConfirmed, `${label}: bookingConfirmed`);
   }
   if (assertion.followUpsScheduled) {
-    const log = newestFollowUpLog(args.db, "FollowupScheduled");
+    const log = findFollowUpLog({
+      db: args.db,
+      event: "FollowupScheduled",
+      slot: assertion.followUpsScheduled.slot,
+    });
     assert.ok(log, `${label}: expected FollowupScheduled log`);
     const payload = (log.toolResult as { payload?: { slot?: string; stages?: string[] } }).payload;
     if (assertion.followUpsScheduled.slot) {

@@ -130,7 +130,7 @@ function promotionLine(args: {
 }) {
   if (
     !args.knowledge.pricing.promotionText ||
-    (!args.contract.mustMentionPricing && args.contract.mentionPolicy.guide.mode === "skip")
+    (args.contract.mentionPolicy.pricing.mode === "skip" && args.contract.mentionPolicy.guide.mode === "skip")
   ) {
     return undefined;
   }
@@ -989,6 +989,19 @@ function handoffLine() {
   return "Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍";
 }
 
+function pendingBookingConfirmationLine(state: SimpleWeddingSalesState) {
+  if (state.pendingUserAction?.type !== "booking_confirmation" || state.bookingConfirmed) {
+    return undefined;
+  }
+
+  const time =
+    displayCheckedCallTime(state) ??
+    displayProposedCallTime(state.pendingUserAction.slot) ??
+    displayProposedCallTime(state.proposedCallTime);
+
+  return `Would you still like me to lock in ${time ?? "that time"}?`;
+}
+
 function renderSafeTemplate(args: {
   state: SimpleWeddingSalesState;
   contract: ReplyActionContract;
@@ -1020,6 +1033,7 @@ function renderSafeTemplate(args: {
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
+    pendingBookingConfirmationLine(args.state),
     questionLine(args),
   ]) || questionLine(args) || fallbackClarificationLine();
 }
@@ -1051,6 +1065,7 @@ function renderCompactInstagramFallback(args: {
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
+    pendingBookingConfirmationLine(args.state),
   ]
     .filter(Boolean)
     .join(" ");
@@ -1107,6 +1122,31 @@ export function writeConstrainedWeddingReply(args: {
     buildCatalogTraceForSkippedContract(contract);
 
   if (guardedCatalogDraft?.text && guardedCatalogDraft.guardResult.ok) {
+    const pendingBookingLine = pendingBookingConfirmationLine(state);
+    if (pendingBookingLine && !/\block\b/i.test(guardedCatalogDraft.text)) {
+      const catalogTextWithPending = joinLines([guardedCatalogDraft.text, pendingBookingLine]);
+      const catalogWithPendingGuard = validateGeneratedReply({
+        reply: catalogTextWithPending,
+        contract,
+        knowledge,
+        state,
+      });
+
+      if (catalogWithPendingGuard.ok) {
+        return {
+          text: catalogTextWithPending,
+          guardResult: catalogWithPendingGuard,
+          writer: {
+            mode: "response_catalog",
+            responseKey: guardedCatalogDraft.responseKey,
+            variationId: guardedCatalogDraft.variationId,
+            variationSeed: guardedCatalogDraft.variationSeed,
+          },
+          writerCatalog,
+        };
+      }
+    }
+
     return {
       text: guardedCatalogDraft.text,
       guardResult: guardedCatalogDraft.guardResult,
@@ -1130,6 +1170,7 @@ export function writeConstrainedWeddingReply(args: {
             ? availabilityLine({ state, contract })
             : undefined,
           pricingLine({ contract, knowledge }),
+          promotionLine({ contract, knowledge }),
           guideLine({ contract, knowledge }),
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,
           contract.mustMentionCalendarAvailability ? calendarLine(state, knowledge, contract) : undefined,
@@ -1141,6 +1182,7 @@ export function writeConstrainedWeddingReply(args: {
           shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
           contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
           contract.replyType === "clarification" ? clarificationLine() : undefined,
+          pendingBookingConfirmationLine(state),
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);
   const guard = validateGeneratedReply({

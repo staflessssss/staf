@@ -223,7 +223,8 @@ export function buildSimpleWeddingKnowledgeContext(input: {
       : undefined;
   const promotionText =
     readOptionalString(selectedRegionPricing, "promotionText") ??
-    readOptionalString(pricingConfig, "promotionText");
+    readOptionalString(pricingConfig, "promotionText") ??
+    readOptionalString(pricing as unknown as Record<string, unknown>, "promotionText");
   const callWindow = `${formatBusinessDays(config.callBookingWindow.businessDays)}, ${formatHour(
     config.callBookingWindow.startHour,
   )}-${formatHour(config.callBookingWindow.endHour)} ${config.callBookingWindow.timezone}`;
@@ -352,6 +353,24 @@ export function getPostBookingFaqAnswer(input: {
     return {
       exists: true,
       answer: `Yes, we do travel. Our collections include travel coverage for ${region}, and if the venue is beyond the included mileage, we can go over the exact travel details on the call 🤍`,
+    };
+  }
+
+  if (question === "portfolio") {
+    const links = knowledge.guide.portfolioLinks.slice(0, 2);
+
+    if (links.length === 0) {
+      return {
+        exists: false,
+        reason: "missing_knowledge",
+      };
+    }
+
+    return {
+      exists: true,
+      answer: `A couple recent films if you want to get a feel for the style: ${links
+        .map((link) => `${link.label}: ${link.url}`)
+        .join(" ")}`,
     };
   }
 

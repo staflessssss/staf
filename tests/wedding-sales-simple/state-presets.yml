@@ -1,0 +1,130 @@
+{
+  "presets": {
+    "first_turn": {
+      "description": "Empty new Instagram conversation",
+      "state": {}
+    },
+    "during_slot_collection": {
+      "description": "Availability was checked and the bot is collecting couple names",
+      "state": {
+        "mode": "bot_active",
+        "customerName": null,
+        "partnerName": null,
+        "weddingDate": "2026-10-17",
+        "weddingDateText": "October 17 2026",
+        "weddingDateDisplay": "October 17, 2026",
+        "location": "Tampa",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-10-17",
+          "location": "Tampa",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "replyMemory": {
+          "turnIndex": 2,
+          "greeted": true,
+          "lastRequiredQuestion": "names",
+          "questionMemory": {
+            "lastRequiredQuestion": "names",
+            "lastQuestionText": "What are both of your names?"
+          }
+        },
+        "toolObservations": []
+      }
+    },
+    "pending_booking_confirmation": {
+      "description": "Calendar slot is available and the bot is waiting for lock-in confirmation",
+      "state": {
+        "mode": "bot_active",
+        "customerName": "Rick",
+        "partnerName": "Rachel",
+        "customerEmail": "rick@example.com",
+        "weddingDate": "2026-10-17",
+        "weddingDateText": "October 17 2026",
+        "weddingDateDisplay": "October 17, 2026",
+        "location": "Tampa",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-10-17",
+          "location": "Tampa",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "venue": "The Vinoy",
+        "proposedCallTime": "2026-06-30T10:00:00-04:00",
+        "checkedCallDate": "2026-06-30",
+        "checkedCallTime": "10:00 AM",
+        "checkedCallStartTime": "10:00 AM",
+        "checkedCallEndTime": "10:30 AM",
+        "consultationCheck": {
+          "proposedTime": "2026-06-30T10:00:00-04:00",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "pendingUserAction": {
+          "type": "booking_confirmation",
+          "slot": "2026-06-30T10:00:00-04:00",
+          "email": "rick@example.com"
+        },
+        "replyMemory": {
+          "turnIndex": 6,
+          "greeted": true,
+          "lastRequiredQuestion": "bookingConfirmation",
+          "pendingBookingConfirmation": {
+            "proposedCallTime": "2026-06-30T10:00:00-04:00",
+            "email": "rick@example.com",
+            "checkedCallDate": "2026-06-30",
+            "checkedCallTime": "10:00 AM",
+            "checkedCallStartTime": "10:00 AM",
+            "checkedCallEndTime": "10:30 AM",
+            "askedAt": "2026-06-29T12:00:00.000Z",
+            "source": "ask_booking_confirmation"
+          },
+          "questionMemory": {
+            "lastRequiredQuestion": "bookingConfirmation",
+            "lastQuestionText": "Want me to lock in 10:00 AM?"
+          }
+        },
+        "toolObservations": []
+      }
+    },
+    "after_booking_confirmed": {
+      "description": "Consultation is already booked",
+      "state": {
+        "mode": "bot_active",
+        "bookingConfirmed": true,
+        "customerName": "Rick",
+        "partnerName": "Rachel",
+        "customerEmail": "rick@example.com",
+        "weddingDate": "2026-10-17",
+        "weddingDateText": "October 17 2026",
+        "weddingDateDisplay": "October 17, 2026",
+        "location": "Tampa",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-10-17",
+          "location": "Tampa",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "venue": "The Vinoy",
+        "proposedCallTime": "2026-06-30T10:00:00-04:00",
+        "checkedCallDate": "2026-06-30",
+        "checkedCallTime": "10:00 AM",
+        "checkedCallStartTime": "10:00 AM",
+        "checkedCallEndTime": "10:30 AM",
+        "pendingUserAction": null,
+        "replyMemory": {
+          "turnIndex": 8,
+          "greeted": true,
+          "questionMemory": {}
+        },
+        "toolObservations": []
+      }
+    }
+  }
+}

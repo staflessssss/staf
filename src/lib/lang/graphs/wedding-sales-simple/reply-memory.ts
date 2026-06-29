@@ -36,11 +36,10 @@ function currentPendingBookingConfirmation(args: {
   const isAvailableSlot = Boolean(
     state.proposedCallTime &&
       state.customerEmail &&
-      state.calendarStatus === "available" &&
-      state.consultationCheck?.status === "available" &&
-      state.consultationCheck.proposedTime === state.proposedCallTime &&
-      state.checkedCallDate &&
-      state.checkedCallTime,
+      state.checkedCallTime &&
+      (state.calendarStatus === "available" ||
+        state.consultationCheck?.status === "available" ||
+        state.checkedCallStartTime),
   );
 
   if (!isAvailableSlot || !state.proposedCallTime || !state.customerEmail) {

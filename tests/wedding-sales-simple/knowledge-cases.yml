@@ -1,0 +1,169 @@
+{
+  "cases": [
+    {
+      "id": "pricing",
+      "question": "pricing",
+      "questionExamples": ["How much are your wedding films?"],
+      "expected": {
+        "answeredQuestion": "pricing",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "promo_discount",
+      "question": "pricing",
+      "questionExamples": ["Are you still doing the 20% discount?"],
+      "expected": {
+        "answeredQuestion": "pricing",
+        "mustContain": ["20% discount"],
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "availability",
+      "question": "availability",
+      "questionExamples": ["Are you available?"],
+      "expected": {
+        "answeredQuestion": "availability",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "travel_fee",
+      "question": "travel",
+      "questionExamples": ["Do you travel to Savannah?", "Is there a travel fee?"],
+      "expected": {
+        "answeredQuestion": "travel",
+        "responseKeyOneOf": [
+          "utter_answer_travel",
+          "utter_answer_travel_resume_call_time",
+          "utter_answer_faq_after_booking"
+        ],
+        "mustContain": ["travel"],
+        "forbidden": ["I booked", "Done — I locked us in", "The date is available"]
+      }
+    },
+    {
+      "id": "coverage_areas",
+      "question": "travel",
+      "questionExamples": ["Do you cover North Carolina and Georgia?"],
+      "expected": {
+        "answeredQuestion": "travel",
+        "mustContain": ["travel"],
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "package_inclusions",
+      "question": "package_inclusions",
+      "questionExamples": ["What is included in the package?"],
+      "expected": {
+        "answeredQuestion": "package_inclusions",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "raw_footage",
+      "question": "raw_footage",
+      "questionExamples": ["Do you offer raw footage?"],
+      "expected": {
+        "answeredQuestion": "raw_footage",
+        "responseKeyOneOf": ["utter_answer_raw_footage", "utter_answer_faq_after_booking"],
+        "mustContain": ["raw"],
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "delivery_timeline",
+      "question": "delivery_timeline",
+      "questionExamples": ["How long does delivery take?"],
+      "expected": {
+        "answeredQuestion": "delivery_timeline",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "sneak_peek",
+      "question": "sneak_peek",
+      "questionExamples": ["Do we get a sneak peek?"],
+      "expected": {
+        "answeredQuestion": "sneak_peek",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "music_choice",
+      "question": "music_choice",
+      "questionExamples": ["Can we choose the music?"],
+      "expected": {
+        "answeredQuestion": "music_choice",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "style",
+      "question": "style",
+      "questionExamples": ["What is your film style?"],
+      "expected": {
+        "answeredQuestion": "style",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "team",
+      "question": "team",
+      "questionExamples": ["Who would shoot our wedding?"],
+      "expected": {
+        "answeredQuestion": "team",
+        "forbidden": ["recent films", "I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "portfolio",
+      "question": "portfolio",
+      "questionExamples": ["Can you send recent films?"],
+      "expected": {
+        "answeredQuestion": "portfolio",
+        "mustContain": ["film"],
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "coi_insurance",
+      "question": "coi",
+      "questionExamples": ["Can you provide a COI for the venue?"],
+      "expected": {
+        "answeredQuestion": "coi",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "payment_contract",
+      "question": "booking",
+      "questionExamples": ["How does payment and contract work?"],
+      "expected": {
+        "answeredQuestion": "booking",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    },
+    {
+      "id": "custom_package",
+      "question": "other",
+      "questionExamples": ["Can you make a custom package for us?"],
+      "expected": {
+        "handoffReason": "unanswered_business_question",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      },
+      "states": ["first_turn", "during_slot_collection", "pending_booking_confirmation"]
+    },
+    {
+      "id": "reschedule_cancel",
+      "question": "booking",
+      "questionExamples": ["Can we reschedule or cancel?"],
+      "expected": {
+        "answeredQuestion": "booking",
+        "forbidden": ["I booked", "Done — I locked us in"]
+      }
+    }
+  ]
+}

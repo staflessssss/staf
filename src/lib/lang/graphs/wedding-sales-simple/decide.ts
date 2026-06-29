@@ -45,7 +45,8 @@ function isKnownPostBookingFaq(question: SimpleWeddingSalesQuestion | undefined)
     question === "delivery_timeline" ||
     question === "sneak_peek" ||
     question === "raw_footage" ||
-    question === "travel"
+    question === "travel" ||
+    question === "portfolio"
   );
 }
 
@@ -515,6 +516,19 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   }
 
   if (
+    state.questionsAskedByCustomer.includes("portfolio") &&
+    !hasActionableCallTime &&
+    !hasUncheckedAvailability &&
+    !checkedAvailabilityThisTurn
+  ) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "reply_only",
+      reason: "customer explicitly asked for portfolio or recent films",
+    });
+  }
+
+  if (
     state.questionsAskedByCustomer.includes("identity") &&
     !hasActionableCallTime &&
     !hasUncheckedAvailability
@@ -553,7 +567,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   if (
     state.questionsAskedByCustomer.includes("other") &&
     !hasKnownQuestion &&
-    !state.proposedCallTime &&
+    !state.lastUnderstanding?.facts.proposedCallTime &&
     !hasStartFlowCommand
   ) {
     return decision({
@@ -866,7 +880,6 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     state.calendarStatus === "available" &&
     state.customerEmail &&
     hasNames(state) &&
-    state.checkedCallDate &&
     state.checkedCallTime &&
     state.customerConfirmedCallSlot
   ) {

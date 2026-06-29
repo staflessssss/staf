@@ -625,6 +625,10 @@ export function derivePendingUserAction(
     return null;
   }
 
+  if (state?.pendingUserAction) {
+    return state.pendingUserAction;
+  }
+
   const pendingBooking = state?.replyMemory?.pendingBookingConfirmation;
 
   if (pendingBooking && !state?.bookingConfirmed) {
@@ -756,7 +760,9 @@ export function mergeTurnUnderstanding(
         : 0,
     questionsAskedByCustomer: understanding.questionsAskedByCustomer,
     pendingUserAction: dialogueUnderstandingWithCommands.shouldSuppressOldContext
-      ? null
+      ? activePendingUserAction?.type === "booking_confirmation"
+        ? activePendingUserAction
+        : null
       : answersPendingBookingConfirmation
         ? activePendingUserAction
         : derivePendingUserAction(state),
@@ -909,11 +915,10 @@ function isCurrentBookableSlot(state: SimpleWeddingSalesState, customerEmail?: s
   return Boolean(
     state.proposedCallTime &&
       customerEmail &&
-      state.calendarStatus === "available" &&
-      state.consultationCheck?.status === "available" &&
-      state.consultationCheck.proposedTime === state.proposedCallTime &&
-      state.checkedCallDate &&
-      state.checkedCallTime,
+      state.checkedCallTime &&
+      (state.calendarStatus === "available" ||
+        state.consultationCheck?.status === "available" ||
+        state.checkedCallStartTime),
   );
 }
 
@@ -926,7 +931,8 @@ function isPendingBookingConfirmationCurrent(
     isCurrentBookableSlot(state, customerEmail) &&
       customerEmail === pending.email &&
       state.proposedCallTime === pending.proposedCallTime &&
-      state.consultationCheck?.proposedTime === pending.proposedCallTime &&
+      (!state.consultationCheck?.proposedTime ||
+        state.consultationCheck.proposedTime === pending.proposedCallTime) &&
       (!pending.checkedCallDate || state.checkedCallDate === pending.checkedCallDate) &&
       (!pending.checkedCallTime || state.checkedCallTime === pending.checkedCallTime) &&
       (!pending.checkedCallStartTime || state.checkedCallStartTime === pending.checkedCallStartTime) &&
