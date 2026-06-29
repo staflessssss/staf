@@ -1,0 +1,42 @@
+{
+  "test_case": "tool failure no false booking",
+  "fixtures": {
+    "state": {
+      "mode": "bot_active",
+      "customerName": "Rick",
+      "partnerName": "Rachel",
+      "customerEmail": "rick@example.com",
+      "weddingDate": "2026-10-17",
+      "location": "Tampa",
+      "venue": "The Vinoy",
+      "checkedCallTime": "10:00",
+      "checkedCallDate": "2026-06-30",
+      "calendarStatus": "available",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "10:00"
+      },
+      "replyMemory": {
+        "turnIndex": 6,
+        "greeted": true,
+        "pendingBookingConfirmation": {
+          "proposedCallTime": "10:00",
+          "email": "rick@example.com"
+        },
+        "questionMemory": {}
+      },
+      "toolObservations": []
+    }
+  },
+  "fixtures_comment": "Uses normal test-mode booking fallback, so this scenario asserts the guard path does not falsely book without an affirmative.",
+  "steps": [
+    {
+      "user": "Maybe, I need to ask Rachel first",
+      "assert": {
+        "bookingConfirmed": false,
+        "toolNotCalled": "book_consultation",
+        "doesNotContain": ["all set", "calendar invite"]
+      }
+    }
+  ]
+}

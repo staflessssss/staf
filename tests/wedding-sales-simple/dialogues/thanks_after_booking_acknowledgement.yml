@@ -1,0 +1,37 @@
+{
+  "test_case": "thanks after booking acknowledgement",
+  "fixtures": {
+    "state": {
+      "mode": "bot_active",
+      "bookingConfirmed": true,
+      "customerName": "Rick",
+      "partnerName": "Rachel",
+      "customerEmail": "rick@example.com",
+      "weddingDate": "2026-10-17",
+      "weddingDateText": "October 17 2026",
+      "weddingDateDisplay": "October 17, 2026",
+      "location": "Tampa",
+      "venue": "The Vinoy",
+      "checkedCallTime": "10:00",
+      "checkedCallDate": "2026-06-30",
+      "replyMemory": {
+        "turnIndex": 8,
+        "greeted": true,
+        "lastRequiredQuestion": null,
+        "questionMemory": {}
+      },
+      "toolObservations": []
+    }
+  },
+  "steps": [
+    {
+      "user": "Thanks, see you later!",
+      "assert": {
+        "responseKey": "utter_acknowledgement",
+        "replyType": "acknowledgement_only",
+        "toolNotCalled": "book_consultation",
+        "doesNotContain": ["calendar invite", "locked in", "booked"]
+      }
+    }
+  ]
+}

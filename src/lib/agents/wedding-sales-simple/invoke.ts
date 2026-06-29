@@ -105,8 +105,7 @@ function outboundAttachments(args: {
 
   if (
     !knowledge ||
-    args.state?.replyContract?.mentionPolicy.guide.mode !== "send_attachment" ||
-    !/\b(?:guide|collections?|price)\b/i.test(args.text)
+    args.state?.replyContract?.mentionPolicy.guide.mode !== "send_attachment"
   ) {
     return undefined;
   }
