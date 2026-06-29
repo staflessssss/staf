@@ -460,15 +460,32 @@ function normalizeCatalogTextForContract(args: {
   text: string;
   responseKey: SimpleWeddingSalesResponseKey;
   contract: ReplyActionContract;
+  state: SimpleWeddingSalesState;
+  knowledge?: SimpleWeddingKnowledgeContext;
 }) {
+  let text = args.text;
+
+  if (
+    args.knowledge &&
+    args.responseKey === "utter_availability_available_ask_names" &&
+    args.contract.mustGreet
+  ) {
+    const greeting = greetingLine({
+      contract: args.contract,
+      state: args.state,
+      knowledge: args.knowledge,
+    })?.replace(/\n{2,}/g, " ");
+    text = joinLines([greeting, text]);
+  }
+
   if (
     args.responseKey !== "utter_availability_available_ask_names" ||
     args.contract.mentionPolicy.guide.mode !== "skip"
   ) {
-    return args.text;
+    return text;
   }
 
-  return args.text
+  return text
     .replace(/\n?I(?:'|’)?ll send the collections guide here so you can look through the options 🎥/i, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -605,6 +622,8 @@ function tryBuildResponseFromCatalog(args: {
       text: renderResponseVariation(variation, slots),
       responseKey: catalogResponseKey,
       contract: args.contract,
+      state: args.state,
+      knowledge: args.knowledge,
     }),
     responseKey: catalogResponseKey,
     variationId: variation.id,
@@ -722,6 +741,8 @@ function tryBuildGuardedResponseFromCatalog(args: {
       text: renderResponseVariation(variation, slots),
       responseKey: catalogResponseKey,
       contract: args.contract,
+      state: args.state,
+      knowledge: args.knowledge,
     });
     const guardResult = validateGeneratedReply({
       reply: text,

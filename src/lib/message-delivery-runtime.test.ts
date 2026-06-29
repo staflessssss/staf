@@ -637,6 +637,195 @@ test("processDelayedDeliveryByIdWithDeps sends simple slot follow-up without inv
   assert.equal(updates.length, 2);
 });
 
+test("processDueDelayedDeliveriesWithDeps reschedules overdue simple follow-up stages instead of sending the whole chain", async () => {
+  const previousDay1 = process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES;
+  const previousDay3 = process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES;
+  const previousDay7 = process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES;
+  process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES = "2";
+  process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES = "4";
+  process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES = "6";
+
+  try {
+    const now = new Date("2026-06-30T12:10:00Z");
+    const anchorCreatedAt = "2026-06-30T12:00:00.000Z";
+    const chainId = "conv-simple:names:turn-2:assistant-1";
+    const updates: Array<{ id?: string; dueAt?: Date; status?: DelayedDeliveryStatus }> = [];
+    const sentMessages: unknown[] = [];
+
+    const payloadForStage = (stage: "day_1" | "day_3" | "day_7") => ({
+      kind: "wedding_sales_simple_slot_follow_up",
+      chainId,
+      slot: "names",
+      stage,
+      responseKey: "utter_follow_up_names",
+      replyContext: {
+        contactId: "contact-1",
+      },
+      anchorCreatedAt,
+      anchorTurnIndex: 2,
+      anchorAssistantMessageId: "assistant-1",
+      lastRequiredQuestion: "names",
+      expectedStillMissing: "names",
+      stateSnapshot: {
+        lastRequiredQuestion: "names",
+        bookingConfirmed: false,
+      },
+      killOnUserMessage: true,
+    });
+
+    const deliveries = {
+      "delivery-day-1": {
+        id: "delivery-day-1",
+        agentId: "agent-1",
+        conversationId: "conv-simple",
+        kind: DelayedDeliveryKind.FOLLOW_UP,
+        payload: payloadForStage("day_1"),
+      },
+      "delivery-day-3": {
+        id: "delivery-day-3",
+        agentId: "agent-1",
+        conversationId: "conv-simple",
+        kind: DelayedDeliveryKind.FOLLOW_UP,
+        payload: payloadForStage("day_3"),
+      },
+      "delivery-day-7": {
+        id: "delivery-day-7",
+        agentId: "agent-1",
+        conversationId: "conv-simple",
+        kind: DelayedDeliveryKind.FOLLOW_UP,
+        payload: payloadForStage("day_7"),
+      },
+    };
+
+    const result = await messageDeliveryRuntimeTestHelpers.processDueDelayedDeliveriesWithDeps(
+      {
+        db: {
+          agent: {
+            findFirst: async () => ({ id: "agent-1" }),
+          },
+          conversation: {
+            findFirst: async () => ({ id: "conv-simple" }),
+          },
+          delayedDelivery: {
+            findMany: async () =>
+              Object.values(deliveries).map((delivery) => ({
+                id: delivery.id,
+                conversationId: delivery.conversationId,
+                payload: delivery.payload,
+              })),
+            findUnique: async (args: { where: { id: keyof typeof deliveries } }) => {
+              const delivery = deliveries[args.where.id];
+              return {
+                ...delivery,
+                agent: {
+                  id: "agent-1",
+                  tenantId: "tenant-1",
+                  status: AgentStatus.ACTIVE,
+                  channelConfig: {},
+                  channel: {
+                    type: ChannelType.INSTAGRAM,
+                    credentialsEnc: "encrypted",
+                  },
+                },
+                conversation: {
+                  id: "conv-simple",
+                  status: ConversationStatus.ACTIVE,
+                  contactId: "contact-1",
+                },
+              };
+            },
+            count: async () => 0,
+            update: async (args: Record<string, unknown>) => args,
+            updateMany: async (args: {
+              where?: { id?: string };
+              data?: { dueAt?: Date; status?: DelayedDeliveryStatus };
+            }) => {
+              updates.push({
+                id: args.where?.id,
+                dueAt: args.data?.dueAt,
+                status: args.data?.status,
+              });
+              return { count: 1 };
+            },
+          },
+          message: {
+            findFirst: async (args: { where?: { role?: MessageRole; toolName?: string } }) => {
+              if (args.where?.role === MessageRole.USER) {
+                return null;
+              }
+
+              if (args.where?.role === MessageRole.TOOL) {
+                return {
+                  toolResult: {
+                    state: {
+                      mode: "bot_active",
+                      bookingConfirmed: false,
+                      replyMemory: {
+                        lastRequiredQuestion: "names",
+                        questionMemory: {
+                          lastRequiredQuestion: "names",
+                        },
+                      },
+                    },
+                  },
+                };
+              }
+
+              return null;
+            },
+            create: async () => ({}),
+            createMany: async () => ({ count: 1 }),
+          },
+        } as never,
+        decrypt: (value: string) => value,
+        getChannelAdapter: () =>
+          ({
+            formatReply: (text: string) => text,
+            sendReply: async (args: { message: unknown }) => {
+              sentMessages.push(args.message);
+              return { ok: true, message_id: "mid-simple-follow-up" };
+            },
+          }) as never,
+        invokeAgent: async () => {
+          throw new Error("simple follow-up should not invoke the agent");
+        },
+        saveMessages: async () => undefined,
+      },
+      now,
+      10,
+    );
+
+    assert.equal(result.length, 1);
+    assert.equal(result[0]?.status, "wedding_sales_simple_follow_up_sent");
+    assert.deepEqual(sentMessages, ["Just checking in 🤍 what are the couple's names?"]);
+
+    const rescheduled = updates.filter((update) => update.dueAt);
+    assert.deepEqual(
+      rescheduled.map((update) => [update.id, update.dueAt?.toISOString()]),
+      [
+        ["delivery-day-3", "2026-06-30T12:12:00.000Z"],
+        ["delivery-day-7", "2026-06-30T12:14:00.000Z"],
+      ],
+    );
+  } finally {
+    if (previousDay1 === undefined) {
+      delete process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES;
+    } else {
+      process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES = previousDay1;
+    }
+    if (previousDay3 === undefined) {
+      delete process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES;
+    } else {
+      process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES = previousDay3;
+    }
+    if (previousDay7 === undefined) {
+      delete process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES;
+    } else {
+      process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES = previousDay7;
+    }
+  }
+});
+
 test("processDelayedDeliveryByIdWithDeps does not auto-resume while the agent is paused", async () => {
   let conversationUpdated = false;
   let sendCalled = false;

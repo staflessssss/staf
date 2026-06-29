@@ -94,7 +94,9 @@ function readPositiveEnvMinutes(name: string) {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function getFollowUpDelayMs(stage: WeddingSalesSimpleSlotFollowUpStage) {
+export function getWeddingSalesSimpleFollowUpDelayMs(
+  stage: WeddingSalesSimpleSlotFollowUpStage,
+) {
   const envNameByStage: Record<WeddingSalesSimpleSlotFollowUpStage, string> = {
     day_1: "WEDDING_FOLLOWUP_DAY_1_MINUTES",
     day_3: "WEDDING_FOLLOWUP_DAY_3_MINUTES",
@@ -517,7 +519,9 @@ export async function scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb(args
           agentId: args.agentId,
           conversationId: args.conversationId,
           kind: DelayedDeliveryKind.FOLLOW_UP,
-          dueAt: new Date(args.anchorCreatedAt.getTime() + getFollowUpDelayMs(followUp.stage)),
+          dueAt: new Date(
+            args.anchorCreatedAt.getTime() + getWeddingSalesSimpleFollowUpDelayMs(followUp.stage),
+          ),
           payload,
         },
       }),

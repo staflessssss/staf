@@ -119,7 +119,6 @@ export function validateGeneratedReply(args: {
   if (
     args.contract.mustGreet &&
     args.contract.responseKey !== "utter_ask_wedding_details" &&
-    args.contract.responseKey !== "utter_availability_available_ask_names" &&
     args.contract.responseKey !== "utter_ask_wedding_date_only" &&
     (!reply.includes(args.knowledge.persona.replyStyle.greetingOpening) ||
       !reply.includes(args.knowledge.persona.name) ||

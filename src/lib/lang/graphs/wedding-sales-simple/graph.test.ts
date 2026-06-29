@@ -1079,7 +1079,7 @@ test("simple wedding sales runtime greets once and does not repeat availability 
     toolContext,
   });
 
-  assert.doesNotMatch(
+  assert.match(
     first.responseDraft ?? "",
     /Hey there|Thank you so much for reaching out|I(?:\u2019|\'|\u2018)?m Taras|founder of Myndful Films|Huge congratulations|such an exciting season of life/i,
   );

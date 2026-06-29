@@ -28,9 +28,11 @@ import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
 import {
   buildWeddingSalesSimpleSlotFollowUpText,
+  getWeddingSalesSimpleFollowUpDelayMs,
   parseWeddingSalesSimpleSlotFollowUpPayload,
   recordWeddingSalesSimpleFollowUpLogWithDb,
   validateWeddingSalesSimpleSlotFollowUpWithDb,
+  type WeddingSalesSimpleSlotFollowUpStage,
 } from "@/lib/agents/wedding-sales-simple/followups";
 
 type RuntimeInvokeAgent = typeof import("@/lib/ai-runtime").invokeAgent;
@@ -1202,6 +1204,67 @@ export async function processDelayedDeliveryByIdWithDeps(
   }
 }
 
+function getWeddingSalesSimpleFollowUpCatchUpDueAt(args: {
+  now: Date;
+  selectedStage: WeddingSalesSimpleSlotFollowUpStage;
+  deferredStage: WeddingSalesSimpleSlotFollowUpStage;
+}) {
+  const selectedDelay = getWeddingSalesSimpleFollowUpDelayMs(args.selectedStage);
+  const deferredDelay = getWeddingSalesSimpleFollowUpDelayMs(args.deferredStage);
+  const minimumGapMs = 60 * 1000;
+  const catchUpGapMs = Math.max(minimumGapMs, deferredDelay - selectedDelay);
+
+  return new Date(args.now.getTime() + catchUpGapMs);
+}
+
+async function rescheduleDeferredWeddingSalesSimpleFollowUps(args: {
+  deps: RuntimeDeps;
+  now: Date;
+  selectedPayloadByChainId: Map<
+    string,
+    NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>
+  >;
+  deferred: Array<{
+    id: string;
+    conversationId: string;
+    payload: NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>;
+  }>;
+}) {
+  for (const delivery of args.deferred) {
+    const selectedPayload = args.selectedPayloadByChainId.get(delivery.payload.chainId);
+    if (!selectedPayload) {
+      continue;
+    }
+
+    const dueAt = getWeddingSalesSimpleFollowUpCatchUpDueAt({
+      now: args.now,
+      selectedStage: selectedPayload.stage,
+      deferredStage: delivery.payload.stage,
+    });
+
+    await args.deps.db.delayedDelivery.updateMany({
+      where: {
+        id: delivery.id,
+        status: DelayedDeliveryStatus.PENDING,
+      },
+      data: {
+        dueAt,
+      },
+    });
+    await recordWeddingSalesSimpleFollowUpLogWithDb({
+      database: args.deps.db,
+      conversationId: delivery.conversationId,
+      event: "FollowupSkipped",
+      reason: "catch_up_chain_rescheduled",
+      payload: {
+        chainId: delivery.payload.chainId,
+        stage: delivery.payload.stage,
+        rescheduledFor: dueAt.toISOString(),
+      },
+    });
+  }
+}
+
 export async function processDueDelayedDeliveriesWithDeps(
   deps: RuntimeDeps,
   now = new Date(),
@@ -1220,13 +1283,53 @@ export async function processDueDelayedDeliveriesWithDeps(
     take: limit,
     select: {
       id: true,
+      conversationId: true,
+      payload: true,
     },
+  });
+
+  const selectedDeliveryIds: string[] = [];
+  const selectedPayloadByChainId = new Map<
+    string,
+    NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>
+  >();
+  const deferredWeddingFollowUps: Array<{
+    id: string;
+    conversationId: string;
+    payload: NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>;
+  }> = [];
+
+  for (const delivery of dueDeliveries) {
+    const followUpPayload = parseWeddingSalesSimpleSlotFollowUpPayload(delivery.payload);
+    if (!followUpPayload) {
+      selectedDeliveryIds.push(delivery.id);
+      continue;
+    }
+
+    if (selectedPayloadByChainId.has(followUpPayload.chainId)) {
+      deferredWeddingFollowUps.push({
+        id: delivery.id,
+        conversationId: delivery.conversationId,
+        payload: followUpPayload,
+      });
+      continue;
+    }
+
+    selectedPayloadByChainId.set(followUpPayload.chainId, followUpPayload);
+    selectedDeliveryIds.push(delivery.id);
+  }
+
+  await rescheduleDeferredWeddingSalesSimpleFollowUps({
+    deps,
+    now,
+    selectedPayloadByChainId,
+    deferred: deferredWeddingFollowUps,
   });
 
   const results = [];
 
-  for (const delivery of dueDeliveries) {
-    results.push(await processDelayedDeliveryByIdWithDeps(delivery.id, deps, now));
+  for (const deliveryId of selectedDeliveryIds) {
+    results.push(await processDelayedDeliveryByIdWithDeps(deliveryId, deps, now));
   }
 
   return results;
