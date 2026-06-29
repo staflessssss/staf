@@ -26,6 +26,12 @@ import { saveMessages } from "@/lib/agent-memory";
 import type { InvokeAgentResult } from "@/lib/ai-runtime";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
+import {
+  buildWeddingSalesSimpleSlotFollowUpText,
+  parseWeddingSalesSimpleSlotFollowUpPayload,
+  recordWeddingSalesSimpleFollowUpLogWithDb,
+  validateWeddingSalesSimpleSlotFollowUpWithDb,
+} from "@/lib/agents/wedding-sales-simple/followups";
 
 type RuntimeInvokeAgent = typeof import("@/lib/ai-runtime").invokeAgent;
 
@@ -834,6 +840,82 @@ async function processFollowUp(args: {
       status: resumeMessageDeliveryFailed
         ? ("business_auto_resumed_without_resume_message" as const)
         : ("business_auto_resumed" as const),
+      conversationId: args.delivery.conversationId,
+    };
+  }
+
+  const simpleSlotFollowUpPayload = parseWeddingSalesSimpleSlotFollowUpPayload(
+    args.delivery.payload,
+  );
+  if (simpleSlotFollowUpPayload) {
+    const anchorCreatedAt = new Date(simpleSlotFollowUpPayload.anchorCreatedAt);
+    await recordWeddingSalesSimpleFollowUpLogWithDb({
+      database: args.deps.db,
+      conversationId: args.delivery.conversationId,
+      event: "FollowupTriggered",
+      payload: simpleSlotFollowUpPayload,
+    });
+
+    const validation = await validateWeddingSalesSimpleSlotFollowUpWithDb({
+      database: args.deps.db,
+      conversationId: args.delivery.conversationId,
+      agentId: args.delivery.agentId,
+      anchorCreatedAt,
+      payload: simpleSlotFollowUpPayload,
+    });
+
+    if (!validation.ok) {
+      await markDeliveryStatus({
+        database: args.deps.db,
+        deliveryId: args.deliveryId,
+        status: DelayedDeliveryStatus.CANCELED,
+        error: `wedding_sales_simple_follow_up_${validation.reason}`,
+      });
+      await recordWeddingSalesSimpleFollowUpLogWithDb({
+        database: args.deps.db,
+        conversationId: args.delivery.conversationId,
+        event: "FollowupCancelled",
+        reason: validation.reason,
+        payload: simpleSlotFollowUpPayload,
+      });
+      return {
+        ok: true,
+        status: "wedding_sales_simple_follow_up_canceled" as const,
+        reason: validation.reason,
+      };
+    }
+
+    const message = buildWeddingSalesSimpleSlotFollowUpText(simpleSlotFollowUpPayload);
+    await deliverThroughChannel({
+      database: args.deps.db,
+      conversationId: args.delivery.conversationId,
+      agent: args.delivery.agent,
+      decryptValue: args.deps.decrypt,
+      getAdapter: args.deps.getChannelAdapter,
+      replyContext: simpleSlotFollowUpPayload.replyContext,
+      text: message,
+    });
+    await args.deps.saveMessages(args.delivery.conversationId, [
+      {
+        role: MessageRole.ASSISTANT,
+        content: message,
+        model: "wedding_sales_simple_follow_up",
+      },
+    ]);
+    await recordWeddingSalesSimpleFollowUpLogWithDb({
+      database: args.deps.db,
+      conversationId: args.delivery.conversationId,
+      event: "FollowupSent",
+      payload: simpleSlotFollowUpPayload,
+    });
+    await markDeliverySentIfProcessing({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+    });
+
+    return {
+      ok: true,
+      status: "wedding_sales_simple_follow_up_sent" as const,
       conversationId: args.delivery.conversationId,
     };
   }

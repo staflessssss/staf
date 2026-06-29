@@ -510,6 +510,133 @@ test("processDelayedDeliveryByIdWithDeps auto-resumes a business-paused dialog",
   assert.deepEqual(events, ["send", "save", "conversation:update"]);
 });
 
+test("processDelayedDeliveryByIdWithDeps sends simple slot follow-up without invoking the agent", async () => {
+  const now = new Date("2026-06-30T12:00:00Z");
+  const updates: Array<Record<string, unknown>> = [];
+  let sentMessage: unknown = null;
+  let savedMessage: unknown = null;
+  let invokeAgentCalled = false;
+
+  const result = await messageDeliveryRuntimeTestHelpers.processDelayedDeliveryByIdWithDeps(
+    "delivery-simple-follow-up",
+    {
+      db: {
+        agent: {
+          findFirst: async () => ({ id: "agent-1" }),
+        },
+        conversation: {
+          findFirst: async () => ({ id: "conv-simple" }),
+        },
+        delayedDelivery: {
+          updateMany: async (args: Record<string, unknown>) => {
+            updates.push(args);
+            return { count: 1 };
+          },
+          findUnique: async () => ({
+            id: "delivery-simple-follow-up",
+            agentId: "agent-1",
+            conversationId: "conv-simple",
+            kind: DelayedDeliveryKind.FOLLOW_UP,
+            payload: {
+              kind: "wedding_sales_simple_slot_follow_up",
+              chainId: "conv-simple:names:turn-2:assistant-1",
+              slot: "names",
+              stage: "day_1",
+              responseKey: "utter_follow_up_names",
+              replyContext: {
+                contactId: "contact-1",
+              },
+              anchorCreatedAt: "2026-06-29T12:00:00.000Z",
+              anchorTurnIndex: 2,
+              anchorAssistantMessageId: "assistant-1",
+              lastRequiredQuestion: "names",
+              expectedStillMissing: "names",
+              stateSnapshot: {
+                lastRequiredQuestion: "names",
+                bookingConfirmed: false,
+              },
+              killOnUserMessage: true,
+            },
+            agent: {
+              id: "agent-1",
+              tenantId: "tenant-1",
+              status: AgentStatus.ACTIVE,
+              channelConfig: {},
+              channel: {
+                type: ChannelType.INSTAGRAM,
+                credentialsEnc: "encrypted",
+              },
+            },
+            conversation: {
+              id: "conv-simple",
+              status: ConversationStatus.ACTIVE,
+              contactId: "contact-1",
+            },
+          }),
+          count: async () => 0,
+          update: async (args: Record<string, unknown>) => args,
+        },
+        message: {
+          findFirst: async (args: { where?: { role?: MessageRole; toolName?: string } }) => {
+            if (args.where?.role === MessageRole.USER) {
+              return null;
+            }
+
+            if (args.where?.role === MessageRole.TOOL) {
+              return {
+                toolResult: {
+                  state: {
+                    mode: "bot_active",
+                    bookingConfirmed: false,
+                    replyMemory: {
+                      lastRequiredQuestion: "names",
+                      questionMemory: {
+                        lastRequiredQuestion: "names",
+                      },
+                    },
+                  },
+                },
+              };
+            }
+
+            return null;
+          },
+          create: async () => ({}),
+          createMany: async () => ({ count: 1 }),
+        },
+      } as never,
+      decrypt: (value: string) => value,
+      getChannelAdapter: () =>
+        ({
+          formatReply: (text: string) => text,
+          sendReply: async (args: { message: unknown }) => {
+            sentMessage = args.message;
+            return { ok: true, message_id: "mid-simple-follow-up" };
+          },
+        }) as never,
+      invokeAgent: async () => {
+        invokeAgentCalled = true;
+        return {
+          message: "should not be used",
+          promptPreview: "prompt",
+          usedTooling: [],
+        };
+      },
+      saveMessages: async (_conversationId, messages) => {
+        savedMessage = messages[0];
+      },
+    },
+    now,
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "wedding_sales_simple_follow_up_sent");
+  assert.equal(sentMessage, "Just checking in 🤍 what are the couple's names?");
+  assert.equal((savedMessage as { model?: string } | null)?.model, "wedding_sales_simple_follow_up");
+  assert.equal(invokeAgentCalled, false);
+  assert.equal(updates.length, 2);
+});
+
 test("processDelayedDeliveryByIdWithDeps does not auto-resume while the agent is paused", async () => {
   let conversationUpdated = false;
   let sendCalled = false;

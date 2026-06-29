@@ -71,6 +71,8 @@ import {
   loadWeddingSalesSimpleStateWithDb,
   saveWeddingSalesSimpleStateWithDb,
 } from "@/lib/agents/wedding-sales-simple/state-store";
+import { scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb } from "@/lib/agents/wedding-sales-simple/followups";
+import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
 
 type LightweightKnowledgeBlock = {
   name: string;
@@ -292,6 +294,8 @@ export type InvokeAgentResult = {
   channelDeliveryPlan?: ChannelDeliveryPlan;
   historyAppend?: RuntimeHistoryMessage[];
   suppressReply?: boolean;
+  weddingSalesSimpleFollowUpState?: Partial<SimpleWeddingSalesState>;
+  weddingSalesSimpleAssistantMessageId?: string;
 };
 
 export type RuntimeHistoryMessage = {
@@ -1998,16 +2002,16 @@ async function runWeddingSalesSimpleRuntime(args: {
     observations: adapterResult.state.toolObservations,
   });
 
-  if (message) {
-    await args.database.message.create({
+  const assistantMessage = message
+    ? await args.database.message.create({
       data: {
         conversationId: conversation.id,
         role: MessageRole.ASSISTANT,
         content: message,
         model: "wedding_sales_simple",
       },
-    });
-  }
+    })
+    : null;
 
   const usedTooling = adapterResult.state.toolObservations.map(
     (observation) => observation.toolName,
@@ -2035,6 +2039,8 @@ async function runWeddingSalesSimpleRuntime(args: {
     model: "wedding_sales_simple",
     attachments: getSimpleWeddingSalesAttachments(adapterResult.outbound.attachments),
     channelDeliveryPlan: adapterResult.outbound.channelDeliveryPlan,
+    weddingSalesSimpleFollowUpState: adapterResult.state,
+    weddingSalesSimpleAssistantMessageId: assistantMessage?.id,
   };
 }
 
@@ -3180,7 +3186,22 @@ async function handleIncomingEventWithDeps(
       },
     });
 
-    if (agentActiveAfterDelivery) {
+    if (
+      agentActiveAfterDelivery &&
+      result.model === "wedding_sales_simple" &&
+      result.weddingSalesSimpleFollowUpState &&
+      result.weddingSalesSimpleAssistantMessageId
+    ) {
+      await scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb({
+        database: deps.db,
+        agentId: agent.id,
+        conversationId: result.conversationId,
+        replyContext,
+        anchorCreatedAt: new Date(),
+        anchorAssistantMessageId: result.weddingSalesSimpleAssistantMessageId,
+        state: result.weddingSalesSimpleFollowUpState,
+      });
+    } else if (agentActiveAfterDelivery) {
       await scheduleFollowUpsForReplyWithDb({
         database: deps.db,
         agentId: agent.id,
