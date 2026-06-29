@@ -1,6 +1,27 @@
 {
   "events": [
     {
+      "id": "instagram_ad_info_reply_variants",
+      "priority": "P0",
+      "variants": [
+        {
+          "text": "Hello, can I get more info on this?",
+          "states": ["first_turn"],
+          "understanding": {
+            "customerMessageType": "new_lead",
+            "facts": {},
+            "questionsAskedByCustomer": ["other"],
+            "confidence": 0.95
+          },
+          "expected": {
+            "responseKey": "utter_ask_wedding_details",
+            "nextStep": "ask_missing_info",
+            "toolNotCalled": "book_consultation"
+          }
+        }
+      ]
+    },
+    {
       "id": "affirmative_yes_variants",
       "priority": "P0",
       "variants": [
