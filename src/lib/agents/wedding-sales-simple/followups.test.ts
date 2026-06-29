@@ -61,7 +61,71 @@ test("schedules 1/3/7 day slot follow-ups when simple runtime asked for names", 
   assert.equal((firstData.payload as Record<string, unknown>).slot, "names");
   assert.equal((firstData.payload as Record<string, unknown>).stage, "day_1");
   assert.equal((firstData.payload as Record<string, unknown>).responseKey, "utter_follow_up_names");
+  assert.equal((firstData.payload as Record<string, unknown>).context, undefined);
   assert.equal(logs.length, 1);
+});
+
+test("uses investment guide day 1 follow-up after available date price guide", async () => {
+  const created: Array<Record<string, unknown>> = [];
+
+  await scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb({
+    database: {
+      delayedDelivery: {
+        findMany: async () => [],
+        updateMany: async () => ({ count: 0 }),
+        create: async (args: Record<string, unknown>) => {
+          created.push(args);
+          return args;
+        },
+      },
+      message: {
+        create: async () => ({}),
+      },
+    } as never,
+    agentId: "agent-1",
+    conversationId: "conv-1",
+    replyContext: { contactId: "contact-1" },
+    anchorCreatedAt: new Date("2026-06-29T12:00:00.000Z"),
+    anchorAssistantMessageId: "assistant-1",
+    state: {
+      mode: "bot_active",
+      bookingConfirmed: false,
+      location: "Tampa",
+      replyMemory: {
+        turnIndex: 2,
+        lastRequiredQuestion: "names",
+        mentioned: {
+          guide: {
+            mode: "image",
+            reason: "availability_available",
+            lastMentionedAt: "2026-06-29T12:00:00.000Z",
+          },
+        },
+      },
+      decisionTrace: {
+        extractedFacts: {},
+        missingFields: ["names"],
+        nextStep: "ask_missing_info",
+        replyType: "availability_available",
+        responseKey: "utter_availability_available_ask_names",
+        reason: "date available",
+      },
+    },
+  });
+
+  const firstPayload = created[0]?.data
+    ? ((created[0].data as Record<string, unknown>).payload as Record<string, unknown>)
+    : null;
+  const secondPayload = created[1]?.data
+    ? ((created[1].data as Record<string, unknown>).payload as Record<string, unknown>)
+    : null;
+
+  assert.equal(firstPayload?.context, "availability_price_guide");
+  assert.equal(secondPayload?.context, "availability_price_guide");
+  assert.match(buildWeddingSalesSimpleSlotFollowUpText(firstPayload as never), /investment guide/);
+  assert.match(buildWeddingSalesSimpleSlotFollowUpText(firstPayload as never), /Summer Special with 20% off ends July 15/);
+  assert.match(buildWeddingSalesSimpleSlotFollowUpText(firstPayload as never), /What are both of your names?/);
+  assert.doesNotMatch(buildWeddingSalesSimpleSlotFollowUpText(secondPayload as never), /Summer Special with 20% off ends July 15/);
 });
 
 test("schedule supports short follow-up intervals through env overrides", async () => {

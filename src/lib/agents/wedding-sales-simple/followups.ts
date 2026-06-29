@@ -56,6 +56,7 @@ export type WeddingSalesSimpleSlotFollowUpPayload = {
   lastRequiredQuestion: string;
   proposedCallTimeDisplay?: string;
   weddingDateText?: string;
+  context?: "availability_price_guide";
   stateSnapshot: {
     weddingDate?: string;
     weddingDateText?: string;
@@ -354,6 +355,7 @@ export function parseWeddingSalesSimpleSlotFollowUpPayload(
     lastRequiredQuestion,
     proposedCallTimeDisplay: readString(value.proposedCallTimeDisplay),
     weddingDateText: readString(value.weddingDateText),
+    context: value.context === "availability_price_guide" ? "availability_price_guide" : undefined,
     stateSnapshot: isRecord(value.stateSnapshot)
       ? {
           weddingDate: readString(value.stateSnapshot.weddingDate),
@@ -374,18 +376,41 @@ export function parseWeddingSalesSimpleSlotFollowUpPayload(
   };
 }
 
+function getFollowUpContext(
+  slot: WeddingSalesSimpleSlotFollowUpSlot,
+  state: Partial<SimpleWeddingSalesState>,
+): WeddingSalesSimpleSlotFollowUpPayload["context"] {
+  if (
+    slot === "names" &&
+    state.decisionTrace?.replyType === "availability_available" &&
+    state.decisionTrace.responseKey === "utter_availability_available_ask_names" &&
+    state.replyMemory?.mentioned?.guide?.reason === "availability_available"
+  ) {
+    return "availability_price_guide";
+  }
+
+  return undefined;
+}
+
 export function buildWeddingSalesSimpleSlotFollowUpText(
   payload: WeddingSalesSimpleSlotFollowUpPayload,
 ) {
   const proposedCallTimeDisplay = payload.proposedCallTimeDisplay ?? "that time";
   const weddingDateText = payload.weddingDateText ?? "that date";
+  const availabilityPriceGuideNamesFollowUp =
+    "Hey there! Just wanted to check in and see if you had a chance to look through our investment guide\u{1F90D}\u2728\n\n" +
+    "Let me know if you have any questions - I\u2019d be happy to help! Also, just a quick reminder that our Summer Special with 20% off ends July 15, so these prices won\u2019t be available for much longer.\n\n" +
+    "What are both of your names?";
 
   const texts: Record<
     WeddingSalesSimpleSlotFollowUpSlot,
     Record<WeddingSalesSimpleSlotFollowUpStage, string>
   > = {
     names: {
-      day_1: "Just checking in 🤍 what are the couple's names?",
+      day_1:
+        payload.context === "availability_price_guide"
+          ? availabilityPriceGuideNamesFollowUp
+          : "Just checking in \u{1F90D} what are the couple's names?",
       day_3: "Still happy to help with the next steps 🤍 what are the couple's names?",
       day_7:
         "One last check-in 🤍 if you'd still like help with the wedding film, what are the couple's names?",
@@ -493,6 +518,7 @@ export async function scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb(args
     lastRequiredQuestion: scheduleDecision.lastRequiredQuestion,
     proposedCallTimeDisplay,
     weddingDateText: args.state.weddingDateText,
+    context: getFollowUpContext(scheduleDecision.slot, args.state),
     stateSnapshot: {
       weddingDate: args.state.weddingDate,
       weddingDateText: args.state.weddingDateText,
