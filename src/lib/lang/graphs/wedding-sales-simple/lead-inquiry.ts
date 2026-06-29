@@ -26,3 +26,21 @@ export function isGenericWeddingLeadInquiry(text: string) {
     /\b(?:inquiry|interested|info|information|get\s+info|learn\s+more)\b/.test(normalized)
   );
 }
+
+export function isIntroductoryLeadOpener(text: string) {
+  const normalized = text
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2019]/g, "'")
+    .replace(/[.!?]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (/^(?:hi|hello|hey|hey there|good morning|good afternoon|good evening)\s*$/.test(normalized)) {
+    return true;
+  }
+
+  return /^(?:hi|hello|hey|hey there)\b[\s\S]{0,80}\b(?:more info|more information|details|interested|wedding|videography|video|pricing|price|packages)\b/.test(
+    normalized,
+  );
+}

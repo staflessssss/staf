@@ -18,6 +18,66 @@
             "nextStep": "ask_missing_info",
             "toolNotCalled": "book_consultation"
           }
+        },
+        {
+          "text": "Hi",
+          "states": ["first_turn"],
+          "understanding": {
+            "customerMessageType": "unclear",
+            "facts": {},
+            "questionsAskedByCustomer": [],
+            "confidence": 0.7
+          },
+          "expected": {
+            "responseKey": "utter_ask_wedding_details",
+            "nextStep": "ask_missing_info",
+            "toolNotCalled": "book_consultation"
+          }
+        },
+        {
+          "text": "Hey there",
+          "states": ["first_turn"],
+          "understanding": {
+            "customerMessageType": "unclear",
+            "facts": {},
+            "questionsAskedByCustomer": [],
+            "confidence": 0.7
+          },
+          "expected": {
+            "responseKey": "utter_ask_wedding_details",
+            "nextStep": "ask_missing_info",
+            "toolNotCalled": "book_consultation"
+          }
+        },
+        {
+          "text": "Hello, I'm interested",
+          "states": ["first_turn"],
+          "understanding": {
+            "customerMessageType": "new_lead",
+            "facts": {},
+            "questionsAskedByCustomer": ["other"],
+            "confidence": 0.9
+          },
+          "expected": {
+            "responseKey": "utter_ask_wedding_details",
+            "nextStep": "ask_missing_info",
+            "toolNotCalled": "book_consultation"
+          }
+        },
+        {
+          "text": "Can I get more information?",
+          "states": ["first_turn"],
+          "understanding": {
+            "customerMessageType": "new_lead",
+            "facts": {},
+            "questionsAskedByCustomer": ["other"],
+            "confidence": 0.9
+          },
+          "expected": {
+            "responseKey": "utter_ask_wedding_details",
+            "nextStep": "ask_missing_info",
+            "toolNotCalled": "book_consultation"
+          }
         }
       ]
     },

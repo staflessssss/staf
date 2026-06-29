@@ -4,7 +4,7 @@ import type {
   SimpleWeddingSalesState,
   TurnUnderstanding,
 } from "./state";
-import { isGenericWeddingLeadInquiry } from "./lead-inquiry";
+import { isGenericWeddingLeadInquiry, isIntroductoryLeadOpener } from "./lead-inquiry";
 
 export type DialogueUnderstanding = {
   messageAct:
@@ -90,6 +90,20 @@ function isAcknowledgementOnly(text: string) {
   );
 }
 
+function isFreshLeadState(state: SimpleWeddingSalesState) {
+  return (
+    !state.weddingDate &&
+    !state.location &&
+    !state.customerName &&
+    !state.partnerName &&
+    !state.venue &&
+    !state.proposedCallTime &&
+    !state.customerEmail &&
+    !state.pendingUserAction &&
+    !state.bookingConfirmed
+  );
+}
+
 function inferPendingAnswer(args: {
   state: SimpleWeddingSalesState;
   text: string;
@@ -146,7 +160,10 @@ export function buildDialogueUnderstanding(args: {
     explicitQuestions,
   });
   const hasFacts = Object.values(args.understanding.facts).some(Boolean);
-  const isGenericLead = isGenericWeddingLeadInquiry(args.state.latestCustomerMessage);
+  const isGenericLead =
+    !hasFacts &&
+    (isGenericWeddingLeadInquiry(args.state.latestCustomerMessage) ||
+      (isFreshLeadState(args.state) && isIntroductoryLeadOpener(args.state.latestCustomerMessage)));
   const messageAct: DialogueUnderstanding["messageAct"] =
     isGenericLead
       ? "generic_lead_inquiry"
