@@ -64,6 +64,75 @@ test("schedules 1/3/7 day slot follow-ups when simple runtime asked for names", 
   assert.equal(logs.length, 1);
 });
 
+test("schedule supports short follow-up intervals through env overrides", async () => {
+  const previousDay1 = process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES;
+  const previousDay3 = process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES;
+  const previousDay7 = process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES;
+  process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES = "2";
+  process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES = "4";
+  process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES = "6";
+
+  try {
+    const created: Array<Record<string, unknown>> = [];
+    const anchorCreatedAt = new Date("2026-06-29T12:00:00.000Z");
+
+    await scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb({
+      database: {
+        delayedDelivery: {
+          findMany: async () => [],
+          updateMany: async () => ({ count: 0 }),
+          create: async (args: Record<string, unknown>) => {
+            created.push(args);
+            return args;
+          },
+        },
+        message: {
+          create: async () => ({}),
+        },
+      } as never,
+      agentId: "agent-1",
+      conversationId: "conv-1",
+      replyContext: { contactId: "contact-1" },
+      anchorCreatedAt,
+      anchorAssistantMessageId: "assistant-1",
+      state: {
+        mode: "bot_active",
+        bookingConfirmed: false,
+        replyMemory: {
+          turnIndex: 2,
+          lastRequiredQuestion: "venue",
+        },
+      },
+    });
+
+    assert.deepEqual(
+      created.map((entry) =>
+        ((entry.data as Record<string, unknown>).dueAt as Date).getTime() -
+        anchorCreatedAt.getTime(),
+      ),
+      [2 * 60 * 1000, 4 * 60 * 1000, 6 * 60 * 1000],
+    );
+  } finally {
+    if (previousDay1 === undefined) {
+      delete process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES;
+    } else {
+      process.env.WEDDING_FOLLOWUP_DAY_1_MINUTES = previousDay1;
+    }
+
+    if (previousDay3 === undefined) {
+      delete process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES;
+    } else {
+      process.env.WEDDING_FOLLOWUP_DAY_3_MINUTES = previousDay3;
+    }
+
+    if (previousDay7 === undefined) {
+      delete process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES;
+    } else {
+      process.env.WEDDING_FOLLOWUP_DAY_7_MINUTES = previousDay7;
+    }
+  }
+});
+
 test("does not schedule simple slot follow-ups for booking confirmed state", async () => {
   const created: Array<Record<string, unknown>> = [];
 

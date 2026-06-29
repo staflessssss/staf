@@ -75,7 +75,7 @@ type WeddingSalesSimpleFollowUpDatabase = Pick<
   "delayedDelivery" | "message" | "conversation" | "agent"
 >;
 
-const FOLLOW_UP_DAY_OFFSETS: Array<{
+const DEFAULT_FOLLOW_UP_DAY_OFFSETS: Array<{
   stage: WeddingSalesSimpleSlotFollowUpStage;
   days: number;
 }> = [
@@ -83,6 +83,34 @@ const FOLLOW_UP_DAY_OFFSETS: Array<{
   { stage: "day_3", days: 3 },
   { stage: "day_7", days: 7 },
 ];
+
+function readPositiveEnvMinutes(name: string) {
+  const raw = process.env[name];
+  if (!raw) {
+    return null;
+  }
+
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function getFollowUpDelayMs(stage: WeddingSalesSimpleSlotFollowUpStage) {
+  const envNameByStage: Record<WeddingSalesSimpleSlotFollowUpStage, string> = {
+    day_1: "WEDDING_FOLLOWUP_DAY_1_MINUTES",
+    day_3: "WEDDING_FOLLOWUP_DAY_3_MINUTES",
+    day_7: "WEDDING_FOLLOWUP_DAY_7_MINUTES",
+  };
+  const overrideMinutes = readPositiveEnvMinutes(envNameByStage[stage]);
+
+  if (overrideMinutes) {
+    return overrideMinutes * 60 * 1000;
+  }
+
+  const defaultOffset = DEFAULT_FOLLOW_UP_DAY_OFFSETS.find(
+    (followUp) => followUp.stage === stage,
+  );
+  return (defaultOffset?.days ?? 1) * 24 * 60 * 60 * 1000;
+}
 
 const CANCELABLE_STATUSES = [
   DelayedDeliveryStatus.PENDING,
@@ -478,7 +506,7 @@ export async function scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb(args
   } satisfies Omit<WeddingSalesSimpleSlotFollowUpPayload, "stage">;
 
   const created = [];
-  for (const followUp of FOLLOW_UP_DAY_OFFSETS) {
+  for (const followUp of DEFAULT_FOLLOW_UP_DAY_OFFSETS) {
     const payload: WeddingSalesSimpleSlotFollowUpPayload = {
       ...payloadBase,
       stage: followUp.stage,
@@ -489,7 +517,7 @@ export async function scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb(args
           agentId: args.agentId,
           conversationId: args.conversationId,
           kind: DelayedDeliveryKind.FOLLOW_UP,
-          dueAt: new Date(args.anchorCreatedAt.getTime() + followUp.days * 24 * 60 * 60 * 1000),
+          dueAt: new Date(args.anchorCreatedAt.getTime() + getFollowUpDelayMs(followUp.stage)),
           payload,
         },
       }),
@@ -503,7 +531,7 @@ export async function scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb(args
       payload: {
         chainId,
         slot: scheduleDecision.slot,
-        stages: FOLLOW_UP_DAY_OFFSETS.map((followUp) => followUp.stage),
+      stages: DEFAULT_FOLLOW_UP_DAY_OFFSETS.map((followUp) => followUp.stage),
       },
   });
 
