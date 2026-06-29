@@ -581,6 +581,54 @@ test("Instagram preflight ignores empty ad or story payload messages", () => {
   assert.equal(result.ignoredEmptyMessageCount, 1);
 });
 
+test("Instagram preflight treats Olasunkanmi ad reply payload as no prior history", () => {
+  const firstAdReplyMessageId =
+    "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDAyMTI3MzYxNTkzOjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI1OTQzMDQ4MDYzMDI4ODY2MTozMjg4NDk3MDk3NzQyOTkwMDIwMzM4MzI3MTIwMzAxMjYwOAZDZD";
+  const secondAdReplyMessageId =
+    "aWdfZAG1faXRlbToxOklHTWVzc2FnZAUlEOjE3ODQxNDAyMTI3MzYxNTkzOjM0MDI4MjM2Njg0MTcxMDMwMTI0NDI1OTQzMDQ4MDYzMDI4ODY2MTozMjg4NTY3NDEwNDE1MDQzODI4ODQ2OTc3NjMwNjAxMjE2MAZDZD";
+
+  const resultForFirstReply = aiRuntimeTestHelpers.classifyInstagramPriorMessages({
+    currentMessageId: firstAdReplyMessageId,
+    messages: [
+      {
+        id: firstAdReplyMessageId,
+        from: { username: "wumirosey", id: "1562821962174810" },
+        created_time: "2026-06-29T01:50:48+0000",
+        message: "Hello, can I get more info on this?",
+      },
+      {
+        id: "empty-story-payload-first",
+        from: { username: "wumirosey", id: "1562821962174810" },
+        created_time: "2026-06-29T01:50:48+0000",
+        message: "",
+      },
+    ],
+  });
+
+  const resultForSecondReply = aiRuntimeTestHelpers.classifyInstagramPriorMessages({
+    currentMessageId: secondAdReplyMessageId,
+    messages: [
+      {
+        id: secondAdReplyMessageId,
+        from: { username: "wumirosey", id: "1562821962174810" },
+        created_time: "2026-06-29T12:26:05+0000",
+        message: "Hello, can I get more info on this?",
+      },
+      {
+        id: "empty-story-payload-second",
+        from: { username: "wumirosey", id: "1562821962174810" },
+        created_time: "2026-06-29T12:26:04+0000",
+        message: "",
+      },
+    ],
+  });
+
+  assert.equal(resultForFirstReply.priorMessages.length, 0);
+  assert.equal(resultForFirstReply.ignoredEmptyMessageCount, 1);
+  assert.equal(resultForSecondReply.priorMessages.length, 0);
+  assert.equal(resultForSecondReply.ignoredEmptyMessageCount, 1);
+});
+
 test("Instagram preflight keeps real prior text history manual-only", () => {
   const result = aiRuntimeTestHelpers.classifyInstagramPriorMessages({
     currentMessageId: "current-message-id",
