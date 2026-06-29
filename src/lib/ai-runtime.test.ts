@@ -558,6 +558,52 @@ test("getInboundConversationPolicy blocks replies outside the configured schedul
   assert.equal(policy, "waiting_for_schedule_window");
 });
 
+test("Instagram preflight ignores empty ad or story payload messages", () => {
+  const result = aiRuntimeTestHelpers.classifyInstagramPriorMessages({
+    currentMessageId: "current-message-id",
+    messages: [
+      {
+        id: "current-message-id",
+        from: { id: "contact-1", username: "lead" },
+        created_time: "2026-06-29T12:26:05+0000",
+        message: "Hello, can I get more info on this?",
+      },
+      {
+        id: "empty-story-payload-id",
+        from: { id: "contact-1", username: "lead" },
+        created_time: "2026-06-29T12:26:04+0000",
+        message: "",
+      },
+    ],
+  });
+
+  assert.equal(result.priorMessages.length, 0);
+  assert.equal(result.ignoredEmptyMessageCount, 1);
+});
+
+test("Instagram preflight keeps real prior text history manual-only", () => {
+  const result = aiRuntimeTestHelpers.classifyInstagramPriorMessages({
+    currentMessageId: "current-message-id",
+    messages: [
+      {
+        id: "current-message-id",
+        from: { id: "contact-1", username: "lead" },
+        created_time: "2026-06-29T12:26:05+0000",
+        message: "Hello, can I get more info on this?",
+      },
+      {
+        id: "prior-text-id",
+        from: { id: "contact-1", username: "lead" },
+        created_time: "2026-06-28T12:26:04+0000",
+        message: "Hi, are you available?",
+      },
+    ],
+  });
+
+  assert.equal(result.priorMessages.length, 1);
+  assert.equal(result.priorMessages[0]?.id, "prior-text-id");
+});
+
 test("buildRuntimeContextLines does not expose hidden prompting visibility flags", () => {
   const hidden = aiRuntimeTestHelpers.buildRuntimeContextLines({
     prompting: {
@@ -932,8 +978,8 @@ test("inspectInstagramConversationHistory follows Instagram conversation paginat
       JSON.stringify({
         messages: {
           data: [
-            { id: "current-message-id" },
-            { id: "prior-message-id" },
+            { id: "current-message-id", message: "Current lead reply" },
+            { id: "prior-message-id", message: "Earlier real message" },
           ],
         },
       }),
@@ -960,6 +1006,80 @@ test("inspectInstagramConversationHistory follows Instagram conversation paginat
     assert.equal(result.status === "prior_history_found" ? result.conversationId : null, "ig-conversation-1");
     assert.equal(result.status === "prior_history_found" ? result.priorMessageCount : null, 1);
     assert.equal(requestedUrls.some((url) => url.includes("after=page-2")), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.CREDENTIALS_ENCRYPTION_KEY = originalKey;
+  }
+});
+
+test("inspectInstagramConversationHistory treats empty ad reply payload as no prior history", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.CREDENTIALS_ENCRYPTION_KEY;
+  process.env.CREDENTIALS_ENCRYPTION_KEY = "b".repeat(64);
+  const credentialsEnc = encrypt(
+    JSON.stringify({
+      instagramUserAccessToken: "instagram-token",
+      igUserId: "ig-business-1",
+      graphApiVersion: "v25.0",
+    }),
+  );
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url.includes("/me/conversations")) {
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "ig-conversation-1",
+              participants: { data: [{ id: "contact-1" }] },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        messages: {
+          data: [
+            {
+              id: "current-message-id",
+              from: { id: "contact-1", username: "lead" },
+              created_time: "2026-06-29T12:26:05+0000",
+              message: "Hello, can I get more info on this?",
+            },
+            {
+              id: "empty-story-payload-id",
+              from: { id: "contact-1", username: "lead" },
+              created_time: "2026-06-29T12:26:04+0000",
+              message: "",
+            },
+          ],
+        },
+      }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  try {
+    const result = await aiRuntimeTestHelpers.inspectInstagramConversationHistory({
+      agent: {
+        id: "agent-1",
+        tenantId: "tenant-1",
+        channelConfig: {},
+        channel: {
+          type: "INSTAGRAM",
+          credentialsEnc,
+        },
+      } as never,
+      contactId: "contact-1",
+      messageId: "current-message-id",
+    });
+
+    assert.equal(result.status, "no_prior_history");
   } finally {
     globalThis.fetch = originalFetch;
     process.env.CREDENTIALS_ENCRYPTION_KEY = originalKey;

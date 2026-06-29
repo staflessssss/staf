@@ -137,6 +137,32 @@ test("simple wedding sales runtime starts qualification for generic Instagram in
   assert.match(result.responseDraft ?? "", /location/i);
 });
 
+test("simple wedding sales runtime treats Instagram ad info replies as new leads", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Hello, can I get more info on this?",
+    understand: () =>
+      understanding({
+        customerMessageType: "new_lead",
+        questionsAskedByCustomer: ["other"],
+      }),
+  });
+
+  assert.notEqual(result.nextStep, "handoff");
+  assert.equal(result.mode, "bot_active");
+  assert.equal(result.handoffReason, undefined);
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.missingField, "weddingDate");
+  assert.equal(result.decisionTrace?.responseKey, "utter_ask_wedding_details");
+  assert.ok(
+    result.dialogueCommands?.some(
+      (command) =>
+        command.type === "start_flow" &&
+        command.flow === "wedding_lead_qualification",
+    ),
+  );
+});
+
 test("simple wedding sales runtime does not pause bot after generic inquiry", async () => {
   const first = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",

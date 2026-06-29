@@ -8,8 +8,16 @@ export function isGenericWeddingLeadInquiry(text: string) {
       "inquiry about wedding video",
       "interested in wedding videography",
       "i'm interested in wedding videography",
+      "get in touch",
+      "tell me more",
+      "i'm interested",
+      "interested",
     ].includes(normalized)
   ) {
+    return true;
+  }
+
+  if (/\b(?:can i|get|send|share|tell me)\b[\s\S]{0,40}\b(?:more info|more information|details)\b/.test(normalized)) {
     return true;
   }
 

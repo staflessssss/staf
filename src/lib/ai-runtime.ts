@@ -734,6 +734,7 @@ type InstagramConversationDetailPayload = {
         username?: string;
       };
       created_time?: string;
+      message?: string;
     }>;
   };
 };
@@ -751,6 +752,30 @@ async function fetchInstagramGraphJson<T>(url: URL, token: string): Promise<T> {
   }
 
   return payload;
+}
+
+function classifyInstagramPriorMessages(args: {
+  messages: NonNullable<InstagramConversationDetailPayload["messages"]>["data"];
+  currentMessageId?: string;
+}) {
+  const currentMessageId = args.currentMessageId?.trim() ?? "";
+  const priorMessages = (args.messages ?? []).filter((message) => {
+    const messageId = message.id?.trim() ?? "";
+
+    if (!messageId || messageId === currentMessageId) {
+      return false;
+    }
+
+    return Boolean(message.message?.trim());
+  });
+
+  return {
+    priorMessages,
+    ignoredEmptyMessageCount: (args.messages ?? []).filter((message) => {
+      const messageId = message.id?.trim() ?? "";
+      return Boolean(messageId && messageId !== currentMessageId && !message.message?.trim());
+    }).length,
+  };
 }
 
 async function inspectInstagramConversationHistory(args: {
@@ -824,25 +849,23 @@ async function inspectInstagramConversationHistory(args: {
 
     conversationUrl.searchParams.set(
       "fields",
-      "messages.limit(25){id,from,created_time}",
+      "messages.limit(25){id,from,created_time,message}",
     );
 
     const detail = await fetchInstagramGraphJson<InstagramConversationDetailPayload>(
       conversationUrl,
       credentials.pageAccessToken,
     );
-    const currentMessageId = args.messageId?.trim() ?? "";
-    const priorMessages = (detail.messages?.data ?? []).filter((message) => {
-      const messageId = message.id?.trim() ?? "";
-
-      return Boolean(messageId && messageId !== currentMessageId);
+    const priorClassification = classifyInstagramPriorMessages({
+      messages: detail.messages?.data,
+      currentMessageId: args.messageId,
     });
 
-    if (priorMessages.length > 0) {
+    if (priorClassification.priorMessages.length > 0) {
       return {
         status: "prior_history_found",
         conversationId: conversation.id,
-        priorMessageCount: priorMessages.length,
+        priorMessageCount: priorClassification.priorMessages.length,
       };
     }
 
@@ -2545,6 +2568,7 @@ export const aiRuntimeTestHelpers = {
   extractDelayedFollowUpGuidance,
   finalizeAssistantText,
   getInboundConversationPolicy,
+  classifyInstagramPriorMessages,
   inspectInstagramConversationHistory,
   getWeddingSalesOwnerHandoffReason,
   handleIncomingEventWithDeps,
