@@ -19,7 +19,7 @@ function isAuthorizedCronRequest(request: NextRequest) {
     (hostname === "localhost" || hostname === "127.0.0.1");
 
   if (configuredSecret) {
-    return request.headers.get("authorization") === `Bearer ${configuredSecret}`;
+    return request.headers.get("authorization") === `Bearer ${configuredSecret.trim()}`;
   }
 
   return isLocalDev;
