@@ -86,7 +86,10 @@ function requiredQuestionForState(
     }
   }
 
-  if (state.nextStep === "reply_only" && state.replyObligations?.length) {
+  if (
+    state.nextStep === "reply_only" &&
+    (state.replyObligations?.length || state.decisionTrace?.replyType === "acknowledgement_only")
+  ) {
     const lastQuestion =
       state.replyMemory?.lastRequiredQuestion ??
       state.replyMemory?.questionMemory?.lastRequiredQuestion;

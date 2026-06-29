@@ -1,0 +1,263 @@
+{
+  "events": [
+    {
+      "id": "affirmative_yes_variants",
+      "priority": "P0",
+      "variants": [
+        "Yes",
+        "Yes please",
+        "Yes, please, sorry",
+        "Yeah that works",
+        "Sounds good",
+        "Go ahead",
+        "Please lock it in"
+      ],
+      "understanding": {
+        "customerMessageType": "booking_confirmation",
+        "facts": {},
+        "questionsAskedByCustomer": [],
+        "confidence": 0.96
+      },
+      "expectedByState": {
+        "pending_booking_confirmation": {
+          "toolCalled": "book_consultation",
+          "responseKey": "utter_booking_confirmed",
+          "bookingConfirmed": true,
+          "pendingUserAction": null
+        },
+        "collecting_names": {
+          "shouldNotBook": true,
+          "bookingConfirmed": false,
+          "bookingNotRepeated": true
+        },
+        "collecting_venue": {
+          "shouldNotBook": true,
+          "bookingConfirmed": false,
+          "bookingNotRepeated": true
+        },
+        "after_booking_confirmed": {
+          "shouldNotBook": true,
+          "bookingNotRepeated": true
+        }
+      }
+    },
+    {
+      "id": "thanks_closing_variants",
+      "priority": "P0",
+      "variants": [
+        "Thanks",
+        "Thank you",
+        "Thanks, see you later!",
+        "Perfect thank you"
+      ],
+      "understanding": {
+        "customerMessageType": "answer_to_question",
+        "facts": {},
+        "questionsAskedByCustomer": [],
+        "confidence": 0.95
+      },
+      "expectedByState": {
+        "after_booking_confirmed": {
+          "responseKey": "utter_acknowledgement",
+          "toolNotCalled": "book_consultation",
+          "bookingNotRepeated": true
+        },
+        "pending_booking_confirmation": {
+          "shouldNotBook": true,
+          "pendingUserActionStill": {
+            "type": "booking_confirmation"
+          }
+        },
+        "collecting_names": {
+          "shouldNotBook": true,
+          "shouldClarifyOrResume": true,
+          "resumedSlot": "names"
+        },
+        "collecting_venue": {
+          "shouldNotBook": true,
+          "shouldClarifyOrResume": true,
+          "resumedSlot": "venue"
+        }
+      }
+    },
+    {
+      "id": "faq_interruption_variants",
+      "priority": "P0",
+      "variants": [
+        {
+          "text": "Do you travel?",
+          "understanding": {
+            "customerMessageType": "business_question",
+            "facts": {},
+            "questionsAskedByCustomer": ["travel"],
+            "confidence": 0.96
+          }
+        },
+        {
+          "text": "How long does delivery take?",
+          "understanding": {
+            "customerMessageType": "business_question",
+            "facts": {},
+            "questionsAskedByCustomer": ["delivery_timeline"],
+            "confidence": 0.96
+          }
+        },
+        {
+          "text": "Do you offer raw footage?",
+          "understanding": {
+            "customerMessageType": "business_question",
+            "facts": {},
+            "questionsAskedByCustomer": ["raw_footage"],
+            "confidence": 0.96
+          }
+        },
+        {
+          "text": "Who shoots?",
+          "understanding": {
+            "customerMessageType": "business_question",
+            "facts": {},
+            "questionsAskedByCustomer": ["team"],
+            "confidence": 0.96
+          }
+        },
+        {
+          "text": "Can I see films?",
+          "understanding": {
+            "customerMessageType": "business_question",
+            "facts": {},
+            "questionsAskedByCustomer": ["portfolio"],
+            "confidence": 0.96
+          }
+        }
+      ],
+      "expectedByState": {
+        "collecting_names": {
+          "shouldNotBook": true,
+          "shouldClarifyOrResume": true,
+          "resumedSlot": "names"
+        },
+        "collecting_venue": {
+          "shouldNotBook": true,
+          "shouldClarifyOrResume": true,
+          "resumedSlot": "venue"
+        },
+        "pending_booking_confirmation": {
+          "shouldNotBook": true,
+          "pendingUserActionStill": {
+            "type": "booking_confirmation"
+          },
+          "shouldAskLockInAgain": true
+        },
+        "after_booking_confirmed": {
+          "shouldNotBook": true,
+          "bookingNotRepeated": true
+        }
+      }
+    },
+    {
+      "id": "correction_variants",
+      "priority": "P0",
+      "variants": [
+        {
+          "text": "Actually it's August 16th",
+          "states": ["after_availability_checked"],
+          "understanding": {
+            "customerMessageType": "answer_to_question",
+            "facts": {
+              "weddingDate": "2026-08-16",
+              "weddingDateText": "August 16 2026",
+              "weddingDateDisplay": "August 16, 2026"
+            },
+            "questionsAskedByCustomer": [],
+            "confidence": 0.96
+          },
+          "expected": {
+            "slotChanged": {
+              "weddingDate": "2026-08-16"
+            },
+            "toolCalled": "check_wedding_availability",
+            "oldAvailabilityInvalidated": true,
+            "shouldNotBook": true
+          }
+        },
+        {
+          "text": "Actually we're in Tampa, not Orlando",
+          "states": ["after_availability_checked"],
+          "understanding": {
+            "customerMessageType": "answer_to_question",
+            "facts": {
+              "location": "Tampa"
+            },
+            "questionsAskedByCustomer": [],
+            "confidence": 0.96
+          },
+          "expected": {
+            "slotChanged": {
+              "location": "Tampa"
+            },
+            "toolCalled": "check_wedding_availability",
+            "oldAvailabilityInvalidated": true,
+            "shouldNotBook": true
+          }
+        },
+        {
+          "text": "Sorry, the venue is The Vinoy",
+          "states": ["collecting_call_time"],
+          "understanding": {
+            "customerMessageType": "answer_to_question",
+            "facts": {
+              "venue": "The Vinoy"
+            },
+            "questionsAskedByCustomer": [],
+            "confidence": 0.96
+          },
+          "expected": {
+            "slotChanged": {
+              "venue": "The Vinoy"
+            },
+            "shouldNotBook": true
+          }
+        },
+        {
+          "text": "Can we do 11am instead?",
+          "states": ["pending_booking_confirmation"],
+          "understanding": {
+            "customerMessageType": "call_time_proposed",
+            "facts": {
+              "proposedCallTime": "2026-06-30T11:00:00-04:00"
+            },
+            "questionsAskedByCustomer": [],
+            "confidence": 0.96
+          },
+          "expected": {
+            "toolCalled": "check_consultation_calendar",
+            "pendingUserAction": {
+              "type": "booking_confirmation",
+              "slot": "2026-06-30T11:00:00-04:00"
+            },
+            "bookingConfirmed": false,
+            "shouldNotBook": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "bot_paused_does_not_resume",
+      "priority": "P0",
+      "variants": ["Yes", "Do you travel?", "Thanks"],
+      "understanding": {
+        "customerMessageType": "answer_to_question",
+        "facts": {},
+        "questionsAskedByCustomer": [],
+        "confidence": 0.95
+      },
+      "expectedByState": {
+        "bot_paused_handoff": {
+          "nextStep": "handoff",
+          "toolNotCalled": "book_consultation",
+          "bookingNotRepeated": true
+        }
+      }
+    }
+  ]
+}

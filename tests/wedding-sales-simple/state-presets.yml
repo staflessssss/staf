@@ -34,6 +34,180 @@
         "toolObservations": []
       }
     },
+    "collecting_names": {
+      "description": "Alias for the names slot collection state",
+      "state": {
+        "mode": "bot_active",
+        "customerName": null,
+        "partnerName": null,
+        "weddingDate": "2026-10-17",
+        "weddingDateText": "October 17 2026",
+        "weddingDateDisplay": "October 17, 2026",
+        "location": "Tampa",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-10-17",
+          "location": "Tampa",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "replyMemory": {
+          "turnIndex": 2,
+          "greeted": true,
+          "lastRequiredQuestion": "names",
+          "questionMemory": {
+            "lastRequiredQuestion": "names",
+            "lastQuestionText": "What are both of your names?"
+          }
+        },
+        "toolObservations": []
+      }
+    },
+    "collecting_venue": {
+      "description": "Couple names are known and the bot is collecting venue",
+      "state": {
+        "mode": "bot_active",
+        "customerName": "Rick",
+        "partnerName": "Rachel",
+        "weddingDate": "2026-10-17",
+        "weddingDateText": "October 17 2026",
+        "weddingDateDisplay": "October 17, 2026",
+        "location": "Tampa",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-10-17",
+          "location": "Tampa",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "replyMemory": {
+          "turnIndex": 3,
+          "greeted": true,
+          "lastRequiredQuestion": "venue",
+          "questionMemory": {
+            "lastRequiredQuestion": "venue",
+            "lastQuestionText": "Do you already have a venue picked out?"
+          }
+        },
+        "toolObservations": []
+      }
+    },
+    "collecting_call_time": {
+      "description": "Venue is known and the bot is collecting consultation call time",
+      "state": {
+        "mode": "bot_active",
+        "customerName": "Rick",
+        "partnerName": "Rachel",
+        "weddingDate": "2026-10-17",
+        "weddingDateText": "October 17 2026",
+        "weddingDateDisplay": "October 17, 2026",
+        "location": "Tampa",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-10-17",
+          "location": "Tampa",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "venue": "The Vinoy",
+        "replyMemory": {
+          "turnIndex": 4,
+          "greeted": true,
+          "lastRequiredQuestion": "callTime",
+          "questionMemory": {
+            "lastRequiredQuestion": "callTime",
+            "lastQuestionText": "What time works best for a quick consult?"
+          }
+        },
+        "toolObservations": []
+      }
+    },
+    "collecting_email": {
+      "description": "Calendar slot is available and the bot is collecting email",
+      "state": {
+        "mode": "bot_active",
+        "customerName": "Rick",
+        "partnerName": "Rachel",
+        "weddingDate": "2026-10-17",
+        "weddingDateText": "October 17 2026",
+        "weddingDateDisplay": "October 17, 2026",
+        "location": "Tampa",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-10-17",
+          "location": "Tampa",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "venue": "The Vinoy",
+        "proposedCallTime": "2026-06-30T10:00:00-04:00",
+        "calendarStatus": "available",
+        "checkedCallDate": "2026-06-30",
+        "checkedCallTime": "10:00 AM",
+        "checkedCallStartTime": "2026-06-30T10:00:00-04:00",
+        "checkedCallEndTime": "2026-06-30T10:30:00-04:00",
+        "consultationCheck": {
+          "proposedTime": "2026-06-30T10:00:00-04:00",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "replyMemory": {
+          "turnIndex": 5,
+          "greeted": true,
+          "lastRequiredQuestion": "email",
+          "questionMemory": {
+            "lastRequiredQuestion": "email",
+            "lastQuestionText": "What's the best email for the calendar invite?"
+          }
+        },
+        "toolObservations": []
+      }
+    },
+    "after_availability_checked": {
+      "description": "Availability was checked for Orlando and can be invalidated by date/location corrections",
+      "state": {
+        "mode": "bot_active",
+        "weddingDate": "2026-08-15",
+        "weddingDateText": "August 15 2026",
+        "weddingDateDisplay": "August 15, 2026",
+        "location": "Orlando",
+        "availabilityRegion": "FL",
+        "availability": "available",
+        "availabilityCheck": {
+          "date": "2026-08-15",
+          "location": "Orlando",
+          "status": "available",
+          "checkedAt": "2026-06-29T12:00:00.000Z"
+        },
+        "replyMemory": {
+          "turnIndex": 2,
+          "greeted": true,
+          "lastRequiredQuestion": "names",
+          "questionMemory": {
+            "lastRequiredQuestion": "names",
+            "lastQuestionText": "What are both of your names?"
+          }
+        },
+        "toolObservations": []
+      }
+    },
+    "bot_paused_handoff": {
+      "description": "Conversation is paused after handoff",
+      "state": {
+        "mode": "bot_paused",
+        "handoffReason": "customer_requests_human",
+        "replyMemory": {
+          "turnIndex": 3,
+          "greeted": true,
+          "questionMemory": {}
+        },
+        "toolObservations": []
+      }
+    },
     "pending_booking_confirmation": {
       "description": "Calendar slot is available and the bot is waiting for lock-in confirmation",
       "state": {
@@ -55,10 +229,11 @@
         },
         "venue": "The Vinoy",
         "proposedCallTime": "2026-06-30T10:00:00-04:00",
+        "calendarStatus": "available",
         "checkedCallDate": "2026-06-30",
-        "checkedCallTime": "10:00 AM",
-        "checkedCallStartTime": "10:00 AM",
-        "checkedCallEndTime": "10:30 AM",
+        "checkedCallTime": "10:00",
+        "checkedCallStartTime": "2026-06-30T10:00:00-04:00",
+        "checkedCallEndTime": "2026-06-30T10:30:00-04:00",
         "consultationCheck": {
           "proposedTime": "2026-06-30T10:00:00-04:00",
           "status": "available",
@@ -72,19 +247,19 @@
         "replyMemory": {
           "turnIndex": 6,
           "greeted": true,
-          "lastRequiredQuestion": "bookingConfirmation",
+          "lastRequiredQuestion": "callTime",
           "pendingBookingConfirmation": {
             "proposedCallTime": "2026-06-30T10:00:00-04:00",
             "email": "rick@example.com",
             "checkedCallDate": "2026-06-30",
-            "checkedCallTime": "10:00 AM",
-            "checkedCallStartTime": "10:00 AM",
-            "checkedCallEndTime": "10:30 AM",
+            "checkedCallTime": "10:00",
+            "checkedCallStartTime": "2026-06-30T10:00:00-04:00",
+            "checkedCallEndTime": "2026-06-30T10:30:00-04:00",
             "askedAt": "2026-06-29T12:00:00.000Z",
             "source": "ask_booking_confirmation"
           },
           "questionMemory": {
-            "lastRequiredQuestion": "bookingConfirmation",
+            "lastRequiredQuestion": "callTime",
             "lastQuestionText": "Want me to lock in 10:00 AM?"
           }
         },

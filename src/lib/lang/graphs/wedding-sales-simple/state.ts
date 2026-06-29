@@ -763,6 +763,8 @@ export function mergeTurnUnderstanding(
       ? activePendingUserAction?.type === "booking_confirmation"
         ? activePendingUserAction
         : null
+      : callTimeChanged
+        ? null
       : answersPendingBookingConfirmation
         ? activePendingUserAction
         : derivePendingUserAction(state),
@@ -897,8 +899,16 @@ function isBareAffirmative(text: string) {
     .replace(/\b(?:sorry|apologies|please|thanks|thank you)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  const containsThanks = /\b(?:thanks|thank you)\b/i.test(normalized);
+  const explicitAffirmativeWithThanks = /^(?:yes|yeah|yep|yup)\b|\b(?:go ahead|lock it in)\b/i.test(
+    normalized,
+  );
   const affirmativePattern =
     /^(?:yes|yeah|yep|yup|sure|ok|okay|sounds good|that works|works for me|perfect|go ahead|lock it in|that sounds good)$/i;
+
+  if (containsThanks && !explicitAffirmativeWithThanks) {
+    return false;
+  }
 
   return (
     affirmativePattern.test(normalized) ||
