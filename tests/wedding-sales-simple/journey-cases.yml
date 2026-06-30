@@ -1,0 +1,437 @@
+{
+  "cases": [
+    {
+      "id": "happy_path_available_raleigh",
+      "title": "Happy path: Raleigh available to booked call",
+      "turns": [
+        {
+          "user": "Hi, I'm interested",
+          "expect": {
+            "responseKey": "utter_ask_wedding_details",
+            "nextStep": "ask_missing_info",
+            "asksFor": "weddingDate",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "October 3 2026 in Raleigh",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "weddingDate": "2026-10-03",
+            "locationContains": "Raleigh",
+            "serviceRegion": "NC_SC_GA",
+            "toolCalled": "check_wedding_availability",
+            "availability": "available",
+            "responseKey": "utter_availability_available_ask_names",
+            "attachmentsInclude": "pricing_guide",
+            "asksFor": "names",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Katie and Mike",
+          "expect": {
+            "namesCaptured": true,
+            "asksFor": "venue",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "The Bradford",
+          "expect": {
+            "venueCaptured": true,
+            "asksFor": "callTime",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Monday at 10am",
+          "forceTools": {
+            "check_consultation_calendar": { "status": "available", "date": "2026-10-05", "time": "10:00" }
+          },
+          "expect": {
+            "toolCalled": "check_consultation_calendar",
+            "callTimeCaptured": true,
+            "asksFor": "email",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "katie@example.com",
+          "expect": {
+            "emailCaptured": true,
+            "asksFor": "bookingConfirmation",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Yes, book it",
+          "forceTools": {
+            "book_consultation": { "status": "booked", "eventId": "evt-happy-path" }
+          },
+          "expect": {
+            "toolCalled": "book_consultation",
+            "booked": true,
+            "responseKey": "utter_booking_confirmed",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "rich_first_message_then_booking",
+      "title": "Rich first message includes names/date/location/venue",
+      "turns": [
+        {
+          "user": "Hi! We're Katie and Mike, wedding is Oct 3 2026 in Winston Salem, venue is The Bradford. Are you available?",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "weddingDate": "2026-10-03",
+            "locationContains": "Winston Salem",
+            "serviceRegion": "NC_SC_GA",
+            "namesCaptured": true,
+            "venueCaptured": true,
+            "toolCalled": "check_wedding_availability",
+            "asksFor": "callTime",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Monday 10am works",
+          "forceTools": {
+            "check_consultation_calendar": { "status": "available", "date": "2026-10-05", "time": "10:00" }
+          },
+          "expect": {
+            "toolCalled": "check_consultation_calendar",
+            "asksFor": "email",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "katie@example.com",
+          "expect": {
+            "emailCaptured": true,
+            "asksFor": "bookingConfirmation",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Yes",
+          "forceTools": {
+            "book_consultation": { "status": "booked", "eventId": "evt-rich-first" }
+          },
+          "expect": {
+            "booked": true,
+            "toolCalled": "book_consultation",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "unknown_city_then_region_clarification",
+      "title": "Unknown city asks region before checking availability",
+      "turns": [
+        {
+          "user": "Wedding in Springfield on Oct 3 2026",
+          "expect": {
+            "weddingDate": "2026-10-03",
+            "locationContains": "Springfield",
+            "serviceRegion": "unknown",
+            "responseKey": "utter_first_turn_lead_region_clarification",
+            "expectNoTool": true,
+            "asksFor": "location",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "It's in North Carolina",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "serviceRegion": "NC_SC_GA",
+            "toolCalled": "check_wedding_availability",
+            "availability": "available",
+            "asksFor": "names",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Katie and Mike",
+          "expect": {
+            "namesCaptured": true,
+            "asksFor": "venue",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "unavailable_tampa",
+      "title": "Unavailable Tampa date does not proceed to booking",
+      "turns": [
+        {
+          "user": "Wedding in Tampa on Oct 3 2026",
+          "forceTools": {
+            "check_wedding_availability": { "status": "unavailable" }
+          },
+          "expect": {
+            "weddingDate": "2026-10-03",
+            "locationContains": "Tampa",
+            "serviceRegion": "FL",
+            "toolCalled": "check_wedding_availability",
+            "availability": "unavailable",
+            "responseKey": "utter_first_turn_lead_unavailable",
+            "outboundContains": "not open",
+            "booked": false,
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "tool_error_then_recovery",
+      "title": "Tool error stays active and later recovers",
+      "turns": [
+        {
+          "user": "Wedding in Raleigh on Oct 3 2026",
+          "forceTools": {
+            "check_wedding_availability": { "status": "tool_error" }
+          },
+          "expect": {
+            "responseKey": "utter_first_turn_lead_tool_check",
+            "humanReviewRequired": true,
+            "attachmentsInclude": "pricing_guide",
+            "asksFor": "names",
+            "noHandoff": true,
+            "noFalseUnavailable": true
+          }
+        },
+        {
+          "user": "Katie and Mike",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "toolCalled": "check_wedding_availability",
+            "availability": "available",
+            "namesCaptured": true,
+            "asksFor": "venue",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "price_shopper",
+      "title": "Price shopper gets price and still enters availability flow",
+      "turns": [
+        {
+          "user": "How much?",
+          "expect": {
+            "responseKey": "utter_ask_wedding_details",
+            "asksFor": "weddingDate",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Do you have availability Oct 3 2026 in Raleigh?",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "weddingDate": "2026-10-03",
+            "serviceRegion": "NC_SC_GA",
+            "toolCalled": "check_wedding_availability",
+            "availability": "available",
+            "asksFor": "names",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Katie and Mike",
+          "expect": {
+            "namesCaptured": true,
+            "asksFor": "venue",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "faq_interruption",
+      "title": "FAQ interruption answers and returns to missing slot",
+      "turns": [
+        {
+          "user": "Wedding in Raleigh on Oct 3 2026",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "asksFor": "names",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Katie and Mike",
+          "expect": {
+            "namesCaptured": true,
+            "asksFor": "venue",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "What's included?",
+          "expect": {
+            "asksFor": "venue",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "The Bradford",
+          "expect": {
+            "venueCaptured": true,
+            "asksFor": "callTime",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "location_correction",
+      "title": "Location correction updates slot and rechecks availability",
+      "turns": [
+        {
+          "user": "Wedding in Raleigh on Oct 3 2026",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "locationContains": "Raleigh",
+            "availability": "available",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Actually it's Winston Salem",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "locationContains": "Winston Salem",
+            "serviceRegion": "NC_SC_GA",
+            "toolCalled": "check_wedding_availability",
+            "availability": "available",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "date_correction",
+      "title": "Date correction updates date and rechecks availability",
+      "turns": [
+        {
+          "user": "Wedding in Tampa on Oct 3 2026",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "weddingDate": "2026-10-03",
+            "availability": "available",
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "Sorry, I meant Oct 10 2026",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "weddingDate": "2026-10-10",
+            "toolCalled": "check_wedding_availability",
+            "availability": "available",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "team_question_before_details",
+      "title": "Team question before details avoids FL-specific copy until FL region is known",
+      "turns": [
+        {
+          "user": "Who will be filming our wedding?",
+          "expect": {
+            "responseKey": "utter_ask_wedding_details",
+            "outboundNotContains": ["Jay", "Tampa"],
+            "noDuplicateQuestion": true,
+            "noHandoff": true
+          }
+        },
+        {
+          "user": "October 3 2026 in Tampa",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": {
+            "serviceRegion": "FL",
+            "toolCalled": "check_wedding_availability",
+            "asksFor": "names",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "invalid_call_time",
+      "title": "Invalid consultation time asks for configured window",
+      "turns": [
+        {
+          "user": "Wedding in Raleigh on Oct 3 2026",
+          "forceTools": {
+            "check_wedding_availability": { "status": "available" }
+          },
+          "expect": { "asksFor": "names", "noHandoff": true }
+        },
+        {
+          "user": "Katie and Mike",
+          "expect": { "asksFor": "venue", "noHandoff": true }
+        },
+        {
+          "user": "The Bradford",
+          "expect": { "asksFor": "callTime", "noHandoff": true }
+        },
+        {
+          "user": "Can we do Saturday at 8pm?",
+          "expect": {
+            "booked": false,
+            "outboundContains": ["Monday-Friday", "9am-2pm"],
+            "asksFor": "callTime",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "explicit_human_request",
+      "title": "Explicit human request is allowed to hand off",
+      "turns": [
+        {
+          "user": "Can I talk to a real person?",
+          "expect": {
+            "responseKey": "utter_ask_wedding_details",
+            "outboundContains": "you're speaking with me here",
+            "asksFor": "weddingDate",
+            "noHandoff": true
+          }
+        }
+      ]
+    }
+  ]
+}

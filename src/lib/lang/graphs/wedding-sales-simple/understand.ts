@@ -181,6 +181,14 @@ function normalizeLlmUnderstanding(
 }
 
 function extractLocation(message: string) {
+  const correction = /\b(?:actually|it(?:'|’)s|it is|location is|city is)\s+(?:in\s+)?([A-Z][A-Za-z .'-]+?)(?:[?.!,]|$|\s+(?:and|for|on|at)\b)/.exec(
+    message,
+  );
+
+  if (correction?.[1]) {
+    return correction[1].trim();
+  }
+
   const match = /\b(?:in|near|around|to)\s+([A-Z][A-Za-z .'-]+?)(?:[?.!,]|$|\s+(?:and|for|on|at)\b)/.exec(
     message,
   );
@@ -194,6 +202,38 @@ function extractLocation(message: string) {
   );
 
   return aboutLocation?.[1]?.trim();
+}
+
+function extractVenue(state: SimpleWeddingSalesState, message: string) {
+  const explicit = /\b(?:venue|place|location)\s+(?:is|will be|would be|=)\s+([A-Z][A-Za-z0-9 .&'-]+?)(?:[?.!,]|$)/.exec(
+    message,
+  );
+
+  if (explicit?.[1]) {
+    return explicit[1].trim();
+  }
+
+  if (state.nextStep !== "ask_venue") {
+    return undefined;
+  }
+
+  if (
+    extractEmail(message) ||
+    extractIsoDate(message) ||
+    extractMonthDate(message).weddingDate ||
+    extractCallTime(state, message) ||
+    inferQuestions(message).length > 0
+  ) {
+    return undefined;
+  }
+
+  const trimmed = message.trim().replace(/[.!?]+$/, "");
+
+  if (!/^[A-Z][A-Za-z0-9 .&'-]{2,80}$/.test(trimmed)) {
+    return undefined;
+  }
+
+  return trimmed;
 }
 
 function normalizeSuggestedTimeLabel(value: string) {
@@ -392,6 +432,7 @@ export function understandTurnHeuristically(
   const email = extractEmail(message);
   const proposedCallTime = extractCallTime(state, message);
   const names = extractNames(message);
+  const venue = extractVenue(state, message);
 
   const customerMessageType: TurnUnderstanding["customerMessageType"] = email
     ? "email_provided"
@@ -412,6 +453,7 @@ export function understandTurnHeuristically(
       weddingDate: isoDate ?? monthDate.weddingDate,
       weddingDateText: monthDate.weddingDateText,
       location: extractLocation(message),
+      venue,
       email,
       proposedCallTime,
       senderRole: inferSenderRole(message),

@@ -647,6 +647,14 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  if (state.bookingConfirmed && bookingWasConfirmedThisTurn(state)) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "booking_confirmed",
+      reason: "booking was confirmed by the booking tool in this turn",
+    });
+  }
+
   if (state.bookingConfirmed && !state.pendingUserAction) {
     const answerQuestion = getAnswerQuestionCommand(state.dialogueCommands);
 
@@ -736,14 +744,6 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
         ? "pricing_answer"
         : "reply_only",
       reason: "customer asked a known business question that should be answered without changing the flow",
-    });
-  }
-
-  if (state.bookingConfirmed && bookingWasConfirmedThisTurn(state)) {
-    return decision({
-      nextStep: "reply_only",
-      replyType: "booking_confirmed",
-      reason: "booking was confirmed by the booking tool in this turn",
     });
   }
 
