@@ -172,6 +172,23 @@ test("deterministic understanding treats who will film as team, not portfolio", 
   assert.deepEqual(result.questionsAskedByCustomer, ["team"]);
 });
 
+test("deterministic understanding does not treat needing a videographer as a team question", () => {
+  const result = understandTurnHeuristically({
+    channel: "instagram",
+    latestCustomerMessage: "Hii! I need a videographer for a wedding in Winston Salem on Oct 3 2026",
+    bookingConfirmed: false,
+    mode: "bot_active",
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    toolObservations: [],
+  });
+
+  assert.equal(result.customerMessageType, "answer_to_question");
+  assert.equal(result.facts.weddingDate, "2026-10-03");
+  assert.equal(result.facts.location, "Winston Salem");
+  assert.ok(!result.questionsAskedByCustomer.includes("team"));
+});
+
 test("deterministic understanding treats recent films as portfolio, not team", () => {
   const result = understandTurnHeuristically({
     channel: "instagram",

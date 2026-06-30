@@ -119,6 +119,8 @@ export function buildSimpleWeddingMentionPolicy(args: {
   const availabilityMentionedForCurrentCheck = availabilityWasMentionedForCurrentCheck(state);
   const justCheckedCalendar = Boolean(state.decisionTrace?.toolCalled === "checkCalendar");
   const consultationMentionedForCurrentSlot = consultationWasMentionedForCurrentSlot(state);
+  const hasKnownWeddingAvailability =
+    state.availability === "available" || state.availability === "unavailable";
 
   const pricing = (() => {
     if (askedPricing && !priceWasMentioned) {
@@ -135,7 +137,7 @@ export function buildSimpleWeddingMentionPolicy(args: {
       };
     }
 
-    if (justCheckedAvailability && !priceWasMentioned) {
+    if (justCheckedAvailability && hasKnownWeddingAvailability && !priceWasMentioned) {
       return {
         mode: "full" as const,
         reason: "availability was checked and current start price has not been mentioned",
@@ -149,7 +151,7 @@ export function buildSimpleWeddingMentionPolicy(args: {
   })();
 
   const availability = (() => {
-    if (justCheckedAvailability) {
+    if (justCheckedAvailability && hasKnownWeddingAvailability) {
       return {
         mode: "new_result" as const,
         reason: "availability tool returned a fresh result for the current date/location",

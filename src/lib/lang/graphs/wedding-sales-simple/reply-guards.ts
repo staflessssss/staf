@@ -1,6 +1,7 @@
 import type { SimpleWeddingKnowledgeContext } from "./knowledge";
 import type { ReplyActionContract } from "./reply-contract";
 import type { SimpleWeddingSalesState } from "./state";
+import { resolveWeddingSalesRegion } from "../wedding-sales/config";
 
 export type ReplyGuardResult =
   | { ok: true }
@@ -77,6 +78,29 @@ function hasWeddingAvailabilityResult(text: string) {
   return /\b(?:date is available|is available in|date is not available|is not open for us|is open for us)\b/i.test(text);
 }
 
+function hasUnavailableWeddingLanguage(text: string) {
+  return /\b(?:not open|not available|unavailable|fully booked)\b/i.test(text);
+}
+
+function mentionsFloridaTeamForNonFloridaLead(text: string) {
+  return /\b(?:Jay|Tampa|Florida weddings|lead filmmaker in Tampa)\b/i.test(text);
+}
+
+function leadIsFlorida(state: SimpleWeddingSalesState) {
+  return state.availabilityRegion === "FL" || resolveWeddingSalesRegion(state) === "FL";
+}
+
+function hasRequiredGreetingShape(args: {
+  text: string;
+  knowledge: SimpleWeddingKnowledgeContext;
+}) {
+  return (
+    /\b(?:hi|hello|thanks so much|thank you)\b/i.test(args.text) &&
+    args.text.includes(args.knowledge.persona.name) &&
+    args.text.includes(args.knowledge.persona.company)
+  );
+}
+
 function hasQualificationQuestion(text: string) {
   return /\b(?:what date and location|what are both of your names|have you chosen your venue|do you already have a venue|what time works|what time would be good|want me to lock)\b/i.test(
     text,
@@ -120,9 +144,8 @@ export function validateGeneratedReply(args: {
     args.contract.mustGreet &&
     args.contract.responseKey !== "utter_ask_wedding_details" &&
     args.contract.responseKey !== "utter_ask_wedding_date_only" &&
-    (!reply.includes(args.knowledge.persona.replyStyle.greetingOpening) ||
-      !reply.includes(args.knowledge.persona.name) ||
-      !reply.includes(args.knowledge.persona.company))
+    args.contract.responseKey !== "utter_availability_available_ask_names" &&
+    !hasRequiredGreetingShape({ text: reply, knowledge: args.knowledge })
   ) {
     reasons.push("first-turn founder greeting is incomplete");
   }
@@ -139,6 +162,21 @@ export function validateGeneratedReply(args: {
     hasFounderGreetingOrCongratulation(reply)
   ) {
     reasons.push("reply repeated founder greeting/persona after greeting was not allowed");
+  }
+
+  if (
+    args.state.availability === "unknown" &&
+    hasUnavailableWeddingLanguage(reply)
+  ) {
+    reasons.push("unknown wedding availability was worded as unavailable");
+  }
+
+  if (
+    !leadIsFlorida(args.state) &&
+    !args.contract.mustAnswerTeam &&
+    mentionsFloridaTeamForNonFloridaLead(reply)
+  ) {
+    reasons.push("reply mentioned Florida team details for a non-FL lead without a team question");
   }
 
   if (args.contract.mustMentionPricing && !reply.includes(args.knowledge.pricing.startPrice)) {

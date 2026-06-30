@@ -292,13 +292,7 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
     questions.push("package_inclusions");
   }
 
-  if (
-    /\bwho\s+(?:(?:will|would)\s+)?(?:shoot|film)s?\b/.test(normalized) ||
-    /\b(?:shooter|filmmaker|videographer|lead filmmaker|team)\b/.test(normalized) ||
-    /\b(?:will\s+you\s+shoot|are\s+you\s+filming|you\s+filming|taras\s+(?:shooting|filming))\b/.test(
-      normalized,
-    )
-  ) {
+  if (isExplicitTeamQuestion(normalized)) {
     questions.push("team");
   }
 
@@ -322,6 +316,22 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
   return [...new Set(questions)];
 }
 
+function isExplicitTeamQuestion(normalized: string) {
+  return (
+    /\bwho\b[\s\S]{0,60}\b(?:shoot|shoots|shooter|filming|film|films|filmmaker|videographer)\b/.test(
+      normalized,
+    ) ||
+    /\bwho\s+(?:would|will)\s+shoot\b/.test(normalized) ||
+    /\bwho\s+is\s+(?:the\s+)?(?:videographer|filmmaker|shooter)\b/.test(normalized) ||
+    /\b(?:who|which)\b[\s\S]{0,40}\bteam\b/.test(normalized) ||
+    /\blead filmmaker\b/.test(normalized) ||
+    /\bis\s+jay\s+(?:shooting|filming|the\s+filmmaker|the\s+videographer)\b/.test(normalized) ||
+    /\b(?:will\s+you\s+shoot|are\s+you\s+filming|you\s+filming|taras\s+(?:shooting|filming))\b/.test(
+      normalized,
+    )
+  );
+}
+
 function normalizeQuestionTypes(
   types: TurnUnderstanding["questionsAskedByCustomer"],
   text: string,
@@ -333,16 +343,13 @@ function normalizeQuestionTypes(
     normalized.delete("other");
   }
 
-  const isShooterQuestion =
-    /\bwho\b[\s\S]{0,60}\b(?:shoot|shoots|shooter|filming|film|films|filmmaker|videographer)\b/.test(
-      lower,
-    ) ||
-    /\bwho\s+(?:would|will)\s+shoot\b/.test(lower) ||
-    /\blead filmmaker\b/.test(lower);
+  const isShooterQuestion = isExplicitTeamQuestion(lower);
 
   if (isShooterQuestion) {
     normalized.add("team");
     normalized.delete("identity");
+  } else {
+    normalized.delete("team");
   }
 
   return [...normalized];

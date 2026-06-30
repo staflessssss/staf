@@ -177,8 +177,7 @@ function responseKeyForContract(args: {
     args.mustMentionWeddingAvailability &&
     state.availability === "available" &&
     (args.mentionPolicy.pricing.mode === "full" ||
-      args.mentionPolicy.pricing.mode === "same_as_before") &&
-    args.mentionPolicy.guide.mode !== "skip"
+      args.mentionPolicy.pricing.mode === "same_as_before")
   ) {
     return "utter_availability_available_ask_names";
   }

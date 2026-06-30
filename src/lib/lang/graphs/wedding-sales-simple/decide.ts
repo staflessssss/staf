@@ -23,6 +23,43 @@ function bookingWasConfirmedThisTurn(state: SimpleWeddingSalesState) {
   );
 }
 
+function parseToolObservationResult(result: string) {
+  try {
+    const parsed = JSON.parse(result);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function latestAvailabilityToolStatus(state: SimpleWeddingSalesState) {
+  const observation = [...state.toolObservations]
+    .reverse()
+    .find((entry) => entry.toolName === "check_wedding_availability");
+
+  if (!observation) {
+    return undefined;
+  }
+
+  const parsed = parseToolObservationResult(observation.result);
+  const directStatus = typeof parsed.status === "string" ? parsed.status : undefined;
+
+  if (directStatus) {
+    return directStatus;
+  }
+
+  const steps = Array.isArray(parsed.steps) ? parsed.steps : [];
+  return steps
+    .map((step) =>
+      step && typeof step === "object" && !Array.isArray(step) && typeof (step as Record<string, unknown>).status === "string"
+        ? String((step as Record<string, unknown>).status)
+        : undefined,
+    )
+    .find(Boolean);
+}
+
 function getCommand<T extends SimpleWeddingSalesDialogueCommand>(
   commands: SimpleWeddingSalesDialogueCommand[] | undefined,
   predicate: (command: SimpleWeddingSalesDialogueCommand) => command is T,
@@ -662,6 +699,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     return decision({
       nextStep: "reply_only",
       replyType: "acknowledgement_only",
+      responseKey: "utter_acknowledgement",
       reason: "customer only acknowledged the previous message",
     });
   }
@@ -726,6 +764,18 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       nextStep: "check_availability",
       replyType: "reply_only",
       reason: "date and location are present and availability has not been checked for this pair",
+    });
+  }
+
+  if (availability === "unknown" && latestAvailabilityToolStatus(state) === "needs_region") {
+    return decision({
+      nextStep: "ask_missing_info",
+      missingField: "location",
+      replyType: "missing_info",
+      reason: "availability tool needs a supported service region, so ask for region clarification without handoff",
+      statePatch: {
+        availability: undefined,
+      },
     });
   }
 

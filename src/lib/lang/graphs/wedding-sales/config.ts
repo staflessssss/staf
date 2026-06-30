@@ -148,7 +148,7 @@ export function resolveWeddingSalesRegion(state?: Pick<WeddingSalesState, "locat
     return "FL";
   }
 
-  if (/\b(?:nc|north carolina|sc|south carolina|ga|georgia|charlotte|raleigh|charleston|atlanta|savannah)\b/i.test(text)) {
+  if (/\b(?:nc|north carolina|sc|south carolina|ga|georgia|charlotte|raleigh|greensboro|winston[-\s]?salem|asheville|charleston|greenville|atlanta|savannah)\b/i.test(text)) {
     return "NC_SC_GA";
   }
 

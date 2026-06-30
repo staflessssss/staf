@@ -5,6 +5,10 @@ import {
   type WeddingSalesToolContext,
 } from "@/lib/lang/tools/wedding-sales";
 
+import {
+  normalizeWeddingSalesRegionKey,
+  resolveWeddingSalesRegion,
+} from "../wedding-sales/config";
 import { getCoupleName, type SimpleWeddingSalesState } from "./state";
 
 function parseToolJson(result: string) {
@@ -58,10 +62,13 @@ function appendObservation(
 }
 
 function buildAvailabilityRequest(state: SimpleWeddingSalesState) {
+  const region = resolveWeddingSalesRegion(state);
+  const location = region === "NC_SC_GA" ? "NC/SC/GA" : region ?? state.location;
+
   return [
     "Check wedding availability",
     state.weddingDate ? `for wedding date ${state.weddingDate}` : null,
-    state.location ? `in ${state.location}` : null,
+    location ? `in ${location}` : null,
     state.venue ? `at ${state.venue}` : null,
   ]
     .filter(Boolean)
@@ -141,12 +148,15 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
   }
 
   if (state.nextStep === "check_availability" && state.weddingDate) {
+    const resolvedRegion = resolveWeddingSalesRegion(state);
+    const toolLocation =
+      resolvedRegion === "NC_SC_GA" ? "NC/SC/GA" : resolvedRegion ?? state.location;
     const result = await checkWeddingAvailabilityTool(toolContext).invoke({
       request: buildAvailabilityRequest(state),
       date: state.weddingDate,
       weddingDate: state.weddingDate,
       coupleName: getCoupleName(state),
-      location: state.location,
+      location: toolLocation,
       channel: state.channel,
     });
     const resultText = typeof result === "string" ? result : JSON.stringify(result);
@@ -168,6 +178,7 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
         availability: availabilityStatus,
         availabilityContextDate: state.weddingDate,
         availabilityRegion:
+          normalizeWeddingSalesRegionKey(resolvedRegion) ??
           getString(steps.find((step) => getString(step.requestedRegion))?.requestedRegion) ??
           getString(steps.find((step) => getString(step.region))?.region),
         suggestedWeddingDates: unavailableStep

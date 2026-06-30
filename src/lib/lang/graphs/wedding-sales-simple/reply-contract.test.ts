@@ -421,7 +421,7 @@ test("reply guard rejects stale wedding availability outside the contract", () =
   assert.ok(guard.reasons.includes("stale wedding availability was repeated"));
 });
 
-test("writer reads founder greeting from structured knowledge instead of fixed copy", () => {
+test("writer uses safe persona greeting without stale channel greeting copy", () => {
   const state = baseState({
     isFirstTurn: true,
   });
@@ -431,8 +431,8 @@ test("writer reads founder greeting from structured knowledge instead of fixed c
       prompting: {
         persona: "You are Elena, the founder of Northlight Weddings.",
         replyStyle: {
-          greetingOpening: "Hello from Northlight 🤍✨",
-          greetingIntroduction: "I’m {{name}}, founder of {{company}}.",
+          greetingOpening: "Hello from Northlight",
+          greetingIntroduction: "I'm {{name}}, founder of {{company}}.",
           greetingCelebration: "Congratulations on this beautiful chapter!",
         },
       },
@@ -442,9 +442,11 @@ test("writer reads founder greeting from structured knowledge instead of fixed c
   const contract = buildReplyActionContract({ state, knowledge });
   const reply = writeConstrainedWeddingReply({ state, knowledge, contract }).text;
 
-  assert.match(reply, /^Hello from Northlight 🤍✨/);
-  assert.match(reply, /I’m Elena, founder of Northlight Weddings/);
-  assert.match(reply, /Congratulations on this beautiful chapter/);
+  assert.match(reply, /^Hi! Thanks so much for reaching out/i);
+  assert.match(reply, /Elena with Northlight Weddings/i);
+  assert.doesNotMatch(reply, /Hello from Northlight/i);
+  assert.doesNotMatch(reply, /founder of Northlight Weddings/i);
+  assert.doesNotMatch(reply, /Congratulations on this beautiful chapter/i);
   assert.doesNotMatch(reply, /Taras|Myndful/);
 });
 
@@ -480,8 +482,8 @@ test("writer infers safe availability response key and avoids deterministic fall
   assert.equal(result.writer.responseKey, "utter_availability_available_ask_names");
   assert.equal(result.writerCatalog.eligible, true);
   assert.equal(result.writerCatalog.guardOk, true);
-  assert.match(result.text, /Hey there|Thank you so much for reaching out/i);
-  assert.match(result.text, /Taras|Myndful Films/i);
+  assert.doesNotMatch(result.text, /Hey there|Thank you so much for reaching out/i);
+  assert.doesNotMatch(result.text, /I(?:\u2019|'|\u2018)?m Taras|founder of Myndful Films|Huge congratulations|such an exciting season of life/i);
   assert.match(result.text, /June 14, 2027 is available in Tampa/i);
   assert.match(result.text, /both of your names|speaking with/i);
 });

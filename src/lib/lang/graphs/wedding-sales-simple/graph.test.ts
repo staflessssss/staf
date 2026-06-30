@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { invokeWeddingSalesSimpleGraph } from "./graph";
+import { decideNextStep, invokeWeddingSalesSimpleGraph } from "./graph";
 import type { SimpleWeddingSalesState, TurnUnderstanding } from "./state";
 import { understandTurnHeuristically } from "./understand";
 
@@ -161,6 +161,46 @@ test("simple wedding sales runtime treats Instagram ad info replies as new leads
         command.flow === "wedding_lead_qualification",
     ),
   );
+});
+
+test("simple wedding sales runtime maps Winston Salem to NC region without handoff", async () => {
+  const result = await invokeWeddingSalesSimpleGraph({
+    channel: "instagram",
+    message: "Hii! I need a videographer for a wedding in Winston Salem on Oct 3 2026",
+    toolContext,
+    config: {
+      guide: {
+        imageUrl: "https://example.com/myndful-nc-guide.png",
+      },
+      pricingByRegion: {
+        NC_SC_GA: {
+          startPrice: "$3,600",
+          currency: "USD",
+          coverageHours: 8,
+        },
+      },
+    },
+    understand: (state) => understandTurnHeuristically(state),
+  });
+
+  assert.equal(result.weddingDate, "2026-10-03");
+  assert.equal(result.weddingDateDisplay, "October 3, 2026");
+  assert.equal(result.location, "Winston Salem");
+  assert.equal(result.availabilityRegion, "NC_SC_GA");
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.mode, "bot_active");
+  assert.notEqual(result.nextStep, "handoff");
+  assert.equal(result.decisionTrace?.toolCalled, "checkAvailability");
+  assert.equal(result.decisionTrace?.replyType, "availability_available");
+  assert.equal(result.replyContract?.responseKey, "utter_availability_available_ask_names");
+  assert.equal(result.replyContract?.mustGreet, true);
+  assert.equal(result.replyContract?.mentionPolicy.guide.mode, "send_attachment");
+  assert.match(result.responseDraft ?? "", /October 3, 2026/i);
+  assert.match(result.responseDraft ?? "", /\$3,600/i);
+  assert.match(result.responseDraft ?? "", /collections guide/i);
+  assert.match(result.responseDraft ?? "", /both of your names/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /not open|not available|unavailable/i);
+  assert.doesNotMatch(result.responseDraft ?? "", /Jay|Tampa/i);
 });
 
 test("simple wedding sales runtime does not pause bot after generic inquiry", async () => {
@@ -756,6 +796,45 @@ test("simple wedding sales runtime hands off instead of treating unknown availab
   assert.doesNotMatch(result.responseDraft ?? "", /date is available|open/i);
 });
 
+test("simple wedding sales policy asks for region clarification on needs_region without handoff", () => {
+  const result = decideNextStep({
+    channel: "instagram",
+    latestCustomerMessage: "Hii! I need a videographer for a wedding in Springfield on June 14 2027",
+    isFirstTurn: true,
+    weddingDate: "2027-06-14",
+    weddingDateDisplay: "June 14, 2027",
+    location: "Springfield",
+    availability: "unknown",
+    availabilityContextDate: "2027-06-14",
+    availabilityCheck: {
+      date: "2027-06-14",
+      location: "Springfield",
+      status: "unknown",
+      checkedAt: "2026-06-24T00:00:00.000Z",
+    },
+    bookingConfirmed: false,
+    mode: "bot_active",
+    unclearAttemptCount: 0,
+    questionsAskedByCustomer: [],
+    pendingUserAction: null,
+    toolObservations: [
+      {
+        toolName: "check_wedding_availability",
+        result: JSON.stringify({
+          status: "needs_region",
+          supportedRegions: ["FL", "NC/SC/GA"],
+        }),
+      },
+    ],
+  } as SimpleWeddingSalesState);
+
+  assert.equal(result.nextStep, "ask_missing_info");
+  assert.equal(result.missingField, "location");
+  assert.equal(result.mode, undefined);
+  assert.equal(result.trace.replyType, "missing_info");
+  assert.equal(result.trace.responseKey, "utter_ask_location_only");
+});
+
 test("simple wedding sales runtime auto-sends guide for a fresh available date", async () => {
   const result = await invokeWeddingSalesSimpleGraph({
     channel: "instagram",
@@ -1105,10 +1184,12 @@ test("simple wedding sales runtime greets once and does not repeat availability 
     toolContext,
   });
 
-  assert.match(
+  assert.doesNotMatch(
     first.responseDraft ?? "",
     /Hey there|Thank you so much for reaching out|I(?:\u2019|\'|\u2018)?m Taras|founder of Myndful Films|Huge congratulations|such an exciting season of life/i,
   );
+  assert.match(first.responseDraft ?? "", /Hi! Thanks so much for reaching out/i);
+  assert.match(first.responseDraft ?? "", /Taras with Myndful Films/i);
   assert.match(first.responseDraft ?? "", /June 14, 2027[\s\S]{0,100}(?:is available in Tampa|in Tampa[\s\S]{0,60}date is available)/i);
   assert.doesNotMatch(first.responseDraft ?? "", /open for us/i);
 

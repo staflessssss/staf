@@ -33,18 +33,14 @@ function greetingLine(args: {
     return undefined;
   }
 
-  const style = args.knowledge.persona.replyStyle;
-  const introduction = renderCopy(style.greetingIntroduction, {
-    name: args.knowledge.persona.name,
-    company: args.knowledge.persona.company,
-  });
+  const introduction = `${args.knowledge.persona.name} with ${args.knowledge.persona.company}.`;
   const celebration =
     args.state.senderRole === "mother" || args.state.senderRole === "planner"
       ? undefined
-      : style.greetingCelebration;
+      : "I’d love to help with the wedding film.";
 
   return joinLines([
-    style.greetingOpening,
+    "Hi! Thanks so much for reaching out 🤍",
     [introduction, celebration].filter(Boolean).join(" "),
   ]);
 }
@@ -486,7 +482,7 @@ function normalizeCatalogTextForContract(args: {
   }
 
   return text
-    .replace(/\n?I(?:'|’)?ll send the collections guide here so you can look through the options 🎥/i, "")
+    .replace(/\n?.*\bcollections guide here so you can look through the options.*(?:\n|$)/i, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
