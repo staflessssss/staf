@@ -144,6 +144,14 @@ function responseKeyForContract(args: {
     return "utter_first_turn_lead_region_clarification";
   }
 
+  if (
+    state.isFirstTurn &&
+    state.availabilityToolStatus === "tool_error" &&
+    state.decisionTrace?.replyType === "availability_unknown"
+  ) {
+    return "utter_first_turn_lead_tool_check";
+  }
+
   if (state.decisionTrace?.replyType === "post_booking_faq") {
     return "utter_answer_faq_after_booking";
   }

@@ -803,6 +803,19 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
+  if (
+    availability === "unknown" &&
+    state.isFirstTurn &&
+    (state.availabilityToolStatus === "tool_error" || latestAvailabilityToolStatus(state) === "missing_credentials")
+  ) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "availability_unknown",
+      reason: "first-turn availability tool error should stay resumable without handoff",
+      responseKey: "utter_first_turn_lead_tool_check",
+    });
+  }
+
   if (availability === "unknown") {
     return decision({
       nextStep: "handoff",

@@ -33,6 +33,7 @@ type FirstTurnCase = {
   expectAskDetails?: boolean;
   expectTeamAnswer?: boolean;
   expectToolError?: boolean;
+  expectedResponseKey?: string;
   forbidTeam?: boolean;
   llmQuestions?: TurnUnderstanding["questionsAskedByCustomer"];
 };
@@ -49,6 +50,11 @@ type MatrixResult = {
   resolvedRegion: "FL" | "NC_SC_GA" | "unknown";
   toolCalls: string[];
   toolResult?: string;
+  mode: SimpleWeddingSalesState["mode"];
+  nextStep: SimpleWeddingSalesState["nextStep"];
+  handoffReason?: SimpleWeddingSalesState["handoffReason"];
+  escalated: boolean;
+  humanReviewRequired: boolean;
   responseKey?: string;
   outboundText: string;
   attachments: Array<{ type: string; purpose?: string; url: string }>;
@@ -337,6 +343,12 @@ function runCase(testCase: FirstTurnCase): MatrixResult {
 
   const toolCalls = state.toolObservations.map((entry) => entry.toolName);
   const toolResult = state.toolObservations.at(-1)?.result;
+  const responseKey = state.replyContract?.responseKey ?? state.decisionTrace?.responseKey;
+  const escalated =
+    state.mode === "human_needed" ||
+    state.mode === "bot_paused" ||
+    state.nextStep === "handoff";
+  const humanReviewRequired = state.availabilityToolStatus === "tool_error";
 
   if (testCase.expectedDate) {
     if (state.weddingDate !== testCase.expectedDate) {
@@ -384,8 +396,20 @@ function runCase(testCase: FirstTurnCase): MatrixResult {
     failures.push("expected pricing guide attachment");
   }
 
+  if (testCase.expectedResponseKey && responseKey !== testCase.expectedResponseKey) {
+    failures.push(`responseKey expected ${testCase.expectedResponseKey}, got ${responseKey ?? "none"}`);
+  }
+
   if (testCase.expectTeamAnswer && state.decisionTrace?.replyType !== "team_answer" && !contract.mustAnswerTeam) {
     failures.push("expected team answer");
+  }
+
+  if (
+    testCase.expectTeamAnswer &&
+    testCase.expectedRegion === "unknown" &&
+    /\b(?:Jay|Tampa|Florida weddings|lead filmmaker in Tampa)\b/i.test(reply.text)
+  ) {
+    failures.push("unknown-region team answer mentioned Jay/Tampa");
   }
 
   if (testCase.forbidTeam && /Jay|lead filmmaker in Tampa|Florida weddings/i.test(reply.text)) {
@@ -407,12 +431,48 @@ function runCase(testCase: FirstTurnCase): MatrixResult {
     failures.push(`normal first-turn lead changed mode to ${state.mode}`);
   }
 
+  const normalFirstTurnLead = !testCase.expectToolError;
+
+  if (normalFirstTurnLead && escalated) {
+    failures.push("normal first-turn lead escalated");
+  }
+
+  if (normalFirstTurnLead && state.mode === "bot_paused") {
+    failures.push("normal first-turn lead paused the bot");
+  }
+
+  if (normalFirstTurnLead && responseKey === "utter_handoff_ack") {
+    failures.push("normal first-turn lead used handoff acknowledgement");
+  }
+
   if (reply.writer.mode === "deterministic_fallback" && !testCase.expectToolError && !testCase.expectTeamAnswer) {
     failures.push("unexpected deterministic fallback writer");
   }
 
   if (testCase.expectToolError && state.availabilityToolStatus !== "tool_error") {
     failures.push(`expected tool_error, got ${state.availabilityToolStatus ?? "none"}`);
+  }
+
+  if (testCase.expectToolError) {
+    if (escalated) {
+      failures.push("first-turn tool_error escalated instead of staying resumable");
+    }
+
+    if (state.mode !== "bot_active") {
+      failures.push(`first-turn tool_error changed mode to ${state.mode}`);
+    }
+
+    if (responseKey === "utter_handoff_ack") {
+      failures.push("first-turn tool_error used handoff acknowledgement");
+    }
+
+    if (!humanReviewRequired) {
+      failures.push("first-turn tool_error did not mark human review required");
+    }
+
+    if (!/double-check availability|follow up here shortly/i.test(reply.text)) {
+      failures.push("first-turn tool_error did not send soft availability check copy");
+    }
   }
 
   const guardOk = state.replyGuardResult?.ok ?? false;
@@ -429,7 +489,12 @@ function runCase(testCase: FirstTurnCase): MatrixResult {
     resolvedRegion: (state.serviceRegion ?? resolvedRegion) as MatrixResult["resolvedRegion"],
     toolCalls,
     toolResult,
-    responseKey: state.replyContract?.responseKey ?? state.decisionTrace?.responseKey,
+    mode: state.mode,
+    nextStep: state.nextStep,
+    handoffReason: state.handoffReason,
+    escalated,
+    humanReviewRequired,
+    responseKey,
     outboundText: reply.text,
     attachments,
     guardResult: state.replyGuardResult,
@@ -459,8 +524,8 @@ function writeReports(results: MatrixResult[]) {
     "",
     `Passed: ${results.filter((result) => result.passed).length}/${results.length}`,
     "",
-    "| Scenario | User message | Date | Location | Region | Tool | Response key | Attachments | Guard | Result |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| Scenario | User message | Date | Location | Region | Tool | Mode | Next step | Handoff | Escalated | Human review | Response key | Attachments | Guard | Result |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...results.map((result) =>
       [
         result.scenario,
@@ -469,6 +534,11 @@ function writeReports(results: MatrixResult[]) {
         result.extractedLocation ?? "",
         result.resolvedRegion,
         result.toolCalls.join(", "),
+        result.mode,
+        result.nextStep,
+        result.handoffReason ?? "",
+        result.escalated ? "yes" : "no",
+        result.humanReviewRequired ? "yes" : "no",
         result.responseKey ?? "",
         result.attachments.map((attachment) => attachment.purpose ?? attachment.type).join(", "),
         (JSON.stringify(result.guardResult) ?? "").replace(/\|/g, "\\|"),
@@ -499,6 +569,11 @@ function writeReports(results: MatrixResult[]) {
         <td>${escapeHtml(result.resolvedRegion)}</td>
         <td>${escapeHtml(result.toolCalls.join(", "))}</td>
         <td>${escapeHtml(result.toolResult ?? "")}</td>
+        <td>${escapeHtml(result.mode)}</td>
+        <td>${escapeHtml(result.nextStep)}</td>
+        <td>${escapeHtml(result.handoffReason ?? "")}</td>
+        <td>${result.escalated ? "yes" : "no"}</td>
+        <td>${result.humanReviewRequired ? "yes" : "no"}</td>
         <td>${escapeHtml(result.responseKey ?? "")}</td>
         <td><pre>${escapeHtml(result.outboundText)}</pre></td>
         <td>${escapeHtml(result.attachments.map((attachment) => `${attachment.type}:${attachment.purpose ?? ""}`).join(", "))}</td>
@@ -534,6 +609,11 @@ function writeReports(results: MatrixResult[]) {
         <th>Region</th>
         <th>Tool calls</th>
         <th>Tool result</th>
+        <th>Mode</th>
+        <th>Next step</th>
+        <th>Handoff</th>
+        <th>Escalated</th>
+        <th>Human review</th>
         <th>Response key</th>
         <th>Outbound text</th>
         <th>Attachments</th>
@@ -559,6 +639,10 @@ function main() {
         userMessage: testCase.message,
         resolvedRegion: "unknown",
         toolCalls: [],
+        mode: "bot_active",
+        nextStep: "reply_only",
+        escalated: false,
+        humanReviewRequired: false,
         outboundText: "",
         attachments: [],
         guardResult: undefined,

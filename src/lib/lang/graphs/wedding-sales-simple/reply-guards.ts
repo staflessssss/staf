@@ -147,6 +147,7 @@ export function validateGeneratedReply(args: {
     args.contract.responseKey !== "utter_availability_available_ask_names" &&
     args.contract.responseKey !== "utter_first_turn_lead_region_clarification" &&
     args.contract.responseKey !== "utter_first_turn_lead_unavailable" &&
+    args.contract.responseKey !== "utter_first_turn_lead_tool_check" &&
     !hasRequiredGreetingShape({ text: reply, knowledge: args.knowledge })
   ) {
     reasons.push("first-turn founder greeting is incomplete");
@@ -175,10 +176,9 @@ export function validateGeneratedReply(args: {
 
   if (
     !leadIsFlorida(args.state) &&
-    !args.contract.mustAnswerTeam &&
     mentionsFloridaTeamForNonFloridaLead(reply)
   ) {
-    reasons.push("reply mentioned Florida team details for a non-FL lead without a team question");
+    reasons.push("reply mentioned Florida team details for a non-FL lead");
   }
 
   if (args.contract.mustMentionPricing && !reply.includes(args.knowledge.pricing.startPrice)) {

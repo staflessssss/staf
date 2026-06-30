@@ -154,6 +154,7 @@ export type SimpleWeddingSalesResponseKey =
   | "utter_ask_wedding_details"
   | "utter_first_turn_lead_region_clarification"
   | "utter_first_turn_lead_unavailable"
+  | "utter_first_turn_lead_tool_check"
   | "utter_ask_location_only"
   | "utter_ask_wedding_date_only"
   | "utter_ask_names_after_details"

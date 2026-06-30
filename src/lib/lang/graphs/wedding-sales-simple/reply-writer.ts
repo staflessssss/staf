@@ -499,6 +499,7 @@ function normalizeCatalogTextForContract(args: {
 const SAFE_OBLIGATION_CATALOG_KEYS = new Set<SimpleWeddingSalesResponseKey>([
   "utter_first_turn_lead_region_clarification",
   "utter_first_turn_lead_unavailable",
+  "utter_first_turn_lead_tool_check",
   "utter_availability_available_ask_names",
   "utter_pricing_repeat_send_guide_ask_names",
   "utter_ask_wedding_date_only",
@@ -885,6 +886,15 @@ function teamLine(state: SimpleWeddingSalesState) {
   const asksIfTarasWillShoot = /\b(?:you|taras)\b[\s\S]{0,40}\b(?:shoot|shooter|film|filming)\b|\b(?:shoot|shooter|film|filming)\b[\s\S]{0,40}\b(?:you|taras)\b/i.test(
     state.latestCustomerMessage,
   );
+  const region = state.availabilityRegion ?? state.serviceRegion;
+
+  if (region === "NC_SC_GA") {
+    return "For NC, SC, and GA weddings, the exact filmmaker depends on the wedding location and availability. I'll confirm the team details with you once we have the date and city.";
+  }
+
+  if (region !== "FL") {
+    return "The exact filmmaker depends on the wedding location and availability. What city and date are you planning for?";
+  }
 
   return asksIfTarasWillShoot
     ? "I'll be your point of contact here, and for Florida weddings Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call."

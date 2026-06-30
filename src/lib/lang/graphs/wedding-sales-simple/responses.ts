@@ -46,6 +46,12 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
       text: "Hi! Thanks so much for reaching out 🤍\n\n{{weddingDateDisplay}} in {{locationDisplay}} is not open for us.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.",
     },
   ],
+  utter_first_turn_lead_tool_check: [
+    {
+      id: "first_turn_tool_check_v1",
+      text: "Hi! Thanks so much for reaching out 🤍\n\nI want to double-check availability before giving you the wrong answer. I'll follow up here shortly.",
+    },
+  ],
   utter_pricing_repeat_send_guide_ask_names: [
     {
       id: "pricing_repeat_names_v1",

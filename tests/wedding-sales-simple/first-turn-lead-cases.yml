@@ -254,7 +254,8 @@
       "expectedLocation": "Raleigh",
       "expectedRegion": "NC_SC_GA",
       "forcedToolStatus": "tool_error",
-      "expectToolError": true
+      "expectToolError": true,
+      "expectedResponseKey": "utter_first_turn_lead_tool_check"
     },
     {
       "id": "llm_bad_team_override",
