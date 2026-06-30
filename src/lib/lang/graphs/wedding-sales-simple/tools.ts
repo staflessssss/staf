@@ -9,7 +9,11 @@ import {
   normalizeWeddingSalesRegionKey,
   resolveWeddingSalesRegion,
 } from "../wedding-sales/config";
-import { getCoupleName, type SimpleWeddingSalesState } from "./state";
+import {
+  getCoupleName,
+  type SimpleWeddingSalesServiceRegion,
+  type SimpleWeddingSalesState,
+} from "./state";
 
 function parseToolJson(result: string) {
   try {
@@ -49,6 +53,30 @@ function getStringArray(value: unknown) {
   return Array.isArray(value)
     ? value.map(getString).filter((entry): entry is string => Boolean(entry))
     : [];
+}
+
+function toSimpleServiceRegion(region: string | undefined): SimpleWeddingSalesServiceRegion {
+  return region === "FL" || region === "NC_SC_GA" ? region : "unknown";
+}
+
+function availabilityToolStatusFromSteps(args: {
+  steps: Record<string, unknown>[];
+  parsed: Record<string, unknown>;
+  testModeAvailable: boolean;
+}): NonNullable<SimpleWeddingSalesState["availabilityToolStatus"]> {
+  if (args.steps.some((step) => step.status === "available") || args.testModeAvailable) {
+    return "available";
+  }
+
+  if (args.steps.some((step) => step.status === "unavailable")) {
+    return "unavailable";
+  }
+
+  if (args.steps.some((step) => step.status === "needs_region") || args.parsed.status === "needs_region") {
+    return "needs_region";
+  }
+
+  return "tool_error";
 }
 
 function appendObservation(
@@ -166,6 +194,11 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
     const unavailable = steps.some((step) => step.status === "unavailable");
     const unavailableStep = steps.find((step) => step.status === "unavailable");
     const testModeAvailable = Boolean(toolContext.testMode) && parsed.status === "missing_credentials";
+    const availabilityToolStatus = availabilityToolStatusFromSteps({
+      steps,
+      parsed,
+      testModeAvailable,
+    });
     const availabilityStatus = available || testModeAvailable
       ? "available"
       : unavailable
@@ -177,6 +210,8 @@ export async function maybeRunSimpleWeddingSalesTool(args: {
         ...state,
         availability: availabilityStatus,
         availabilityContextDate: state.weddingDate,
+        serviceRegion: toSimpleServiceRegion(normalizeWeddingSalesRegionKey(resolvedRegion)),
+        availabilityToolStatus,
         availabilityRegion:
           normalizeWeddingSalesRegionKey(resolvedRegion) ??
           getString(steps.find((step) => getString(step.requestedRegion))?.requestedRegion) ??

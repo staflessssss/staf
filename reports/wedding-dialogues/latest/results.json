@@ -1,0 +1,603 @@
+[
+  {
+    "scenario": "known_winston_salem_need_videographer",
+    "userMessage": "Hii! I need a videographer for a wedding in Winston Salem on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Winston Salem",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Winston Salem 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_winston_salem_nc_availability",
+    "userMessage": "Do you have availability in Winston-Salem NC on Oct 3 2026?",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Winston-Salem NC",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Winston-Salem NC 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_greensboro",
+    "userMessage": "Hi, we're getting married in Greensboro NC on October 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Greensboro NC",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Greensboro NC 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_charlotte",
+    "userMessage": "Need a wedding videographer in Charlotte on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Charlotte",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Charlotte 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_raleigh",
+    "userMessage": "Hi! Wedding in Raleigh NC on October 3rd 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Raleigh NC",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh NC 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_savannah",
+    "userMessage": "Looking for a videographer in Savannah GA on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Savannah GA",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Savannah GA 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_charleston",
+    "userMessage": "Wedding in Charleston SC on October 3 2026, are you available?",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Charleston SC",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Charleston SC 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_tampa",
+    "userMessage": "Hi, do you have availability in Tampa FL on Oct 3 2026?",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Tampa FL",
+    "resolvedRegion": "FL",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Tampa FL 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_orlando",
+    "userMessage": "I need wedding video in Orlando Florida on October 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Orlando Florida",
+    "resolvedRegion": "FL",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Orlando Florida 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "known_st_pete",
+    "userMessage": "We're getting married in St Pete on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "St Pete",
+    "resolvedRegion": "FL",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in St Pete 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_springfield",
+    "userMessage": "I need a videographer in Springfield on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Springfield",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_first_turn_lead_region_clarification",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_portland_travel",
+    "userMessage": "Do you travel to Portland for weddings on Oct 3 2026?",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Portland",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_first_turn_lead_region_clarification",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Portland. Just to confirm - is that in FL or NC/SC/GA?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_columbus",
+    "userMessage": "Wedding in Columbus on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Columbus",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_first_turn_lead_region_clarification",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Columbus. Just to confirm - is that in FL or NC/SC/GA?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_washington",
+    "userMessage": "We're in Washington on October 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Washington",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_first_turn_lead_region_clarification",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Washington. Just to confirm - is that in FL or NC/SC/GA?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_newport",
+    "userMessage": "Are you available for Newport on Oct 3 2026?",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Newport",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_first_turn_lead_region_clarification",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Newport. Just to confirm - is that in FL or NC/SC/GA?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "opener_interested",
+    "userMessage": "Hello, I'm interested",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! So happy you reached out 🤍 What wedding date and city are you planning for?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "opener_more_information",
+    "userMessage": "Can I get more information?",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! So happy you reached out 🤍 What wedding date and city are you planning for?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "opener_more_info",
+    "userMessage": "More info please",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! So happy you reached out 🤍 What wedding date and city are you planning for?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "opener_wedding_videography",
+    "userMessage": "Interested in wedding videography",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! So happy you reached out 🤍 What wedding date and city are you planning for?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "opener_how_does_this_work",
+    "userMessage": "Hi, how does this work?",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! So happy you reached out 🤍 What wedding date and city are you planning for?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_not_needed_videographer",
+    "userMessage": "I need a videographer for my wedding",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi, happy you’re here 🤍 What date and location are you thinking for the wedding?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_who_filming",
+    "userMessage": "Who will be filming our wedding?",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nFor Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.\n\nWhat date are you looking at?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_jay_filming",
+    "userMessage": "Is Jay the one filming?",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nFor Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.\n\nWhat date are you looking at?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_on_your_team",
+    "userMessage": "Who is on your team?",
+    "resolvedRegion": "unknown",
+    "toolCalls": [],
+    "responseKey": "utter_ask_wedding_details",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nFor Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.\n\nWhat date are you looking at?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_word_but_availability",
+    "userMessage": "Do you have a videographer available for Oct 3 2026 in Tampa?",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Tampa",
+    "resolvedRegion": "FL",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Tampa 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "forced_needs_region",
+    "userMessage": "I need a videographer in Springfield on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Springfield",
+    "resolvedRegion": "unknown",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"needs_region\",\"supportedRegions\":[\"FL\",\"NC/SC/GA\"],\"summary\":\"This capacity availability function needs a region that matches one configured capacity rule.\"}",
+    "responseKey": "utter_first_turn_lead_region_clarification",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "forced_available_winston",
+    "userMessage": "Wedding in Winston Salem on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Winston Salem",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Winston Salem 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "forced_unavailable_tampa",
+    "userMessage": "Wedding in Tampa on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Tampa",
+    "resolvedRegion": "FL",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"unavailable\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":false,\"summary\":\"Forced test availability unavailable.\"}",
+    "responseKey": "utter_first_turn_lead_unavailable",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nOctober 3, 2026 in Tampa is not open for us.\n\nOur 8-hour wedding films start at $2,800 for Florida.",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "forced_tool_error_raleigh",
+    "userMessage": "Wedding in Raleigh on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Raleigh",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"missing_credentials\",\"summary\":\"Forced test tool error.\"}",
+    "responseKey": "utter_handoff_ack",
+    "outboundText": "Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍",
+    "attachments": [],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "llm_bad_team_override",
+    "userMessage": "I need a videographer in Winston Salem on Oct 3 2026",
+    "extractedDate": "2026-10-03",
+    "extractedLocation": "Winston Salem",
+    "resolvedRegion": "NC_SC_GA",
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResult": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true,\"summary\":\"Forced test availability available.\"}",
+    "responseKey": "utter_availability_available_ask_names",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Winston Salem 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\n\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "guardResult": {
+      "ok": true
+    },
+    "passed": true,
+    "failures": []
+  }
+]

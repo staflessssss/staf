@@ -1,0 +1,626 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Wedding First-Turn Lead Matrix</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #171717; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { background: #f4f4f4; position: sticky; top: 0; }
+    tr.pass { background: #f6fff6; }
+    tr.fail { background: #fff6f6; }
+    pre { white-space: pre-wrap; margin: 0; max-width: 420px; }
+  </style>
+</head>
+<body>
+  <h1>Wedding First-Turn Lead Matrix</h1>
+  <p>Passed: 30/30</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Scenario</th>
+        <th>User message</th>
+        <th>Date</th>
+        <th>Location</th>
+        <th>Region</th>
+        <th>Tool calls</th>
+        <th>Tool result</th>
+        <th>Response key</th>
+        <th>Outbound text</th>
+        <th>Attachments</th>
+        <th>Guard</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="pass">
+        <td>known_winston_salem_need_videographer</td>
+        <td>Hii! I need a videographer for a wedding in Winston Salem on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Winston Salem</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston Salem 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_winston_salem_nc_availability</td>
+        <td>Do you have availability in Winston-Salem NC on Oct 3 2026?</td>
+        <td>2026-10-03</td>
+        <td>Winston-Salem NC</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston-Salem NC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_greensboro</td>
+        <td>Hi, we're getting married in Greensboro NC on October 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Greensboro NC</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Greensboro NC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_charlotte</td>
+        <td>Need a wedding videographer in Charlotte on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Charlotte</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Charlotte 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_raleigh</td>
+        <td>Hi! Wedding in Raleigh NC on October 3rd 2026</td>
+        <td>2026-10-03</td>
+        <td>Raleigh NC</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh NC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_savannah</td>
+        <td>Looking for a videographer in Savannah GA on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Savannah GA</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Savannah GA 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_charleston</td>
+        <td>Wedding in Charleston SC on October 3 2026, are you available?</td>
+        <td>2026-10-03</td>
+        <td>Charleston SC</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Charleston SC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_tampa</td>
+        <td>Hi, do you have availability in Tampa FL on Oct 3 2026?</td>
+        <td>2026-10-03</td>
+        <td>Tampa FL</td>
+        <td>FL</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;FL&quot;,&quot;requestedRegion&quot;:&quot;FL&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Tampa FL 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_orlando</td>
+        <td>I need wedding video in Orlando Florida on October 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Orlando Florida</td>
+        <td>FL</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;FL&quot;,&quot;requestedRegion&quot;:&quot;FL&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Orlando Florida 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>known_st_pete</td>
+        <td>We're getting married in St Pete on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>St Pete</td>
+        <td>FL</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;FL&quot;,&quot;requestedRegion&quot;:&quot;FL&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in St Pete 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>unknown_springfield</td>
+        <td>I need a videographer in Springfield on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Springfield</td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_first_turn_lead_region_clarification</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>unknown_portland_travel</td>
+        <td>Do you travel to Portland for weddings on Oct 3 2026?</td>
+        <td>2026-10-03</td>
+        <td>Portland</td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_first_turn_lead_region_clarification</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Portland. Just to confirm - is that in FL or NC/SC/GA?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>unknown_columbus</td>
+        <td>Wedding in Columbus on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Columbus</td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_first_turn_lead_region_clarification</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Columbus. Just to confirm - is that in FL or NC/SC/GA?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>unknown_washington</td>
+        <td>We're in Washington on October 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Washington</td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_first_turn_lead_region_clarification</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Washington. Just to confirm - is that in FL or NC/SC/GA?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>unknown_newport</td>
+        <td>Are you available for Newport on Oct 3 2026?</td>
+        <td>2026-10-03</td>
+        <td>Newport</td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_first_turn_lead_region_clarification</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Newport. Just to confirm - is that in FL or NC/SC/GA?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>opener_interested</td>
+        <td>Hello, I'm interested</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! So happy you reached out 🤍 What wedding date and city are you planning for?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>opener_more_information</td>
+        <td>Can I get more information?</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! So happy you reached out 🤍 What wedding date and city are you planning for?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>opener_more_info</td>
+        <td>More info please</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! So happy you reached out 🤍 What wedding date and city are you planning for?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>opener_wedding_videography</td>
+        <td>Interested in wedding videography</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! So happy you reached out 🤍 What wedding date and city are you planning for?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>opener_how_does_this_work</td>
+        <td>Hi, how does this work?</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! So happy you reached out 🤍 What wedding date and city are you planning for?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>team_not_needed_videographer</td>
+        <td>I need a videographer for my wedding</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi, happy you’re here 🤍 What date and location are you thinking for the wedding?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>team_who_filming</td>
+        <td>Who will be filming our wedding?</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.
+
+What date are you looking at?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>team_jay_filming</td>
+        <td>Is Jay the one filming?</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.
+
+What date are you looking at?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>team_on_your_team</td>
+        <td>Who is on your team?</td>
+        <td></td>
+        <td></td>
+        <td>unknown</td>
+        <td></td>
+        <td></td>
+        <td>utter_ask_wedding_details</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.
+
+What date are you looking at?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>team_word_but_availability</td>
+        <td>Do you have a videographer available for Oct 3 2026 in Tampa?</td>
+        <td>2026-10-03</td>
+        <td>Tampa</td>
+        <td>FL</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;FL&quot;,&quot;requestedRegion&quot;:&quot;FL&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Tampa 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>forced_needs_region</td>
+        <td>I need a videographer in Springfield on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Springfield</td>
+        <td>unknown</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;needs_region&quot;,&quot;supportedRegions&quot;:[&quot;FL&quot;,&quot;NC/SC/GA&quot;],&quot;summary&quot;:&quot;This capacity availability function needs a region that matches one configured capacity rule.&quot;}</td>
+        <td>utter_first_turn_lead_region_clarification</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>forced_available_winston</td>
+        <td>Wedding in Winston Salem on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Winston Salem</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston Salem 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>forced_unavailable_tampa</td>
+        <td>Wedding in Tampa on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Tampa</td>
+        <td>FL</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;unavailable&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;FL&quot;,&quot;requestedRegion&quot;:&quot;FL&quot;,&quot;available&quot;:false,&quot;summary&quot;:&quot;Forced test availability unavailable.&quot;}</td>
+        <td>utter_first_turn_lead_unavailable</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍
+
+October 3, 2026 in Tampa is not open for us.
+
+Our 8-hour wedding films start at $2,800 for Florida.</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>forced_tool_error_raleigh</td>
+        <td>Wedding in Raleigh on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Raleigh</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;missing_credentials&quot;,&quot;summary&quot;:&quot;Forced test tool error.&quot;}</td>
+        <td>utter_handoff_ack</td>
+        <td><pre>Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍</pre></td>
+        <td></td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr>
+
+      <tr class="pass">
+        <td>llm_bad_team_override</td>
+        <td>I need a videographer in Winston Salem on Oct 3 2026</td>
+        <td>2026-10-03</td>
+        <td>Winston Salem</td>
+        <td>NC_SC_GA</td>
+        <td>check_wedding_availability</td>
+        <td>{&quot;status&quot;:&quot;available&quot;,&quot;date&quot;:&quot;2026-10-03&quot;,&quot;requestedDate&quot;:&quot;2026-10-03&quot;,&quot;region&quot;:&quot;NC/SC/GA&quot;,&quot;requestedRegion&quot;:&quot;NC/SC/GA&quot;,&quot;available&quot;:true,&quot;summary&quot;:&quot;Forced test availability available.&quot;}</td>
+        <td>utter_availability_available_ask_names</td>
+        <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston Salem 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+        <td>image:pricing_guide</td>
+        <td>{&quot;ok&quot;:true}</td>
+        <td>PASS</td>
+      </tr></tbody>
+  </table>
+</body>
+</html>

@@ -1,0 +1,356 @@
+# Wedding First-Turn Lead Matrix
+
+Passed: 30/30
+
+| Scenario | User message | Date | Location | Region | Tool | Response key | Attachments | Guard | Result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+known_winston_salem_need_videographer | Hii! I need a videographer for a wedding in Winston Salem on Oct 3 2026 | 2026-10-03 | Winston Salem | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_winston_salem_nc_availability | Do you have availability in Winston-Salem NC on Oct 3 2026? | 2026-10-03 | Winston-Salem NC | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_greensboro | Hi, we're getting married in Greensboro NC on October 3 2026 | 2026-10-03 | Greensboro NC | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_charlotte | Need a wedding videographer in Charlotte on Oct 3 2026 | 2026-10-03 | Charlotte | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_raleigh | Hi! Wedding in Raleigh NC on October 3rd 2026 | 2026-10-03 | Raleigh NC | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_savannah | Looking for a videographer in Savannah GA on Oct 3 2026 | 2026-10-03 | Savannah GA | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_charleston | Wedding in Charleston SC on October 3 2026, are you available? | 2026-10-03 | Charleston SC | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_tampa | Hi, do you have availability in Tampa FL on Oct 3 2026? | 2026-10-03 | Tampa FL | FL | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_orlando | I need wedding video in Orlando Florida on October 3 2026 | 2026-10-03 | Orlando Florida | FL | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_st_pete | We're getting married in St Pete on Oct 3 2026 | 2026-10-03 | St Pete | FL | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+unknown_springfield | I need a videographer in Springfield on Oct 3 2026 | 2026-10-03 | Springfield | unknown |  | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
+unknown_portland_travel | Do you travel to Portland for weddings on Oct 3 2026? | 2026-10-03 | Portland | unknown |  | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
+unknown_columbus | Wedding in Columbus on Oct 3 2026 | 2026-10-03 | Columbus | unknown |  | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
+unknown_washington | We're in Washington on October 3 2026 | 2026-10-03 | Washington | unknown |  | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
+unknown_newport | Are you available for Newport on Oct 3 2026? | 2026-10-03 | Newport | unknown |  | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
+opener_interested | Hello, I'm interested |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+opener_more_information | Can I get more information? |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+opener_more_info | More info please |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+opener_wedding_videography | Interested in wedding videography |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+opener_how_does_this_work | Hi, how does this work? |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+team_not_needed_videographer | I need a videographer for my wedding |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+team_who_filming | Who will be filming our wedding? |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+team_jay_filming | Is Jay the one filming? |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+team_on_your_team | Who is on your team? |  |  | unknown |  | utter_ask_wedding_details |  | {"ok":true} | PASS
+team_word_but_availability | Do you have a videographer available for Oct 3 2026 in Tampa? | 2026-10-03 | Tampa | FL | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+forced_needs_region | I need a videographer in Springfield on Oct 3 2026 | 2026-10-03 | Springfield | unknown | check_wedding_availability | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
+forced_available_winston | Wedding in Winston Salem on Oct 3 2026 | 2026-10-03 | Winston Salem | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+forced_unavailable_tampa | Wedding in Tampa on Oct 3 2026 | 2026-10-03 | Tampa | FL | check_wedding_availability | utter_first_turn_lead_unavailable |  | {"ok":true} | PASS
+forced_tool_error_raleigh | Wedding in Raleigh on Oct 3 2026 | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | utter_handoff_ack |  | {"ok":true} | PASS
+llm_bad_team_override | I need a videographer in Winston Salem on Oct 3 2026 | 2026-10-03 | Winston Salem | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+
+## Outbound Text
+
+### known_winston_salem_need_videographer
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston Salem 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_winston_salem_nc_availability
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston-Salem NC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_greensboro
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Greensboro NC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_charlotte
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Charlotte 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_raleigh
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh NC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_savannah
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Savannah GA 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_charleston
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Charleston SC 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_tampa
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Tampa FL 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_orlando
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Orlando Florida 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### known_st_pete
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in St Pete 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### unknown_springfield
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?
+```
+
+### unknown_portland_travel
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Portland. Just to confirm - is that in FL or NC/SC/GA?
+```
+
+### unknown_columbus
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Columbus. Just to confirm - is that in FL or NC/SC/GA?
+```
+
+### unknown_washington
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Washington. Just to confirm - is that in FL or NC/SC/GA?
+```
+
+### unknown_newport
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Newport. Just to confirm - is that in FL or NC/SC/GA?
+```
+
+### opener_interested
+
+```text
+Hi! So happy you reached out 🤍 What wedding date and city are you planning for?
+```
+
+### opener_more_information
+
+```text
+Hi! So happy you reached out 🤍 What wedding date and city are you planning for?
+```
+
+### opener_more_info
+
+```text
+Hi! So happy you reached out 🤍 What wedding date and city are you planning for?
+```
+
+### opener_wedding_videography
+
+```text
+Hi! So happy you reached out 🤍 What wedding date and city are you planning for?
+```
+
+### opener_how_does_this_work
+
+```text
+Hi! So happy you reached out 🤍 What wedding date and city are you planning for?
+```
+
+### team_not_needed_videographer
+
+```text
+Hi, happy you’re here 🤍 What date and location are you thinking for the wedding?
+```
+
+### team_who_filming
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.
+
+What date are you looking at?
+```
+
+### team_jay_filming
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.
+
+What date are you looking at?
+```
+
+### team_on_your_team
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+For Florida weddings, Jay is our lead filmmaker in Tampa. I'll confirm the exact team details with you on the call.
+
+What date are you looking at?
+```
+
+### team_word_but_availability
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Tampa 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### forced_needs_region
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?
+```
+
+### forced_available_winston
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston Salem 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```
+
+### forced_unavailable_tampa
+
+```text
+Hi! Thanks so much for reaching out 🤍
+
+October 3, 2026 in Tampa is not open for us.
+
+Our 8-hour wedding films start at $2,800 for Florida.
+```
+
+### forced_tool_error_raleigh
+
+```text
+Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍
+```
+
+### llm_bad_team_override
+
+```text
+Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Winston Salem 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?
+```

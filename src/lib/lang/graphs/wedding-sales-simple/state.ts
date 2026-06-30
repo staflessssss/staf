@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 
 import type { WeddingSalesChannel } from "../wedding-sales/state";
+import { normalizeWeddingSalesRegionKey, resolveWeddingSalesRegion } from "../wedding-sales/config";
 import {
   buildDialogueUnderstanding,
   type DialogueUnderstanding,
@@ -17,6 +18,13 @@ import {
 } from "./wedding-lead-form";
 
 export type SimpleWeddingSalesChannel = WeddingSalesChannel;
+export type SimpleWeddingSalesServiceRegion = "FL" | "NC_SC_GA" | "unknown";
+export type SimpleWeddingSalesAvailabilityToolStatus =
+  | "not_checked"
+  | "available"
+  | "unavailable"
+  | "needs_region"
+  | "tool_error";
 
 export const turnUnderstandingSchema = z.object({
   customerMessageType: z.enum([
@@ -66,6 +74,10 @@ export const turnUnderstandingSchema = z.object({
 export type TurnUnderstanding = z.infer<typeof turnUnderstandingSchema>;
 
 export type SimpleWeddingSalesQuestion = TurnUnderstanding["questionsAskedByCustomer"][number];
+
+function toSimpleServiceRegion(region: string | undefined): SimpleWeddingSalesServiceRegion {
+  return region === "FL" || region === "NC_SC_GA" ? region : "unknown";
+}
 
 export type SimpleWeddingSalesNextStep =
   | "reply_only"
@@ -140,6 +152,8 @@ export type SimpleWeddingSalesResponseKey =
   | "utter_availability_available_ask_names"
   | "utter_pricing_repeat_send_guide_ask_names"
   | "utter_ask_wedding_details"
+  | "utter_first_turn_lead_region_clarification"
+  | "utter_first_turn_lead_unavailable"
   | "utter_ask_location_only"
   | "utter_ask_wedding_date_only"
   | "utter_ask_names_after_details"
@@ -279,6 +293,8 @@ export type SimpleWeddingSalesSlots = {
   weddingDateText?: string;
   weddingDateDisplay?: string;
   location?: string;
+  serviceRegion?: SimpleWeddingSalesServiceRegion;
+  availabilityToolStatus?: SimpleWeddingSalesAvailabilityToolStatus;
   availabilityRegion?: string;
   weddingAvailability?: "available" | "unavailable" | "unknown";
   venue?: string;
@@ -464,6 +480,8 @@ export type SimpleWeddingSalesState = {
   senderRole?: "bride" | "groom" | "mother" | "planner" | "friend" | "unknown";
   availability?: "available" | "unavailable" | "unknown";
   availabilityContextDate?: string;
+  serviceRegion?: SimpleWeddingSalesServiceRegion;
+  availabilityToolStatus?: SimpleWeddingSalesAvailabilityToolStatus;
   availabilityRegion?: string;
   suggestedWeddingDates?: string[];
   availabilityCheck?: {
@@ -568,6 +586,8 @@ export function createInitialSimpleWeddingSalesState(args: {
     senderRole: args.previousState?.senderRole,
     availability: args.previousState?.availability,
     availabilityContextDate: args.previousState?.availabilityContextDate,
+    serviceRegion: args.previousState?.serviceRegion ?? "unknown",
+    availabilityToolStatus: args.previousState?.availabilityToolStatus ?? "not_checked",
     availabilityRegion: args.previousState?.availabilityRegion,
     suggestedWeddingDates: args.previousState?.suggestedWeddingDates,
     availabilityCheck: args.previousState?.availabilityCheck,
@@ -720,6 +740,13 @@ export function mergeTurnUnderstanding(
       callTimeCompletion.proposedCallTime !== state.proposedCallTime,
   );
   const customerEmail = facts.email ?? state.customerEmail;
+  const serviceRegion = toSimpleServiceRegion(
+    normalizeWeddingSalesRegionKey(resolveWeddingSalesRegion({
+      location: weddingLeadForm.slotPatch.location ?? facts.location ?? state.location,
+      venue: facts.venue ?? state.venue,
+      availabilityRegion: state.availabilityRegion,
+    })) ?? state.serviceRegion,
+  );
   const bookingConfirmation = resolveBookingConfirmationAnswer({
     state,
     understanding,
@@ -740,6 +767,7 @@ export function mergeTurnUnderstanding(
       weddingLeadForm.slotPatch.weddingDateText ?? facts.weddingDateText ?? state.weddingDateText,
     weddingDateDisplay: weddingLeadForm.slotPatch.weddingDateDisplay ?? state.weddingDateDisplay,
     location: weddingLeadForm.slotPatch.location ?? facts.location ?? state.location,
+    serviceRegion,
     venue: facts.venue ?? state.venue,
     customerEmail,
     senderRole: facts.senderRole ?? state.senderRole,

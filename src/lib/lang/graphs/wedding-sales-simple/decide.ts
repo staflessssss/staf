@@ -9,6 +9,7 @@ import type {
   SimpleWeddingSalesReplyObligation,
   SimpleWeddingSalesState,
 } from "./state";
+import { resolveWeddingSalesRegion } from "../wedding-sales/config";
 
 function hasCommand(
   commands: SimpleWeddingSalesDialogueCommand[] | undefined,
@@ -482,6 +483,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   const checkedAvailabilityThisTurn = state.toolObservations.some(
     (observation) => observation.toolName === "check_wedding_availability",
   );
+  const resolvedServiceRegion = resolveWeddingSalesRegion(state);
 
   if (hasStartFlowCommand && !state.weddingDate) {
     return decision({
@@ -489,6 +491,25 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       missingField: "weddingDate",
       replyType: "missing_info",
       reason: "generic wedding lead inquiry starts qualification flow",
+    });
+  }
+
+  if (
+    state.isFirstTurn &&
+    state.weddingDate &&
+    state.location &&
+    !resolvedServiceRegion &&
+    !checkedAvailabilityThisTurn
+  ) {
+    return decision({
+      nextStep: "ask_missing_info",
+      missingField: "location",
+      replyType: "missing_info",
+      reason: "first-turn lead has a date and ambiguous location, so ask supported region before availability check",
+      statePatch: {
+        serviceRegion: "unknown",
+        availabilityToolStatus: "needs_region",
+      },
     });
   }
 
@@ -767,7 +788,10 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     });
   }
 
-  if (availability === "unknown" && latestAvailabilityToolStatus(state) === "needs_region") {
+  if (
+    availability === "unknown" &&
+    (state.availabilityToolStatus === "needs_region" || latestAvailabilityToolStatus(state) === "needs_region")
+  ) {
     return decision({
       nextStep: "ask_missing_info",
       missingField: "location",

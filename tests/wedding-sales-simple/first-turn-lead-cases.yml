@@ -1,0 +1,271 @@
+{
+  "cases": [
+    {
+      "id": "known_winston_salem_need_videographer",
+      "message": "Hii! I need a videographer for a wedding in Winston Salem on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Winston Salem",
+      "expectedRegion": "NC_SC_GA",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true,
+      "forbidTeam": true
+    },
+    {
+      "id": "known_winston_salem_nc_availability",
+      "message": "Do you have availability in Winston-Salem NC on Oct 3 2026?",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Winston-Salem NC",
+      "expectedRegion": "NC_SC_GA",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_greensboro",
+      "message": "Hi, we're getting married in Greensboro NC on October 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Greensboro NC",
+      "expectedRegion": "NC_SC_GA",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_charlotte",
+      "message": "Need a wedding videographer in Charlotte on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Charlotte",
+      "expectedRegion": "NC_SC_GA",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_raleigh",
+      "message": "Hi! Wedding in Raleigh NC on October 3rd 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Raleigh NC",
+      "expectedRegion": "NC_SC_GA",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_savannah",
+      "message": "Looking for a videographer in Savannah GA on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Savannah GA",
+      "expectedRegion": "NC_SC_GA",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_charleston",
+      "message": "Wedding in Charleston SC on October 3 2026, are you available?",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Charleston SC",
+      "expectedRegion": "NC_SC_GA",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_tampa",
+      "message": "Hi, do you have availability in Tampa FL on Oct 3 2026?",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Tampa FL",
+      "expectedRegion": "FL",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_orlando",
+      "message": "I need wedding video in Orlando Florida on October 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Orlando Florida",
+      "expectedRegion": "FL",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "known_st_pete",
+      "message": "We're getting married in St Pete on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "St Pete",
+      "expectedRegion": "FL",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "unknown_springfield",
+      "message": "I need a videographer in Springfield on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Springfield",
+      "expectedRegion": "unknown",
+      "expectToolStatus": "needs_region",
+      "expectClarification": true
+    },
+    {
+      "id": "unknown_portland_travel",
+      "message": "Do you travel to Portland for weddings on Oct 3 2026?",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Portland",
+      "expectedRegion": "unknown",
+      "expectToolStatus": "needs_region",
+      "expectClarification": true
+    },
+    {
+      "id": "unknown_columbus",
+      "message": "Wedding in Columbus on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Columbus",
+      "expectedRegion": "unknown",
+      "expectToolStatus": "needs_region",
+      "expectClarification": true
+    },
+    {
+      "id": "unknown_washington",
+      "message": "We're in Washington on October 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Washington",
+      "expectedRegion": "unknown",
+      "expectToolStatus": "needs_region",
+      "expectClarification": true
+    },
+    {
+      "id": "unknown_newport",
+      "message": "Are you available for Newport on Oct 3 2026?",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Newport",
+      "expectedRegion": "unknown",
+      "expectToolStatus": "needs_region",
+      "expectClarification": true
+    },
+    {
+      "id": "opener_interested",
+      "message": "Hello, I'm interested",
+      "expectedRegion": "unknown",
+      "expectNoTool": true,
+      "expectAskDetails": true
+    },
+    {
+      "id": "opener_more_information",
+      "message": "Can I get more information?",
+      "expectedRegion": "unknown",
+      "expectNoTool": true,
+      "expectAskDetails": true
+    },
+    {
+      "id": "opener_more_info",
+      "message": "More info please",
+      "expectedRegion": "unknown",
+      "expectNoTool": true,
+      "expectAskDetails": true
+    },
+    {
+      "id": "opener_wedding_videography",
+      "message": "Interested in wedding videography",
+      "expectedRegion": "unknown",
+      "expectNoTool": true,
+      "expectAskDetails": true,
+      "forbidTeam": true
+    },
+    {
+      "id": "opener_how_does_this_work",
+      "message": "Hi, how does this work?",
+      "expectedRegion": "unknown",
+      "expectNoTool": true,
+      "expectAskDetails": true
+    },
+    {
+      "id": "team_not_needed_videographer",
+      "message": "I need a videographer for my wedding",
+      "expectedRegion": "unknown",
+      "expectNoTool": true,
+      "expectAskDetails": true,
+      "forbidTeam": true
+    },
+    {
+      "id": "team_who_filming",
+      "message": "Who will be filming our wedding?",
+      "expectedRegion": "unknown",
+      "expectTeamAnswer": true
+    },
+    {
+      "id": "team_jay_filming",
+      "message": "Is Jay the one filming?",
+      "expectedRegion": "unknown",
+      "expectTeamAnswer": true
+    },
+    {
+      "id": "team_on_your_team",
+      "message": "Who is on your team?",
+      "expectedRegion": "unknown",
+      "expectTeamAnswer": true
+    },
+    {
+      "id": "team_word_but_availability",
+      "message": "Do you have a videographer available for Oct 3 2026 in Tampa?",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Tampa",
+      "expectedRegion": "FL",
+      "expectToolCall": "check_wedding_availability",
+      "expectAvailability": "available",
+      "expectGuide": true,
+      "forbidTeam": true
+    },
+    {
+      "id": "forced_needs_region",
+      "message": "I need a videographer in Springfield on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Springfield",
+      "expectedRegion": "unknown",
+      "forcedToolStatus": "needs_region",
+      "expectClarification": true
+    },
+    {
+      "id": "forced_available_winston",
+      "message": "Wedding in Winston Salem on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Winston Salem",
+      "expectedRegion": "NC_SC_GA",
+      "forcedToolStatus": "available",
+      "expectAvailability": "available",
+      "expectGuide": true
+    },
+    {
+      "id": "forced_unavailable_tampa",
+      "message": "Wedding in Tampa on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Tampa",
+      "expectedRegion": "FL",
+      "forcedToolStatus": "unavailable",
+      "expectAvailability": "unavailable"
+    },
+    {
+      "id": "forced_tool_error_raleigh",
+      "message": "Wedding in Raleigh on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Raleigh",
+      "expectedRegion": "NC_SC_GA",
+      "forcedToolStatus": "tool_error",
+      "expectToolError": true
+    },
+    {
+      "id": "llm_bad_team_override",
+      "message": "I need a videographer in Winston Salem on Oct 3 2026",
+      "expectedDate": "2026-10-03",
+      "expectedLocation": "Winston Salem",
+      "expectedRegion": "NC_SC_GA",
+      "llmQuestions": ["team"],
+      "expectAvailability": "available",
+      "expectGuide": true,
+      "forbidTeam": true
+    }
+  ]
+}

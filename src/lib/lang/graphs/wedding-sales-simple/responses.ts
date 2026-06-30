@@ -34,6 +34,18 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
       text: "Great news — {{weddingDateDisplay}} is available in {{locationDisplay}} 🤍\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.\n{{promotionText}}\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
     },
   ],
+  utter_first_turn_lead_region_clarification: [
+    {
+      id: "first_turn_region_clarification_v1",
+      text: "Hi! Thanks so much for reaching out 🤍\n\nI have {{weddingDateDisplay}} in {{locationDisplay}}. Just to confirm - is that in FL or NC/SC/GA?",
+    },
+  ],
+  utter_first_turn_lead_unavailable: [
+    {
+      id: "first_turn_unavailable_v1",
+      text: "Hi! Thanks so much for reaching out 🤍\n\n{{weddingDateDisplay}} in {{locationDisplay}} is not open for us.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}.",
+    },
+  ],
   utter_pricing_repeat_send_guide_ask_names: [
     {
       id: "pricing_repeat_names_v1",

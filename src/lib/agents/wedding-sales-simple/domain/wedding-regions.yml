@@ -1,0 +1,43 @@
+{
+  "regions": {
+    "FL": {
+      "display": "FL",
+      "aliases": [
+        "FL",
+        "Florida",
+        "Tampa",
+        "Tampa FL",
+        "Miami",
+        "Orlando",
+        "St Pete",
+        "St. Petersburg",
+        "Sarasota",
+        "Fort Lauderdale"
+      ]
+    },
+    "NC_SC_GA": {
+      "display": "NC/SC/GA",
+      "aliases": [
+        "NC",
+        "North Carolina",
+        "Winston Salem",
+        "Winston-Salem",
+        "Winston Salem NC",
+        "Winston-Salem, NC",
+        "Greensboro",
+        "Charlotte",
+        "Raleigh",
+        "Durham",
+        "Asheville",
+        "SC",
+        "South Carolina",
+        "Charleston",
+        "Greenville",
+        "GA",
+        "Georgia",
+        "Savannah",
+        "Atlanta"
+      ]
+    }
+  }
+}

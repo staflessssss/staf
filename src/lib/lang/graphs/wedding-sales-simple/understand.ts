@@ -181,7 +181,7 @@ function normalizeLlmUnderstanding(
 }
 
 function extractLocation(message: string) {
-  const match = /\b(?:in|near|around)\s+([A-Z][A-Za-z .'-]+?)(?:[?.!,]|$|\s+(?:and|for|on|at)\b)/.exec(
+  const match = /\b(?:in|near|around|to)\s+([A-Z][A-Za-z .'-]+?)(?:[?.!,]|$|\s+(?:and|for|on|at)\b)/.exec(
     message,
   );
 
@@ -325,7 +325,7 @@ function isExplicitTeamQuestion(normalized: string) {
     /\bwho\s+is\s+(?:the\s+)?(?:videographer|filmmaker|shooter)\b/.test(normalized) ||
     /\b(?:who|which)\b[\s\S]{0,40}\bteam\b/.test(normalized) ||
     /\blead filmmaker\b/.test(normalized) ||
-    /\bis\s+jay\s+(?:shooting|filming|the\s+filmmaker|the\s+videographer)\b/.test(normalized) ||
+    /\bis\s+jay\s+(?:shooting|filming|the\s+one\s+filming|the\s+filmmaker|the\s+videographer)\b/.test(normalized) ||
     /\b(?:will\s+you\s+shoot|are\s+you\s+filming|you\s+filming|taras\s+(?:shooting|filming))\b/.test(
       normalized,
     )

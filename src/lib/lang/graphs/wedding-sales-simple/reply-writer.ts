@@ -193,6 +193,15 @@ function questionLine(args: {
     case "weddingDate":
       return "What date are you looking at?";
     case "location":
+      if (
+        args.state.isFirstTurn &&
+        args.state.weddingDateDisplay &&
+        args.state.location &&
+        args.state.availabilityToolStatus === "needs_region"
+      ) {
+        return `I have ${args.state.weddingDateDisplay} in ${args.state.location}. Just to confirm - is that in FL or NC/SC/GA?`;
+      }
+
       return "What city or area is the wedding in?";
     case "venue":
       return `${args.knowledge.persona.replyStyle.namesAcknowledgement} Do you already have a venue picked out?`;
@@ -488,6 +497,8 @@ function normalizeCatalogTextForContract(args: {
 }
 
 const SAFE_OBLIGATION_CATALOG_KEYS = new Set<SimpleWeddingSalesResponseKey>([
+  "utter_first_turn_lead_region_clarification",
+  "utter_first_turn_lead_unavailable",
   "utter_availability_available_ask_names",
   "utter_pricing_repeat_send_guide_ask_names",
   "utter_ask_wedding_date_only",
@@ -501,13 +512,17 @@ function catalogExclusionReason(
   responseKey = catalogResponseKeyForContract(contract),
 ) {
   const allowsWeddingAvailability =
-    responseKey === "utter_availability_available_ask_names" && contract.mustMentionPricing;
+    (responseKey === "utter_availability_available_ask_names" && contract.mustMentionPricing) ||
+    responseKey === "utter_first_turn_lead_unavailable";
   const allowsPricing =
     responseKey === "utter_availability_available_ask_names" ||
+    responseKey === "utter_first_turn_lead_unavailable" ||
     responseKey === "utter_pricing_repeat_send_guide_ask_names" ||
     responseKey === "utter_ask_wedding_date_only";
   const allowsCalendarAvailability = responseKey === "utter_calendar_available_ask_email";
-  const allowsTravel = responseKey === "utter_answer_travel_resume_call_time";
+  const allowsTravel =
+    responseKey === "utter_answer_travel_resume_call_time" ||
+    responseKey === "utter_first_turn_lead_region_clarification";
   const allowsSafeObligations = Boolean(responseKey && SAFE_OBLIGATION_CATALOG_KEYS.has(responseKey));
 
   if (

@@ -145,6 +145,8 @@ export function validateGeneratedReply(args: {
     args.contract.responseKey !== "utter_ask_wedding_details" &&
     args.contract.responseKey !== "utter_ask_wedding_date_only" &&
     args.contract.responseKey !== "utter_availability_available_ask_names" &&
+    args.contract.responseKey !== "utter_first_turn_lead_region_clarification" &&
+    args.contract.responseKey !== "utter_first_turn_lead_unavailable" &&
     !hasRequiredGreetingShape({ text: reply, knowledge: args.knowledge })
   ) {
     reasons.push("first-turn founder greeting is incomplete");

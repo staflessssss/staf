@@ -144,7 +144,7 @@ export function resolveWeddingSalesRegion(state?: Pick<WeddingSalesState, "locat
 
   const text = [state?.location, state?.venue].filter(Boolean).join(" ").toLowerCase();
 
-  if (/\b(?:fl|florida|tampa|miami|orlando|st\.?\s*augustine|saint augustine|jacksonville|fort lauderdale|palm beach)\b/i.test(text)) {
+  if (/\b(?:fl|florida|tampa|miami|orlando|st\.?\s*pete|st\.?\s*petersburg|sarasota|st\.?\s*augustine|saint augustine|jacksonville|fort lauderdale|palm beach)\b/i.test(text)) {
     return "FL";
   }
 

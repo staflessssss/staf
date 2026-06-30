@@ -134,6 +134,16 @@ function responseKeyForContract(args: {
 }): SimpleWeddingSalesResponseKey | undefined {
   const { state, requiredQuestion, replyObligations } = args;
 
+  if (
+    requiredQuestion === "location" &&
+    state.isFirstTurn &&
+    state.weddingDate &&
+    state.location &&
+    state.availabilityToolStatus === "needs_region"
+  ) {
+    return "utter_first_turn_lead_region_clarification";
+  }
+
   if (state.decisionTrace?.replyType === "post_booking_faq") {
     return "utter_answer_faq_after_booking";
   }
@@ -162,6 +172,14 @@ function responseKeyForContract(args: {
 
   if (args.mustMentionBookingConfirmation) {
     return "utter_booking_confirmed";
+  }
+
+  if (
+    state.isFirstTurn &&
+    state.availability === "unavailable" &&
+    state.decisionTrace?.replyType === "availability_unavailable"
+  ) {
+    return "utter_first_turn_lead_unavailable";
   }
 
   if (args.mentionPolicy.consultation.mode === "ask_booking_confirmation") {
@@ -223,6 +241,15 @@ function responseKeyForContract(args: {
   }
 
   if (requiredQuestion === "location") {
+    if (
+      state.isFirstTurn &&
+      state.weddingDate &&
+      state.location &&
+      state.availabilityToolStatus === "needs_region"
+    ) {
+      return "utter_first_turn_lead_region_clarification";
+    }
+
     return state.weddingDate ? "utter_ask_location_only" : "utter_ask_wedding_details";
   }
 
