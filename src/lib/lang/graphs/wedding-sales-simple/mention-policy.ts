@@ -121,6 +121,14 @@ export function buildSimpleWeddingMentionPolicy(args: {
   const consultationMentionedForCurrentSlot = consultationWasMentionedForCurrentSlot(state);
   const hasKnownWeddingAvailability =
     state.availability === "available" || state.availability === "unavailable";
+  const firstTurnKnownRegionToolError = Boolean(
+    state.isFirstTurn &&
+      state.availabilityToolStatus === "tool_error" &&
+      state.weddingDate &&
+      state.location &&
+      state.serviceRegion &&
+      state.serviceRegion !== "unknown",
+  );
 
   const pricing = (() => {
     if (askedPricing && !priceWasMentioned) {
@@ -141,6 +149,13 @@ export function buildSimpleWeddingMentionPolicy(args: {
       return {
         mode: "full" as const,
         reason: "availability was checked and current start price has not been mentioned",
+      };
+    }
+
+    if (firstTurnKnownRegionToolError && !priceWasMentioned) {
+      return {
+        mode: "full" as const,
+        reason: "first-turn availability tool error should still share regional starting price",
       };
     }
 
@@ -188,6 +203,13 @@ export function buildSimpleWeddingMentionPolicy(args: {
       return {
         mode: "send_attachment" as const,
         reason: "fresh available date should include collections guide image",
+      };
+    }
+
+    if (firstTurnKnownRegionToolError && !guideMentioned) {
+      return {
+        mode: "send_attachment" as const,
+        reason: "first-turn availability tool error should still include collections guide image",
       };
     }
 

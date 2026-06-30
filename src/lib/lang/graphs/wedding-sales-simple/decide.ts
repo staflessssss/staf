@@ -809,7 +809,8 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
     (state.availabilityToolStatus === "tool_error" || latestAvailabilityToolStatus(state) === "missing_credentials")
   ) {
     return decision({
-      nextStep: "reply_only",
+      nextStep: hasNames(state) ? "reply_only" : "ask_missing_info",
+      missingField: hasNames(state) ? undefined : "names",
       replyType: "availability_unknown",
       reason: "first-turn availability tool error should stay resumable without handoff",
       responseKey: "utter_first_turn_lead_tool_check",

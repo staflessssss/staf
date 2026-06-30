@@ -412,6 +412,14 @@ function runCase(testCase: FirstTurnCase): MatrixResult {
     failures.push("unknown-region team answer mentioned Jay/Tampa");
   }
 
+  if (
+    testCase.expectTeamAnswer &&
+    testCase.expectedRegion === "unknown" &&
+    (reply.text.match(/\b(?:what\s+(?:wedding\s+)?date|date\s+(?:and|or)\s+(?:city|location)|city\s+(?:and|or)\s+date)\b/gi)?.length ?? 0) > 1
+  ) {
+    failures.push("unknown-region team answer asked for date/city more than once");
+  }
+
   if (testCase.forbidTeam && /Jay|lead filmmaker in Tampa|Florida weddings/i.test(reply.text)) {
     failures.push("forbidden team/Tampa copy appeared");
   }
@@ -470,8 +478,32 @@ function runCase(testCase: FirstTurnCase): MatrixResult {
       failures.push("first-turn tool_error did not mark human review required");
     }
 
-    if (!/double-check availability|follow up here shortly/i.test(reply.text)) {
+    if (!/having trouble checking availability|double-check availability/i.test(reply.text)) {
       failures.push("first-turn tool_error did not send soft availability check copy");
+    }
+
+    if (!/Raleigh/i.test(reply.text)) {
+      failures.push("first-turn tool_error did not mention Raleigh");
+    }
+
+    if (!/October 3, 2026/i.test(reply.text)) {
+      failures.push("first-turn tool_error did not mention October 3, 2026");
+    }
+
+    if (!/don(?:'|’|`)t want to guess|do not want to guess/i.test(reply.text)) {
+      failures.push("first-turn tool_error did not say it would not guess");
+    }
+
+    if (!/\$3,600/.test(reply.text) || !/NC\/SC\/GA/i.test(reply.text)) {
+      failures.push("first-turn tool_error did not mention NC/SC/GA pricing");
+    }
+
+    if (!/\b(names?|both of your names)\b/i.test(reply.text)) {
+      failures.push("first-turn tool_error did not ask names");
+    }
+
+    if (!attachments.some((attachment) => attachment.purpose === "pricing_guide")) {
+      failures.push("first-turn tool_error did not include pricing guide attachment");
     }
   }
 

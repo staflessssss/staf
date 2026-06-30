@@ -517,7 +517,7 @@
     "escalated": false,
     "humanReviewRequired": false,
     "responseKey": "utter_ask_wedding_details",
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability. What city and date are you planning for?\n\nWhat date are you looking at?",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability.\n\nWhat wedding date and city are you planning for?",
     "attachments": [],
     "guardResult": {
       "ok": true
@@ -535,7 +535,7 @@
     "escalated": false,
     "humanReviewRequired": false,
     "responseKey": "utter_ask_wedding_details",
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability. What city and date are you planning for?\n\nWhat date are you looking at?",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability.\n\nWhat wedding date and city are you planning for?",
     "attachments": [],
     "guardResult": {
       "ok": true
@@ -553,7 +553,7 @@
     "escalated": false,
     "humanReviewRequired": false,
     "responseKey": "utter_ask_wedding_details",
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability. What city and date are you planning for?\n\nWhat date are you looking at?",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability.\n\nWhat wedding date and city are you planning for?",
     "attachments": [],
     "guardResult": {
       "ok": true
@@ -678,12 +678,19 @@
     ],
     "toolResult": "{\"status\":\"missing_credentials\",\"summary\":\"Forced test tool error.\"}",
     "mode": "bot_active",
-    "nextStep": "reply_only",
+    "nextStep": "ask_missing_info",
     "escalated": false,
     "humanReviewRequired": true,
     "responseKey": "utter_first_turn_lead_tool_check",
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI want to double-check availability before giving you the wrong answer. I'll follow up here shortly.",
-    "attachments": [],
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Raleigh. I’m having trouble checking availability right this second, so I don’t want to guess.\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA, and I’ll send the collections guide here too 🎥\n\nI’ll have the date checked and follow up shortly. In the meantime, what are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
     "guardResult": {
       "ok": true
     },

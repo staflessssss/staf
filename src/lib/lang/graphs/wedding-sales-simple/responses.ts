@@ -49,7 +49,7 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_first_turn_lead_tool_check: [
     {
       id: "first_turn_tool_check_v1",
-      text: "Hi! Thanks so much for reaching out 🤍\n\nI want to double-check availability before giving you the wrong answer. I'll follow up here shortly.",
+      text: "Hi! Thanks so much for reaching out 🤍\n\nI have {{weddingDateDisplay}} in {{locationDisplay}}. I’m having trouble checking availability right this second, so I don’t want to guess.\n\nOur {{coverageHours}}-hour wedding films start at {{startPrice}} for {{coverageRegion}}, and I’ll send the collections guide here too 🎥\n\nI’ll have the date checked and follow up shortly. In the meantime, what are both of your names?",
     },
   ],
   utter_pricing_repeat_send_guide_ask_names: [

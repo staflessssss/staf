@@ -191,6 +191,14 @@ function questionLine(args: {
     case "names":
       return "And what are both of your names? I’ll keep everything organized on my side.";
     case "weddingDate":
+      if (
+        args.state.isFirstTurn &&
+        shouldAnswerTeamQuestion(args.state, args.contract) &&
+        !args.state.location
+      ) {
+        return "What wedding date and city are you planning for?";
+      }
+
       return "What date are you looking at?";
     case "location":
       if (
@@ -429,6 +437,15 @@ function compatibleResponseKeys(contract: ReplyActionContract): SimpleWeddingSal
   }
 
   if (
+    contract.responseKey === "utter_first_turn_lead_tool_check" &&
+    contract.requiredQuestion === "names" &&
+    contract.mustMentionPricing &&
+    contract.mentionPolicy.guide.mode !== "skip"
+  ) {
+    return ["utter_first_turn_lead_tool_check"];
+  }
+
+  if (
     contract.requiredQuestion === "names" &&
     contract.mustMentionPricing &&
     contract.mentionPolicy.pricing.mode === "same_as_before"
@@ -518,6 +535,7 @@ function catalogExclusionReason(
   const allowsPricing =
     responseKey === "utter_availability_available_ask_names" ||
     responseKey === "utter_first_turn_lead_unavailable" ||
+    responseKey === "utter_first_turn_lead_tool_check" ||
     responseKey === "utter_pricing_repeat_send_guide_ask_names" ||
     responseKey === "utter_ask_wedding_date_only";
   const allowsCalendarAvailability = responseKey === "utter_calendar_available_ask_email";
@@ -893,7 +911,7 @@ function teamLine(state: SimpleWeddingSalesState) {
   }
 
   if (region !== "FL") {
-    return "The exact filmmaker depends on the wedding location and availability. What city and date are you planning for?";
+    return "The exact filmmaker depends on the wedding location and availability.";
   }
 
   return asksIfTarasWillShoot

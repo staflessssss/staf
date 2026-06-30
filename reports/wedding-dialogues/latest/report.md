@@ -32,7 +32,7 @@ team_word_but_availability | Do you have a videographer available for Oct 3 2026
 forced_needs_region | I need a videographer in Springfield on Oct 3 2026 | 2026-10-03 | Springfield | unknown | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
 forced_available_winston | Wedding in Winston Salem on Oct 3 2026 | 2026-10-03 | Winston Salem | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
 forced_unavailable_tampa | Wedding in Tampa on Oct 3 2026 | 2026-10-03 | Tampa | FL | check_wedding_availability | bot_active | reply_only |  | no | no | utter_first_turn_lead_unavailable |  | {"ok":true} | PASS
-forced_tool_error_raleigh | Wedding in Raleigh on Oct 3 2026 | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | bot_active | reply_only |  | no | yes | utter_first_turn_lead_tool_check |  | {"ok":true} | PASS
+forced_tool_error_raleigh | Wedding in Raleigh on Oct 3 2026 | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | yes | utter_first_turn_lead_tool_check | pricing_guide | {"ok":true} | PASS
 llm_bad_team_override | I need a videographer in Winston Salem on Oct 3 2026 | 2026-10-03 | Winston Salem | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
 
 ## Outbound Text
@@ -260,9 +260,9 @@ Hi! Thanks so much for reaching out 🤍
 
 Taras with Myndful Films. I’d love to help with the wedding film.
 
-The exact filmmaker depends on the wedding location and availability. What city and date are you planning for?
+The exact filmmaker depends on the wedding location and availability.
 
-What date are you looking at?
+What wedding date and city are you planning for?
 ```
 
 ### team_jay_filming
@@ -272,9 +272,9 @@ Hi! Thanks so much for reaching out 🤍
 
 Taras with Myndful Films. I’d love to help with the wedding film.
 
-The exact filmmaker depends on the wedding location and availability. What city and date are you planning for?
+The exact filmmaker depends on the wedding location and availability.
 
-What date are you looking at?
+What wedding date and city are you planning for?
 ```
 
 ### team_on_your_team
@@ -284,9 +284,9 @@ Hi! Thanks so much for reaching out 🤍
 
 Taras with Myndful Films. I’d love to help with the wedding film.
 
-The exact filmmaker depends on the wedding location and availability. What city and date are you planning for?
+The exact filmmaker depends on the wedding location and availability.
 
-What date are you looking at?
+What wedding date and city are you planning for?
 ```
 
 ### team_word_but_availability
@@ -340,7 +340,11 @@ Our 8-hour wedding films start at $2,800 for Florida.
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I want to double-check availability before giving you the wrong answer. I'll follow up here shortly.
+I have October 3, 2026 in Raleigh. I’m having trouble checking availability right this second, so I don’t want to guess.
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA, and I’ll send the collections guide here too 🎥
+
+I’ll have the date checked and follow up shortly. In the meantime, what are both of your names?
 ```
 
 ### llm_bad_team_override
