@@ -96,6 +96,12 @@ function hasQuestion(state: SimpleWeddingSalesState) {
   return state.questionsAskedByCustomer.length > 0;
 }
 
+function hasNewExtractedFacts(state: SimpleWeddingSalesState) {
+  const facts = state.lastUnderstanding?.facts;
+
+  return Boolean(facts && Object.values(facts).some(Boolean));
+}
+
 function getReplyObligations(
   questions: SimpleWeddingSalesQuestion[],
   latestCustomerMessage = "",
@@ -123,6 +129,12 @@ function getReplyObligations(
 
   if (normalizedQuestions.includes("identity")) {
     obligations.add("identity");
+  }
+
+  if (normalizedQuestions.includes("package_inclusions")) {
+    obligations.add("package_inclusions");
+    obligations.add("pricing");
+    obligations.add("guide");
   }
 
   if (normalizedQuestions.includes("portfolio")) {
@@ -445,6 +457,7 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       nextStep: args.nextStep,
       responseKey:
         args.responseKey ??
+        (args.replyType === "acknowledgement_only" ? "utter_acknowledgement" : undefined) ??
         responseKeyForDecision({
           replyType: args.replyType,
           replyObligations,
@@ -587,6 +600,20 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
   }
 
   if (
+    state.questionsAskedByCustomer.includes("human_request") &&
+    !hasActionableCallTime &&
+    !hasUncheckedAvailability
+  ) {
+    return decision({
+      nextStep: "handoff",
+      mode: "human_needed",
+      handoffReason: "customer_requests_human",
+      replyType: "handoff",
+      reason: "customer explicitly asked for a real person or human handoff",
+    });
+  }
+
+  if (
     state.questionsAskedByCustomer.includes("identity") &&
     !hasActionableCallTime &&
     !hasUncheckedAvailability
@@ -605,6 +632,22 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       handoffReason: "unclear_after_2_attempts",
       replyType: "handoff",
       reason: "customer message stayed unclear after repeated attempts",
+    });
+  }
+
+  if (
+    state.dialogueUnderstanding?.messageAct === "acknowledgement_only" ||
+    (hasCommand(state.dialogueCommands, (command) => command.type === "acknowledgement_only") &&
+      !hasQuestion(state) &&
+      !hasNewExtractedFacts(state))
+  ) {
+    return decision({
+      nextStep: "reply_only",
+      replyType: "acknowledgement_only",
+      responseKey: "utter_acknowledgement",
+      reason: state.bookingConfirmed
+        ? "customer only acknowledged after booking was already confirmed"
+        : "customer only acknowledged the previous message",
     });
   }
 
@@ -701,18 +744,6 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
       });
     }
 
-    if (
-      state.dialogueUnderstanding?.messageAct === "acknowledgement_only" ||
-      hasCommand(state.dialogueCommands, (command) => command.type === "acknowledgement_only")
-    ) {
-      return decision({
-        nextStep: "reply_only",
-        replyType: "acknowledgement_only",
-        responseKey: "utter_acknowledgement",
-        reason: "customer only acknowledged after booking was already confirmed",
-      });
-    }
-
     if (state.dialogueUnderstanding?.messageAct === "new_business_question" || state.questionsAskedByCustomer.includes("other")) {
       return decision({
         nextStep: "handoff",
@@ -722,15 +753,6 @@ export function decideNextStep(state: SimpleWeddingSalesState): {
         reason: "customer asked an unknown post-booking business question",
       });
     }
-  }
-
-  if (state.dialogueUnderstanding?.messageAct === "acknowledgement_only") {
-    return decision({
-      nextStep: "reply_only",
-      replyType: "acknowledgement_only",
-      responseKey: "utter_acknowledgement",
-      reason: "customer only acknowledged the previous message",
-    });
   }
 
   if (

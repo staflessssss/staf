@@ -1,7 +1,7 @@
 # Wedding Full-Journey Matrix
 
-Passed turns: 35/35
-Passed scenarios: 12/12
+Passed turns: 37/37
+Passed scenarios: 14/14
 
 | Scenario | Turn | User | Date | Location | Region | Tool | Response key | Next step | Mode | Handoff | Attachments | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -22,8 +22,8 @@ unknown_city_then_region_clarification | 3 | Katie and Mike | 2026-10-03 | North
 unavailable_tampa | 1 | Wedding in Tampa on Oct 3 2026 | 2026-10-03 | Tampa | FL | check_wedding_availability | utter_first_turn_lead_unavailable | reply_only | bot_active |  |  | PASS
 tool_error_then_recovery | 1 | Wedding in Raleigh on Oct 3 2026 | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | utter_first_turn_lead_tool_check | ask_missing_info | bot_active |  | pricing_guide | PASS
 tool_error_then_recovery | 2 | Katie and Mike | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | utter_ask_venue | ask_venue | bot_active |  |  | PASS
-price_shopper | 1 | How much? |  |  | unknown |  | utter_ask_wedding_details | ask_missing_info | bot_active |  |  | PASS
-price_shopper | 2 | Do you have availability Oct 3 2026 in Raleigh? | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | ask_missing_info | bot_active |  | pricing_guide | PASS
+price_shopper | 1 | How much? |  |  | unknown |  | utter_ask_wedding_details | ask_missing_info | bot_active |  | pricing_guide | PASS
+price_shopper | 2 | Do you have availability Oct 3 2026 in Raleigh? | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | ask_missing_info | bot_active |  |  | PASS
 price_shopper | 3 | Katie and Mike | 2026-10-03 | Raleigh | NC_SC_GA |  | utter_ask_venue | ask_venue | bot_active |  |  | PASS
 faq_interruption | 1 | Wedding in Raleigh on Oct 3 2026 | 2026-10-03 | Raleigh | NC_SC_GA | check_wedding_availability | utter_availability_available_ask_names | ask_missing_info | bot_active |  | pricing_guide | PASS
 faq_interruption | 2 | Katie and Mike | 2026-10-03 | Raleigh | NC_SC_GA |  | utter_ask_venue | ask_venue | bot_active |  |  | PASS
@@ -39,7 +39,9 @@ invalid_call_time | 1 | Wedding in Raleigh on Oct 3 2026 | 2026-10-03 | Raleigh 
 invalid_call_time | 2 | Katie and Mike | 2026-10-03 | Raleigh | NC_SC_GA |  | utter_ask_venue | ask_venue | bot_active |  |  | PASS
 invalid_call_time | 3 | The Bradford | 2026-10-03 | Raleigh | NC_SC_GA |  | utter_venue_collected_ask_call_time | ask_call_time | bot_active |  |  | PASS
 invalid_call_time | 4 | Can we do Saturday at 8pm? | 2026-10-03 | Raleigh | NC_SC_GA |  | utter_call_time_out_of_window | ask_call_time | bot_active |  |  | PASS
-explicit_human_request | 1 | Can I talk to a real person? |  |  | unknown |  | utter_ask_wedding_details | reply_only | bot_active |  |  | PASS
+generic_opener_does_not_set_name | 1 | More info please |  |  | unknown |  | utter_ask_wedding_details | ask_missing_info | bot_active |  |  | PASS
+speak_directly_with_taras_no_handoff | 1 | Can I speak directly with Taras? |  |  | unknown |  | utter_ask_wedding_details | reply_only | bot_active |  |  | PASS
+real_person_request_human_review | 1 | Can I talk to a real person? |  |  | unknown |  | utter_handoff_ack | handoff | human_needed | customer_requests_human |  | PASS
 
 ## Transcripts
 
@@ -53,11 +55,8 @@ Hi! So happy you reached out 🤍 What wedding date and city are you planning fo
 
 ```json
 {
-  "extractedSlots": {
-    "customerName": "interested"
-  },
+  "extractedSlots": {},
   "slotsAfter": {
-    "customerName": "interested",
     "serviceRegion": "unknown",
     "availabilityToolStatus": "not_checked",
     "pendingUserAction": null,
@@ -96,7 +95,6 @@ What are both of your names?
     "location": "Raleigh"
   },
   "slotsAfter": {
-    "customerName": "interested",
     "weddingDate": "2026-10-03",
     "weddingDateDisplay": "October 3, 2026",
     "location": "Raleigh",
@@ -769,7 +767,15 @@ So nice to meet you both! Do you already have a venue picked out?
 User: How much?
 
 ```text
-Hi, happy you’re here 🤍 What date and location are you thinking for the wedding?
+Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+Our wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA.
+
+I’ll include the collections guide here so you can look through the options 🎥
+
+What date are you looking at?
 ```
 
 ```json
@@ -787,7 +793,9 @@ Hi, happy you’re here 🤍 What date and location are you thinking for the wed
   "mode": "bot_active",
   "escalated": false,
   "humanReviewRequired": false,
-  "attachments": [],
+  "attachments": [
+    "pricing_guide"
+  ],
   "result": "PASS"
 }
 ```
@@ -797,13 +805,9 @@ Hi, happy you’re here 🤍 What date and location are you thinking for the wed
 User: Do you have availability Oct 3 2026 in Raleigh?
 
 ```text
-Great news — October 3, 2026 is available in Raleigh 🤍
+I checked October 3, 2026 in Raleigh too, and that date is available 🤍
 
-Our 8-hour wedding films start at $3,600 for NC/SC/GA.
-Also, we are running a 20% discount through June 30.
-I’ll send the collections guide here so you can look through the options 🎥
-
-What are both of your names?
+And what are both of your names? I’ll keep everything organized on my side.
 ```
 
 ```json
@@ -831,9 +835,7 @@ What are both of your names?
   "mode": "bot_active",
   "escalated": false,
   "humanReviewRequired": false,
-  "attachments": [
-    "pricing_guide"
-  ],
+  "attachments": [],
   "result": "PASS"
 }
 ```
@@ -965,7 +967,9 @@ So nice to meet you both 🤍 Do you already have a venue picked out?
 User: What's included?
 
 ```text
-Love it. What venue are you two planning for?
+Our wedding films include coverage, editing, licensed music, and online delivery. The exact collection depends on the package, and I can walk you through the guide.
+
+So nice to meet you both! Do you already have a venue picked out?
 ```
 
 ```json
@@ -1454,9 +1458,37 @@ User: Can we do Saturday at 8pm?
 }
 ```
 
-### explicit_human_request / Turn 1
+### generic_opener_does_not_set_name / Turn 1
 
-User: Can I talk to a real person?
+User: More info please
+
+```text
+Hi! So happy you reached out 🤍 What wedding date and city are you planning for?
+```
+
+```json
+{
+  "extractedSlots": {},
+  "slotsAfter": {
+    "serviceRegion": "unknown",
+    "availabilityToolStatus": "not_checked",
+    "pendingUserAction": null,
+    "bookingConfirmed": false
+  },
+  "toolCalls": [],
+  "responseKey": "utter_ask_wedding_details",
+  "nextStep": "ask_missing_info",
+  "mode": "bot_active",
+  "escalated": false,
+  "humanReviewRequired": false,
+  "attachments": [],
+  "result": "PASS"
+}
+```
+
+### speak_directly_with_taras_no_handoff / Turn 1
+
+User: Can I speak directly with Taras?
 
 ```text
 Hi! Thanks so much for reaching out 🤍
@@ -1483,6 +1515,35 @@ What date are you looking at?
   "mode": "bot_active",
   "escalated": false,
   "humanReviewRequired": false,
+  "attachments": [],
+  "result": "PASS"
+}
+```
+
+### real_person_request_human_review / Turn 1
+
+User: Can I talk to a real person?
+
+```text
+Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍
+```
+
+```json
+{
+  "extractedSlots": {},
+  "slotsAfter": {
+    "serviceRegion": "unknown",
+    "availabilityToolStatus": "not_checked",
+    "pendingUserAction": null,
+    "bookingConfirmed": false
+  },
+  "toolCalls": [],
+  "responseKey": "utter_handoff_ack",
+  "nextStep": "handoff",
+  "mode": "human_needed",
+  "handoffReason": "customer_requests_human",
+  "escalated": true,
+  "humanReviewRequired": true,
   "attachments": [],
   "result": "PASS"
 }

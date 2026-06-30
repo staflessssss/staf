@@ -117,6 +117,14 @@ function pricingLine(args: {
     return `Same starting point: ${args.knowledge.pricing.startPrice}${regionText}.`;
   }
 
+  if (!region && args.knowledge.pricing.regionalStartPrices && args.knowledge.pricing.regionalStartPrices.length > 1) {
+    const prices = args.knowledge.pricing.regionalStartPrices
+      .map((item) => `${item.startPrice} for ${item.label}`)
+      .join(" and ");
+
+    return `Our wedding films start at ${prices}.`;
+  }
+
   return `Our ${coverage}wedding films start at ${args.knowledge.pricing.startPrice}${regionText}.`;
 }
 
@@ -554,6 +562,7 @@ function catalogExclusionReason(
     (contract.mustAnswerTravel && !allowsTravel) ||
     contract.mustAnswerTeam ||
     contract.mustAnswerIdentity ||
+    contract.mustAnswerQuestions?.includes("package_inclusions") ||
     contract.mustAnswerQuestions?.includes("portfolio")
   ) {
     return "responseKey_excluded" as const;
@@ -936,6 +945,14 @@ function rawFootageLine(knowledge: SimpleWeddingKnowledgeContext) {
   return "Yes - raw footage can be added depending on the collection and what you're looking for. We can talk through the cleanest option on the call 🤍";
 }
 
+function packageInclusionsLine(contract: ReplyActionContract) {
+  if (!contract.mustAnswerQuestions?.includes("package_inclusions")) {
+    return undefined;
+  }
+
+  return "Our wedding films include coverage, editing, licensed music, and online delivery. The exact collection depends on the package, and I can walk you through the guide.";
+}
+
 function postBookingFaqLine(args: {
   state: SimpleWeddingSalesState;
   knowledge: SimpleWeddingKnowledgeContext;
@@ -1068,6 +1085,7 @@ function renderSafeTemplate(args: {
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
     args.contract.mustAnswerTravel ? travelLine(args.knowledge) : undefined,
+    packageInclusionsLine(args.contract),
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
@@ -1100,6 +1118,7 @@ function renderCompactInstagramFallback(args: {
     callLogisticsLine(args.state),
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
     args.contract.mustAnswerTravel ? travelLine(args.knowledge) : undefined,
+    packageInclusionsLine(args.contract),
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
@@ -1217,6 +1236,7 @@ export function writeConstrainedWeddingReply(args: {
           callLogisticsLine(state),
           contract.mustAnswerIdentity ? identityLine(knowledge) : undefined,
           contract.mustAnswerTravel ? travelLine(knowledge) : undefined,
+          packageInclusionsLine(contract),
           mustAnswerRawFootage(contract) ? rawFootageLine(knowledge) : undefined,
           shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
           contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,

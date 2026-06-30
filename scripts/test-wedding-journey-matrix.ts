@@ -37,6 +37,8 @@ type ForcedTool = {
 type JourneyExpectation = {
   weddingDate?: string;
   locationContains?: string;
+  customerNameEmpty?: boolean;
+  noFakeName?: boolean;
   serviceRegion?: "FL" | "NC_SC_GA" | "unknown";
   availabilityToolStatus?: SimpleWeddingSalesState["availabilityToolStatus"];
   availability?: SimpleWeddingSalesState["availability"];
@@ -56,6 +58,7 @@ type JourneyExpectation = {
   expectNoTool?: boolean;
   attachmentsInclude?: string;
   outboundContains?: string | string[];
+  outboundContainsAny?: string[];
   outboundNotContains?: string | string[];
   asksFor?: "names" | "venue" | "callTime" | "email" | "bookingConfirmation" | "weddingDate" | "location";
   noHandoff?: boolean;
@@ -593,6 +596,22 @@ function assertTurn(args: {
     failures.push(`location expected to contain ${expect.locationContains}, got ${state.location ?? "none"}`);
   }
 
+  if (expect.customerNameEmpty && state.customerName) {
+    failures.push(`customerName expected empty, got ${state.customerName}`);
+  }
+
+  if (expect.noFakeName) {
+    const fakeNames = new Set(["interested", "info", "more info", "details", "wedding videography"]);
+    const names = [state.customerName, state.partnerName]
+      .filter(Boolean)
+      .map((value) => value!.trim().toLowerCase());
+    const fake = names.find((name) => fakeNames.has(name));
+
+    if (fake) {
+      failures.push(`fake name captured: ${fake}`);
+    }
+  }
+
   if (expect.serviceRegion && state.serviceRegion !== expect.serviceRegion) {
     failures.push(`serviceRegion expected ${expect.serviceRegion}, got ${state.serviceRegion ?? "none"}`);
   }
@@ -669,6 +688,15 @@ function assertTurn(args: {
     if (!row.outboundText.toLowerCase().includes(text.toLowerCase())) {
       failures.push(`outbound expected to contain "${text}"`);
     }
+  }
+
+  if (
+    expect.outboundContainsAny?.length &&
+    !expect.outboundContainsAny.some((text) =>
+      row.outboundText.toLowerCase().includes(text.toLowerCase()),
+    )
+  ) {
+    failures.push(`outbound expected to contain any of: ${expect.outboundContainsAny.join(", ")}`);
   }
 
   for (const text of asList(expect.outboundNotContains)) {
@@ -805,7 +833,7 @@ function runTurn(args: {
     mode: state.mode,
     handoffReason: state.handoffReason,
     escalated: state.mode !== "bot_active" || state.nextStep === "handoff",
-    humanReviewRequired: state.availabilityToolStatus === "tool_error",
+    humanReviewRequired: state.availabilityToolStatus === "tool_error" || state.mode === "human_needed",
     outboundText: reply.text,
     attachments,
     passed: true,

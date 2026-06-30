@@ -98,7 +98,7 @@ function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState 
       ? {
           ...decision.trace,
           nextStep: selectedFlowRunner.predictedNextStep,
-          responseKey: selectedFlowRunner.predictedResponseKey,
+          responseKey: selectedFlowRunner.predictedResponseKey ?? decision.trace.responseKey,
           replyType: selectedFlowRunner.legacyReplyType ?? decision.trace.replyType,
           reason: selectedFlowRunner.reason,
         }

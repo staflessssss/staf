@@ -15,7 +15,7 @@
 </head>
 <body>
   <h1>Wedding Full-Journey Matrix</h1>
-  <p>Passed turns: 35/35</p>
+  <p>Passed turns: 37/37</p>
   <table>
     <thead>
       <tr>
@@ -43,7 +43,6 @@
       <td>Hi, I'm interested</td>
       <td><pre>{}</pre></td>
       <td><pre>{
-  &quot;customerName&quot;: &quot;interested&quot;,
   &quot;serviceRegion&quot;: &quot;unknown&quot;,
   &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
   &quot;pendingUserAction&quot;: null,
@@ -67,14 +66,12 @@
       <td>2</td>
       <td>October 3 2026 in Raleigh</td>
       <td><pre>{
-  &quot;customerName&quot;: &quot;interested&quot;,
   &quot;serviceRegion&quot;: &quot;unknown&quot;,
   &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
   &quot;pendingUserAction&quot;: null,
   &quot;bookingConfirmed&quot;: false
 }</pre></td>
       <td><pre>{
-  &quot;customerName&quot;: &quot;interested&quot;,
   &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
   &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
   &quot;location&quot;: &quot;Raleigh&quot;,
@@ -108,7 +105,6 @@ What are both of your names?</pre></td>
       <td>3</td>
       <td>Katie and Mike</td>
       <td><pre>{
-  &quot;customerName&quot;: &quot;interested&quot;,
   &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
   &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
   &quot;location&quot;: &quot;Raleigh&quot;,
@@ -787,8 +783,16 @@ So nice to meet you both! Do you already have a venue picked out?</pre></td>
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>Hi, happy you’re here 🤍 What date and location are you thinking for the wedding?</pre></td>
-      <td></td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+Our wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA.
+
+I’ll include the collections guide here so you can look through the options 🎥
+
+What date are you looking at?</pre></td>
+      <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
   
@@ -820,14 +824,10 @@ So nice to meet you both! Do you already have a venue picked out?</pre></td>
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>Great news — October 3, 2026 is available in Raleigh 🤍
+      <td><pre>I checked October 3, 2026 in Raleigh too, and that date is available 🤍
 
-Our 8-hour wedding films start at $3,600 for NC/SC/GA.
-Also, we are running a 20% discount through June 30.
-I’ll send the collections guide here so you can look through the options 🎥
-
-What are both of your names?</pre></td>
-      <td>image:pricing_guide</td>
+And what are both of your names? I’ll keep everything organized on my side.</pre></td>
+      <td></td>
       <td>PASS</td>
     </tr>
   
@@ -981,7 +981,9 @@ What are both of your names?</pre></td>
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>Love it. What venue are you two planning for?</pre></td>
+      <td><pre>Our wedding films include coverage, editing, licensed music, and online delivery. The exact collection depends on the package, and I can walk you through the guide.
+
+So nice to meet you both! Do you already have a venue picked out?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
@@ -1420,9 +1422,33 @@ From here, the easiest next step is a quick consult so I can hear more about the
   
 
     <tr class="pass">
-      <td>explicit_human_request</td>
+      <td>generic_opener_does_not_set_name</td>
       <td>1</td>
-      <td>Can I talk to a real person?</td>
+      <td>More info please</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! So happy you reached out 🤍 What wedding date and city are you planning for?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+  
+
+    <tr class="pass">
+      <td>speak_directly_with_taras_no_handoff</td>
+      <td>1</td>
+      <td>Can I speak directly with Taras?</td>
       <td><pre>{}</pre></td>
       <td><pre>{
   &quot;serviceRegion&quot;: &quot;unknown&quot;,
@@ -1444,6 +1470,30 @@ Taras with Myndful Films. I’d love to help with the wedding film.
 Absolutely - you're speaking with me here. I'm Taras, and I'm happy to go over anything you'd like before we finish 🤍
 
 What date are you looking at?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+  
+
+    <tr class="pass">
+      <td>real_person_request_human_review</td>
+      <td>1</td>
+      <td>Can I talk to a real person?</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_handoff_ack</td>
+      <td>handoff</td>
+      <td>human_needed</td>
+      <td>customer_requests_human</td>
+      <td>yes</td>
+      <td>yes</td>
+      <td><pre>Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>

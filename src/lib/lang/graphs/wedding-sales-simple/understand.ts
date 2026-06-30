@@ -55,8 +55,9 @@ Rules:
 - customerMessageType is the main intent of the latest message.
 - questionsAskedByCustomer can include multiple topics.
 - Use raw_footage for questions about raw footage, raw files, unedited footage, or all footage.
-- A request to speak with Taras, the owner, a person, or a human is an identity question because
-  this assistant writes as the configured founder. Include identity; do not treat it as a handoff decision.
+- A request to speak directly with Taras/the owner is an identity question because this assistant
+  writes as the configured founder. Include identity; do not treat that as a handoff decision.
+- A request for a real person, human, representative, or someone to call is human_request.
 `.trim();
 
 function extractEmail(message: string) {
@@ -131,10 +132,25 @@ function extractNames(message: string) {
   );
   const barePair = /^\s*([A-Z][a-z]+)\s+(?:and|&)\s+([A-Z][a-z]+)[.!]?\s*$/.exec(normalizedMessage);
   const match = introduced ?? barePair;
+  const blocked = new Set([
+    "interested",
+    "info",
+    "details",
+    "wedding",
+    "videography",
+    "pricing",
+    "packages",
+  ]);
+  const customerName = match?.[1]?.trim();
+  const partnerName = match?.[2]?.trim();
+
+  if (customerName && blocked.has(customerName.toLowerCase())) {
+    return {};
+  }
 
   return {
-    customerName: match?.[1],
-    partnerName: match?.[2],
+    customerName,
+    partnerName,
   };
 }
 
@@ -288,7 +304,7 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
   const normalized = message.toLowerCase();
   const questions: TurnUnderstanding["questionsAskedByCustomer"] = [];
 
-  if (/\b(price|pricing|cost|package|packages|collection|collections|rate|rates)\b/.test(normalized)) {
+  if (/\b(price|pricing|cost|package|packages|collection|collections|rate|rates|how much)\b/.test(normalized)) {
     questions.push("pricing");
   }
 
@@ -344,11 +360,17 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
     questions.push("booking");
   }
 
+  if (/\b(?:real person|human|representative|someone real|actual person)\b/.test(normalized)) {
+    questions.push("human_request");
+  }
+
+  if (/\b(?:someone|person)\b[\s\S]{0,40}\b(?:call|phone)\b|\b(?:call|phone)\b[\s\S]{0,40}\b(?:someone|person|human)\b/.test(normalized)) {
+    questions.push("human_request");
+  }
+
   if (
     /\b(?:are you|is this)\s+taras\b/.test(normalized) ||
-    /\b(?:speak|talk|chat)\b[\s\S]{0,40}\b(?:taras|human|person|someone real|owner)\b/.test(
-      normalized,
-    )
+    /\b(?:speak|talk|chat)\b[\s\S]{0,40}\b(?:taras|owner)\b/.test(normalized)
   ) {
     questions.push("identity");
   }

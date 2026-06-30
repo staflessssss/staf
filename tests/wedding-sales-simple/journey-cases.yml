@@ -10,6 +10,8 @@
             "responseKey": "utter_ask_wedding_details",
             "nextStep": "ask_missing_info",
             "asksFor": "weddingDate",
+            "customerNameEmpty": true,
+            "noFakeName": true,
             "noHandoff": true
           }
         },
@@ -234,8 +236,9 @@
         {
           "user": "How much?",
           "expect": {
-            "responseKey": "utter_ask_wedding_details",
+            "outboundContains": ["$2,800", "$3,600"],
             "asksFor": "weddingDate",
+            "expectNoTool": true,
             "noHandoff": true
           }
         },
@@ -288,6 +291,8 @@
         {
           "user": "What's included?",
           "expect": {
+            "outboundContains": "include",
+            "outboundContainsAny": ["coverage", "film", "delivery", "collection"],
             "asksFor": "venue",
             "noHandoff": true
           }
@@ -419,16 +424,48 @@
       ]
     },
     {
-      "id": "explicit_human_request",
-      "title": "Explicit human request is allowed to hand off",
+      "id": "generic_opener_does_not_set_name",
+      "title": "Generic opener does not pollute name slots",
+      "turns": [
+        {
+          "user": "More info please",
+          "expect": {
+            "customerNameEmpty": true,
+            "noFakeName": true,
+            "asksFor": "weddingDate",
+            "expectNoTool": true,
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "speak_directly_with_taras_no_handoff",
+      "title": "Request to speak directly with Taras stays identity/no-handoff",
+      "turns": [
+        {
+          "user": "Can I speak directly with Taras?",
+          "expect": {
+            "responseKey": "utter_ask_wedding_details",
+            "outboundContains": "Taras",
+            "asksFor": "weddingDate",
+            "noHandoff": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "real_person_request_human_review",
+      "title": "Request for a real person triggers human-safe handoff",
       "turns": [
         {
           "user": "Can I talk to a real person?",
           "expect": {
-            "responseKey": "utter_ask_wedding_details",
-            "outboundContains": "you're speaking with me here",
-            "asksFor": "weddingDate",
-            "noHandoff": true
+            "responseKey": "utter_handoff_ack",
+            "handoffReason": "customer_requests_human",
+            "humanReviewRequired": true,
+            "outboundNotContains": "you're speaking with me here",
+            "mode": "human_needed"
           }
         }
       ]

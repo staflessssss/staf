@@ -40,6 +40,11 @@ export type SimpleWeddingKnowledgeContext = {
     currency?: string;
     coverageHours?: number;
     region?: string;
+    regionalStartPrices?: Array<{
+      region: string;
+      label: string;
+      startPrice: string;
+    }>;
     promotionText?: string;
     packages: Array<{
       name: string;
@@ -184,6 +189,28 @@ function coverageRegionLabel(knowledge: Pick<SimpleWeddingKnowledgeContext, "pri
   return knowledge.pricing.region ?? "your area";
 }
 
+function regionalStartPriceLabels(config: WeddingSalesConfig) {
+  return Object.entries(config.pricingByRegion ?? {})
+    .map(([region, pricing]) => {
+      const normalized = normalizeWeddingSalesRegionKey(region);
+      const label =
+        normalized === "FL"
+          ? "Florida"
+          : normalized === "NC_SC_GA"
+            ? "NC/SC/GA"
+            : region;
+
+      return pricing.startPrice
+        ? {
+            region: normalized ?? region,
+            label,
+            startPrice: pricing.startPrice,
+          }
+        : undefined;
+    })
+    .filter((item): item is { region: string; label: string; startPrice: string } => Boolean(item));
+}
+
 function readPersonaIdentity(channelConfig: unknown) {
   const root = asRecord(channelConfig);
   const prompting = asRecord(root?.prompting);
@@ -283,6 +310,7 @@ export function buildSimpleWeddingKnowledgeContext(input: {
       currency: pricing.currency,
       coverageHours: pricing.coverageHours,
       region,
+      regionalStartPrices: regionalStartPriceLabels(config),
       promotionText,
       packages: readPackages(features),
     },

@@ -6,15 +6,12 @@
     "user": "Hi, I'm interested",
     "slotsBefore": {},
     "slotsAfter": {
-      "customerName": "interested",
       "serviceRegion": "unknown",
       "availabilityToolStatus": "not_checked",
       "pendingUserAction": null,
       "bookingConfirmed": false
     },
-    "extractedSlots": {
-      "customerName": "interested"
-    },
+    "extractedSlots": {},
     "toolCalls": [],
     "toolResults": [],
     "responseKey": "utter_ask_wedding_details",
@@ -34,14 +31,12 @@
     "turn": 2,
     "user": "October 3 2026 in Raleigh",
     "slotsBefore": {
-      "customerName": "interested",
       "serviceRegion": "unknown",
       "availabilityToolStatus": "not_checked",
       "pendingUserAction": null,
       "bookingConfirmed": false
     },
     "slotsAfter": {
-      "customerName": "interested",
       "weddingDate": "2026-10-03",
       "weddingDateDisplay": "October 3, 2026",
       "location": "Raleigh",
@@ -89,7 +84,6 @@
     "turn": 3,
     "user": "Katie and Mike",
     "slotsBefore": {
-      "customerName": "interested",
       "weddingDate": "2026-10-03",
       "weddingDateDisplay": "October 3, 2026",
       "location": "Raleigh",
@@ -869,8 +863,15 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Hi, happy you’re here 🤍 What date and location are you thinking for the wedding?",
-    "attachments": [],
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nOur wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA.\n\nI’ll include the collections guide here so you can look through the options 🎥\n\nWhat date are you looking at?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
     "passed": true,
     "failures": []
   },
@@ -915,15 +916,8 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Great news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
-    "attachments": [
-      {
-        "type": "image",
-        "url": "https://example.com/nc-sc-ga-guide.png",
-        "label": "NC SC GA Collections guide",
-        "purpose": "pricing_guide"
-      }
-    ],
+    "outboundText": "I checked October 3, 2026 in Raleigh too, and that date is available 🤍\n\nAnd what are both of your names? I’ll keep everything organized on my side.",
+    "attachments": [],
     "passed": true,
     "failures": []
   },
@@ -1098,7 +1092,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Love it. What venue are you two planning for?",
+    "outboundText": "Our wedding films include coverage, editing, licensed music, and online delivery. The exact collection depends on the package, and I can walk you through the guide.\n\nSo nice to meet you both! Do you already have a venue picked out?",
     "attachments": [],
     "passed": true,
     "failures": []
@@ -1609,10 +1603,36 @@
     "failures": []
   },
   {
-    "scenario": "explicit_human_request",
-    "title": "Explicit human request is allowed to hand off",
+    "scenario": "generic_opener_does_not_set_name",
+    "title": "Generic opener does not pollute name slots",
     "turn": 1,
-    "user": "Can I talk to a real person?",
+    "user": "More info please",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "ask_missing_info",
+    "missingField": "weddingDate",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! So happy you reached out 🤍 What wedding date and city are you planning for?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "speak_directly_with_taras_no_handoff",
+    "title": "Request to speak directly with Taras stays identity/no-handoff",
+    "turn": 1,
+    "user": "Can I speak directly with Taras?",
     "slotsBefore": {},
     "slotsAfter": {
       "serviceRegion": "unknown",
@@ -1629,6 +1649,32 @@
     "escalated": false,
     "humanReviewRequired": false,
     "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nAbsolutely - you're speaking with me here. I'm Taras, and I'm happy to go over anything you'd like before we finish 🤍\n\nWhat date are you looking at?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "real_person_request_human_review",
+    "title": "Request for a real person triggers human-safe handoff",
+    "turn": 1,
+    "user": "Can I talk to a real person?",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_handoff_ack",
+    "nextStep": "handoff",
+    "mode": "human_needed",
+    "handoffReason": "customer_requests_human",
+    "escalated": true,
+    "humanReviewRequired": true,
+    "outboundText": "Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍",
     "attachments": [],
     "passed": true,
     "failures": []

@@ -65,6 +65,7 @@ export const turnUnderstandingSchema = z.object({
       "team",
       "booking",
       "identity",
+      "human_request",
       "other",
     ]),
   ),
@@ -143,6 +144,7 @@ export type SimpleWeddingSalesReplyObligation =
   | "guide"
   | "team"
   | "identity"
+  | "package_inclusions"
   | "travel"
   | "raw_footage"
   | "portfolio";
