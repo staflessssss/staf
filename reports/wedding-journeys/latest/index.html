@@ -15,7 +15,8 @@
 </head>
 <body>
   <h1>Wedding Full-Journey Matrix</h1>
-  <p>Passed turns: 37/37</p>
+  <p>Passed turns: 118/118</p>
+  <p>Total scenarios: 24; booked: 14; human review: 2; unavailable: 0; waiting clarification: 9; abandoned: 0</p>
   <table>
     <thead>
       <tr>
@@ -59,7 +60,6 @@
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>happy_path_available_raleigh</td>
@@ -98,7 +98,6 @@ What are both of your names?</pre></td>
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>happy_path_available_raleigh</td>
@@ -137,7 +136,6 @@ What are both of your names?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>happy_path_available_raleigh</td>
@@ -181,7 +179,6 @@ From here, the easiest next step is a quick consult so I can hear more about the
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>happy_path_available_raleigh</td>
@@ -230,7 +227,6 @@ What's the best email for the calendar invite?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>happy_path_available_raleigh</td>
@@ -286,7 +282,6 @@ What's the best email for the calendar invite?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>happy_path_available_raleigh</td>
@@ -345,12 +340,11 @@ The calendar invite should come through at katie@example.com.</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>rich_first_message_then_booking</td>
       <td>1</td>
-      <td>Hi! We're Katie and Mike, wedding is Oct 3 2026 in Winston Salem, venue is The Bradford. Are you available?</td>
+      <td>Hi! We're Katie and Mike. Wedding is Oct 3 2026 in Winston Salem. Venue is The Bradford. Are you available?</td>
       <td><pre>{}</pre></td>
       <td><pre>{
   &quot;customerName&quot;: &quot;Katie&quot;,
@@ -382,7 +376,6 @@ From here, the easiest next step is a quick consult so I can hear more about the
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>rich_first_message_then_booking</td>
@@ -431,7 +424,6 @@ What's the best email for the calendar invite?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>rich_first_message_then_booking</td>
@@ -487,7 +479,6 @@ What's the best email for the calendar invite?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
       <td>rich_first_message_then_booking</td>
@@ -546,10 +537,9 @@ You should get the calendar invite at katie@example.com.</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>unknown_city_then_region_clarification</td>
+      <td>unknown_city_then_region_clarification_to_booking</td>
       <td>1</td>
       <td>Wedding in Springfield on Oct 3 2026</td>
       <td><pre>{}</pre></td>
@@ -575,10 +565,9 @@ I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>unknown_city_then_region_clarification</td>
+      <td>unknown_city_then_region_clarification_to_booking</td>
       <td>2</td>
       <td>It's in North Carolina</td>
       <td><pre>{
@@ -617,10 +606,9 @@ What are both of your names?</pre></td>
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>unknown_city_then_region_clarification</td>
+      <td>unknown_city_then_region_clarification_to_booking</td>
       <td>3</td>
       <td>Katie and Mike</td>
       <td><pre>{
@@ -652,14 +640,217 @@ What are both of your names?</pre></td>
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>unavailable_tampa</td>
+      <td>unknown_city_then_region_clarification_to_booking</td>
+      <td>4</td>
+      <td>The Bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>The Bradford gives us a helpful starting point.
+
+The easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unknown_city_then_region_clarification_to_booking</td>
+      <td>5</td>
+      <td>Monday 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unknown_city_then_region_clarification_to_booking</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unknown_city_then_region_clarification_to_booking</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;North Carolina&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect — you're all set for 10:00 AM ✨
+
+You should see the calendar invite come through at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unavailable_then_alternative_date_booking</td>
       <td>1</td>
       <td>Wedding in Tampa on Oct 3 2026</td>
       <td><pre>{}</pre></td>
@@ -688,10 +879,293 @@ Our 8-hour wedding films start at $2,800 for Florida.</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>tool_error_then_recovery</td>
+      <td>unavailable_then_alternative_date_booking</td>
+      <td>2</td>
+      <td>What about Oct 10 2026?</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;unavailable&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;unavailable&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>I checked October 10, 2026 in Tampa too, and that date is available 🤍
+
+Also, we are running a 20% discount through June 30.
+
+I’ll include the collections guide here so you can look through the options 🎥
+
+And what are both of your names? I’ll keep everything organized on my side.</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unavailable_then_alternative_date_booking</td>
+      <td>3</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unavailable_then_alternative_date_booking</td>
+      <td>4</td>
+      <td>The Vinoy</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Beautiful - The Vinoy gives us a good starting point.
+
+From here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unavailable_then_alternative_date_booking</td>
+      <td>5</td>
+      <td>Tuesday 11am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Tuesday 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-06&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>11:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unavailable_then_alternative_date_booking</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Tuesday 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-06&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Tuesday 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-06&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Tuesday 11am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 11:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>unavailable_then_alternative_date_booking</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Tuesday 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-06&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Tuesday 11am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Tuesday 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-06&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect — you're all set for 11:00 AM ✨
+
+You should see the calendar invite come through at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>tool_error_then_recovery_booking</td>
       <td>1</td>
       <td>Wedding in Raleigh on Oct 3 2026</td>
       <td><pre>{}</pre></td>
@@ -722,10 +1196,9 @@ I’ll have the date checked and follow up shortly. In the meantime, what are bo
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>tool_error_then_recovery</td>
+      <td>tool_error_then_recovery_booking</td>
       <td>2</td>
       <td>Katie and Mike</td>
       <td><pre>{
@@ -763,10 +1236,213 @@ So nice to meet you both! Do you already have a venue picked out?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>price_shopper</td>
+      <td>tool_error_then_recovery_booking</td>
+      <td>3</td>
+      <td>The Bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>The Bradford gives us a helpful starting point.
+
+The easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>tool_error_then_recovery_booking</td>
+      <td>4</td>
+      <td>Monday 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>tool_error_then_recovery_booking</td>
+      <td>5</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>tool_error_then_recovery_booking</td>
+      <td>6</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Done — I locked us in for 10:00 AM ✨
+
+The calendar invite should come through at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>price_shopper_full</td>
       <td>1</td>
       <td>How much?</td>
       <td><pre>{}</pre></td>
@@ -795,12 +1471,11 @@ What date are you looking at?</pre></td>
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>price_shopper</td>
+      <td>price_shopper_full</td>
       <td>2</td>
-      <td>Do you have availability Oct 3 2026 in Raleigh?</td>
+      <td>Do you have Oct 3 2026 in Raleigh?</td>
       <td><pre>{
   &quot;serviceRegion&quot;: &quot;unknown&quot;,
   &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
@@ -830,10 +1505,9 @@ And what are both of your names? I’ll keep everything organized on my side.</p
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>price_shopper</td>
+      <td>price_shopper_full</td>
       <td>3</td>
       <td>Katie and Mike</td>
       <td><pre>{
@@ -865,14 +1539,369 @@ And what are both of your names? I’ll keep everything organized on my side.</p
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>faq_interruption</td>
+      <td>price_shopper_full</td>
+      <td>4</td>
+      <td>The Bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Beautiful - The Bradford gives us a good starting point.
+
+From here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>price_shopper_full</td>
+      <td>5</td>
+      <td>Monday 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>price_shopper_full</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>price_shopper_full</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>All set for 10:00 AM 🤍
+
+You should get the calendar invite at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>budget_objection</td>
+      <td>1</td>
+      <td>How much?</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+Our wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA.
+
+I’ll include the collections guide here so you can look through the options 🎥
+
+What date are you looking at?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>budget_objection</td>
+      <td>2</td>
+      <td>That's too expensive</td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.
+
+What date are you looking at?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>budget_objection</td>
+      <td>3</td>
+      <td>Do you have anything cheaper?</td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.
+
+What date are you looking at?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>discount_pressure</td>
+      <td>1</td>
+      <td>Do you have discounts?</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+Our wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA.
+
+I’ll include the collections guide here so you can look through the options 🎥
+
+What date are you looking at?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>discount_pressure</td>
+      <td>2</td>
+      <td>Can you do $1000?</td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.
+
+What date are you looking at?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>faq_interruption_full_booking</td>
       <td>1</td>
       <td>Wedding in Raleigh on Oct 3 2026</td>
       <td><pre>{}</pre></td>
@@ -905,10 +1934,9 @@ What are both of your names?</pre></td>
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>faq_interruption</td>
+      <td>faq_interruption_full_booking</td>
       <td>2</td>
       <td>Katie and Mike</td>
       <td><pre>{
@@ -944,10 +1972,9 @@ What are both of your names?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>faq_interruption</td>
+      <td>faq_interruption_full_booking</td>
       <td>3</td>
       <td>What's included?</td>
       <td><pre>{
@@ -987,10 +2014,9 @@ So nice to meet you both! Do you already have a venue picked out?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>faq_interruption</td>
+      <td>faq_interruption_full_booking</td>
       <td>4</td>
       <td>The Bradford</td>
       <td><pre>{
@@ -1031,88 +2057,207 @@ The easiest next step is a quick consult so I can learn a little more about the 
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>location_correction</td>
-      <td>1</td>
-      <td>Wedding in Raleigh on Oct 3 2026</td>
-      <td><pre>{}</pre></td>
+      <td>faq_interruption_full_booking</td>
+      <td>5</td>
+      <td>Monday 10am</td>
       <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
   &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
   &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
   &quot;location&quot;: &quot;Raleigh&quot;,
   &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
   &quot;availability&quot;: &quot;available&quot;,
   &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
   &quot;pendingUserAction&quot;: null,
   &quot;bookingConfirmed&quot;: false
 }</pre></td>
-      <td>check_wedding_availability</td>
-      <td>utter_availability_available_ask_names</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>faq_interruption_full_booking</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>faq_interruption_full_booking</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Done — I locked us in for 10:00 AM ✨
+
+The calendar invite should come through at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>style_faq_before_date</td>
+      <td>1</td>
+      <td>What's your filming style?</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
       <td>ask_missing_info</td>
       <td>bot_active</td>
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+      <td><pre>Hi! Thanks so much for reaching out 🤍
 
-Great news — October 3, 2026 is available in Raleigh 🤍
+Taras with Myndful Films. I’d love to help with the wedding film.
 
-Our 8-hour wedding films start at $3,600 for NC/SC/GA.
-Also, we are running a 20% discount through June 30.
-I’ll send the collections guide here so you can look through the options 🎥
+Our style is cinematic but natural and documentary-leaning - focused on real moments, clean audio, and a film that feels like your day.
 
-What are both of your names?</pre></td>
-      <td>image:pricing_guide</td>
+What date are you looking at?</pre></td>
+      <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>location_correction</td>
+      <td>style_faq_before_date</td>
       <td>2</td>
-      <td>Actually it's Winston Salem</td>
+      <td>Do you have Oct 3 2026 in Tampa?</td>
       <td><pre>{
-  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
-  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
-  &quot;location&quot;: &quot;Raleigh&quot;,
-  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
-  &quot;availability&quot;: &quot;available&quot;,
-  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
   &quot;pendingUserAction&quot;: null,
   &quot;bookingConfirmed&quot;: false
 }</pre></td>
-      <td><pre>{
-  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
-  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
-  &quot;location&quot;: &quot;Winston Salem&quot;,
-  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
-  &quot;availability&quot;: &quot;available&quot;,
-  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
-  &quot;pendingUserAction&quot;: null,
-  &quot;bookingConfirmed&quot;: false
-}</pre></td>
-      <td>check_wedding_availability</td>
-      <td>utter_availability_available_ask_names</td>
-      <td>ask_missing_info</td>
-      <td>bot_active</td>
-      <td></td>
-      <td>no</td>
-      <td>no</td>
-      <td><pre>I checked Winston Salem too, and October 3, 2026 is still available there 🤍
-
-And what are both of your names? I’ll keep everything organized on my side.</pre></td>
-      <td></td>
-      <td>PASS</td>
-    </tr>
-  
-
-    <tr class="pass">
-      <td>date_correction</td>
-      <td>1</td>
-      <td>Wedding in Tampa on Oct 3 2026</td>
-      <td><pre>{}</pre></td>
       <td><pre>{
   &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
   &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
@@ -1130,9 +2275,7 @@ And what are both of your names? I’ll keep everything organized on my side.</p
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
-
-Great news — October 3, 2026 is available in Tampa 🤍
+      <td><pre>Great news — October 3, 2026 is available in Tampa 🤍
 
 Our 8-hour wedding films start at $2,800 for Florida.
 Also, we are running a 20% discount through June 30.
@@ -1142,12 +2285,11 @@ What are both of your names?</pre></td>
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>date_correction</td>
-      <td>2</td>
-      <td>Sorry, I meant Oct 10 2026</td>
+      <td>style_faq_before_date</td>
+      <td>3</td>
+      <td>Katie and Mike</td>
       <td><pre>{
   &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
   &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
@@ -1159,8 +2301,10 @@ What are both of your names?</pre></td>
   &quot;bookingConfirmed&quot;: false
 }</pre></td>
       <td><pre>{
-  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
-  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
   &quot;location&quot;: &quot;Tampa&quot;,
   &quot;serviceRegion&quot;: &quot;FL&quot;,
   &quot;availability&quot;: &quot;available&quot;,
@@ -1168,23 +2312,20 @@ What are both of your names?</pre></td>
   &quot;pendingUserAction&quot;: null,
   &quot;bookingConfirmed&quot;: false
 }</pre></td>
-      <td>check_wedding_availability</td>
-      <td>utter_availability_available_ask_names</td>
-      <td>ask_missing_info</td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
       <td>bot_active</td>
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>I checked October 10, 2026 in Tampa too, and that date is available 🤍
-
-And what are both of your names? I’ll keep everything organized on my side.</pre></td>
+      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>team_question_before_details</td>
+      <td>team_question_before_details_to_booking</td>
       <td>1</td>
       <td>Who will be filming our wedding?</td>
       <td><pre>{}</pre></td>
@@ -1211,10 +2352,9 @@ What wedding date and city are you planning for?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>team_question_before_details</td>
+      <td>team_question_before_details_to_booking</td>
       <td>2</td>
       <td>October 3 2026 in Tampa</td>
       <td><pre>{
@@ -1250,10 +2390,341 @@ What are both of your names?</pre></td>
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>invalid_call_time</td>
+      <td>team_question_before_details_to_booking</td>
+      <td>3</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>team_question_before_details_to_booking</td>
+      <td>4</td>
+      <td>The Vinoy</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Beautiful - The Vinoy gives us a good starting point.
+
+From here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>team_question_before_details_to_booking</td>
+      <td>5</td>
+      <td>Monday 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>team_question_before_details_to_booking</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>team_question_before_details_to_booking</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Vinoy&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>All set for 10:00 AM 🤍
+
+You should get the calendar invite at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>human_request_handoff</td>
+      <td>1</td>
+      <td>Can I talk to a real person?</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_handoff_ack</td>
+      <td>handoff</td>
+      <td>human_needed</td>
+      <td>customer_requests_human</td>
+      <td>yes</td>
+      <td>yes</td>
+      <td><pre>Totally - I'll have a real person from the team follow up here shortly 🤍</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>speak_directly_with_taras_no_handoff</td>
+      <td>1</td>
+      <td>Can I speak directly with Taras?</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_wedding_details</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍
+
+Taras with Myndful Films. I’d love to help with the wedding film.
+
+Absolutely - you're speaking with me here. I'm Taras, and I'm happy to go over anything you'd like before we finish 🤍
+
+What date are you looking at?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>speak_directly_with_taras_no_handoff</td>
+      <td>2</td>
+      <td>October 3 2026 in Raleigh</td>
+      <td><pre>{
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>location_correction_full</td>
       <td>1</td>
       <td>Wedding in Raleigh on Oct 3 2026</td>
       <td><pre>{}</pre></td>
@@ -1286,10 +2757,344 @@ What are both of your names?</pre></td>
       <td>image:pricing_guide</td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>invalid_call_time</td>
+      <td>location_correction_full</td>
+      <td>2</td>
+      <td>Actually it's Winston Salem</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Winston Salem&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>I checked Winston Salem too, and October 3, 2026 is still available there 🤍
+
+And what are both of your names? I’ll keep everything organized on my side.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>location_correction_full</td>
+      <td>3</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Winston Salem&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Winston Salem&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>date_correction_full</td>
+      <td>1</td>
+      <td>Wedding in Tampa on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Tampa 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>date_correction_full</td>
+      <td>2</td>
+      <td>Sorry I meant Oct 10 2026</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>I checked October 10, 2026 in Tampa too, and that date is available 🤍
+
+And what are both of your names? I’ll keep everything organized on my side.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>date_correction_full</td>
+      <td>3</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-10&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 10, 2026&quot;,
+  &quot;location&quot;: &quot;Tampa&quot;,
+  &quot;serviceRegion&quot;: &quot;FL&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>names_correction</td>
+      <td>1</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>names_correction</td>
+      <td>2</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>names_correction</td>
+      <td>3</td>
+      <td>Actually my partner is John, not Mike</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;John&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>email_typo_correction_booking</td>
+      <td>1</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>email_typo_correction_booking</td>
       <td>2</td>
       <td>Katie and Mike</td>
       <td><pre>{
@@ -1325,10 +3130,9 @@ What are both of your names?</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>invalid_call_time</td>
+      <td>email_typo_correction_booking</td>
       <td>3</td>
       <td>The Bradford</td>
       <td><pre>{
@@ -1369,10 +3173,348 @@ From here, the easiest next step is a quick consult so I can hear more about the
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>invalid_call_time</td>
+      <td>email_typo_correction_booking</td>
+      <td>4</td>
+      <td>Monday 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>email_typo_correction_booking</td>
+      <td>5</td>
+      <td>katy@gmal.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katy@gmal.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katy@gmal.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>email_typo_correction_booking</td>
+      <td>6</td>
+      <td>Sorry typo: katie@gmail.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katy@gmal.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katy@gmal.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@gmail.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katy@gmal.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Would you still like me to lock in 10:00 AM?
+
+Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>email_typo_correction_booking</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@gmail.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katy@gmal.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@gmail.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>All set for 10:00 AM 🤍
+
+You should get the calendar invite at katie@gmail.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>invalid_call_time_then_valid_booking</td>
+      <td>1</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>invalid_call_time_then_valid_booking</td>
+      <td>2</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>invalid_call_time_then_valid_booking</td>
+      <td>3</td>
+      <td>The Bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>The Bradford gives us a helpful starting point.
+
+The easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>invalid_call_time_then_valid_booking</td>
       <td>4</td>
       <td>Can we do Saturday at 8pm?</td>
       <td><pre>{
@@ -1419,12 +3561,1206 @@ From here, the easiest next step is a quick consult so I can hear more about the
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>generic_opener_does_not_set_name</td>
+      <td>invalid_call_time_then_valid_booking</td>
+      <td>5</td>
+      <td>Monday at 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;call_time_choice&quot;,
+    &quot;options&quot;: [
+      &quot;1pm&quot;,
+      &quot;2pm&quot;
+    ],
+    &quot;dateContext&quot;: &quot;saturday&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;call_time_choice&quot;,
+    &quot;options&quot;: [
+      &quot;1pm&quot;,
+      &quot;2pm&quot;
+    ],
+    &quot;dateContext&quot;: &quot;saturday&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>invalid_call_time_then_valid_booking</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;call_time_choice&quot;,
+    &quot;options&quot;: [
+      &quot;1pm&quot;,
+      &quot;2pm&quot;
+    ],
+    &quot;dateContext&quot;: &quot;saturday&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday at 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>invalid_call_time_then_valid_booking</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday at 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect — you're all set for 10:00 AM ✨
+
+You should see the calendar invite come through at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>calendar_busy_then_suggested_time_booking</td>
       <td>1</td>
-      <td>More info please</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>calendar_busy_then_suggested_time_booking</td>
+      <td>2</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>calendar_busy_then_suggested_time_booking</td>
+      <td>3</td>
+      <td>The Bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Beautiful - The Bradford gives us a good starting point.
+
+From here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>calendar_busy_then_suggested_time_booking</td>
+      <td>4</td>
+      <td>Monday at 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;busy&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td></td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>That time is already taken, but I could do 10:00 AM or 11:00 AM instead. Would one of those work for you? ✨</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>calendar_busy_then_suggested_time_booking</td>
+      <td>5</td>
+      <td>11am works</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;busy&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>11:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>calendar_busy_then_suggested_time_booking</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday at 11am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 11:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>calendar_busy_then_suggested_time_booking</td>
+      <td>7</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday at 11am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday at 11am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;11:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>All set for 11:00 AM 🤍
+
+You should get the calendar invite at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_thanks_no_duplicate_booking</td>
+      <td>1</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_thanks_no_duplicate_booking</td>
+      <td>2</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_thanks_no_duplicate_booking</td>
+      <td>3</td>
+      <td>The Bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Beautiful - The Bradford gives us a good starting point.
+
+From here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_thanks_no_duplicate_booking</td>
+      <td>4</td>
+      <td>Monday 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_thanks_no_duplicate_booking</td>
+      <td>5</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_thanks_no_duplicate_booking</td>
+      <td>6</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Done — I locked us in for 10:00 AM ✨
+
+The calendar invite should come through at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_thanks_no_duplicate_booking</td>
+      <td>7</td>
+      <td>Thanks, see you then</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td></td>
+      <td>utter_acknowledgement</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Of course — talk soon 🤍</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_reschedule_request</td>
+      <td>1</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_reschedule_request</td>
+      <td>2</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_reschedule_request</td>
+      <td>3</td>
+      <td>The Bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>The Bradford gives us a helpful starting point.
+
+The easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_reschedule_request</td>
+      <td>4</td>
+      <td>Monday 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_reschedule_request</td>
+      <td>5</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_reschedule_request</td>
+      <td>6</td>
+      <td>Yes</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;Monday 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
+      <td>reply_only</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>All set for 10:00 AM 🤍
+
+You should get the calendar invite at katie@example.com.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>post_booking_reschedule_request</td>
+      <td>7</td>
+      <td>Actually can we reschedule?</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;The Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;Monday 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td></td>
+      <td>utter_handoff_ack</td>
+      <td>handoff</td>
+      <td>human_needed</td>
+      <td>customer_requests_human</td>
+      <td>yes</td>
+      <td>yes</td>
+      <td><pre>Totally - I'll have a real person from the team follow up here shortly 🤍</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>out_of_region_new_york</td>
+      <td>1</td>
+      <td>Wedding in New York on Oct 3 2026</td>
+      <td><pre>{}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;New York&quot;,
+  &quot;serviceRegion&quot;: &quot;unknown&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;needs_region&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_first_turn_lead_region_clarification</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍
+
+I have October 3, 2026 in New York. Just to confirm - is that in FL or NC/SC/GA?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>messy_casual_short_messages</td>
+      <td>1</td>
+      <td>yo need video</td>
       <td><pre>{}</pre></td>
       <td><pre>{
   &quot;serviceRegion&quot;: &quot;unknown&quot;,
@@ -1443,61 +4779,397 @@ From here, the easiest next step is a quick consult so I can hear more about the
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>speak_directly_with_taras_no_handoff</td>
-      <td>1</td>
-      <td>Can I speak directly with Taras?</td>
-      <td><pre>{}</pre></td>
+      <td>messy_casual_short_messages</td>
+      <td>2</td>
+      <td>oct 3 2026 raleigh</td>
       <td><pre>{
   &quot;serviceRegion&quot;: &quot;unknown&quot;,
   &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
   &quot;pendingUserAction&quot;: null,
   &quot;bookingConfirmed&quot;: false
 }</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
       <td></td>
-      <td>utter_ask_wedding_details</td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>messy_casual_short_messages</td>
+      <td>3</td>
+      <td>katie n mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Love it. What venue are you two planning for?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>messy_casual_short_messages</td>
+      <td>4</td>
+      <td>bradford</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_venue_collected_ask_call_time</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Beautiful - Bradford gives us a good starting point.
+
+From here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>messy_casual_short_messages</td>
+      <td>5</td>
+      <td>mon 10am</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;Bradford&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;mon 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_consultation_calendar</td>
+      <td>utter_calendar_available_ask_email</td>
+      <td>ask_email</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>10:00 AM works on my calendar.
+
+What's the best email for the calendar invite?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>messy_casual_short_messages</td>
+      <td>6</td>
+      <td>katie@example.com</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;mon 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;mon 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;mon 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td></td>
+      <td>utter_ask_booking_confirmation</td>
+      <td>ask_call_time</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Perfect, got it. Want me to lock in 10:00 AM?</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>messy_casual_short_messages</td>
+      <td>7</td>
+      <td>yeah</td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;mon 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: {
+    &quot;type&quot;: &quot;booking_confirmation&quot;,
+    &quot;slot&quot;: &quot;mon 10am&quot;,
+    &quot;email&quot;: &quot;katie@example.com&quot;
+  },
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;venue&quot;: &quot;Bradford&quot;,
+  &quot;proposedCallTime&quot;: &quot;mon 10am&quot;,
+  &quot;checkedCallDate&quot;: &quot;2026-10-05&quot;,
+  &quot;checkedCallTime&quot;: &quot;10:00&quot;,
+  &quot;calendarStatus&quot;: &quot;available&quot;,
+  &quot;customerEmail&quot;: &quot;katie@example.com&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: true
+}</pre></td>
+      <td>book_consultation</td>
+      <td>utter_booking_confirmed</td>
       <td>reply_only</td>
       <td>bot_active</td>
       <td></td>
       <td>no</td>
       <td>no</td>
-      <td><pre>Hi! Thanks so much for reaching out 🤍
+      <td><pre>All set for 10:00 AM 🤍
 
-Taras with Myndful Films. I’d love to help with the wedding film.
-
-Absolutely - you're speaking with me here. I'm Taras, and I'm happy to go over anything you'd like before we finish 🤍
-
-What date are you looking at?</pre></td>
+You should get the calendar invite at katie@example.com.</pre></td>
       <td></td>
       <td>PASS</td>
     </tr>
-  
 
     <tr class="pass">
-      <td>real_person_request_human_review</td>
+      <td>duplicate_inbound_no_duplicate_guide</td>
       <td>1</td>
-      <td>Can I talk to a real person?</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
       <td><pre>{}</pre></td>
       <td><pre>{
-  &quot;serviceRegion&quot;: &quot;unknown&quot;,
-  &quot;availabilityToolStatus&quot;: &quot;not_checked&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
+
+Great news — October 3, 2026 is available in Raleigh 🤍
+
+Our 8-hour wedding films start at $3,600 for NC/SC/GA.
+Also, we are running a 20% discount through June 30.
+I’ll send the collections guide here so you can look through the options 🎥
+
+What are both of your names?</pre></td>
+      <td>image:pricing_guide</td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>duplicate_inbound_no_duplicate_guide</td>
+      <td>2</td>
+      <td>Wedding in Raleigh on Oct 3 2026</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td>check_wedding_availability</td>
+      <td>utter_availability_available_ask_names</td>
+      <td>ask_missing_info</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>I checked October 3, 2026 in Raleigh too, and that date is available 🤍
+
+And what are both of your names? I’ll keep everything organized on my side.</pre></td>
+      <td></td>
+      <td>PASS</td>
+    </tr>
+
+    <tr class="pass">
+      <td>duplicate_inbound_no_duplicate_guide</td>
+      <td>3</td>
+      <td>Katie and Mike</td>
+      <td><pre>{
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
+  &quot;pendingUserAction&quot;: null,
+  &quot;bookingConfirmed&quot;: false
+}</pre></td>
+      <td><pre>{
+  &quot;customerName&quot;: &quot;Katie&quot;,
+  &quot;partnerName&quot;: &quot;Mike&quot;,
+  &quot;weddingDate&quot;: &quot;2026-10-03&quot;,
+  &quot;weddingDateDisplay&quot;: &quot;October 3, 2026&quot;,
+  &quot;location&quot;: &quot;Raleigh&quot;,
+  &quot;serviceRegion&quot;: &quot;NC_SC_GA&quot;,
+  &quot;availability&quot;: &quot;available&quot;,
+  &quot;availabilityToolStatus&quot;: &quot;available&quot;,
   &quot;pendingUserAction&quot;: null,
   &quot;bookingConfirmed&quot;: false
 }</pre></td>
       <td></td>
-      <td>utter_handoff_ack</td>
-      <td>handoff</td>
-      <td>human_needed</td>
-      <td>customer_requests_human</td>
-      <td>yes</td>
-      <td>yes</td>
-      <td><pre>Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍</pre></td>
+      <td>utter_ask_venue</td>
+      <td>ask_venue</td>
+      <td>bot_active</td>
+      <td></td>
+      <td>no</td>
+      <td>no</td>
+      <td><pre>So nice to meet you both 🤍 Do you already have a venue picked out?</pre></td>
       <td></td>
       <td>PASS</td>
-    </tr>
-  </tbody>
+    </tr></tbody>
   </table>
 </body>
 </html>

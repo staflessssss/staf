@@ -13,6 +13,7 @@
     },
     "extractedSlots": {},
     "toolCalls": [],
+    "cumulativeToolCalls": [],
     "toolResults": [],
     "responseKey": "utter_ask_wedding_details",
     "nextStep": "ask_missing_info",
@@ -52,6 +53,9 @@
       "location": "Raleigh"
     },
     "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
       "check_wedding_availability"
     ],
     "toolResults": [
@@ -110,6 +114,9 @@
       "partnerName": "Mike"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
     "responseKey": "utter_ask_venue",
     "nextStep": "ask_venue",
@@ -155,6 +162,9 @@
       "venue": "The Bradford"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
     "responseKey": "utter_venue_collected_ask_call_time",
     "nextStep": "ask_call_time",
@@ -205,6 +215,10 @@
       "proposedCallTime": "Monday at 10am"
     },
     "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
       "check_consultation_calendar"
     ],
     "toolResults": [
@@ -271,6 +285,10 @@
       "email": "katie@example.com"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
     "toolResults": [],
     "responseKey": "utter_ask_booking_confirmation",
     "nextStep": "ask_call_time",
@@ -331,6 +349,11 @@
     "toolCalls": [
       "book_consultation"
     ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
     "toolResults": [
       {
         "toolName": "book_consultation",
@@ -351,7 +374,7 @@
     "scenario": "rich_first_message_then_booking",
     "title": "Rich first message includes names/date/location/venue",
     "turn": 1,
-    "user": "Hi! We're Katie and Mike, wedding is Oct 3 2026 in Winston Salem, venue is The Bradford. Are you available?",
+    "user": "Hi! We're Katie and Mike. Wedding is Oct 3 2026 in Winston Salem. Venue is The Bradford. Are you available?",
     "slotsBefore": {},
     "slotsAfter": {
       "customerName": "Katie",
@@ -375,6 +398,9 @@
       "venue": "The Bradford"
     },
     "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
       "check_wedding_availability"
     ],
     "toolResults": [
@@ -432,6 +458,10 @@
       "proposedCallTime": "Monday 10am"
     },
     "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
       "check_consultation_calendar"
     ],
     "toolResults": [
@@ -498,6 +528,10 @@
       "email": "katie@example.com"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
     "toolResults": [],
     "responseKey": "utter_ask_booking_confirmation",
     "nextStep": "ask_call_time",
@@ -558,6 +592,11 @@
     "toolCalls": [
       "book_consultation"
     ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
     "toolResults": [
       {
         "toolName": "book_consultation",
@@ -575,8 +614,8 @@
     "failures": []
   },
   {
-    "scenario": "unknown_city_then_region_clarification",
-    "title": "Unknown city asks region before checking availability",
+    "scenario": "unknown_city_then_region_clarification_to_booking",
+    "title": "Unknown city clarifies region then books",
     "turn": 1,
     "user": "Wedding in Springfield on Oct 3 2026",
     "slotsBefore": {},
@@ -595,6 +634,7 @@
       "location": "Springfield"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [],
     "toolResults": [],
     "responseKey": "utter_first_turn_lead_region_clarification",
     "nextStep": "ask_missing_info",
@@ -608,8 +648,8 @@
     "failures": []
   },
   {
-    "scenario": "unknown_city_then_region_clarification",
-    "title": "Unknown city asks region before checking availability",
+    "scenario": "unknown_city_then_region_clarification_to_booking",
+    "title": "Unknown city clarifies region then books",
     "turn": 2,
     "user": "It's in North Carolina",
     "slotsBefore": {
@@ -637,6 +677,9 @@
     "toolCalls": [
       "check_wedding_availability"
     ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [
       {
         "toolName": "check_wedding_availability",
@@ -662,8 +705,8 @@
     "failures": []
   },
   {
-    "scenario": "unknown_city_then_region_clarification",
-    "title": "Unknown city asks region before checking availability",
+    "scenario": "unknown_city_then_region_clarification_to_booking",
+    "title": "Unknown city clarifies region then books",
     "turn": 3,
     "user": "Katie and Mike",
     "slotsBefore": {
@@ -693,20 +736,265 @@
       "partnerName": "Mike"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
     "responseKey": "utter_ask_venue",
     "nextStep": "ask_venue",
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "outboundText": "Love it. What venue are you two planning for?",
     "attachments": [],
     "passed": true,
     "failures": []
   },
   {
-    "scenario": "unavailable_tampa",
-    "title": "Unavailable Tampa date does not proceed to booking",
+    "scenario": "unknown_city_then_region_clarification_to_booking",
+    "title": "Unknown city clarifies region then books",
+    "turn": 4,
+    "user": "The Bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Bradford"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "The Bradford gives us a helpful starting point.\n\nThe easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_city_then_region_clarification_to_booking",
+    "title": "Unknown city clarifies region then books",
+    "turn": 5,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_city_then_region_clarification_to_booking",
+    "title": "Unknown city clarifies region then books",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unknown_city_then_region_clarification_to_booking",
+    "title": "Unknown city clarifies region then books",
+    "turn": 7,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "North Carolina",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-unknown-city\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect — you're all set for 10:00 AM ✨\n\nYou should see the calendar invite come through at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unavailable_then_alternative_date_booking",
+    "title": "Unavailable Tampa date changes to alternative and books",
     "turn": 1,
     "user": "Wedding in Tampa on Oct 3 2026",
     "slotsBefore": {},
@@ -728,6 +1016,9 @@
     "toolCalls": [
       "check_wedding_availability"
     ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [
       {
         "toolName": "check_wedding_availability",
@@ -745,8 +1036,361 @@
     "failures": []
   },
   {
-    "scenario": "tool_error_then_recovery",
-    "title": "Tool error stays active and later recovers",
+    "scenario": "unavailable_then_alternative_date_booking",
+    "title": "Unavailable Tampa date changes to alternative and books",
+    "turn": 2,
+    "user": "What about Oct 10 2026?",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "unavailable",
+      "availabilityToolStatus": "unavailable",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-10",
+      "weddingDateText": "Oct 10 2026"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-10\",\"requestedDate\":\"2026-10-10\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "I checked October 10, 2026 in Tampa too, and that date is available 🤍\n\nAlso, we are running a 20% discount through June 30.\n\nI’ll include the collections guide here so you can look through the options 🎥\n\nAnd what are both of your names? I’ll keep everything organized on my side.",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unavailable_then_alternative_date_booking",
+    "title": "Unavailable Tampa date changes to alternative and books",
+    "turn": 3,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unavailable_then_alternative_date_booking",
+    "title": "Unavailable Tampa date changes to alternative and books",
+    "turn": 4,
+    "user": "The Vinoy",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Vinoy"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Beautiful - The Vinoy gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unavailable_then_alternative_date_booking",
+    "title": "Unavailable Tampa date changes to alternative and books",
+    "turn": 5,
+    "user": "Tuesday 11am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Tuesday 11am",
+      "checkedCallDate": "2026-10-06",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Tuesday 11am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-06\",\"time\":\"11:00\",\"startTime\":\"2026-10-06T11:00:00-04:00\",\"endTime\":\"2026-10-06T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "11:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unavailable_then_alternative_date_booking",
+    "title": "Unavailable Tampa date changes to alternative and books",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Tuesday 11am",
+      "checkedCallDate": "2026-10-06",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Tuesday 11am",
+      "checkedCallDate": "2026-10-06",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Tuesday 11am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 11:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "unavailable_then_alternative_date_booking",
+    "title": "Unavailable Tampa date changes to alternative and books",
+    "turn": 7,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Tuesday 11am",
+      "checkedCallDate": "2026-10-06",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Tuesday 11am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Tuesday 11am",
+      "checkedCallDate": "2026-10-06",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-alt-date\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect — you're all set for 11:00 AM ✨\n\nYou should see the calendar invite come through at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "tool_error_then_recovery_booking",
+    "title": "Availability tool error recovers and books",
     "turn": 1,
     "user": "Wedding in Raleigh on Oct 3 2026",
     "slotsBefore": {},
@@ -766,6 +1410,9 @@
       "location": "Raleigh"
     },
     "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
       "check_wedding_availability"
     ],
     "toolResults": [
@@ -793,8 +1440,8 @@
     "failures": []
   },
   {
-    "scenario": "tool_error_then_recovery",
-    "title": "Tool error stays active and later recovers",
+    "scenario": "tool_error_then_recovery_booking",
+    "title": "Availability tool error recovers and books",
     "turn": 2,
     "user": "Katie and Mike",
     "slotsBefore": {
@@ -826,6 +1473,10 @@
     "toolCalls": [
       "check_wedding_availability"
     ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
     "toolResults": [
       {
         "toolName": "check_wedding_availability",
@@ -843,8 +1494,254 @@
     "failures": []
   },
   {
-    "scenario": "price_shopper",
-    "title": "Price shopper gets price and still enters availability flow",
+    "scenario": "tool_error_then_recovery_booking",
+    "title": "Availability tool error recovers and books",
+    "turn": 3,
+    "user": "The Bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Bradford"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "The Bradford gives us a helpful starting point.\n\nThe easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "tool_error_then_recovery_booking",
+    "title": "Availability tool error recovers and books",
+    "turn": 4,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "tool_error_then_recovery_booking",
+    "title": "Availability tool error recovers and books",
+    "turn": 5,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "tool_error_then_recovery_booking",
+    "title": "Availability tool error recovers and books",
+    "turn": 6,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-tool-recovery\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Done — I locked us in for 10:00 AM ✨\n\nThe calendar invite should come through at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "price_shopper_full",
+    "title": "Price shopper gets price then books",
     "turn": 1,
     "user": "How much?",
     "slotsBefore": {},
@@ -856,6 +1753,7 @@
     },
     "extractedSlots": {},
     "toolCalls": [],
+    "cumulativeToolCalls": [],
     "toolResults": [],
     "responseKey": "utter_ask_wedding_details",
     "nextStep": "ask_missing_info",
@@ -876,10 +1774,10 @@
     "failures": []
   },
   {
-    "scenario": "price_shopper",
-    "title": "Price shopper gets price and still enters availability flow",
+    "scenario": "price_shopper_full",
+    "title": "Price shopper gets price then books",
     "turn": 2,
-    "user": "Do you have availability Oct 3 2026 in Raleigh?",
+    "user": "Do you have Oct 3 2026 in Raleigh?",
     "slotsBefore": {
       "serviceRegion": "unknown",
       "availabilityToolStatus": "not_checked",
@@ -904,6 +1802,9 @@
     "toolCalls": [
       "check_wedding_availability"
     ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [
       {
         "toolName": "check_wedding_availability",
@@ -922,8 +1823,8 @@
     "failures": []
   },
   {
-    "scenario": "price_shopper",
-    "title": "Price shopper gets price and still enters availability flow",
+    "scenario": "price_shopper_full",
+    "title": "Price shopper gets price then books",
     "turn": 3,
     "user": "Katie and Mike",
     "slotsBefore": {
@@ -953,153 +1854,23 @@
       "partnerName": "Mike"
     },
     "toolCalls": [],
-    "toolResults": [],
-    "responseKey": "utter_ask_venue",
-    "nextStep": "ask_venue",
-    "mode": "bot_active",
-    "escalated": false,
-    "humanReviewRequired": false,
-    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
-    "attachments": [],
-    "passed": true,
-    "failures": []
-  },
-  {
-    "scenario": "faq_interruption",
-    "title": "FAQ interruption answers and returns to missing slot",
-    "turn": 1,
-    "user": "Wedding in Raleigh on Oct 3 2026",
-    "slotsBefore": {},
-    "slotsAfter": {
-      "weddingDate": "2026-10-03",
-      "weddingDateDisplay": "October 3, 2026",
-      "location": "Raleigh",
-      "serviceRegion": "NC_SC_GA",
-      "availability": "available",
-      "availabilityToolStatus": "available",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "extractedSlots": {
-      "weddingDate": "2026-10-03",
-      "weddingDateText": "Oct 3 2026",
-      "location": "Raleigh"
-    },
-    "toolCalls": [
+    "cumulativeToolCalls": [
       "check_wedding_availability"
     ],
-    "toolResults": [
-      {
-        "toolName": "check_wedding_availability",
-        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
-      }
-    ],
-    "responseKey": "utter_availability_available_ask_names",
-    "nextStep": "ask_missing_info",
-    "missingField": "names",
-    "mode": "bot_active",
-    "escalated": false,
-    "humanReviewRequired": false,
-    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
-    "attachments": [
-      {
-        "type": "image",
-        "url": "https://example.com/nc-sc-ga-guide.png",
-        "label": "NC SC GA Collections guide",
-        "purpose": "pricing_guide"
-      }
-    ],
-    "passed": true,
-    "failures": []
-  },
-  {
-    "scenario": "faq_interruption",
-    "title": "FAQ interruption answers and returns to missing slot",
-    "turn": 2,
-    "user": "Katie and Mike",
-    "slotsBefore": {
-      "weddingDate": "2026-10-03",
-      "weddingDateDisplay": "October 3, 2026",
-      "location": "Raleigh",
-      "serviceRegion": "NC_SC_GA",
-      "availability": "available",
-      "availabilityToolStatus": "available",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "slotsAfter": {
-      "customerName": "Katie",
-      "partnerName": "Mike",
-      "weddingDate": "2026-10-03",
-      "weddingDateDisplay": "October 3, 2026",
-      "location": "Raleigh",
-      "serviceRegion": "NC_SC_GA",
-      "availability": "available",
-      "availabilityToolStatus": "available",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "extractedSlots": {
-      "customerName": "Katie",
-      "partnerName": "Mike"
-    },
-    "toolCalls": [],
     "toolResults": [],
     "responseKey": "utter_ask_venue",
     "nextStep": "ask_venue",
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "outboundText": "Love it. What venue are you two planning for?",
     "attachments": [],
     "passed": true,
     "failures": []
   },
   {
-    "scenario": "faq_interruption",
-    "title": "FAQ interruption answers and returns to missing slot",
-    "turn": 3,
-    "user": "What's included?",
-    "slotsBefore": {
-      "customerName": "Katie",
-      "partnerName": "Mike",
-      "weddingDate": "2026-10-03",
-      "weddingDateDisplay": "October 3, 2026",
-      "location": "Raleigh",
-      "serviceRegion": "NC_SC_GA",
-      "availability": "available",
-      "availabilityToolStatus": "available",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "slotsAfter": {
-      "customerName": "Katie",
-      "partnerName": "Mike",
-      "weddingDate": "2026-10-03",
-      "weddingDateDisplay": "October 3, 2026",
-      "location": "Raleigh",
-      "serviceRegion": "NC_SC_GA",
-      "availability": "available",
-      "availabilityToolStatus": "available",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "extractedSlots": {},
-    "toolCalls": [],
-    "toolResults": [],
-    "responseKey": "utter_ask_venue",
-    "nextStep": "ask_venue",
-    "mode": "bot_active",
-    "escalated": false,
-    "humanReviewRequired": false,
-    "outboundText": "Our wedding films include coverage, editing, licensed music, and online delivery. The exact collection depends on the package, and I can walk you through the guide.\n\nSo nice to meet you both! Do you already have a venue picked out?",
-    "attachments": [],
-    "passed": true,
-    "failures": []
-  },
-  {
-    "scenario": "faq_interruption",
-    "title": "FAQ interruption answers and returns to missing slot",
+    "scenario": "price_shopper_full",
+    "title": "Price shopper gets price then books",
     "turn": 4,
     "user": "The Bradford",
     "slotsBefore": {
@@ -1131,215 +1902,219 @@
       "venue": "The Bradford"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
     "responseKey": "utter_venue_collected_ask_call_time",
     "nextStep": "ask_call_time",
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "The Bradford gives us a helpful starting point.\n\nThe easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "outboundText": "Beautiful - The Bradford gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
     "attachments": [],
     "passed": true,
     "failures": []
   },
   {
-    "scenario": "location_correction",
-    "title": "Location correction updates slot and rechecks availability",
-    "turn": 1,
-    "user": "Wedding in Raleigh on Oct 3 2026",
-    "slotsBefore": {},
-    "slotsAfter": {
+    "scenario": "price_shopper_full",
+    "title": "Price shopper gets price then books",
+    "turn": 5,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
       "weddingDate": "2026-10-03",
       "weddingDateDisplay": "October 3, 2026",
       "location": "Raleigh",
       "serviceRegion": "NC_SC_GA",
       "availability": "available",
       "availabilityToolStatus": "available",
+      "venue": "The Bradford",
       "pendingUserAction": null,
       "bookingConfirmed": false
     },
-    "extractedSlots": {
-      "weddingDate": "2026-10-03",
-      "weddingDateText": "Oct 3 2026",
-      "location": "Raleigh"
-    },
-    "toolCalls": [
-      "check_wedding_availability"
-    ],
-    "toolResults": [
-      {
-        "toolName": "check_wedding_availability",
-        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
-      }
-    ],
-    "responseKey": "utter_availability_available_ask_names",
-    "nextStep": "ask_missing_info",
-    "missingField": "names",
-    "mode": "bot_active",
-    "escalated": false,
-    "humanReviewRequired": false,
-    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
-    "attachments": [
-      {
-        "type": "image",
-        "url": "https://example.com/nc-sc-ga-guide.png",
-        "label": "NC SC GA Collections guide",
-        "purpose": "pricing_guide"
-      }
-    ],
-    "passed": true,
-    "failures": []
-  },
-  {
-    "scenario": "location_correction",
-    "title": "Location correction updates slot and rechecks availability",
-    "turn": 2,
-    "user": "Actually it's Winston Salem",
-    "slotsBefore": {
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
       "weddingDate": "2026-10-03",
       "weddingDateDisplay": "October 3, 2026",
       "location": "Raleigh",
       "serviceRegion": "NC_SC_GA",
       "availability": "available",
       "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
       "pendingUserAction": null,
       "bookingConfirmed": false
     },
-    "slotsAfter": {
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "price_shopper_full",
+    "title": "Price shopper gets price then books",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
       "weddingDate": "2026-10-03",
       "weddingDateDisplay": "October 3, 2026",
-      "location": "Winston Salem",
+      "location": "Raleigh",
       "serviceRegion": "NC_SC_GA",
       "availability": "available",
       "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
       "pendingUserAction": null,
       "bookingConfirmed": false
     },
-    "extractedSlots": {
-      "location": "Winston Salem"
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
     },
-    "toolCalls": [
-      "check_wedding_availability"
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
     ],
-    "toolResults": [
-      {
-        "toolName": "check_wedding_availability",
-        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
-      }
-    ],
-    "responseKey": "utter_availability_available_ask_names",
-    "nextStep": "ask_missing_info",
-    "missingField": "names",
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "I checked Winston Salem too, and October 3, 2026 is still available there 🤍\n\nAnd what are both of your names? I’ll keep everything organized on my side.",
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
     "attachments": [],
     "passed": true,
     "failures": []
   },
   {
-    "scenario": "date_correction",
-    "title": "Date correction updates date and rechecks availability",
-    "turn": 1,
-    "user": "Wedding in Tampa on Oct 3 2026",
-    "slotsBefore": {},
-    "slotsAfter": {
-      "weddingDate": "2026-10-03",
-      "weddingDateDisplay": "October 3, 2026",
-      "location": "Tampa",
-      "serviceRegion": "FL",
-      "availability": "available",
-      "availabilityToolStatus": "available",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "extractedSlots": {
-      "weddingDate": "2026-10-03",
-      "weddingDateText": "Oct 3 2026",
-      "location": "Tampa"
-    },
-    "toolCalls": [
-      "check_wedding_availability"
-    ],
-    "toolResults": [
-      {
-        "toolName": "check_wedding_availability",
-        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
-      }
-    ],
-    "responseKey": "utter_availability_available_ask_names",
-    "nextStep": "ask_missing_info",
-    "missingField": "names",
-    "mode": "bot_active",
-    "escalated": false,
-    "humanReviewRequired": false,
-    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Tampa 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
-    "attachments": [
-      {
-        "type": "image",
-        "url": "https://example.com/fl-guide.png",
-        "label": "FL Collections guide",
-        "purpose": "pricing_guide"
-      }
-    ],
-    "passed": true,
-    "failures": []
-  },
-  {
-    "scenario": "date_correction",
-    "title": "Date correction updates date and rechecks availability",
-    "turn": 2,
-    "user": "Sorry, I meant Oct 10 2026",
+    "scenario": "price_shopper_full",
+    "title": "Price shopper gets price then books",
+    "turn": 7,
+    "user": "Yes",
     "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
       "weddingDate": "2026-10-03",
       "weddingDateDisplay": "October 3, 2026",
-      "location": "Tampa",
-      "serviceRegion": "FL",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
       "availability": "available",
       "availabilityToolStatus": "available",
-      "pendingUserAction": null,
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
       "bookingConfirmed": false
     },
     "slotsAfter": {
-      "weddingDate": "2026-10-10",
-      "weddingDateDisplay": "October 10, 2026",
-      "location": "Tampa",
-      "serviceRegion": "FL",
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
       "availability": "available",
       "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
       "pendingUserAction": null,
-      "bookingConfirmed": false
+      "bookingConfirmed": true
     },
-    "extractedSlots": {
-      "weddingDate": "2026-10-10",
-      "weddingDateText": "Oct 10 2026"
-    },
+    "extractedSlots": {},
     "toolCalls": [
-      "check_wedding_availability"
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
     ],
     "toolResults": [
       {
-        "toolName": "check_wedding_availability",
-        "result": "{\"status\":\"available\",\"date\":\"2026-10-10\",\"requestedDate\":\"2026-10-10\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-price-shopper\"}"
       }
     ],
-    "responseKey": "utter_availability_available_ask_names",
-    "nextStep": "ask_missing_info",
-    "missingField": "names",
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "I checked October 10, 2026 in Tampa too, and that date is available 🤍\n\nAnd what are both of your names? I’ll keep everything organized on my side.",
+    "outboundText": "All set for 10:00 AM 🤍\n\nYou should get the calendar invite at katie@example.com.",
     "attachments": [],
     "passed": true,
     "failures": []
   },
   {
-    "scenario": "team_question_before_details",
-    "title": "Team question before details avoids FL-specific copy until FL region is known",
+    "scenario": "budget_objection",
+    "title": "Budget objection remains sales-safe",
     "turn": 1,
-    "user": "Who will be filming our wedding?",
+    "user": "How much?",
     "slotsBefore": {},
     "slotsAfter": {
       "serviceRegion": "unknown",
@@ -1349,64 +2124,20 @@
     },
     "extractedSlots": {},
     "toolCalls": [],
+    "cumulativeToolCalls": [],
     "toolResults": [],
     "responseKey": "utter_ask_wedding_details",
-    "nextStep": "reply_only",
-    "mode": "bot_active",
-    "escalated": false,
-    "humanReviewRequired": false,
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability.\n\nWhat wedding date and city are you planning for?",
-    "attachments": [],
-    "passed": true,
-    "failures": []
-  },
-  {
-    "scenario": "team_question_before_details",
-    "title": "Team question before details avoids FL-specific copy until FL region is known",
-    "turn": 2,
-    "user": "October 3 2026 in Tampa",
-    "slotsBefore": {
-      "serviceRegion": "unknown",
-      "availabilityToolStatus": "not_checked",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "slotsAfter": {
-      "weddingDate": "2026-10-03",
-      "weddingDateDisplay": "October 3, 2026",
-      "location": "Tampa",
-      "serviceRegion": "FL",
-      "availability": "available",
-      "availabilityToolStatus": "available",
-      "pendingUserAction": null,
-      "bookingConfirmed": false
-    },
-    "extractedSlots": {
-      "weddingDate": "2026-10-03",
-      "weddingDateText": "October 3 2026",
-      "location": "Tampa"
-    },
-    "toolCalls": [
-      "check_wedding_availability"
-    ],
-    "toolResults": [
-      {
-        "toolName": "check_wedding_availability",
-        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
-      }
-    ],
-    "responseKey": "utter_availability_available_ask_names",
     "nextStep": "ask_missing_info",
-    "missingField": "names",
+    "missingField": "weddingDate",
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Great news — October 3, 2026 is available in Tampa 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nOur wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA.\n\nI’ll include the collections guide here so you can look through the options 🎥\n\nWhat date are you looking at?",
     "attachments": [
       {
         "type": "image",
         "url": "https://example.com/fl-guide.png",
-        "label": "FL Collections guide",
+        "label": "Collections guide",
         "purpose": "pricing_guide"
       }
     ],
@@ -1414,8 +2145,138 @@
     "failures": []
   },
   {
-    "scenario": "invalid_call_time",
-    "title": "Invalid consultation time asks for configured window",
+    "scenario": "budget_objection",
+    "title": "Budget objection remains sales-safe",
+    "turn": 2,
+    "user": "That's too expensive",
+    "slotsBefore": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "ask_missing_info",
+    "missingField": "weddingDate",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.\n\nWhat date are you looking at?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "budget_objection",
+    "title": "Budget objection remains sales-safe",
+    "turn": 3,
+    "user": "Do you have anything cheaper?",
+    "slotsBefore": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "ask_missing_info",
+    "missingField": "weddingDate",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.\n\nWhat date are you looking at?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "discount_pressure",
+    "title": "Discount pressure does not invent a deal",
+    "turn": 1,
+    "user": "Do you have discounts?",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "ask_missing_info",
+    "missingField": "weddingDate",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nOur wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA.\n\nI’ll include the collections guide here so you can look through the options 🎥\n\nWhat date are you looking at?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "discount_pressure",
+    "title": "Discount pressure does not invent a deal",
+    "turn": 2,
+    "user": "Can you do $1000?",
+    "slotsBefore": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "ask_missing_info",
+    "missingField": "weddingDate",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.\n\nWhat date are you looking at?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "faq_interruption_full_booking",
+    "title": "FAQ interruption answers and returns to booking flow",
     "turn": 1,
     "user": "Wedding in Raleigh on Oct 3 2026",
     "slotsBefore": {},
@@ -1435,6 +2296,9 @@
       "location": "Raleigh"
     },
     "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
       "check_wedding_availability"
     ],
     "toolResults": [
@@ -1462,8 +2326,8 @@
     "failures": []
   },
   {
-    "scenario": "invalid_call_time",
-    "title": "Invalid consultation time asks for configured window",
+    "scenario": "faq_interruption_full_booking",
+    "title": "FAQ interruption answers and returns to booking flow",
     "turn": 2,
     "user": "Katie and Mike",
     "slotsBefore": {
@@ -1493,6 +2357,9 @@
       "partnerName": "Mike"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
     "responseKey": "utter_ask_venue",
     "nextStep": "ask_venue",
@@ -1505,8 +2372,1445 @@
     "failures": []
   },
   {
-    "scenario": "invalid_call_time",
-    "title": "Invalid consultation time asks for configured window",
+    "scenario": "faq_interruption_full_booking",
+    "title": "FAQ interruption answers and returns to booking flow",
+    "turn": 3,
+    "user": "What's included?",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Our wedding films include coverage, editing, licensed music, and online delivery. The exact collection depends on the package, and I can walk you through the guide.\n\nSo nice to meet you both! Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "faq_interruption_full_booking",
+    "title": "FAQ interruption answers and returns to booking flow",
+    "turn": 4,
+    "user": "The Bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Bradford"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "The Bradford gives us a helpful starting point.\n\nThe easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "faq_interruption_full_booking",
+    "title": "FAQ interruption answers and returns to booking flow",
+    "turn": 5,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "faq_interruption_full_booking",
+    "title": "FAQ interruption answers and returns to booking flow",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "faq_interruption_full_booking",
+    "title": "FAQ interruption answers and returns to booking flow",
+    "turn": 7,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-faq-booking\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Done — I locked us in for 10:00 AM ✨\n\nThe calendar invite should come through at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "style_faq_before_date",
+    "title": "Style FAQ before date answers then processes availability",
+    "turn": 1,
+    "user": "What's your filming style?",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "ask_missing_info",
+    "missingField": "weddingDate",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nOur style is cinematic but natural and documentary-leaning - focused on real moments, clean audio, and a film that feels like your day.\n\nWhat date are you looking at?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "style_faq_before_date",
+    "title": "Style FAQ before date answers then processes availability",
+    "turn": 2,
+    "user": "Do you have Oct 3 2026 in Tampa?",
+    "slotsBefore": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Tampa"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Great news — October 3, 2026 is available in Tampa 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "style_faq_before_date",
+    "title": "Style FAQ before date answers then processes availability",
+    "turn": 3,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_question_before_details_to_booking",
+    "title": "Team question before details then books in Florida",
+    "turn": 1,
+    "user": "Who will be filming our wedding?",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nThe exact filmmaker depends on the wedding location and availability.\n\nWhat wedding date and city are you planning for?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_question_before_details_to_booking",
+    "title": "Team question before details then books in Florida",
+    "turn": 2,
+    "user": "October 3 2026 in Tampa",
+    "slotsBefore": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "October 3 2026",
+      "location": "Tampa"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Great news — October 3, 2026 is available in Tampa 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_question_before_details_to_booking",
+    "title": "Team question before details then books in Florida",
+    "turn": 3,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Love it. What venue are you two planning for?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_question_before_details_to_booking",
+    "title": "Team question before details then books in Florida",
+    "turn": 4,
+    "user": "The Vinoy",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Vinoy"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Beautiful - The Vinoy gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_question_before_details_to_booking",
+    "title": "Team question before details then books in Florida",
+    "turn": 5,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_question_before_details_to_booking",
+    "title": "Team question before details then books in Florida",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "team_question_before_details_to_booking",
+    "title": "Team question before details then books in Florida",
+    "turn": 7,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Vinoy",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-team-booking\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "All set for 10:00 AM 🤍\n\nYou should get the calendar invite at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "human_request_handoff",
+    "title": "Explicit real person request goes to human review",
+    "turn": 1,
+    "user": "Can I talk to a real person?",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_handoff_ack",
+    "nextStep": "handoff",
+    "mode": "human_needed",
+    "handoffReason": "customer_requests_human",
+    "escalated": true,
+    "humanReviewRequired": true,
+    "outboundText": "Totally - I'll have a real person from the team follow up here shortly 🤍",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "speak_directly_with_taras_no_handoff",
+    "title": "Request to speak directly with Taras stays identity/no-handoff",
+    "turn": 1,
+    "user": "Can I speak directly with Taras?",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_ask_wedding_details",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nAbsolutely - you're speaking with me here. I'm Taras, and I'm happy to go over anything you'd like before we finish 🤍\n\nWhat date are you looking at?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "speak_directly_with_taras_no_handoff",
+    "title": "Request to speak directly with Taras stays identity/no-handoff",
+    "turn": 2,
+    "user": "October 3 2026 in Raleigh",
+    "slotsBefore": {
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "not_checked",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "October 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Great news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "location_correction_full",
+    "title": "Location correction updates slot and rechecks availability",
+    "turn": 1,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "location_correction_full",
+    "title": "Location correction updates slot and rechecks availability",
+    "turn": 2,
+    "user": "Actually it's Winston Salem",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Winston Salem",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "location": "Winston Salem"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "I checked Winston Salem too, and October 3, 2026 is still available there 🤍\n\nAnd what are both of your names? I’ll keep everything organized on my side.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "location_correction_full",
+    "title": "Location correction updates slot and rechecks availability",
+    "turn": 3,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Winston Salem",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Winston Salem",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Love it. What venue are you two planning for?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "date_correction_full",
+    "title": "Date correction updates date and rechecks availability",
+    "turn": 1,
+    "user": "Wedding in Tampa on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Tampa"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Tampa 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/fl-guide.png",
+        "label": "FL Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "date_correction_full",
+    "title": "Date correction updates date and rechecks availability",
+    "turn": 2,
+    "user": "Sorry I meant Oct 10 2026",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-10",
+      "weddingDateText": "Oct 10 2026"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-10\",\"requestedDate\":\"2026-10-10\",\"region\":\"FL\",\"requestedRegion\":\"FL\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "I checked October 10, 2026 in Tampa too, and that date is available 🤍\n\nAnd what are both of your names? I’ll keep everything organized on my side.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "date_correction_full",
+    "title": "Date correction updates date and rechecks availability",
+    "turn": 3,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-10",
+      "weddingDateDisplay": "October 10, 2026",
+      "location": "Tampa",
+      "serviceRegion": "FL",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "names_correction",
+    "title": "Partner name correction updates names without resetting flow",
+    "turn": 1,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "names_correction",
+    "title": "Partner name correction updates names without resetting flow",
+    "turn": 2,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Love it. What venue are you two planning for?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "names_correction",
+    "title": "Partner name correction updates names without resetting flow",
+    "turn": 3,
+    "user": "Actually my partner is John, not Mike",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "John",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "partnerName": "John"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "email_typo_correction_booking",
+    "title": "Email typo correction is used for booking",
+    "turn": 1,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "email_typo_correction_booking",
+    "title": "Email typo correction is used for booking",
+    "turn": 2,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "email_typo_correction_booking",
+    "title": "Email typo correction is used for booking",
     "turn": 3,
     "user": "The Bradford",
     "slotsBefore": {
@@ -1538,6 +3842,9 @@
       "venue": "The Bradford"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
     "responseKey": "utter_venue_collected_ask_call_time",
     "nextStep": "ask_call_time",
@@ -1550,8 +3857,415 @@
     "failures": []
   },
   {
-    "scenario": "invalid_call_time",
-    "title": "Invalid consultation time asks for configured window",
+    "scenario": "email_typo_correction_booking",
+    "title": "Email typo correction is used for booking",
+    "turn": 4,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "email_typo_correction_booking",
+    "title": "Email typo correction is used for booking",
+    "turn": 5,
+    "user": "katy@gmal.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katy@gmal.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katy@gmal.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katy@gmal.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "email_typo_correction_booking",
+    "title": "Email typo correction is used for booking",
+    "turn": 6,
+    "user": "Sorry typo: katie@gmail.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katy@gmal.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katy@gmal.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@gmail.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katy@gmal.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@gmail.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Would you still like me to lock in 10:00 AM?\n\nPerfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "email_typo_correction_booking",
+    "title": "Email typo correction is used for booking",
+    "turn": 7,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@gmail.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katy@gmal.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@gmail.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-email-corrected\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "All set for 10:00 AM 🤍\n\nYou should get the calendar invite at katie@gmail.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "invalid_call_time_then_valid_booking",
+    "title": "Invalid call time rejected, valid time books",
+    "turn": 1,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "invalid_call_time_then_valid_booking",
+    "title": "Invalid call time rejected, valid time books",
+    "turn": 2,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "invalid_call_time_then_valid_booking",
+    "title": "Invalid call time rejected, valid time books",
+    "turn": 3,
+    "user": "The Bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Bradford"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "The Bradford gives us a helpful starting point.\n\nThe easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "invalid_call_time_then_valid_booking",
+    "title": "Invalid call time rejected, valid time books",
     "turn": 4,
     "user": "Can we do Saturday at 8pm?",
     "slotsBefore": {
@@ -1591,6 +4305,9 @@
       "proposedCallTime": "Saturday at 8pm"
     },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
     "responseKey": "utter_call_time_out_of_window",
     "nextStep": "ask_call_time",
@@ -1603,10 +4320,1462 @@
     "failures": []
   },
   {
-    "scenario": "generic_opener_does_not_set_name",
-    "title": "Generic opener does not pollute name slots",
+    "scenario": "invalid_call_time_then_valid_booking",
+    "title": "Invalid call time rejected, valid time books",
+    "turn": 5,
+    "user": "Monday at 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": {
+        "type": "call_time_choice",
+        "options": [
+          "1pm",
+          "2pm"
+        ],
+        "dateContext": "saturday"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": {
+        "type": "call_time_choice",
+        "options": [
+          "1pm",
+          "2pm"
+        ],
+        "dateContext": "saturday"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday at 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "invalid_call_time_then_valid_booking",
+    "title": "Invalid call time rejected, valid time books",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": {
+        "type": "call_time_choice",
+        "options": [
+          "1pm",
+          "2pm"
+        ],
+        "dateContext": "saturday"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday at 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "invalid_call_time_then_valid_booking",
+    "title": "Invalid call time rejected, valid time books",
+    "turn": 7,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday at 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-valid-after-invalid\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect — you're all set for 10:00 AM ✨\n\nYou should see the calendar invite come through at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "calendar_busy_then_suggested_time_booking",
+    "title": "Calendar busy then suggested time books",
     "turn": 1,
-    "user": "More info please",
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "calendar_busy_then_suggested_time_booking",
+    "title": "Calendar busy then suggested time books",
+    "turn": 2,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "calendar_busy_then_suggested_time_booking",
+    "title": "Calendar busy then suggested time books",
+    "turn": 3,
+    "user": "The Bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Bradford"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Beautiful - The Bradford gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "calendar_busy_then_suggested_time_booking",
+    "title": "Calendar busy then suggested time books",
+    "turn": 4,
+    "user": "Monday at 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "busy",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday at 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"busy\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "That time is already taken, but I could do 10:00 AM or 11:00 AM instead. Would one of those work for you? ✨",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "calendar_busy_then_suggested_time_booking",
+    "title": "Calendar busy then suggested time books",
+    "turn": 5,
+    "user": "11am works",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "busy",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 11am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "11am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"11:00\",\"startTime\":\"2026-10-05T11:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "11:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "calendar_busy_then_suggested_time_booking",
+    "title": "Calendar busy then suggested time books",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 11am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 11am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday at 11am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 11:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "calendar_busy_then_suggested_time_booking",
+    "title": "Calendar busy then suggested time books",
+    "turn": 7,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 11am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday at 11am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday at 11am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "11:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-busy-suggested\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "All set for 11:00 AM 🤍\n\nYou should get the calendar invite at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_thanks_no_duplicate_booking",
+    "title": "Post-booking thanks does not book twice",
+    "turn": 1,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_thanks_no_duplicate_booking",
+    "title": "Post-booking thanks does not book twice",
+    "turn": 2,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Love it. What venue are you two planning for?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_thanks_no_duplicate_booking",
+    "title": "Post-booking thanks does not book twice",
+    "turn": 3,
+    "user": "The Bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Bradford"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Beautiful - The Bradford gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_thanks_no_duplicate_booking",
+    "title": "Post-booking thanks does not book twice",
+    "turn": 4,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_thanks_no_duplicate_booking",
+    "title": "Post-booking thanks does not book twice",
+    "turn": 5,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_thanks_no_duplicate_booking",
+    "title": "Post-booking thanks does not book twice",
+    "turn": 6,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-no-duplicate\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Done — I locked us in for 10:00 AM ✨\n\nThe calendar invite should come through at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_thanks_no_duplicate_booking",
+    "title": "Post-booking thanks does not book twice",
+    "turn": 7,
+    "user": "Thanks, see you then",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_acknowledgement",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Of course — talk soon 🤍",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_reschedule_request",
+    "title": "Post-booking reschedule request goes to human review",
+    "turn": 1,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_reschedule_request",
+    "title": "Post-booking reschedule request goes to human review",
+    "turn": 2,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Love it. What venue are you two planning for?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_reschedule_request",
+    "title": "Post-booking reschedule request goes to human review",
+    "turn": 3,
+    "user": "The Bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "The Bradford"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "The Bradford gives us a helpful starting point.\n\nThe easiest next step is a quick consult so I can learn a little more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_reschedule_request",
+    "title": "Post-booking reschedule request goes to human review",
+    "turn": 4,
+    "user": "Monday 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "Monday 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_reschedule_request",
+    "title": "Post-booking reschedule request goes to human review",
+    "turn": 5,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_reschedule_request",
+    "title": "Post-booking reschedule request goes to human review",
+    "turn": 6,
+    "user": "Yes",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "Monday 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-reschedule\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "All set for 10:00 AM 🤍\n\nYou should get the calendar invite at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "post_booking_reschedule_request",
+    "title": "Post-booking reschedule request goes to human review",
+    "turn": 7,
+    "user": "Actually can we reschedule?",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "The Bradford",
+      "proposedCallTime": "Monday 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_handoff_ack",
+    "nextStep": "handoff",
+    "mode": "human_needed",
+    "handoffReason": "customer_requests_human",
+    "escalated": true,
+    "humanReviewRequired": true,
+    "outboundText": "Totally - I'll have a real person from the team follow up here shortly 🤍",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "out_of_region_new_york",
+    "title": "Unsupported New York location stays safe",
+    "turn": 1,
+    "user": "Wedding in New York on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "New York",
+      "serviceRegion": "unknown",
+      "availabilityToolStatus": "needs_region",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "New York"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [],
+    "toolResults": [],
+    "responseKey": "utter_first_turn_lead_region_clarification",
+    "nextStep": "ask_missing_info",
+    "missingField": "location",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in New York. Just to confirm - is that in FL or NC/SC/GA?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "messy_casual_short_messages",
+    "title": "Messy casual short messages still reach booking",
+    "turn": 1,
+    "user": "yo need video",
     "slotsBefore": {},
     "slotsAfter": {
       "serviceRegion": "unknown",
@@ -1616,6 +5785,7 @@
     },
     "extractedSlots": {},
     "toolCalls": [],
+    "cumulativeToolCalls": [],
     "toolResults": [],
     "responseKey": "utter_ask_wedding_details",
     "nextStep": "ask_missing_info",
@@ -1629,52 +5799,497 @@
     "failures": []
   },
   {
-    "scenario": "speak_directly_with_taras_no_handoff",
-    "title": "Request to speak directly with Taras stays identity/no-handoff",
-    "turn": 1,
-    "user": "Can I speak directly with Taras?",
-    "slotsBefore": {},
-    "slotsAfter": {
+    "scenario": "messy_casual_short_messages",
+    "title": "Messy casual short messages still reach booking",
+    "turn": 2,
+    "user": "oct 3 2026 raleigh",
+    "slotsBefore": {
       "serviceRegion": "unknown",
       "availabilityToolStatus": "not_checked",
       "pendingUserAction": null,
       "bookingConfirmed": false
     },
-    "extractedSlots": {},
-    "toolCalls": [],
-    "toolResults": [],
-    "responseKey": "utter_ask_wedding_details",
-    "nextStep": "reply_only",
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nTaras with Myndful Films. I’d love to help with the wedding film.\n\nAbsolutely - you're speaking with me here. I'm Taras, and I'm happy to go over anything you'd like before we finish 🤍\n\nWhat date are you looking at?",
+    "outboundText": "Great news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "messy_casual_short_messages",
+    "title": "Messy casual short messages still reach booking",
+    "turn": 3,
+    "user": "katie n mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Love it. What venue are you two planning for?",
     "attachments": [],
     "passed": true,
     "failures": []
   },
   {
-    "scenario": "real_person_request_human_review",
-    "title": "Request for a real person triggers human-safe handoff",
-    "turn": 1,
-    "user": "Can I talk to a real person?",
-    "slotsBefore": {},
-    "slotsAfter": {
-      "serviceRegion": "unknown",
-      "availabilityToolStatus": "not_checked",
+    "scenario": "messy_casual_short_messages",
+    "title": "Messy casual short messages still reach booking",
+    "turn": 4,
+    "user": "bradford",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
       "pendingUserAction": null,
       "bookingConfirmed": false
     },
-    "extractedSlots": {},
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "venue": "Bradford"
+    },
     "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
     "toolResults": [],
-    "responseKey": "utter_handoff_ack",
-    "nextStep": "handoff",
-    "mode": "human_needed",
-    "handoffReason": "customer_requests_human",
-    "escalated": true,
-    "humanReviewRequired": true,
-    "outboundText": "Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍",
+    "responseKey": "utter_venue_collected_ask_call_time",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Beautiful - Bradford gives us a good starting point.\n\nFrom here, the easiest next step is a quick consult so I can hear more about the day. What time works best? I do consults Monday-Friday, 9am-2pm Eastern.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "messy_casual_short_messages",
+    "title": "Messy casual short messages still reach booking",
+    "turn": 5,
+    "user": "mon 10am",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "Bradford",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "Bradford",
+      "proposedCallTime": "mon 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "proposedCallTime": "mon 10am"
+    },
+    "toolCalls": [
+      "check_consultation_calendar"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_consultation_calendar",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-05\",\"time\":\"10:00\",\"startTime\":\"2026-10-05T10:00:00-04:00\",\"endTime\":\"2026-10-05T10:30:00-04:00\",\"suggestedTimes\":[\"10:00\",\"11:00\"]}"
+      }
+    ],
+    "responseKey": "utter_calendar_available_ask_email",
+    "nextStep": "ask_email",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "10:00 AM works on my calendar.\n\nWhat's the best email for the calendar invite?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "messy_casual_short_messages",
+    "title": "Messy casual short messages still reach booking",
+    "turn": 6,
+    "user": "katie@example.com",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "Bradford",
+      "proposedCallTime": "mon 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "Bradford",
+      "proposedCallTime": "mon 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "mon 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "email": "katie@example.com"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_booking_confirmation",
+    "nextStep": "ask_call_time",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Perfect, got it. Want me to lock in 10:00 AM?",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "messy_casual_short_messages",
+    "title": "Messy casual short messages still reach booking",
+    "turn": 7,
+    "user": "yeah",
+    "slotsBefore": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "Bradford",
+      "proposedCallTime": "mon 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": {
+        "type": "booking_confirmation",
+        "slot": "mon 10am",
+        "email": "katie@example.com"
+      },
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "venue": "Bradford",
+      "proposedCallTime": "mon 10am",
+      "checkedCallDate": "2026-10-05",
+      "checkedCallTime": "10:00",
+      "calendarStatus": "available",
+      "customerEmail": "katie@example.com",
+      "pendingUserAction": null,
+      "bookingConfirmed": true
+    },
+    "extractedSlots": {},
+    "toolCalls": [
+      "book_consultation"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_consultation_calendar",
+      "book_consultation"
+    ],
+    "toolResults": [
+      {
+        "toolName": "book_consultation",
+        "result": "{\"status\":\"booked\",\"eventId\":\"evt-messy\"}"
+      }
+    ],
+    "responseKey": "utter_booking_confirmed",
+    "nextStep": "reply_only",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "All set for 10:00 AM 🤍\n\nYou should get the calendar invite at katie@example.com.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "duplicate_inbound_no_duplicate_guide",
+    "title": "Duplicate inbound does not duplicate guide or destabilize state",
+    "turn": 1,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {},
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.\n\nGreat news — October 3, 2026 is available in Raleigh 🤍\n\nOur 8-hour wedding films start at $3,600 for NC/SC/GA.\nAlso, we are running a 20% discount through June 30.\nI’ll send the collections guide here so you can look through the options 🎥\n\nWhat are both of your names?",
+    "attachments": [
+      {
+        "type": "image",
+        "url": "https://example.com/nc-sc-ga-guide.png",
+        "label": "NC SC GA Collections guide",
+        "purpose": "pricing_guide"
+      }
+    ],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "duplicate_inbound_no_duplicate_guide",
+    "title": "Duplicate inbound does not duplicate guide or destabilize state",
+    "turn": 2,
+    "user": "Wedding in Raleigh on Oct 3 2026",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "weddingDate": "2026-10-03",
+      "weddingDateText": "Oct 3 2026",
+      "location": "Raleigh"
+    },
+    "toolCalls": [
+      "check_wedding_availability"
+    ],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [
+      {
+        "toolName": "check_wedding_availability",
+        "result": "{\"status\":\"available\",\"date\":\"2026-10-03\",\"requestedDate\":\"2026-10-03\",\"region\":\"NC/SC/GA\",\"requestedRegion\":\"NC/SC/GA\",\"available\":true}"
+      }
+    ],
+    "responseKey": "utter_availability_available_ask_names",
+    "nextStep": "ask_missing_info",
+    "missingField": "names",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "I checked October 3, 2026 in Raleigh too, and that date is available 🤍\n\nAnd what are both of your names? I’ll keep everything organized on my side.",
+    "attachments": [],
+    "passed": true,
+    "failures": []
+  },
+  {
+    "scenario": "duplicate_inbound_no_duplicate_guide",
+    "title": "Duplicate inbound does not duplicate guide or destabilize state",
+    "turn": 3,
+    "user": "Katie and Mike",
+    "slotsBefore": {
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "slotsAfter": {
+      "customerName": "Katie",
+      "partnerName": "Mike",
+      "weddingDate": "2026-10-03",
+      "weddingDateDisplay": "October 3, 2026",
+      "location": "Raleigh",
+      "serviceRegion": "NC_SC_GA",
+      "availability": "available",
+      "availabilityToolStatus": "available",
+      "pendingUserAction": null,
+      "bookingConfirmed": false
+    },
+    "extractedSlots": {
+      "customerName": "Katie",
+      "partnerName": "Mike"
+    },
+    "toolCalls": [],
+    "cumulativeToolCalls": [
+      "check_wedding_availability",
+      "check_wedding_availability"
+    ],
+    "toolResults": [],
+    "responseKey": "utter_ask_venue",
+    "nextStep": "ask_venue",
+    "mode": "bot_active",
+    "escalated": false,
+    "humanReviewRequired": false,
+    "outboundText": "So nice to meet you both 🤍 Do you already have a venue picked out?",
     "attachments": [],
     "passed": true,
     "failures": []

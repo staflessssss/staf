@@ -55,12 +55,26 @@ type JourneyExpectation = {
   escalated?: boolean;
   humanReviewRequired?: boolean;
   toolCalled?: ToolName;
+  toolCallCount?: number;
+  bookConsultationCallCount?: number;
+  guideSentCount?: number;
+  attachmentCount?: number;
   expectNoTool?: boolean;
   attachmentsInclude?: string;
   outboundContains?: string | string[];
   outboundContainsAny?: string[];
   outboundNotContains?: string | string[];
+  customerName?: string;
+  partnerName?: string;
+  customerEmail?: string;
   asksFor?: "names" | "venue" | "callTime" | "email" | "bookingConfirmation" | "weddingDate" | "location";
+  noStaleDate?: string;
+  noStaleLocation?: string;
+  noFakeDiscount?: boolean;
+  noInventedPackage?: boolean;
+  noToolErrorCopyOnHumanRequest?: boolean;
+  noDuplicateBooking?: boolean;
+  noDuplicateGuide?: boolean;
   noHandoff?: boolean;
   noBotPaused?: boolean;
   noEscalated?: boolean;
@@ -93,6 +107,7 @@ type JourneyReportRow = {
   slotsAfter: Record<string, unknown>;
   extractedSlots: Record<string, unknown>;
   toolCalls: ToolName[];
+  cumulativeToolCalls: ToolName[];
   toolResults: Array<{ toolName: ToolName; result: string }>;
   responseKey?: string;
   nextStep?: string;
@@ -215,7 +230,7 @@ function applyDecision(state: SimpleWeddingSalesState): SimpleWeddingSalesState 
       ? {
           ...decision.trace,
           nextStep: selectedFlowRunner.predictedNextStep,
-          responseKey: selectedFlowRunner.predictedResponseKey,
+          responseKey: selectedFlowRunner.predictedResponseKey ?? decision.trace.responseKey,
           replyType: selectedFlowRunner.legacyReplyType ?? decision.trace.replyType,
           reason: selectedFlowRunner.reason,
         }
@@ -574,6 +589,17 @@ function duplicateQuestionCount(text: string) {
   return text.match(/\b(?:what\s+(?:wedding\s+)?date|date\s+(?:and|or)\s+(?:city|location)|city\s+(?:and|or)\s+date)\b/gi)?.length ?? 0;
 }
 
+function countTool(row: JourneyReportRow, toolName: ToolName) {
+  return row.cumulativeToolCalls.filter((entry) => entry === toolName).length;
+}
+
+function countGuideMentions(state: SimpleWeddingSalesState, row: JourneyReportRow) {
+  const memorySent = state.replyMemory?.mentioned?.guide ? 1 : 0;
+  const currentAttachments = row.attachments.filter((attachment) => attachment.purpose === "pricing_guide").length;
+
+  return Math.max(memorySent, currentAttachments);
+}
+
 function assertTurn(args: {
   state: SimpleWeddingSalesState;
   row: JourneyReportRow;
@@ -628,6 +654,18 @@ function assertTurn(args: {
     failures.push(`namesCaptured expected ${expect.namesCaptured}, got ${hasNames(state)}`);
   }
 
+  if (expect.customerName && state.customerName !== expect.customerName) {
+    failures.push(`customerName expected ${expect.customerName}, got ${state.customerName ?? "none"}`);
+  }
+
+  if (expect.partnerName && state.partnerName !== expect.partnerName) {
+    failures.push(`partnerName expected ${expect.partnerName}, got ${state.partnerName ?? "none"}`);
+  }
+
+  if (expect.customerEmail && state.customerEmail !== expect.customerEmail) {
+    failures.push(`customerEmail expected ${expect.customerEmail}, got ${state.customerEmail ?? "none"}`);
+  }
+
   if (expect.venueCaptured !== undefined && Boolean(state.venue) !== expect.venueCaptured) {
     failures.push(`venueCaptured expected ${expect.venueCaptured}, got ${Boolean(state.venue)}`);
   }
@@ -678,6 +716,25 @@ function assertTurn(args: {
 
   if (expect.expectNoTool && row.toolCalls.length > 0) {
     failures.push(`expected no tool calls, got ${row.toolCalls.join(", ")}`);
+  }
+
+  if (expect.toolCallCount !== undefined && row.toolCalls.length !== expect.toolCallCount) {
+    failures.push(`toolCallCount expected ${expect.toolCallCount}, got ${row.toolCalls.length}`);
+  }
+
+  if (
+    expect.bookConsultationCallCount !== undefined &&
+    countTool(row, "book_consultation") !== expect.bookConsultationCallCount
+  ) {
+    failures.push(`bookConsultationCallCount expected ${expect.bookConsultationCallCount}, got ${countTool(row, "book_consultation")}`);
+  }
+
+  if (expect.guideSentCount !== undefined && countGuideMentions(state, row) !== expect.guideSentCount) {
+    failures.push(`guideSentCount expected ${expect.guideSentCount}, got ${countGuideMentions(state, row)}`);
+  }
+
+  if (expect.attachmentCount !== undefined && row.attachments.length !== expect.attachmentCount) {
+    failures.push(`attachmentCount expected ${expect.attachmentCount}, got ${row.attachments.length}`);
   }
 
   if (expect.attachmentsInclude && !row.attachments.some((attachment) => attachment.purpose === expect.attachmentsInclude)) {
@@ -733,6 +790,37 @@ function assertTurn(args: {
     failures.push("duplicate date/city question appeared");
   }
 
+  if (expect.noStaleDate && row.outboundText.toLowerCase().includes(expect.noStaleDate.toLowerCase())) {
+    failures.push(`stale date appeared: ${expect.noStaleDate}`);
+  }
+
+  if (expect.noStaleLocation && row.outboundText.toLowerCase().includes(expect.noStaleLocation.toLowerCase())) {
+    failures.push(`stale location appeared: ${expect.noStaleLocation}`);
+  }
+
+  if (expect.noFakeDiscount && /\b(?:extra|another|additional|special)\s+\d{1,2}%|\$1,000|\$1000\b/i.test(row.outboundText)) {
+    failures.push("fake discount or requested low price appeared");
+  }
+
+  if (expect.noInventedPackage && /\b(?:budget|starter|basic)\s+(?:package|collection)\b/i.test(row.outboundText)) {
+    failures.push("invented package appeared");
+  }
+
+  if (
+    expect.noToolErrorCopyOnHumanRequest &&
+    /\b(?:Good question|double-check availability|wrong answer)\b/i.test(row.outboundText)
+  ) {
+    failures.push("tool-error copy appeared on human request");
+  }
+
+  if (expect.noDuplicateBooking && countTool(row, "book_consultation") > 1) {
+    failures.push(`duplicate booking tool calls: ${countTool(row, "book_consultation")}`);
+  }
+
+  if (expect.noDuplicateGuide && countGuideMentions(state, row) > 1) {
+    failures.push(`duplicate guide sends: ${countGuideMentions(state, row)}`);
+  }
+
   return failures;
 }
 
@@ -741,6 +829,7 @@ function runTurn(args: {
   state: SimpleWeddingSalesState | undefined;
   turn: JourneyTurn;
   index: number;
+  cumulativeToolCalls: ToolName[];
 }): { state: SimpleWeddingSalesState; row: JourneyReportRow } {
   const slotsBefore = slotsSnapshot(args.state);
   let state = createInitialSimpleWeddingSalesState({
@@ -814,6 +903,7 @@ function runTurn(args: {
   void deliveryPlan;
 
   const toolCalls = state.toolObservations.map((entry) => entry.toolName as ToolName);
+  const cumulativeToolCalls = [...args.cumulativeToolCalls, ...toolCalls];
   const row: JourneyReportRow = {
     scenario: args.scenario.id,
     title: args.scenario.title,
@@ -823,6 +913,7 @@ function runTurn(args: {
     slotsAfter: slotsSnapshot(state),
     extractedSlots: understanding.facts,
     toolCalls,
+    cumulativeToolCalls,
     toolResults: state.toolObservations.map((entry) => ({
       toolName: entry.toolName as ToolName,
       result: entry.result,
@@ -848,6 +939,7 @@ function runTurn(args: {
 function runScenario(scenario: JourneyCase): JourneyReportRow[] {
   let state: SimpleWeddingSalesState | undefined;
   const rows: JourneyReportRow[] = [];
+  let cumulativeToolCalls: ToolName[] = [];
 
   scenario.turns.forEach((turn, index) => {
     const result = runTurn({
@@ -855,8 +947,10 @@ function runScenario(scenario: JourneyCase): JourneyReportRow[] {
       state,
       turn,
       index: index + 1,
+      cumulativeToolCalls,
     });
     state = result.state;
+    cumulativeToolCalls = result.row.cumulativeToolCalls;
     rows.push(result.row);
   });
 
@@ -874,12 +968,58 @@ function escapeHtml(value: string | undefined) {
 function writeReports(rows: JourneyReportRow[]) {
   mkdirSync(reportDir, { recursive: true });
   writeFileSync(path.join(reportDir, "results.json"), `${JSON.stringify(rows, null, 2)}\n`);
+  const scenarioIds = [...new Set(rows.map((row) => row.scenario))];
+  const finalRows = scenarioIds
+    .map((scenario) => [...rows].reverse().find((row) => row.scenario === scenario))
+    .filter((row): row is JourneyReportRow => Boolean(row));
+  const finalStates = {
+    booked: finalRows.filter((row) => row.slotsAfter.bookingConfirmed === true).length,
+    humanReview: finalRows.filter((row) => row.humanReviewRequired || row.mode === "human_needed").length,
+    unavailable: finalRows.filter((row) => row.slotsAfter.availability === "unavailable").length,
+    waitingClarification: finalRows.filter((row) =>
+      !row.escalated &&
+      row.slotsAfter.bookingConfirmed !== true &&
+      row.slotsAfter.availability !== "unavailable" &&
+      Boolean(row.missingField || row.nextStep?.startsWith("ask_")),
+    ).length,
+    abandoned: finalRows.filter((row) =>
+      !row.escalated &&
+      row.slotsAfter.bookingConfirmed !== true &&
+      row.slotsAfter.availability !== "unavailable" &&
+      !row.missingField &&
+      !row.nextStep?.startsWith("ask_"),
+    ).length,
+  };
+  const failuresByScenario = scenarioIds
+    .map((scenario) => ({
+      scenario,
+      failures: rows.filter((row) => row.scenario === scenario && !row.passed),
+    }))
+    .filter((entry) => entry.failures.length > 0);
 
   const markdown = [
     "# Wedding Full-Journey Matrix",
     "",
     `Passed turns: ${rows.filter((row) => row.passed).length}/${rows.length}`,
-    `Passed scenarios: ${new Set(rows.filter((row) => row.passed).map((row) => row.scenario)).size}/${new Set(rows.map((row) => row.scenario)).size}`,
+    `Passed scenarios: ${scenarioIds.filter((scenario) => rows.filter((row) => row.scenario === scenario).every((row) => row.passed)).length}/${scenarioIds.length}`,
+    "",
+    "## Scenario Summary",
+    "",
+    `Total scenarios: ${scenarioIds.length}`,
+    `Total turns: ${rows.length}`,
+    `Final booked: ${finalStates.booked}`,
+    `Final human review: ${finalStates.humanReview}`,
+    `Final unavailable: ${finalStates.unavailable}`,
+    `Final waiting clarification: ${finalStates.waitingClarification}`,
+    `Final abandoned: ${finalStates.abandoned}`,
+    "",
+    "## Failures By Scenario",
+    "",
+    ...(failuresByScenario.length
+      ? failuresByScenario.map((entry) =>
+          `- ${entry.scenario}: ${entry.failures.map((row) => `turn ${row.turn}: ${row.failures.join("; ")}`).join(" | ")}`,
+        )
+      : ["None"]),
     "",
     "| Scenario | Turn | User | Date | Location | Region | Tool | Response key | Next step | Mode | Handoff | Attachments | Result |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -950,7 +1090,7 @@ function writeReports(rows: JourneyReportRow[]) {
       <td>${escapeHtml(row.attachments.map((attachment) => `${attachment.type}:${attachment.purpose ?? ""}`).join(", "))}</td>
       <td>${row.passed ? "PASS" : escapeHtml(row.failures.join("; "))}</td>
     </tr>
-  `).join("\n");
+  `.trimEnd()).join("\n");
   const html = `<!doctype html>
 <html>
 <head>
@@ -969,6 +1109,7 @@ function writeReports(rows: JourneyReportRow[]) {
 <body>
   <h1>Wedding Full-Journey Matrix</h1>
   <p>Passed turns: ${rows.filter((row) => row.passed).length}/${rows.length}</p>
+  <p>Total scenarios: ${scenarioIds.length}; booked: ${finalStates.booked}; human review: ${finalStates.humanReview}; unavailable: ${finalStates.unavailable}; waiting clarification: ${finalStates.waitingClarification}; abandoned: ${finalStates.abandoned}</p>
   <table>
     <thead>
       <tr>
@@ -1011,6 +1152,7 @@ function main() {
         slotsAfter: {},
         extractedSlots: {},
         toolCalls: [],
+        cumulativeToolCalls: [],
         toolResults: [],
         mode: "bot_active",
         escalated: false,

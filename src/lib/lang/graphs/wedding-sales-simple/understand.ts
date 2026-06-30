@@ -64,6 +64,12 @@ function extractEmail(message: string) {
   return /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.exec(message)?.[0];
 }
 
+function titleWords(value: string) {
+  return value.replace(/\b([a-z])([a-z]*)\b/gi, (_match, first: string, rest: string) =>
+    `${first.toUpperCase()}${rest.toLowerCase()}`,
+  );
+}
+
 function extractIsoDate(message: string) {
   return /\b(20\d{2})-(\d{2})-(\d{2})\b/.exec(message)?.[0];
 }
@@ -127,11 +133,21 @@ function extractMonthDate(message: string) {
 
 function extractNames(message: string) {
   const normalizedMessage = message.replace(/^\s*\d+[\).:-]?\s*/, "");
+  const titleName = (value: string | undefined) =>
+    value ? `${value[0]?.toUpperCase()}${value.slice(1).toLowerCase()}` : undefined;
+  const partnerCorrection = /\b(?:actually|sorry|apologies)?[\s\S]{0,50}\bpartner\s+(?:is|=)\s+([A-Z][a-z]+)(?:,\s*not\s+([A-Z][a-z]+))?/i.exec(
+    normalizedMessage,
+  );
+  const casualPair = /^\s*([A-Z][a-z]+)\s+(?:n|and|&)\s+([A-Z][a-z]+)[.!]?\s*$/i.exec(
+    normalizedMessage,
+  );
   const introduced = /\b(?:we are|we're|this is|names are|i am|i'm)\s+([A-Z][a-z]+)(?:\s+(?:and|&)\s+([A-Z][a-z]+))?/i.exec(
     normalizedMessage,
   );
-  const barePair = /^\s*([A-Z][a-z]+)\s+(?:and|&)\s+([A-Z][a-z]+)[.!]?\s*$/.exec(normalizedMessage);
-  const match = introduced ?? barePair;
+  const barePair = /^\s*([A-Z][a-z]+)\s+(?:and|&)\s+([A-Z][a-z]+)[.!]?\s*$/i.exec(normalizedMessage);
+  const match = partnerCorrection
+    ? [partnerCorrection[0], undefined, partnerCorrection[1]]
+    : introduced ?? casualPair ?? barePair;
   const blocked = new Set([
     "interested",
     "info",
@@ -141,8 +157,8 @@ function extractNames(message: string) {
     "pricing",
     "packages",
   ]);
-  const customerName = match?.[1]?.trim();
-  const partnerName = match?.[2]?.trim();
+  const customerName = titleName(match?.[1]?.trim());
+  const partnerName = titleName(match?.[2]?.trim());
 
   if (customerName && blocked.has(customerName.toLowerCase())) {
     return {};
@@ -202,7 +218,7 @@ function extractLocation(message: string) {
   );
 
   if (correction?.[1]) {
-    return correction[1].trim();
+    return titleWords(correction[1].trim());
   }
 
   const match = /\b(?:in|near|around|to)\s+([A-Z][A-Za-z .'-]+?)(?:[?.!,]|$|\s+(?:and|for|on|at)\b)/.exec(
@@ -210,23 +226,31 @@ function extractLocation(message: string) {
   );
 
   if (match?.[1]) {
-    return match[1].trim();
+    return titleWords(match[1].trim());
   }
 
   const aboutLocation = /\b(?:about|for)\s+([A-Z][A-Za-z .'-]+?)(?:[?.!,]|$|\s+(?:and|date|on|at)\b)/.exec(
     message,
   );
 
-  return aboutLocation?.[1]?.trim();
+  if (aboutLocation?.[1]) {
+    return titleWords(aboutLocation[1].trim());
+  }
+
+  const afterDate = /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+20\d{2})?\s+([A-Za-z][A-Za-z .'-]+?)\s*$/i.exec(
+    message,
+  );
+
+  return afterDate?.[1] ? titleWords(afterDate[1].trim()) : undefined;
 }
 
 function extractVenue(state: SimpleWeddingSalesState, message: string) {
-  const explicit = /\b(?:venue|place|location)\s+(?:is|will be|would be|=)\s+([A-Z][A-Za-z0-9 .&'-]+?)(?:[?.!,]|$)/.exec(
+  const explicit = /\b(?:venue|place|location)\s+(?:is|will be|would be|=)\s+([A-Z][A-Za-z0-9 .&'-]+?)(?:[?.!,]|$)/i.exec(
     message,
   );
 
   if (explicit?.[1]) {
-    return explicit[1].trim();
+    return titleWords(explicit[1].trim());
   }
 
   if (state.nextStep !== "ask_venue") {
@@ -245,11 +269,11 @@ function extractVenue(state: SimpleWeddingSalesState, message: string) {
 
   const trimmed = message.trim().replace(/[.!?]+$/, "");
 
-  if (!/^[A-Z][A-Za-z0-9 .&'-]{2,80}$/.test(trimmed)) {
+  if (!/^[A-Za-z][A-Za-z0-9 .&'-]{2,80}$/.test(trimmed)) {
     return undefined;
   }
 
-  return trimmed;
+  return titleWords(trimmed);
 }
 
 function normalizeSuggestedTimeLabel(value: string) {
@@ -289,7 +313,7 @@ function resolveSuggestedCallTime(
 }
 
 function extractCallTime(state: SimpleWeddingSalesState, message: string) {
-  const match = /\b(?:(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next week|next monday|next tuesday|next wednesday|next thursday|next friday)[^?.!,]{0,40})?\b(?:at\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i.exec(
+  const match = /\b(?:(?:tomorrow|today|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|next week|next monday|next tuesday|next wednesday|next thursday|next friday)[^?.!,]{0,40})?\b(?:at\s*)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/i.exec(
     message,
   );
 
@@ -304,7 +328,7 @@ function inferQuestions(message: string): TurnUnderstanding["questionsAskedByCus
   const normalized = message.toLowerCase();
   const questions: TurnUnderstanding["questionsAskedByCustomer"] = [];
 
-  if (/\b(price|pricing|cost|package|packages|collection|collections|rate|rates|how much)\b/.test(normalized)) {
+  if (/\b(price|pricing|cost|package|packages|collection|collections|rate|rates|how much|expensive|cheaper|discount|discounts|deal|budget)\b|\$\d+/.test(normalized)) {
     questions.push("pricing");
   }
 

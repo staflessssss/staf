@@ -137,6 +137,10 @@ function getReplyObligations(
     obligations.add("guide");
   }
 
+  if (normalizedQuestions.includes("style")) {
+    obligations.add("style");
+  }
+
   if (normalizedQuestions.includes("portfolio")) {
     obligations.add("portfolio");
   }

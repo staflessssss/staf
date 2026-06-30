@@ -145,6 +145,7 @@ export type SimpleWeddingSalesReplyObligation =
   | "team"
   | "identity"
   | "package_inclusions"
+  | "style"
   | "travel"
   | "raw_footage"
   | "portfolio";

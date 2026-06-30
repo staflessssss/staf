@@ -563,6 +563,7 @@ function catalogExclusionReason(
     contract.mustAnswerTeam ||
     contract.mustAnswerIdentity ||
     contract.mustAnswerQuestions?.includes("package_inclusions") ||
+    contract.mustAnswerQuestions?.includes("style") ||
     contract.mustAnswerQuestions?.includes("portfolio")
   ) {
     return "responseKey_excluded" as const;
@@ -953,6 +954,14 @@ function packageInclusionsLine(contract: ReplyActionContract) {
   return "Our wedding films include coverage, editing, licensed music, and online delivery. The exact collection depends on the package, and I can walk you through the guide.";
 }
 
+function styleLine(contract: ReplyActionContract) {
+  if (!contract.mustAnswerQuestions?.includes("style")) {
+    return undefined;
+  }
+
+  return "Our style is cinematic but natural and documentary-leaning - focused on real moments, clean audio, and a film that feels like your day.";
+}
+
 function postBookingFaqLine(args: {
   state: SimpleWeddingSalesState;
   knowledge: SimpleWeddingKnowledgeContext;
@@ -1045,6 +1054,14 @@ function handoffLine() {
   return "Good question — let me double-check that so I don't give you the wrong answer. I'll follow up here shortly 🤍";
 }
 
+function handoffLineForState(state?: SimpleWeddingSalesState) {
+  if (state?.handoffReason === "customer_requests_human") {
+    return "Totally - I'll have a real person from the team follow up here shortly 🤍";
+  }
+
+  return handoffLine();
+}
+
 function pendingBookingConfirmationLine(state: SimpleWeddingSalesState) {
   if (state.pendingUserAction?.type !== "booking_confirmation" || state.bookingConfirmed) {
     return undefined;
@@ -1064,7 +1081,7 @@ function renderSafeTemplate(args: {
   knowledge: SimpleWeddingKnowledgeContext;
 }) {
   if (args.state.nextStep === "handoff") {
-    return handoffLine();
+    return handoffLineForState(args.state);
   }
 
   return joinLines([
@@ -1086,6 +1103,7 @@ function renderSafeTemplate(args: {
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
     args.contract.mustAnswerTravel ? travelLine(args.knowledge) : undefined,
     packageInclusionsLine(args.contract),
+    styleLine(args.contract),
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
@@ -1119,6 +1137,7 @@ function renderCompactInstagramFallback(args: {
     args.contract.mustAnswerIdentity ? identityLine(args.knowledge) : undefined,
     args.contract.mustAnswerTravel ? travelLine(args.knowledge) : undefined,
     packageInclusionsLine(args.contract),
+    styleLine(args.contract),
     mustAnswerRawFootage(args.contract) ? rawFootageLine(args.knowledge) : undefined,
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
@@ -1221,7 +1240,7 @@ export function writeConstrainedWeddingReply(args: {
   const shouldSharePortfolio = state.questionsAskedByCustomer.includes("portfolio");
   const draft =
     state.nextStep === "handoff"
-      ? handoffLine()
+      ? handoffLineForState(state)
       : joinLines([
           greetingLine({ contract, state, knowledge }),
           contract.mustMentionWeddingAvailability
@@ -1237,6 +1256,7 @@ export function writeConstrainedWeddingReply(args: {
           contract.mustAnswerIdentity ? identityLine(knowledge) : undefined,
           contract.mustAnswerTravel ? travelLine(knowledge) : undefined,
           packageInclusionsLine(contract),
+          styleLine(contract),
           mustAnswerRawFootage(contract) ? rawFootageLine(knowledge) : undefined,
           shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
           contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
@@ -1302,7 +1322,7 @@ export function writeConstrainedWeddingReply(args: {
 
   if (!minimalGuard.ok) {
     return {
-      text: handoffLine(),
+      text: handoffLineForState(state),
       guardResult: minimalGuard,
       writer: {
         mode: "deterministic_fallback",
