@@ -383,7 +383,7 @@ function runCase(testCase: FirstTurnCase): MatrixResult {
       failures.push(`expected region/location clarification, got ${state.nextStep}/${state.missingField ?? "none"}`);
     }
 
-    if (!/FL or NC\/SC\/GA|city or area|confirm/i.test(reply.text)) {
+    if (!/FL or NC\/SC\/GA|city or area|confirm|main coverage areas|travel wedding|one of those areas/i.test(reply.text)) {
       failures.push("clarification text missing supported region prompt");
     }
   }

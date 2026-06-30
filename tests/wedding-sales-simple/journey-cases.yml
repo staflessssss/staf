@@ -79,8 +79,8 @@
       "title": "Budget objection remains sales-safe",
       "turns": [
         { "user": "How much?", "expect": { "outboundContains": ["$2,800", "$3,600"], "expectNoTool": true, "noHandoff": true } },
-        { "user": "That's too expensive", "expect": { "outboundContainsAny": ["start", "collection", "guide", "date", "city"], "noFakeDiscount": true, "noInventedPackage": true, "noHandoff": true } },
-        { "user": "Do you have anything cheaper?", "expect": { "outboundContainsAny": ["start", "collection", "$2,800", "$3,600", "guide"], "noFakeDiscount": true, "noInventedPackage": true, "noHandoff": true } }
+        { "user": "That's too expensive", "expect": { "outboundContainsAny": ["stay within budget", "$2,800 for Florida", "$3,600 for NC/SC/GA", "guide"], "outboundNotContains": "Yep, pricing is the same", "noFakeDiscount": true, "noInventedPackage": true, "noHandoff": true } },
+        { "user": "Do you have anything cheaper?", "expect": { "outboundContainsAny": ["stay within budget", "$2,800 for Florida", "$3,600 for NC/SC/GA", "guide"], "outboundNotContains": "Yep, pricing is the same", "noFakeDiscount": true, "noInventedPackage": true, "noHandoff": true } }
       ]
     },
     {
@@ -88,7 +88,7 @@
       "title": "Discount pressure does not invent a deal",
       "turns": [
         { "user": "Do you have discounts?", "expect": { "outboundContainsAny": ["20% discount", "$2,800", "$3,600", "June 30"], "noFakeDiscount": true, "noInventedPackage": true, "noHandoff": true } },
-        { "user": "Can you do $1000?", "expect": { "outboundNotContains": "$1000", "noFakeDiscount": true, "noInventedPackage": true, "noHandoff": true } }
+        { "user": "Can you do $1000?", "expect": { "outboundContainsAny": ["custom discount", "20% discount", "date", "city"], "outboundNotContains": ["$1000", "Yep, pricing is the same"], "noFakeDiscount": true, "noInventedPackage": true, "noHandoff": true } }
       ]
     },
     {
@@ -177,7 +177,7 @@
         { "user": "The Bradford", "expect": { "asksFor": "callTime", "noHandoff": true } },
         { "user": "Monday 10am", "forceTools": { "check_consultation_calendar": { "status": "available", "date": "2026-10-05", "time": "10:00" } }, "expect": { "asksFor": "email", "noHandoff": true } },
         { "user": "katy@gmal.com", "expect": { "customerEmail": "katy@gmal.com", "asksFor": "bookingConfirmation", "noHandoff": true } },
-        { "user": "Sorry typo: katie@gmail.com", "expect": { "customerEmail": "katie@gmail.com", "asksFor": "bookingConfirmation", "noHandoff": true } },
+        { "user": "Sorry typo: katie@gmail.com", "expect": { "customerEmail": "katie@gmail.com", "outboundContains": "updated the email to katie@gmail.com", "outboundNotContains": "katy@gmal.com", "asksFor": "bookingConfirmation", "noDuplicateBookingConfirmation": true, "noHandoff": true } },
         { "user": "Yes", "forceTools": { "book_consultation": { "status": "booked", "eventId": "evt-email-corrected" } }, "expect": { "customerEmail": "katie@gmail.com", "booked": true, "bookConsultationCallCount": 1, "noHandoff": true } }
       ]
     },
@@ -201,7 +201,7 @@
         { "user": "Wedding in Raleigh on Oct 3 2026", "forceTools": { "check_wedding_availability": { "status": "available" } }, "expect": { "asksFor": "names", "noHandoff": true } },
         { "user": "Katie and Mike", "expect": { "asksFor": "venue", "noHandoff": true } },
         { "user": "The Bradford", "expect": { "asksFor": "callTime", "noHandoff": true } },
-        { "user": "Monday at 10am", "forceTools": { "check_consultation_calendar": { "status": "busy", "date": "2026-10-05", "time": "10:00" } }, "expect": { "toolCalled": "check_consultation_calendar", "booked": false, "outboundContainsAny": ["11:00", "11am", "instead", "Would one of those work"], "noHandoff": true } },
+        { "user": "Monday at 10am", "forceTools": { "check_consultation_calendar": { "status": "busy", "date": "2026-10-05", "time": "10:00" } }, "expect": { "toolCalled": "check_consultation_calendar", "booked": false, "outboundContainsAny": ["11:00 AM is open", "11am"], "outboundNotContains": "10:00 AM or 11:00 AM", "noOfferedBusyTime": "10:00 AM", "noHandoff": true } },
         { "user": "11am works", "forceTools": { "check_consultation_calendar": { "status": "available", "date": "2026-10-05", "time": "11:00" } }, "expect": { "toolCalled": "check_consultation_calendar", "asksFor": "email", "noHandoff": true } },
         { "user": "katie@example.com", "expect": { "asksFor": "bookingConfirmation", "noHandoff": true } },
         { "user": "Yes", "forceTools": { "book_consultation": { "status": "booked", "eventId": "evt-busy-suggested" } }, "expect": { "booked": true, "bookConsultationCallCount": 1, "noHandoff": true } }
@@ -237,7 +237,7 @@
       "id": "out_of_region_new_york",
       "title": "Unsupported New York location stays safe",
       "turns": [
-        { "user": "Wedding in New York on Oct 3 2026", "expect": { "weddingDate": "2026-10-03", "locationContains": "New York", "serviceRegion": "unknown", "expectNoTool": true, "outboundNotContains": "not open", "noFalseUnavailable": true, "noHandoff": true } }
+        { "user": "Wedding in New York on Oct 3 2026", "expect": { "weddingDate": "2026-10-03", "locationContains": "New York", "serviceRegion": "unknown", "expectNoTool": true, "outboundContains": "main coverage areas are Florida and NC/SC/GA", "outboundContainsAny": ["travel wedding", "one of those areas"], "outboundNotContains": ["not open", "Just to confirm - is that in FL or NC/SC/GA"], "noFalseUnavailable": true, "noHandoff": true } }
       ]
     },
     {

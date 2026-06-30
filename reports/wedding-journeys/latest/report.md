@@ -617,7 +617,7 @@ User: Wedding in Springfield on Oct 3 2026
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in Springfield. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ```json
@@ -1793,7 +1793,9 @@ What date are you looking at?
 User: That's too expensive
 
 ```text
-Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.
+I totally understand wanting to stay within budget 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA. I can't promise a custom discount here, but we can look through the collection options together.
 
 What date are you looking at?
 ```
@@ -1823,7 +1825,9 @@ What date are you looking at?
 User: Do you have anything cheaper?
 
 ```text
-Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.
+I totally understand wanting to stay within budget 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA. I can't promise a custom discount here, but we can look through the collection options together.
 
 What date are you looking at?
 ```
@@ -1891,7 +1895,9 @@ What date are you looking at?
 User: Can you do $1000?
 
 ```text
-Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.
+I totally understand wanting to stay within budget 🤍
+
+Our 8-hour wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA. I can't promise a custom discount here, but we can look through the collection options together.
 
 What date are you looking at?
 ```
@@ -3316,9 +3322,7 @@ Perfect, got it. Want me to lock in 10:00 AM?
 User: Sorry typo: katie@gmail.com
 
 ```text
-Would you still like me to lock in 10:00 AM?
-
-Perfect, got it. Want me to lock in 10:00 AM?
+Got it - I updated the email to katie@gmail.com. Want me to lock in 10:00 AM?
 ```
 
 ```json
@@ -3842,7 +3846,7 @@ From here, the easiest next step is a quick consult so I can hear more about the
 User: Monday at 10am
 
 ```text
-That time is already taken, but I could do 10:00 AM or 11:00 AM instead. Would one of those work for you? ✨
+That time is already taken, but 11:00 AM is open. Would that work for you?
 ```
 
 ```json
@@ -4620,7 +4624,7 @@ User: Wedding in New York on Oct 3 2026
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in New York. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in New York. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ```json

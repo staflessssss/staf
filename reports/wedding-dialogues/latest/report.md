@@ -5,13 +5,13 @@ Passed: 30/30
 | Scenario | User message | Date | Location | Region | Tool | Mode | Next step | Handoff | Escalated | Human review | Response key | Attachments | Guard | Result |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 known_winston_salem_need_videographer | Hii! I need a videographer for a wedding in Winston Salem on Oct 3 2026 | 2026-10-03 | Winston Salem | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
-known_winston_salem_nc_availability | Do you have availability in Winston-Salem NC on Oct 3 2026? | 2026-10-03 | Winston-Salem NC | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
-known_greensboro | Hi, we're getting married in Greensboro NC on October 3 2026 | 2026-10-03 | Greensboro NC | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_winston_salem_nc_availability | Do you have availability in Winston-Salem NC on Oct 3 2026? | 2026-10-03 | Winston-Salem Nc | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_greensboro | Hi, we're getting married in Greensboro NC on October 3 2026 | 2026-10-03 | Greensboro Nc | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
 known_charlotte | Need a wedding videographer in Charlotte on Oct 3 2026 | 2026-10-03 | Charlotte | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
-known_raleigh | Hi! Wedding in Raleigh NC on October 3rd 2026 | 2026-10-03 | Raleigh NC | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
-known_savannah | Looking for a videographer in Savannah GA on Oct 3 2026 | 2026-10-03 | Savannah GA | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
-known_charleston | Wedding in Charleston SC on October 3 2026, are you available? | 2026-10-03 | Charleston SC | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
-known_tampa | Hi, do you have availability in Tampa FL on Oct 3 2026? | 2026-10-03 | Tampa FL | FL | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_raleigh | Hi! Wedding in Raleigh NC on October 3rd 2026 | 2026-10-03 | Raleigh Nc | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_savannah | Looking for a videographer in Savannah GA on Oct 3 2026 | 2026-10-03 | Savannah Ga | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_charleston | Wedding in Charleston SC on October 3 2026, are you available? | 2026-10-03 | Charleston Sc | NC_SC_GA | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
+known_tampa | Hi, do you have availability in Tampa FL on Oct 3 2026? | 2026-10-03 | Tampa Fl | FL | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
 known_orlando | I need wedding video in Orlando Florida on October 3 2026 | 2026-10-03 | Orlando Florida | FL | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
 known_st_pete | We're getting married in St Pete on Oct 3 2026 | 2026-10-03 | St Pete | FL | check_wedding_availability | bot_active | ask_missing_info |  | no | no | utter_availability_available_ask_names | pricing_guide | {"ok":true} | PASS
 unknown_springfield | I need a videographer in Springfield on Oct 3 2026 | 2026-10-03 | Springfield | unknown |  | bot_active | ask_missing_info |  | no | no | utter_first_turn_lead_region_clarification |  | {"ok":true} | PASS
@@ -56,7 +56,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
 
-Great news — October 3, 2026 is available in Winston-Salem NC 🤍
+Great news — October 3, 2026 is available in Winston-Salem Nc 🤍
 
 Our 8-hour wedding films start at $3,600 for NC/SC/GA.
 
@@ -70,7 +70,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
 
-Great news — October 3, 2026 is available in Greensboro NC 🤍
+Great news — October 3, 2026 is available in Greensboro Nc 🤍
 
 Our 8-hour wedding films start at $3,600 for NC/SC/GA.
 
@@ -98,7 +98,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
 
-Great news — October 3, 2026 is available in Raleigh NC 🤍
+Great news — October 3, 2026 is available in Raleigh Nc 🤍
 
 Our 8-hour wedding films start at $3,600 for NC/SC/GA.
 
@@ -112,7 +112,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
 
-Great news — October 3, 2026 is available in Savannah GA 🤍
+Great news — October 3, 2026 is available in Savannah Ga 🤍
 
 Our 8-hour wedding films start at $3,600 for NC/SC/GA.
 
@@ -126,7 +126,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
 
-Great news — October 3, 2026 is available in Charleston SC 🤍
+Great news — October 3, 2026 is available in Charleston Sc 🤍
 
 Our 8-hour wedding films start at $3,600 for NC/SC/GA.
 
@@ -140,7 +140,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍 Taras with Myndful Films. I’d love to help with the wedding film.
 
-Great news — October 3, 2026 is available in Tampa FL 🤍
+Great news — October 3, 2026 is available in Tampa Fl 🤍
 
 Our 8-hour wedding films start at $2,800 for Florida.
 
@@ -182,7 +182,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in Springfield. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ### unknown_portland_travel
@@ -190,7 +190,7 @@ I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in Portland. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in Portland. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ### unknown_columbus
@@ -198,7 +198,7 @@ I have October 3, 2026 in Portland. Just to confirm - is that in FL or NC/SC/GA?
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in Columbus. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in Columbus. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ### unknown_washington
@@ -206,7 +206,7 @@ I have October 3, 2026 in Columbus. Just to confirm - is that in FL or NC/SC/GA?
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in Washington. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in Washington. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ### unknown_newport
@@ -214,7 +214,7 @@ I have October 3, 2026 in Washington. Just to confirm - is that in FL or NC/SC/G
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in Newport. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in Newport. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ### opener_interested
@@ -308,7 +308,7 @@ What are both of your names?
 ```text
 Hi! Thanks so much for reaching out 🤍
 
-I have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?
+I have October 3, 2026 in Springfield. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?
 ```
 
 ### forced_available_winston

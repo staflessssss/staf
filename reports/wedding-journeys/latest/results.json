@@ -642,7 +642,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Springfield. Just to confirm - is that in FL or NC/SC/GA?",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in Springfield. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?",
     "attachments": [],
     "passed": true,
     "failures": []
@@ -2171,7 +2171,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.\n\nWhat date are you looking at?",
+    "outboundText": "I totally understand wanting to stay within budget 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA. I can't promise a custom discount here, but we can look through the collection options together.\n\nWhat date are you looking at?",
     "attachments": [],
     "passed": true,
     "failures": []
@@ -2203,7 +2203,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.\n\nWhat date are you looking at?",
+    "outboundText": "I totally understand wanting to stay within budget 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA. I can't promise a custom discount here, but we can look through the collection options together.\n\nWhat date are you looking at?",
     "attachments": [],
     "passed": true,
     "failures": []
@@ -2269,7 +2269,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Yep, pricing is the same as I mentioned - $2,800 for the 8-hour collection.\n\nWhat date are you looking at?",
+    "outboundText": "I totally understand wanting to stay within budget 🤍\n\nOur 8-hour wedding films start at $2,800 for Florida and $3,600 for NC/SC/GA. I can't promise a custom discount here, but we can look through the collection options together.\n\nWhat date are you looking at?",
     "attachments": [],
     "passed": true,
     "failures": []
@@ -4043,7 +4043,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Would you still like me to lock in 10:00 AM?\n\nPerfect, got it. Want me to lock in 10:00 AM?",
+    "outboundText": "Got it - I updated the email to katie@gmail.com. Want me to lock in 10:00 AM?",
     "attachments": [],
     "passed": true,
     "failures": []
@@ -4734,7 +4734,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "That time is already taken, but I could do 10:00 AM or 11:00 AM instead. Would one of those work for you? ✨",
+    "outboundText": "That time is already taken, but 11:00 AM is open. Would that work for you?",
     "attachments": [],
     "passed": true,
     "failures": []
@@ -5766,7 +5766,7 @@
     "mode": "bot_active",
     "escalated": false,
     "humanReviewRequired": false,
-    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in New York. Just to confirm - is that in FL or NC/SC/GA?",
+    "outboundText": "Hi! Thanks so much for reaching out 🤍\n\nI have October 3, 2026 in New York. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?",
     "attachments": [],
     "passed": true,
     "failures": []

@@ -94,6 +94,7 @@ function availabilityLine(args: {
 function pricingLine(args: {
   contract: ReplyActionContract;
   knowledge: SimpleWeddingKnowledgeContext;
+  state?: SimpleWeddingSalesState;
 }) {
   if (args.contract.mentionPolicy.pricing.mode === "skip") {
     return undefined;
@@ -110,6 +111,19 @@ function pricingLine(args: {
     : "";
 
   if (args.contract.mentionPolicy.pricing.mode === "same_as_before") {
+    if (args.state && isBudgetOrDiscountPressure(args.state.latestCustomerMessage)) {
+      const prices = args.knowledge.pricing.regionalStartPrices?.length
+        ? args.knowledge.pricing.regionalStartPrices
+            .map((item) => `${item.startPrice} for ${item.label}`)
+            .join(" and ")
+        : `${args.knowledge.pricing.startPrice}${regionText}`;
+      const promo = args.knowledge.pricing.promotionText
+        ? ` ${args.knowledge.pricing.promotionText}`
+        : "";
+
+      return `I totally understand wanting to stay within budget 🤍\n\nOur ${coverage}wedding films start at ${prices}.${promo} I can't promise a custom discount here, but we can look through the collection options together.`;
+    }
+
     return `Yep, pricing is the same as I mentioned - ${args.knowledge.pricing.startPrice} for the ${coverage || ""}collection${regionText}.`;
   }
 
@@ -126,6 +140,10 @@ function pricingLine(args: {
   }
 
   return `Our ${coverage}wedding films start at ${args.knowledge.pricing.startPrice}${regionText}.`;
+}
+
+function isBudgetOrDiscountPressure(message: string) {
+  return /\b(?:too expensive|expensive|cheaper|budget|discount|deal|can you do)\b|\$\d+/i.test(message);
 }
 
 function promotionLine(args: {
@@ -215,7 +233,7 @@ function questionLine(args: {
         args.state.location &&
         args.state.availabilityToolStatus === "needs_region"
       ) {
-        return `I have ${args.state.weddingDateDisplay} in ${args.state.location}. Just to confirm - is that in FL or NC/SC/GA?`;
+        return "Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?";
       }
 
       return "What city or area is the wedding in?";
@@ -227,6 +245,15 @@ function questionLine(args: {
         args.state.customerEmail &&
         !args.state.customerConfirmedCallSlot
       ) {
+        const pendingEmail = args.state.replyMemory?.pendingBookingConfirmation?.email;
+        if (
+          args.state.lastUnderstanding?.facts.email &&
+          pendingEmail &&
+          pendingEmail !== args.state.customerEmail
+        ) {
+          return `Got it - I updated the email to ${args.state.customerEmail}. Want me to lock in ${checkedTime ?? "that time"}?`;
+        }
+
         return `Perfect, got it. Want me to lock in ${checkedTime ?? "that time"}?`;
       }
 
@@ -860,11 +887,19 @@ function calendarLine(
   }
 
   if (contract.mentionPolicy.consultation.mode === "busy" && state.calendarStatus === "busy") {
-    const suggestions = formatTimeList(state.suggestedCallTimes ?? []);
+    const suggestions = formatTimeList(
+      (state.suggestedCallTimes ?? []).filter((time) => time !== state.checkedCallTime),
+    );
 
-    return suggestions
-      ? `${knowledge.persona.replyStyle.calendarAlternativesIntro} ${suggestions} instead. ${knowledge.persona.replyStyle.calendarAlternativesQuestion}`
-      : "That time is already taken.";
+    if (!suggestions) {
+      return "That time is already taken.";
+    }
+
+    const singleSuggestion = !/\bor\b|,/.test(suggestions);
+
+    return singleSuggestion
+      ? `That time is already taken, but ${suggestions} is open. Would that work for you?`
+      : `${knowledge.persona.replyStyle.calendarAlternativesIntro} ${suggestions} instead. ${knowledge.persona.replyStyle.calendarAlternativesQuestion}`;
   }
 
   return undefined;
@@ -1062,8 +1097,19 @@ function handoffLineForState(state?: SimpleWeddingSalesState) {
   return handoffLine();
 }
 
-function pendingBookingConfirmationLine(state: SimpleWeddingSalesState) {
+function pendingBookingConfirmationLine(
+  state: SimpleWeddingSalesState,
+  contract?: ReplyActionContract,
+) {
   if (state.pendingUserAction?.type !== "booking_confirmation" || state.bookingConfirmed) {
+    return undefined;
+  }
+
+  if (
+    contract?.requiredQuestion === "callTime" &&
+    contract.mentionPolicy.consultation.mode === "ask_booking_confirmation" &&
+    Boolean(state.lastUnderstanding?.facts.email)
+  ) {
     return undefined;
   }
 
@@ -1108,7 +1154,7 @@ function renderSafeTemplate(args: {
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
-    pendingBookingConfirmationLine(args.state),
+    pendingBookingConfirmationLine(args.state, args.contract),
     questionLine(args),
   ]) || questionLine(args) || fallbackClarificationLine();
 }
@@ -1142,7 +1188,7 @@ function renderCompactInstagramFallback(args: {
     shouldAnswerTeamQuestion(args.state, args.contract) ? teamLine(args.state) : undefined,
     args.contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
     args.contract.replyType === "clarification" ? clarificationLine() : undefined,
-    pendingBookingConfirmationLine(args.state),
+    pendingBookingConfirmationLine(args.state, args.contract),
   ]
     .filter(Boolean)
     .join(" ");
@@ -1199,7 +1245,7 @@ export function writeConstrainedWeddingReply(args: {
     buildCatalogTraceForSkippedContract(contract);
 
   if (guardedCatalogDraft?.text && guardedCatalogDraft.guardResult.ok) {
-    const pendingBookingLine = pendingBookingConfirmationLine(state);
+    const pendingBookingLine = pendingBookingConfirmationLine(state, contract);
     if (pendingBookingLine && !/\block\b/i.test(guardedCatalogDraft.text)) {
       const catalogTextWithPending = joinLines([guardedCatalogDraft.text, pendingBookingLine]);
       const catalogWithPendingGuard = validateGeneratedReply({
@@ -1246,7 +1292,7 @@ export function writeConstrainedWeddingReply(args: {
           contract.mustMentionWeddingAvailability
             ? availabilityLine({ state, contract })
             : undefined,
-          pricingLine({ contract, knowledge }),
+          pricingLine({ contract, knowledge, state }),
           promotionLine({ contract, knowledge }),
           guideLine({ contract, knowledge }),
           shouldSharePortfolio ? portfolioLine(knowledge) : undefined,
@@ -1261,7 +1307,7 @@ export function writeConstrainedWeddingReply(args: {
           shouldAnswerTeamQuestion(state, contract) ? teamLine(state) : undefined,
           contract.replyType === "acknowledgement_only" ? acknowledgementLine() : undefined,
           contract.replyType === "clarification" ? clarificationLine() : undefined,
-          pendingBookingConfirmationLine(state),
+          pendingBookingConfirmationLine(state, contract),
           questionLine({ contract, state, knowledge }),
         ]) || renderSafeTemplate(args);
   const guard = validateGeneratedReply({

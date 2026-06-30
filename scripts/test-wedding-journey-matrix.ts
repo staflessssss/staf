@@ -75,6 +75,8 @@ type JourneyExpectation = {
   noToolErrorCopyOnHumanRequest?: boolean;
   noDuplicateBooking?: boolean;
   noDuplicateGuide?: boolean;
+  noDuplicateBookingConfirmation?: boolean;
+  noOfferedBusyTime?: string;
   noHandoff?: boolean;
   noBotPaused?: boolean;
   noEscalated?: boolean;
@@ -819,6 +821,24 @@ function assertTurn(args: {
 
   if (expect.noDuplicateGuide && countGuideMentions(state, row) > 1) {
     failures.push(`duplicate guide sends: ${countGuideMentions(state, row)}`);
+  }
+
+  if (expect.noDuplicateBookingConfirmation) {
+    const confirmationQuestionCount =
+      row.outboundText.match(/\b(?:lock in|would you still like me to lock|want me to lock)\b/gi)?.length ?? 0;
+
+    if (confirmationQuestionCount > 1) {
+      failures.push(`duplicate booking confirmation question appeared ${confirmationQuestionCount} times`);
+    }
+  }
+
+  if (expect.noOfferedBusyTime) {
+    const normalizedBusyTime = expect.noOfferedBusyTime.toLowerCase();
+    const offeredAlternatives = /but\s+([\s\S]{0,80}?)(?:instead|is open|are open|would)/i.exec(row.outboundText)?.[1]?.toLowerCase() ?? "";
+
+    if (offeredAlternatives.includes(normalizedBusyTime)) {
+      failures.push(`busy time offered as alternative: ${expect.noOfferedBusyTime}`);
+    }
   }
 
   return failures;

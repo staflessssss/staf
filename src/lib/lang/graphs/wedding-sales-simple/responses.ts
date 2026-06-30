@@ -37,7 +37,7 @@ export const SIMPLE_WEDDING_RESPONSES: Partial<
   utter_first_turn_lead_region_clarification: [
     {
       id: "first_turn_region_clarification_v1",
-      text: "Hi! Thanks so much for reaching out 🤍\n\nI have {{weddingDateDisplay}} in {{locationDisplay}}. Just to confirm - is that in FL or NC/SC/GA?",
+      text: "Hi! Thanks so much for reaching out 🤍\n\nI have {{weddingDateDisplay}} in {{locationDisplay}}. Our main coverage areas are Florida and NC/SC/GA. Is this a travel wedding, or are you asking about one of those areas?",
     },
   ],
   utter_first_turn_lead_unavailable: [
