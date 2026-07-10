@@ -1787,17 +1787,22 @@ function ownerHandoffCustomerReply() {
   return "Absolutely — I’ll have Taras/the team step in for you 🤍";
 }
 
-function getFallbackModelId(args: { hasTools: boolean; primaryModelId: string }) {
-  const fallbackModelId = args.hasTools
-    ? process.env.OPENAI_TOOL_FALLBACK_MODEL || process.env.OPENAI_FALLBACK_MODEL
-    : process.env.OPENAI_FALLBACK_MODEL;
+function normalizeConfiguredModelId(value: string | undefined) {
+  return value?.replace(/(?:\\r|\\n|\r|\n)+/g, "").trim() || undefined;
+}
 
-  const normalizedFallback = fallbackModelId?.trim();
-  if (!normalizedFallback || normalizedFallback === args.primaryModelId) {
+function getFallbackModelId(args: { hasTools: boolean; primaryModelId: string }) {
+  const fallbackModelId = normalizeConfiguredModelId(
+    args.hasTools
+      ? process.env.OPENAI_TOOL_FALLBACK_MODEL || process.env.OPENAI_FALLBACK_MODEL
+      : process.env.OPENAI_FALLBACK_MODEL,
+  );
+
+  if (!fallbackModelId || fallbackModelId === args.primaryModelId) {
     return null;
   }
 
-  return normalizedFallback;
+  return fallbackModelId;
 }
 
 function customerReplyForOwnerHandoff(args: { explicitHumanRequest: boolean }) {
@@ -2417,9 +2422,11 @@ async function runModelInvocation(args: {
     ...(ownerHandoffTool ? { [OWNER_HANDOFF_RUNTIME_TOOL_NAME]: ownerHandoffTool } : {}),
   };
   const hasTools = Object.keys(availableTools).length > 0;
-  const modelId = hasTools
-    ? process.env.OPENAI_TOOL_MODEL || "gpt-5.4-mini"
-    : process.env.OPENAI_MODEL || "gpt-5.4-mini";
+  const modelId = normalizeConfiguredModelId(
+    hasTools
+      ? process.env.OPENAI_TOOL_MODEL || "gpt-5.4-mini"
+      : process.env.OPENAI_MODEL || "gpt-5.4-mini",
+  ) ?? "gpt-5.4-mini";
   const fallbackModelId = getFallbackModelId({ hasTools, primaryModelId: modelId });
   let usedModelId = modelId;
 
@@ -2832,6 +2839,7 @@ export const aiRuntimeTestHelpers = {
   getRequiredWeddingAvailabilityToolKey,
   getRequiredConsultationCalendarToolKey,
   isTechnicalModelFailure,
+  normalizeConfiguredModelId,
   ownerHandoffCustomerReply,
   buildConfiguredCollectionsGuideTool,
   rewriteCustomerOpenAvailabilityPhrase,
