@@ -26,6 +26,7 @@ import { saveMessages } from "@/lib/agent-memory";
 import type { InvokeAgentResult } from "@/lib/ai-runtime";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
+import { processOwnerHandoffDeliveryWithDb } from "@/lib/owner-handoff";
 import {
   recordDeliveryFailedWithDb,
   recordFollowUpSentWithDb,
@@ -1188,6 +1189,19 @@ export async function processDelayedDeliveryByIdWithDeps(
   deps: RuntimeDeps,
   now = new Date(),
 ) {
+  const handoffDelivery = await deps.db.delayedDelivery.findUnique({
+    where: { id: deliveryId },
+    select: { kind: true },
+  });
+
+  if (handoffDelivery?.kind === DelayedDeliveryKind.HANDOFF) {
+    return processOwnerHandoffDeliveryWithDb({
+      database: deps.db,
+      deliveryId,
+      now,
+    });
+  }
+
   const claimed = await deps.db.delayedDelivery.updateMany({
     where: {
       id: deliveryId,

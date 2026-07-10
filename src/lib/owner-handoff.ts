@@ -1,4 +1,5 @@
 import {
+  AgentEventStatus,
   AgentEventType,
   ChannelType,
   ConnectionStatus,
@@ -24,6 +25,7 @@ import {
 
 export const OWNER_HANDOFF_REQUEST_TOOL_NAME = "owner_handoff_request";
 export const OWNER_HANDOFF_RESPONSE_TOOL_NAME = "owner_handoff_response";
+export const OWNER_HANDOFF_UPDATE_TOOL_NAME = "owner_handoff_update";
 const OWNER_HANDOFF_CALLBACK_PREFIX = "oh";
 
 type HandoffAgent = {
@@ -59,6 +61,12 @@ type HandoffChannelAdapter = {
 type OwnerTelegramResponse = {
   message: string;
   replyMarkup?: TelegramReplyMarkup;
+};
+
+type HandoffDeliveryPayload = {
+  requestMessageId: string;
+  ownerChatId: string;
+  message: string;
 };
 
 const OPERATIONAL_HANDOFF_PATTERNS = [
@@ -202,52 +210,67 @@ export async function hasConnectedOwnerTelegram(tenantId: string, database: type
 }
 
 function formatOwnerHandoffMessage(args: {
-  conversationId: string;
   channel: ChannelType;
   contactLabel: string;
   agentName?: string;
   customerMessage: string;
   reason: string;
+  recentContext: string[];
+  memorySummary: string[];
 }) {
   return [
-    "Behalfy needs your help",
+    "Behalfy - needs your answer",
     "",
-    `Conversation: ${args.conversationId}`,
-    `Channel: ${args.channel}`,
-    args.agentName ? `Agent: ${args.agentName}` : null,
+    `${args.agentName ?? "Agent"} - ${args.channel}`,
     `Customer: ${args.contactLabel}`,
-    `Reason: ${args.reason}`,
     "",
-    "Customer wrote:",
+    "Why this needs you:",
+    args.reason === "operational_or_existing_client_question"
+      ? "This concerns an existing client or a business operation."
+      : "The agent does not have a grounded answer for this question.",
+    ...(args.memorySummary.length > 0 ? ["", "Known details:", ...args.memorySummary] : []),
+    ...(args.recentContext.length > 0 ? ["", "Recent context:", ...args.recentContext] : []),
+    "",
+    "Latest customer message:",
     args.customerMessage,
     "",
-    "Fast reply:",
-    "Tap Reply on this Telegram message and type the exact answer to send to the customer.",
-    "",
-    "Commands:",
-    `/send ${args.conversationId} <exact message to customer>`,
-    `/takeover ${args.conversationId}`,
-    `/resume ${args.conversationId}`,
+    "Reply directly to this message. Your text will be sent to the customer.",
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
 }
 
-function buildOwnerHandoffReplyMarkup(conversationId: string): TelegramReplyMarkup {
-  return {
-    inline_keyboard: [
-      [
-        {
-          text: "Reply",
-          callback_data: `${OWNER_HANDOFF_CALLBACK_PREFIX}:reply:${conversationId}`,
-        },
-        {
-          text: "Take over",
-          callback_data: `${OWNER_HANDOFF_CALLBACK_PREFIX}:takeover:${conversationId}`,
-        },
-      ],
+function formatRecentContext(
+  messages: Array<{ role: MessageRole; content: string }>,
+) {
+  return messages
+    .filter((message) => message.role === MessageRole.USER || message.role === MessageRole.ASSISTANT)
+    .slice(-4, -1)
+    .map((message) => {
+      const speaker = message.role === MessageRole.USER ? "Customer" : "Agent";
+      const text = message.content.replace(/\s+/g, " ").trim();
+      return `${speaker}: ${text.length > 280 ? `${text.slice(0, 277)}...` : text}`;
+    })
+    .filter((line) => !line.endsWith(": "));
+}
+
+function formatMemorySummary(memory: Prisma.JsonValue | null | undefined) {
+  const record = readRecord(memory);
+  const values = [
+    ["Wedding", record.weddingDate],
+    ["Location", record.location],
+    ["Venue", record.venue],
+    [
+      "Names",
+      [record.customerName, record.partnerName]
+        .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+        .join(" + "),
     ],
-  };
+  ] as const;
+
+  return values
+    .filter(([, value]) => typeof value === "string" && Boolean(value.trim()))
+    .map(([label, value]) => `${label}: ${value}`);
 }
 
 function buildOwnerResumeReplyMarkup(conversationId: string): TelegramReplyMarkup {
@@ -299,7 +322,169 @@ function extractTelegramDeliveryMessageId(delivery: unknown) {
 
 export const ownerHandoffTestHelpers = {
   extractTelegramDeliveryMessageId,
+  formatMemorySummary,
+  formatOwnerHandoffMessage,
+  formatRecentContext,
 };
+
+function readHandoffDeliveryPayload(value: Prisma.JsonValue | null | undefined) {
+  const payload = readRecord(value);
+  const requestMessageId = typeof payload.requestMessageId === "string" ? payload.requestMessageId : "";
+  const ownerChatId = typeof payload.ownerChatId === "string" ? payload.ownerChatId : "";
+  const message = typeof payload.message === "string" ? payload.message : "";
+
+  return requestMessageId && ownerChatId && message
+    ? ({ requestMessageId, ownerChatId, message } satisfies HandoffDeliveryPayload)
+    : null;
+}
+
+function getHandoffRetryAt(attempts: number, now: Date) {
+  return new Date(now.getTime() + Math.min(5 * 60_000, 15_000 * 2 ** Math.max(0, attempts - 1)));
+}
+
+export async function processOwnerHandoffDeliveryWithDb(args: {
+  database: typeof db;
+  deliveryId: string;
+  now?: Date;
+}) {
+  const now = args.now ?? new Date();
+  const claimed = await args.database.delayedDelivery.updateMany({
+    where: {
+      id: args.deliveryId,
+      kind: DelayedDeliveryKind.HANDOFF,
+      status: DelayedDeliveryStatus.PENDING,
+      dueAt: { lte: now },
+    },
+    data: {
+      status: DelayedDeliveryStatus.PROCESSING,
+      attempts: { increment: 1 },
+      lastAttemptAt: now,
+      error: null,
+    },
+  });
+
+  if (claimed.count === 0) {
+    return { ok: true, status: "handoff_delivery_not_claimed" as const };
+  }
+
+  const delivery = await args.database.delayedDelivery.findUnique({
+    where: { id: args.deliveryId },
+    include: {
+      agent: { select: { tenantId: true } },
+      conversation: { select: { channel: true } },
+    },
+  });
+  const payload = readHandoffDeliveryPayload(delivery?.payload);
+
+  if (!delivery || !payload) {
+    if (delivery) {
+      await args.database.delayedDelivery.update({
+        where: { id: delivery.id },
+        data: { status: DelayedDeliveryStatus.FAILED, error: "handoff_delivery_missing_payload" },
+      });
+    }
+    return { ok: false, status: "handoff_delivery_missing_payload" as const };
+  }
+
+  try {
+    const ownerTelegram = await args.database.channelConnection.findUnique({
+      where: {
+        tenantId_type: {
+          tenantId: delivery.agent.tenantId,
+          type: ChannelType.TELEGRAM,
+        },
+      },
+    });
+    const ownerConfig = readOwnerHandoffConfig(ownerTelegram?.metadata);
+
+    if (
+      ownerTelegram?.status !== ConnectionStatus.CONNECTED ||
+      !ownerConfig.enabled ||
+      ownerConfig.ownerChatId !== payload.ownerChatId
+    ) {
+      throw new Error("owner_handoff_telegram_unavailable");
+    }
+
+    const sent = await telegramAdapter.sendReply({
+      credentials: decrypt(ownerTelegram.credentialsEnc),
+      contactId: payload.ownerChatId,
+      message: payload.message,
+    });
+    const telegramMessageId = extractTelegramDeliveryMessageId(sent);
+
+    await args.database.$transaction([
+      args.database.delayedDelivery.update({
+        where: { id: delivery.id },
+        data: {
+          status: DelayedDeliveryStatus.SENT,
+          sentAt: now,
+          error: null,
+        },
+      }),
+      args.database.message.update({
+        where: { id: payload.requestMessageId },
+        data: {
+          toolResult: {
+            status: "sent_to_owner",
+            ownerChatId: payload.ownerChatId,
+            telegramMessageId,
+            deliveryId: delivery.id,
+          },
+        },
+      }),
+    ]);
+
+    return { ok: true, status: "handoff_sent_to_owner" as const, telegramMessageId };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "handoff_delivery_failed";
+    const retryAt = delivery.attempts < 3 ? getHandoffRetryAt(delivery.attempts, now) : null;
+    const status = retryAt ? DelayedDeliveryStatus.PENDING : DelayedDeliveryStatus.FAILED;
+
+    await args.database.delayedDelivery.update({
+      where: { id: delivery.id },
+      data: {
+        status,
+        ...(retryAt ? { dueAt: retryAt } : {}),
+        error: errorMessage,
+      },
+    });
+    await args.database.message.update({
+      where: { id: payload.requestMessageId },
+      data: {
+        toolResult: {
+          status: retryAt ? "owner_delivery_retry_scheduled" : "owner_delivery_failed",
+          ownerChatId: payload.ownerChatId,
+          deliveryId: delivery.id,
+          error: errorMessage,
+        },
+      },
+    });
+
+    if (!retryAt) {
+      await recordAgentEventsBestEffort({
+        database: args.database,
+        agentId: delivery.agentId,
+        conversationId: delivery.conversationId,
+        channel: delivery.conversation.channel,
+        events: [
+          {
+            type: AgentEventType.DELIVERY_FAILED,
+            status: AgentEventStatus.FAILED,
+            dedupeKey: `handoff-delivery-failed:${delivery.id}`,
+            metadata: { error: errorMessage, kind: "handoff" },
+          },
+        ],
+      });
+    }
+
+    return {
+      ok: false,
+      status: retryAt ? ("handoff_retry_scheduled" as const) : ("handoff_delivery_failed" as const),
+      error: errorMessage,
+      ...(retryAt ? { retryAt } : {}),
+    };
+  }
+}
 
 export async function requestOwnerHandoffWithDb(args: {
   database: typeof db;
@@ -336,6 +521,7 @@ export async function requestOwnerHandoffWithDb(args: {
   const conversation = await args.database.conversation.findUnique({
     where: { id: args.conversationId },
     include: {
+      memory: true,
       messages: {
         orderBy: { createdAt: "asc" },
       },
@@ -354,14 +540,16 @@ export async function requestOwnerHandoffWithDb(args: {
     conversation.contactId;
   const replyContext = buildLatestReplyContext({ conversation });
   const message = formatOwnerHandoffMessage({
-    conversationId: conversation.id,
     channel: conversation.channel,
     contactLabel,
     agentName: args.agent.name ?? undefined,
     customerMessage: args.customerMessage,
     reason: args.reason,
+    recentContext: formatRecentContext(conversation.messages),
+    memorySummary: formatMemorySummary(conversation.memory?.memory),
   });
   let requestMessageId = "";
+  let handoffDeliveryId = "";
 
   await args.database.$transaction(async (tx) => {
     await tx.conversation.update({
@@ -396,34 +584,34 @@ export async function requestOwnerHandoffWithDb(args: {
           replyContext,
         },
         toolResult: {
-          status: "sent_to_owner",
+          status: "pending_owner_delivery",
           ownerChatId: ownerConfig.ownerChatId,
         },
       },
     });
     requestMessageId = requestMessage.id;
-  });
-
-  const delivery = await telegramAdapter.sendReply({
-    credentials: decrypt(ownerTelegram.credentialsEnc),
-    contactId: ownerConfig.ownerChatId,
-    message,
-    replyMarkup: buildOwnerHandoffReplyMarkup(conversation.id),
-  });
-  const telegramMessageId = extractTelegramDeliveryMessageId(delivery);
-
-  if (requestMessageId && telegramMessageId) {
-    await args.database.message.update({
-      where: { id: requestMessageId },
+    const handoffDelivery = await tx.delayedDelivery.create({
       data: {
-        toolResult: {
-          status: "sent_to_owner",
+        agentId: args.agent.id,
+        conversationId: conversation.id,
+        kind: DelayedDeliveryKind.HANDOFF,
+        dueAt: new Date(),
+        payload: {
+          requestMessageId,
           ownerChatId: ownerConfig.ownerChatId,
-          telegramMessageId,
-        },
+          message,
+        } satisfies HandoffDeliveryPayload,
       },
     });
-  }
+    handoffDeliveryId = handoffDelivery.id;
+  });
+
+  const handoffDelivery = handoffDeliveryId
+    ? await processOwnerHandoffDeliveryWithDb({
+        database: args.database,
+        deliveryId: handoffDeliveryId,
+      })
+    : null;
   await recordConversationHandoffPause({
     database: args.database,
     conversationId: conversation.id,
@@ -438,7 +626,10 @@ export async function requestOwnerHandoffWithDb(args: {
       {
         type: AgentEventType.HANDOFF_REQUESTED,
         dedupeKey: requestMessageId ? `handoff-requested:${requestMessageId}` : undefined,
-        metadata: { reason: args.reason },
+        metadata: {
+          reason: args.reason,
+          deliveryStatus: handoffDelivery?.status ?? "handoff_delivery_missing",
+        },
       },
     ],
   });
@@ -446,6 +637,98 @@ export async function requestOwnerHandoffWithDb(args: {
   return {
     status: "owner_handoff_requested" as const,
   };
+}
+
+export async function notifyOwnerOfHandoffUpdateWithDb(args: {
+  database: typeof db;
+  agent: { tenantId: string };
+  conversationId: string;
+  customerMessage: string;
+}) {
+  const request = await args.database.message.findFirst({
+    where: {
+      conversationId: args.conversationId,
+      role: MessageRole.TOOL,
+      toolName: OWNER_HANDOFF_REQUEST_TOOL_NAME,
+    },
+    select: {
+      toolResult: true,
+      conversation: {
+        select: {
+          contactId: true,
+          contactUsername: true,
+          contactDisplayName: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  const requestResult = readRecord(request?.toolResult);
+  const ownerChatId =
+    typeof requestResult.ownerChatId === "string" ? requestResult.ownerChatId.trim() : "";
+  const replyToMessageId =
+    typeof requestResult.telegramMessageId === "string" ? requestResult.telegramMessageId.trim() : "";
+
+  if (!ownerChatId || !replyToMessageId) {
+    return { status: "handoff_update_skipped_not_notified" as const };
+  }
+
+  const ownerTelegram = await args.database.channelConnection.findUnique({
+    where: {
+      tenantId_type: {
+        tenantId: args.agent.tenantId,
+        type: ChannelType.TELEGRAM,
+      },
+    },
+  });
+  const ownerConfig = readOwnerHandoffConfig(ownerTelegram?.metadata);
+
+  if (
+    ownerTelegram?.status !== ConnectionStatus.CONNECTED ||
+    !ownerConfig.enabled ||
+    ownerConfig.ownerChatId !== ownerChatId
+  ) {
+    return { status: "handoff_update_skipped_telegram_unavailable" as const };
+  }
+
+  const contactLabel =
+    request?.conversation.contactUsername ||
+    request?.conversation.contactDisplayName ||
+    request?.conversation.contactId ||
+    "Customer";
+
+  try {
+    const sent = await telegramAdapter.sendReply({
+      credentials: decrypt(ownerTelegram.credentialsEnc),
+      contactId: ownerChatId,
+      replyToMessageId,
+      message: [
+        `New message from ${contactLabel}:`,
+        args.customerMessage,
+        "",
+        "Reply to the original handoff card when you are ready to answer.",
+      ].join("\n"),
+    });
+
+    await args.database.message.create({
+      data: {
+        conversationId: args.conversationId,
+        role: MessageRole.TOOL,
+        toolName: OWNER_HANDOFF_UPDATE_TOOL_NAME,
+        content: args.customerMessage,
+        toolInput: {
+          status: "sent_to_owner",
+          replyToMessageId,
+          telegramMessageId: extractTelegramDeliveryMessageId(sent),
+        },
+      },
+    });
+
+    return { status: "handoff_update_sent" as const };
+  } catch (error) {
+    console.warn("[owner-handoff] failed to deliver customer update", error);
+    return { status: "handoff_update_failed" as const };
+  }
 }
 
 async function sendReplyThroughConversationChannel(args: {

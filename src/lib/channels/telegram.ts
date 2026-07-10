@@ -89,6 +89,7 @@ async function sendTelegramMessage(args: {
   contactId: string;
   text: string;
   replyMarkup?: TelegramReplyMarkup;
+  replyToMessageId?: string;
 }) {
   const response = await fetch(`https://api.telegram.org/bot${args.botToken}/sendMessage`, {
     method: "POST",
@@ -98,6 +99,7 @@ async function sendTelegramMessage(args: {
     body: JSON.stringify({
       chat_id: args.contactId,
       text: args.text,
+      ...(args.replyToMessageId ? { reply_to_message_id: args.replyToMessageId } : {}),
       ...(args.replyMarkup ? { reply_markup: args.replyMarkup } : {}),
     }),
   });
@@ -197,6 +199,7 @@ export const telegramAdapter = {
     message: string | string[];
     channelConfig?: unknown;
     replyMarkup?: TelegramReplyMarkup;
+    replyToMessageId?: string;
   }) => {
     const botToken = parseTelegramBotToken(params.credentials);
 
@@ -220,6 +223,7 @@ export const telegramAdapter = {
           botToken,
           contactId: params.contactId,
           text: part,
+          replyToMessageId: index === 0 ? params.replyToMessageId : undefined,
           replyMarkup:
             params.replyMarkup && index === messageParts.length - 1
               ? params.replyMarkup

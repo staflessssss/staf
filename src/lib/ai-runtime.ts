@@ -66,6 +66,7 @@ import {
 import {
   OWNER_HANDOFF_REQUEST_TOOL_NAME,
   hasConnectedOwnerTelegram,
+  notifyOwnerOfHandoffUpdateWithDb,
   requestOwnerHandoffWithDb,
   shouldRequestOwnerHandoff,
 } from "@/lib/owner-handoff";
@@ -2976,6 +2977,12 @@ async function handleIncomingEventWithDeps(
       subject: incoming.subject,
       conversationStatus: ConversationStatus.ESCALATED,
     });
+    await notifyOwnerOfHandoffUpdateWithDb({
+      database: deps.db,
+      agent,
+      conversationId: conversation.id,
+      customerMessage: incoming.message,
+    });
     await cancelPendingDelayedDeliveriesWithDb({
       database: deps.db,
       conversationId: conversation.id,
@@ -3154,6 +3161,12 @@ async function handleIncomingEventWithDeps(
       threadId: incoming.threadId,
       subject: incoming.subject,
       conversationStatus: ConversationStatus.ESCALATED,
+    });
+    await notifyOwnerOfHandoffUpdateWithDb({
+      database: deps.db,
+      agent,
+      conversationId: conversation.id,
+      customerMessage: incoming.message,
     });
     await cancelPendingDelayedDeliveriesWithDb({
       database: deps.db,

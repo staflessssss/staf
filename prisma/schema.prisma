@@ -321,6 +321,7 @@ model DelayedDelivery {
 enum DelayedDeliveryKind {
   BUFFERED_REPLY
   FOLLOW_UP
+  HANDOFF
 }
 
 enum DelayedDeliveryStatus {

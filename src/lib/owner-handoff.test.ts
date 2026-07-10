@@ -118,4 +118,34 @@ describe("owner handoff Telegram delivery", () => {
       "12345",
     );
   });
+
+  it("formats a concise owner card without a raw conversation command", () => {
+    const message = ownerHandoffTestHelpers.formatOwnerHandoffMessage({
+      channel: "INSTAGRAM",
+      contactLabel: "@sarah",
+      agentName: "Taras",
+      customerMessage: "Can you resend our questionnaire?",
+      reason: "operational_or_existing_client_question",
+      recentContext: ["Customer: Our wedding is October 17 in Raleigh."],
+      memorySummary: ["Wedding: 2026-10-17", "Location: Raleigh"],
+    });
+
+    assert.match(message, /Known details:/);
+    assert.match(message, /Recent context:/);
+    assert.match(message, /Reply directly to this message/);
+    assert.doesNotMatch(message, /\/send\s+cm/);
+    assert.doesNotMatch(message, /Conversation:/);
+  });
+
+  it("summarizes only useful memory fields for the owner", () => {
+    assert.deepEqual(
+      ownerHandoffTestHelpers.formatMemorySummary({
+        weddingDate: "2026-10-17",
+        location: "Raleigh",
+        customerName: "Sarah",
+        partnerName: "Daniel",
+      }),
+      ["Wedding: 2026-10-17", "Location: Raleigh", "Names: Sarah + Daniel"],
+    );
+  });
 });
