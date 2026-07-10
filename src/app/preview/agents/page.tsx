@@ -1,4 +1,5 @@
 import { AgentsView, type AgentsViewAgent } from "@/app/client/agents/agents-view";
+import { CabinetFrame } from "@/components/cabinet/cabinet-frame";
 
 // Auth/DB-free preview of the agents dashboard layout.
 // Open http://localhost:3000/preview/agents — no login required.
@@ -41,11 +42,8 @@ const mockAgents: AgentsViewAgent[] = [
 
 export default function PreviewAgentsPage() {
   return (
-    <AgentsView
-      agents={mockAgents}
-      tenantId="preview"
-      userInitials="BF"
-      userName="Behalfy Client"
-    />
+    <CabinetFrame userInitials="BF" userName="Behalfy Client">
+      <AgentsView agents={mockAgents} tenantId="preview" />
+    </CabinetFrame>
   );
 }

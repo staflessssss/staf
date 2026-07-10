@@ -4,7 +4,6 @@ import { ChannelType } from "@prisma/client";
 import { ArrowUpRight, Plug, Radio, Wrench } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
-import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import {
   channelDefinitions,
   getConnectionStatusLabel,
@@ -27,7 +26,6 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
   const session = await requireClientSession();
   const tenantId = session.user.tenantId;
   const { saved, error } = await searchParams;
-  const userName = getCabinetUserName(session.user);
   const tenant = await db.tenant.findUnique({
     where: { id: tenantId },
     include: {
@@ -62,7 +60,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
 
   if (!tenant) {
     return (
-      <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
+      <CabinetShell header={header}>
         <div className="border-b border-white/[0.09] bg-[#10110f] p-8 text-sm text-white/58">
           Tenant not found.
         </div>
@@ -86,7 +84,7 @@ export default async function ClientConnectionsPage({ searchParams }: ClientConn
   }).length;
 
   return (
-    <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
+    <CabinetShell header={header}>
       <div className="space-y-5">
         {saved ? (
           <div className="rounded-xl border border-[#47c978]/28 bg-[#47c978]/[0.08] px-4 py-3 text-sm text-[#62d990]">

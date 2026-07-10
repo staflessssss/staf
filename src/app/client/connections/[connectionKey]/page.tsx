@@ -4,7 +4,6 @@ import { ChannelType } from "@prisma/client";
 import { notFound } from "next/navigation";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
-import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import {
   connectPresetChannelAction,
   connectPresetIntegrationAction,
@@ -52,7 +51,6 @@ export default async function ConnectionDetailPage({
   const { connectionKey } = await params;
   const { saved, error } = await searchParams;
   const definition = getConnectionDefinition(connectionKey);
-  const userName = getCabinetUserName(session.user);
 
   if (!definition) {
     notFound();
@@ -93,7 +91,7 @@ export default async function ConnectionDetailPage({
 
   if (!tenant) {
     return (
-      <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
+      <CabinetShell header={header}>
         <div className="border-b border-white/[0.09] bg-[#10110f] p-8 text-sm text-white/58">
           Tenant not found.
         </div>
@@ -130,7 +128,7 @@ export default async function ConnectionDetailPage({
       : "/start";
 
   return (
-    <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
+    <CabinetShell header={header}>
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-2 text-sm text-white/46">
           <Link href="/client/connections" className="transition hover:text-[#e9be86]">

@@ -9,7 +9,7 @@ import {
 import { ArrowUpRight, CheckCircle2, Clock3, Link2, UsersRound, Video } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
-import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
+import { getInitials } from "@/components/cabinet/user";
 import {
   getCapturedLeadFields,
   getLeadDetails,
@@ -172,8 +172,6 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
   const selectedLead =
     qualifiedLeadThreads.find((thread) => thread.id === lead) ?? qualifiedLeadThreads[0] ?? null;
   const selectedTimeline = selectedLead?.messages ?? [];
-  const userName = getCabinetUserName(session.user);
-
   const header = (
     <>
       <div>
@@ -197,7 +195,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
   );
 
   return (
-    <CabinetShell header={header} userInitials={getInitials(userName)} userName={userName}>
+    <CabinetShell header={header}>
       <section className="grid grid-cols-1 overflow-hidden border-b border-white/[0.09] bg-[#10110f] sm:grid-cols-3">
         {[
           {

@@ -1,12 +1,12 @@
 import { OverviewView } from "@/app/client/overview/overview-view";
+import { CabinetFrame } from "@/components/cabinet/cabinet-frame";
 
 // Auth/DB-free preview of the stats overview. Open http://localhost:3000/preview/overview
 export default function PreviewOverviewPage() {
   return (
-    <OverviewView
-      userInitials="BF"
-      userName="Behalfy Client"
-      data={{
+    <CabinetFrame userInitials="BF" userName="Behalfy Client">
+      <OverviewView
+        data={{
         period: "30d",
         channel: "all",
         activeAgents: 3,
@@ -79,7 +79,8 @@ export default function PreviewOverviewPage() {
           medianResponseMs: 82_000,
           lastSuccessfulReply: new Date(),
         },
-      }}
-    />
+        }}
+      />
+    </CabinetFrame>
   );
 }

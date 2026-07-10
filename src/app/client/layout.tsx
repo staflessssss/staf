@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { CabinetFrame } from "@/components/cabinet/cabinet-frame";
+import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import { requireClientSession } from "@/lib/client-auth";
 
 export default async function ClientLayout({
@@ -7,11 +9,12 @@ export default async function ClientLayout({
 }: {
   children: ReactNode;
 }) {
-  await requireClientSession();
+  const session = await requireClientSession();
+  const userName = getCabinetUserName(session.user);
 
   return (
-    <div className="min-h-screen bg-[#080806] text-white">
+    <CabinetFrame userInitials={getInitials(userName)} userName={userName}>
       {children}
-    </div>
+    </CabinetFrame>
   );
 }

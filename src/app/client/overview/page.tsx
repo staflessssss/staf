@@ -9,7 +9,6 @@ import {
   MessageRole,
 } from "@prisma/client";
 
-import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
@@ -202,12 +201,8 @@ export default async function ClientOverviewPage({ searchParams }: ClientOvervie
         agentEvents[0]?.occurredAt ?? agentConversations[0]?.updatedAt ?? null,
     };
   });
-  const userLabel = getCabinetUserName(session.user);
-
   return (
     <OverviewView
-      userInitials={getInitials(userLabel)}
-      userName={userLabel}
       data={{
         period,
         channel,

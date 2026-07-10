@@ -11,7 +11,7 @@ import {
 import { CalendarCheck2, Wrench } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
-import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
+import { getInitials } from "@/components/cabinet/user";
 import { isBusinessManualMessage } from "@/lib/business-handoff";
 import {
   getLeadDetails,
@@ -445,7 +445,6 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
     ]);
   const totalPages = Math.max(1, Math.ceil(conversationCount / pageSize));
 
-  const userName = getCabinetUserName(session.user);
   const selectedConversation =
     conversations.find((item) => item.id === conversation) ?? conversations[0] ?? null;
   const selectedMessages = selectedConversation
@@ -570,11 +569,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
   );
 
   return (
-    <CabinetShell
-      header={header}
-      userInitials={getInitials(userName)}
-      userName={userName}
-    >
+    <CabinetShell header={header}>
       <div className="-mx-4 -my-5 grid min-h-[calc(100%+2.5rem)] gap-0 md:-mx-8 md:-my-7 md:min-h-[calc(100%+3.5rem)] xl:h-[calc(100%+3.5rem)] xl:min-h-0 xl:overflow-hidden xl:grid-cols-[360px_minmax(520px,1fr)_340px] 2xl:grid-cols-[410px_minmax(680px,1fr)_380px]">
         <section className="flex min-h-[560px] flex-col overflow-hidden border-b border-white/[0.09] bg-[#10110f] xl:h-full xl:min-h-0 xl:border-b-0 xl:border-r">
           <div className="border-b border-white/[0.08] p-5 md:p-6">

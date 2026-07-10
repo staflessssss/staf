@@ -77,12 +77,8 @@ function formatDuration(value: number | null) {
 
 export function OverviewView({
   data,
-  userInitials,
-  userName,
 }: {
   data: OverviewData;
-  userInitials: string;
-  userName: string;
 }) {
   const kpis = [
     { icon: MessagesSquare, label: "New inquiries", value: data.newConversations, sub: "new conversations" },
@@ -133,7 +129,7 @@ export function OverviewView({
   );
 
   return (
-    <CabinetShell userInitials={userInitials} userName={userName} header={header}>
+    <CabinetShell header={header}>
       <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
         {channelOptions.map((option) => (
           <Link

@@ -1,5 +1,4 @@
 import { AgentsView } from "./agents-view";
-import { getCabinetUserName, getInitials } from "@/components/cabinet/user";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
 
@@ -23,15 +22,5 @@ export default async function ClientAgentsPage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  const userLabel = getCabinetUserName(session.user);
-  const userInitials = getInitials(userLabel);
-
-  return (
-    <AgentsView
-      agents={agents}
-      tenantId={tenantId}
-      userInitials={userInitials}
-      userName={userLabel}
-    />
-  );
+  return <AgentsView agents={agents} tenantId={tenantId} />;
 }

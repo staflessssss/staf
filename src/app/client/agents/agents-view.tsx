@@ -41,13 +41,9 @@ function AgentStatusPill({ status }: { status: string }) {
 export function AgentsView({
   agents,
   tenantId,
-  userInitials,
-  userName,
 }: {
   agents: AgentsViewAgent[];
   tenantId: string;
-  userInitials: string;
-  userName: string;
 }) {
   const activeCount = agents.filter((agent) => agent.status === "ACTIVE").length;
 
@@ -72,7 +68,7 @@ export function AgentsView({
   );
 
   return (
-    <CabinetShell userInitials={userInitials} userName={userName} header={header}>
+    <CabinetShell header={header}>
       {agents.length === 0 ? (
         <div className="border-b border-white/[0.09] bg-[#10110f] p-8 text-base text-white/56">
           Your team is still preparing the first agent for this account.
