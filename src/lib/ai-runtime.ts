@@ -1658,7 +1658,11 @@ function buildRequiredWeddingAvailabilityActionNudge(args: {
   currentMessage: string;
   historyMessages?: RuntimeHistoryMessage[];
 }) {
-  if (!messageHasWeddingExactDateWithYear(args.currentMessage)) {
+  const selectedSuggestedDate = selectedRecentSuggestedWeddingDate(args);
+  const hasExactDate = messageHasWeddingExactDateWithYear(args.currentMessage);
+  const hasSelectedSuggestedDate =
+    messageHasWeddingMonthDayWithoutYear(args.currentMessage) && Boolean(selectedSuggestedDate);
+  if (!hasExactDate && !hasSelectedSuggestedDate) {
     return "";
   }
 
@@ -1679,7 +1683,7 @@ function buildRequiredWeddingAvailabilityActionNudge(args: {
   }
 
   return `Wedding availability ACTION REQUIRED:
-- The customer just provided an exact wedding date and the recent conversation already has a supported wedding city/region.
+- The customer just provided an exact wedding date, or selected a nearby date previously offered by the availability tool, and the recent conversation already has a supported wedding city/region.
 - Call the wedding availability tool now before asking for names, pricing, or next steps.
 - Do not say "I'm checking" or imply availability unless the tool runs and returns a result.`;
 }
@@ -1691,7 +1695,13 @@ function buildRequiredConsultationCalendarActionNudge(args: {
     return "";
   }
 
-  if (!/\b(?:consult|consultation|call|zoom|meet|meeting|chat|book|schedule|lock)\b/i.test(args.currentMessage)) {
+  const hasConsultationIntent =
+    /\b(?:consult|consultation|call|zoom|meet|meeting|chat|book|schedule|lock)\b/i.test(
+      args.currentMessage,
+    ) ||
+    (/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(args.currentMessage) &&
+      /\b(?:okay|ok|yes|works?|sounds good)\b/i.test(args.currentMessage));
+  if (!hasConsultationIntent) {
     return "";
   }
 
@@ -2452,6 +2462,18 @@ async function runModelInvocation(args: {
     historyMessages: args.historyMessages,
     currentMessage: args.input.message,
   });
+  const requiredWeddingAvailabilityAction = buildRequiredWeddingAvailabilityActionNudge({
+    historyMessages: args.historyMessages,
+    currentMessage: args.input.message,
+  });
+  const requiredConsultationCalendarAction = buildRequiredConsultationCalendarActionNudge({
+    currentMessage: args.input.message,
+  });
+  const requiredToolKey =
+    getRequiredWeddingAvailabilityToolKey({
+      requiredActionNudge: requiredWeddingAvailabilityAction,
+      availableTools,
+    });
   const recentWeddingAvailabilityContext = buildRecentWeddingAvailabilityContext({
     historyMessages: args.historyMessages,
     currentMessage: args.input.message,
@@ -2477,14 +2499,24 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
   ${runtimeContextLines ? `${runtimeContextLines}\n` : ""}Incoming customer message:
   ${args.input.message}
 
-  ${[
-    recentWeddingAvailabilityContext,
-    schedulingNudge,
-  ].filter(Boolean).join("\n\n")}`.trim(),
+    ${[
+      recentWeddingAvailabilityContext,
+      schedulingNudge,
+      requiredWeddingAvailabilityAction,
+      requiredConsultationCalendarAction,
+    ].filter(Boolean).join("\n\n")}`.trim(),
     ...(hasTools
       ? {
           tools: availableTools,
           stopWhen: stepCountIs(5),
+          ...(requiredToolKey
+            ? {
+                prepareStep: ({ stepNumber }: { stepNumber: number }) =>
+                  stepNumber === 0
+                    ? { toolChoice: { type: "tool" as const, toolName: requiredToolKey } }
+                    : { toolChoice: "auto" as const },
+              }
+            : {}),
         }
       : {}),
     };

@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "setup:instagram-channel": "node --env-file=.env --import tsx scripts/setup-instagram-channel.ts",
     "prepare:myndful-onboarding": "node --env-file=.env --import tsx scripts/prepare-myndful-onboarding.ts",
+    "eval:myndful": "tsx scripts/run-myndful-conversation-evals.ts",
     "clone:agents-to-tenant": "node --env-file=.env --import tsx scripts/clone-agents-to-tenant.ts",
     "check:instagram-launch": "node --env-file=.env --import tsx scripts/check-instagram-launch.ts",
     "prisma:generate": "prisma generate",
