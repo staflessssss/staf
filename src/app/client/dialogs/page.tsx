@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { ChannelType, ConversationStatus, MessageRole, type Prisma } from "@prisma/client";
+import {
+  AgentEventSource,
+  AgentEventStatus,
+  AgentEventType,
+  ChannelType,
+  ConversationStatus,
+  MessageRole,
+  type Prisma,
+} from "@prisma/client";
 import { CalendarCheck2, Wrench } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
@@ -23,6 +31,8 @@ type DialogsPageProps = {
     conversation?: string;
     sort?: string;
     tab?: string;
+    q?: string;
+    page?: string;
   }>;
 };
 
@@ -191,6 +201,8 @@ function buildDialogsHref(params: {
   conversation?: string;
   sort?: DialogSort;
   tab?: DialogTab;
+  q?: string;
+  page?: number;
 }) {
   const query = new URLSearchParams();
 
@@ -199,6 +211,8 @@ function buildDialogsHref(params: {
   if (params.conversation) query.set("conversation", params.conversation);
   if (params.sort && params.sort !== "newest") query.set("sort", params.sort);
   if (params.tab && params.tab !== "conversation") query.set("tab", params.tab);
+  if (params.q) query.set("q", params.q);
+  if (params.page && params.page > 1) query.set("page", String(params.page));
 
   const text = query.toString();
   return text ? `/client/dialogs?${text}` : "/client/dialogs";
@@ -305,28 +319,39 @@ function buildAgentWorkOutcome(event: {
 export default async function ClientDialogsPage({ searchParams }: DialogsPageProps) {
   const session = await requireClientSession();
   const tenantId = session.user.tenantId;
-  const { agent, channel, conversation, sort, tab } = await searchParams;
+  const { agent, channel, conversation, sort, tab, q, page: rawPage } = await searchParams;
   const channelFilter = parseChannelFilter(channel);
   const sortOrder = parseSort(sort);
   const activeTab = parseTab(tab);
+  const searchQuery = q?.trim().slice(0, 120) ?? "";
+  const page = Math.max(1, Number.parseInt(rawPage ?? "1", 10) || 1);
+  const pageSize = 40;
+  const conversationWhere = {
+    agent: {
+      tenantId,
+      ...(agent ? { id: agent } : {}),
+    },
+    ...(channelFilter ? { channel: channelFilter } : {}),
+    ...(searchQuery
+      ? {
+          OR: [
+            { contactId: { contains: searchQuery, mode: "insensitive" as const } },
+            { contactUsername: { contains: searchQuery, mode: "insensitive" as const } },
+            { contactDisplayName: { contains: searchQuery, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+    messages: { some: {} },
+  };
 
-  const [agents, conversations, conversationCount, visibleMessageCount, toolMessages] =
+  const [agents, conversations, conversationCount, visibleMessageCount, toolMessages, outcomeEvents] =
     await Promise.all([
       db.agent.findMany({
         where: { tenantId },
         orderBy: { updatedAt: "desc" },
       }),
       db.conversation.findMany({
-        where: {
-          agent: {
-            tenantId,
-            ...(agent ? { id: agent } : {}),
-          },
-          ...(channelFilter ? { channel: channelFilter } : {}),
-          messages: {
-            some: {},
-          },
-        },
+        where: conversationWhere,
         include: {
           agent: true,
           messages: {
@@ -351,12 +376,11 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           },
         },
         orderBy: { updatedAt: sortOrder === "oldest" ? "asc" : "desc" },
-        take: 60,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       }),
       db.conversation.count({
-        where: {
-          agent: { tenantId },
-        },
+        where: conversationWhere,
       }),
       db.message.count({
         where: {
@@ -383,14 +407,18 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           },
           role: MessageRole.TOOL,
           AND: [
-            {
-              toolName: {
-                not: null,
-              },
-            },
+            { toolName: { not: null } },
             {
               NOT: {
-                toolName: INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME,
+                toolName: {
+                  in: [
+                    INSTAGRAM_OUTBOUND_DELIVERY_TOOL_NAME,
+                    "business_manual_message",
+                    "__wedding_sales_simple_state",
+                    "__wedding_sales_simple_safety_log",
+                    "__wedding_sales_simple_follow_up_log",
+                  ],
+                },
               },
             },
           ],
@@ -403,9 +431,19 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           },
         },
         orderBy: { createdAt: "desc" },
-        take: 24,
+        take: 250,
+      }),
+      db.agentEvent.findMany({
+        where: {
+          agent: { tenantId },
+          type: { in: [AgentEventType.LEAD_QUALIFIED, AgentEventType.CONSULTATION_BOOKED] },
+          status: AgentEventStatus.SUCCEEDED,
+          source: { in: [AgentEventSource.LIVE, AgentEventSource.BACKFILL] },
+        },
+        select: { conversationId: true, type: true },
       }),
     ]);
+  const totalPages = Math.max(1, Math.ceil(conversationCount / pageSize));
 
   const userName = getCabinetUserName(session.user);
   const selectedConversation =
@@ -493,10 +531,16 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
       ? selectedConversation?.contactId
       : null;
   const latestWork = latestOutcome ? buildAgentWorkOutcome(latestOutcome) : null;
-  const leadScore = Math.min(
-    96,
-    58 + targetActions.length * 14 + Math.min(agents.length, 3) * 4,
+  const selectedOutcomeEvents = selectedConversation
+    ? outcomeEvents.filter((event) => event.conversationId === selectedConversation.id)
+    : [];
+  const selectedBooked = selectedOutcomeEvents.some(
+    (event) => event.type === AgentEventType.CONSULTATION_BOOKED,
   );
+  const selectedQualified = selectedOutcomeEvents.some(
+    (event) => event.type === AgentEventType.LEAD_QUALIFIED,
+  );
+  const selectedLeadStage = selectedBooked ? "Booked" : selectedQualified ? "Qualified" : "In progress";
   const leadRows = [
     ["Name", selectedLeadDetails?.coupleName ?? fallbackLeadDetails?.coupleName ?? selectedContactName],
     ...(selectedConversation?.channel === ChannelType.INSTAGRAM
@@ -536,7 +580,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
           <div className="border-b border-white/[0.08] p-5 md:p-6">
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
               <Link
-                href={buildDialogsHref({ channel: channelFilter, sort: sortOrder })}
+                href={buildDialogsHref({ channel: channelFilter, sort: sortOrder, q: searchQuery })}
                 className={[
                   "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
                   !agent
@@ -549,7 +593,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               {agents.slice(0, 4).map((item) => (
                 <Link
                   key={item.id}
-                  href={buildDialogsHref({ agent: item.id, channel: channelFilter, sort: sortOrder })}
+                  href={buildDialogsHref({ agent: item.id, channel: channelFilter, sort: sortOrder, q: searchQuery })}
                   className={[
                     "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
                     agent === item.id
@@ -570,7 +614,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                   return (
                     <Link
                       key={item.label}
-                      href={buildDialogsHref({ agent, channel: item.value, sort: sortOrder })}
+                      href={buildDialogsHref({ agent, channel: item.value, sort: sortOrder, q: searchQuery })}
                       className={[
                         "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
                         isActive
@@ -594,6 +638,7 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                         agent,
                         channel: channelFilter,
                         sort: item.value,
+                        q: searchQuery,
                       })}
                       className={[
                         "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition",
@@ -607,6 +652,23 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                   );
                 })}
               </div>
+              <form action="/client/dialogs" method="get" className="flex gap-2">
+                {agent ? <input type="hidden" name="agent" value={agent} /> : null}
+                {channelFilter ? <input type="hidden" name="channel" value={channelFilter} /> : null}
+                {sortOrder !== "newest" ? <input type="hidden" name="sort" value={sortOrder} /> : null}
+                <input
+                  name="q"
+                  defaultValue={searchQuery}
+                  placeholder="Search contact"
+                  className="min-w-0 flex-1 rounded-md border border-white/[0.1] bg-black/20 px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7a96d]/50"
+                />
+                <button
+                  type="submit"
+                  className="rounded-md border border-[#d7a96d]/38 bg-[#3a3028] px-3 py-2 text-xs font-semibold text-[#e9be86]"
+                >
+                  Search
+                </button>
+              </form>
             </div>
           </div>
 
@@ -621,15 +683,17 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                 const channel = formatChannel(item.channel);
                 const preview = getLastMessagePreview(item.messages);
                 const isSelected = selectedConversation?.id === item.id;
-                const itemTargetActions = targetActions.filter(
-                  (action) => action.conversationId === item.id,
+                const itemOutcomeEvents = outcomeEvents.filter(
+                  (event) => event.conversationId === item.id,
                 );
-                const hasBookedAction = itemTargetActions.some((action) =>
-                  (action.toolName ?? "").toLowerCase().includes("book"),
+                const hasBookedAction = itemOutcomeEvents.some(
+                  (event) => event.type === AgentEventType.CONSULTATION_BOOKED,
                 );
                 const badge = getDialogBadge({
                   status: item.status,
-                  hasQualifiedLead: itemTargetActions.length > 0,
+                  hasQualifiedLead: itemOutcomeEvents.some(
+                    (event) => event.type === AgentEventType.LEAD_QUALIFIED,
+                  ),
                   hasBookedAction,
                   isSelected,
                 });
@@ -643,6 +707,8 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                       conversation: item.id,
                       sort: sortOrder,
                       tab: activeTab,
+                      q: searchQuery,
+                      page,
                     })}
                     className={[
                       "block border-b border-white/[0.075] px-5 py-5 transition hover:bg-white/[0.035]",
@@ -678,6 +744,37 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
               })
             )}
           </div>
+          {conversationCount > pageSize ? (
+            <div className="flex items-center justify-between border-t border-white/[0.08] px-5 py-3 text-xs text-white/50">
+              <Link
+                href={buildDialogsHref({
+                  agent,
+                  channel: channelFilter,
+                  sort: sortOrder,
+                  q: searchQuery,
+                  page: Math.max(1, page - 1),
+                })}
+                aria-disabled={page <= 1}
+                className={page <= 1 ? "pointer-events-none opacity-30" : "hover:text-white"}
+              >
+                Previous
+              </Link>
+              <span>Page {Math.min(page, totalPages)} of {totalPages}</span>
+              <Link
+                href={buildDialogsHref({
+                  agent,
+                  channel: channelFilter,
+                  sort: sortOrder,
+                  q: searchQuery,
+                  page: Math.min(totalPages, page + 1),
+                })}
+                aria-disabled={page >= totalPages}
+                className={page >= totalPages ? "pointer-events-none opacity-30" : "hover:text-white"}
+              >
+                Next
+              </Link>
+            </div>
+          ) : null}
         </section>
 
         <section className="flex min-h-[620px] flex-col overflow-hidden border-b border-white/[0.09] bg-[#0f100f] xl:h-full xl:min-h-0 xl:border-b-0 xl:border-r">
@@ -722,6 +819,8 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
                     conversation: selectedConversation?.id,
                     sort: sortOrder,
                     tab: item.value,
+                    q: searchQuery,
+                    page,
                   })}
                   className={[
                     "shrink-0 pb-3 transition",
@@ -901,21 +1000,16 @@ export default async function ClientDialogsPage({ searchParams }: DialogsPagePro
 
         <aside className="bg-[#10100e] xl:h-full xl:overflow-hidden">
           <div className="border-b border-white/[0.09] p-5">
-            <p className="text-lg font-semibold text-white">Lead score</p>
-            <div className="mt-6 flex items-center gap-5">
-              <div className="grid size-20 shrink-0 place-items-center rounded-full border-[5px] border-[#d7a96d] text-2xl font-normal text-white">
-                {leadScore}
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-white">
-                  {targetActions.length > 0 ? "High intent" : "In progress"}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-white/48">
-                  {agents.length > 0 ? "Agent active" : "Needs setup"}
-                  <br />
-                  {targetActions.length > 0 ? "Likely to convert" : "Collecting details"}
-                </p>
-              </div>
+            <p className="text-lg font-semibold text-white">Lead stage</p>
+            <div className="mt-5 rounded-md border border-[#d7a96d]/28 bg-[#3a2c1e] p-4">
+              <p className="text-lg font-semibold text-[#e9be86]">{selectedLeadStage}</p>
+              <p className="mt-2 text-sm leading-6 text-white/48">
+                {selectedBooked
+                  ? "A consultation has been booked."
+                  : selectedQualified
+                    ? "Date, location and contact details are qualified."
+                    : "The agent is still collecting the required details."}
+              </p>
             </div>
           </div>
 

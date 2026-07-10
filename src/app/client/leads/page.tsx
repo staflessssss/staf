@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { MessageRole } from "@prisma/client";
+import {
+  AgentEventSource,
+  AgentEventStatus,
+  AgentEventType,
+  MessageRole,
+  type Prisma,
+} from "@prisma/client";
 import { ArrowUpRight, CheckCircle2, Clock3, Link2, UsersRound, Video } from "lucide-react";
 
 import { CabinetShell } from "@/components/cabinet/cabinet-shell";
@@ -12,7 +18,17 @@ import {
 } from "@/lib/client-analytics";
 import { requireClientSession } from "@/lib/client-auth";
 import { db } from "@/lib/db";
-import { isQualifiedLeadToolMessage } from "@/lib/lead-qualification";
+
+function asMemory(value: Prisma.JsonValue | null | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, Prisma.JsonValue>)
+    : {};
+}
+
+function memoryString(memory: Record<string, Prisma.JsonValue>, key: string) {
+  const value = memory[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
 function formatDateTime(value: Date) {
   return value.toLocaleString("en-US", {
@@ -69,15 +85,25 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
   const leadThreads = await db.conversation.findMany({
     where: {
       agent: { tenantId },
-      messages: {
+      events: {
         some: {
-          role: MessageRole.TOOL,
-          NOT: { toolName: null },
+          type: { in: [AgentEventType.LEAD_QUALIFIED, AgentEventType.CONSULTATION_BOOKED] },
+          status: AgentEventStatus.SUCCEEDED,
+          source: { in: [AgentEventSource.LIVE, AgentEventSource.BACKFILL] },
         },
       },
     },
     include: {
       agent: true,
+      memory: true,
+      events: {
+        where: {
+          type: { in: [AgentEventType.LEAD_QUALIFIED, AgentEventType.CONSULTATION_BOOKED] },
+          status: AgentEventStatus.SUCCEEDED,
+          source: { in: [AgentEventSource.LIVE, AgentEventSource.BACKFILL] },
+        },
+        orderBy: { occurredAt: "desc" },
+      },
       messages: {
         where: {
           role: MessageRole.TOOL,
@@ -90,38 +116,59 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
     orderBy: { updatedAt: "desc" },
   });
 
-  const qualifiedLeadThreads = leadThreads
-    .map((thread) => {
-      const qualifiedMessage = thread.messages.find((message) =>
-        isQualifiedLeadToolMessage({
-          toolName: message.toolName,
-          toolResult: message.toolResult,
-        }),
-      );
+  const qualifiedLeadThreads = leadThreads.map((thread) => {
+    const bookedEvent = thread.events.find(
+      (event) => event.type === AgentEventType.CONSULTATION_BOOKED,
+    );
+    const outcomeEvent = bookedEvent ?? thread.events[0]!;
+    const detailMessage = thread.messages.find((message) =>
+      (message.toolName ?? "").toLowerCase().includes("book"),
+    ) ?? thread.messages[0];
+    const toolDetails = detailMessage ? getLeadDetails(detailMessage, thread.contactId) : null;
+    const memory = asMemory(thread.memory?.memory);
+    const customerName = memoryString(memory, "customerName");
+    const partnerName = memoryString(memory, "partnerName");
+    const names = [customerName, partnerName].filter(Boolean).join(" & ") || null;
+    const memoryFields = [
+      names ? { label: "Names", value: names } : null,
+      memoryString(memory, "weddingDate")
+        ? { label: "Wedding Date", value: memoryString(memory, "weddingDate")! }
+        : null,
+      memoryString(memory, "location")
+        ? { label: "Location", value: memoryString(memory, "location")! }
+        : null,
+      memoryString(memory, "venue")
+        ? { label: "Venue", value: memoryString(memory, "venue")! }
+        : null,
+      memoryString(memory, "proposedCallTime")
+        ? { label: "Consultation Time", value: memoryString(memory, "proposedCallTime")! }
+        : null,
+      memoryString(memory, "customerEmail")
+        ? { label: "Email", value: memoryString(memory, "customerEmail")! }
+        : null,
+    ].filter((field): field is { label: string; value: string } => Boolean(field));
+    const capturedFields = Array.from(
+      new Map(
+        [...memoryFields, ...thread.messages.flatMap((message) => getCapturedLeadFields(message))]
+          .map((field) => [field.label.toLowerCase(), field] as const),
+      ).values(),
+    );
 
-      return qualifiedMessage
-        ? {
-            ...thread,
-            qualifiedMessage,
-            details: getLeadDetails(qualifiedMessage, thread.contactId),
-            capturedFields: Array.from(
-              new Map(
-                thread.messages
-                  .flatMap((message) => getCapturedLeadFields(message))
-                  .map((field) => [field.label.toLowerCase(), field] as const),
-              ).values(),
-            ),
-          }
-        : null;
-    })
-    .filter((thread): thread is NonNullable<typeof thread> => Boolean(thread));
+    return {
+      ...thread,
+      outcomeEvent,
+      booked: Boolean(bookedEvent),
+      details: {
+        action: bookedEvent ? "Consultation booked" : "Lead qualified",
+        status: bookedEvent ? "Booked" : "Qualified",
+        coupleName: names ?? toolDetails?.coupleName ?? null,
+        meetLink: toolDetails?.meetLink ?? null,
+      },
+      capturedFields,
+    };
+  });
 
-  const bookedLeadCount = qualifiedLeadThreads.filter((thread) =>
-    isQualifiedLeadToolMessage({
-      toolName: thread.qualifiedMessage.toolName,
-      toolResult: thread.qualifiedMessage.toolResult,
-    }),
-  ).length;
+  const bookedLeadCount = qualifiedLeadThreads.filter((thread) => thread.booked).length;
   const selectedLead =
     qualifiedLeadThreads.find((thread) => thread.id === lead) ?? qualifiedLeadThreads[0] ?? null;
   const selectedTimeline = selectedLead?.messages ?? [];
@@ -168,7 +215,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
           {
             icon: Clock3,
             label: "Latest activity",
-            value: selectedLead ? formatDateTime(selectedLead.qualifiedMessage.createdAt) : "-",
+            value: selectedLead ? formatDateTime(selectedLead.outcomeEvent.occurredAt) : "-",
             sub: "from the active lead list",
           },
         ].map(({ icon: Icon, label, value, sub }) => (
@@ -254,7 +301,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                         {details.status}
                       </span>
                       <span className="text-[11px] font-medium text-white/42">
-                        {formatDateTime(thread.qualifiedMessage.createdAt)}
+                        {formatDateTime(thread.outcomeEvent.occurredAt)}
                       </span>
                     </div>
                   </Link>
@@ -290,7 +337,7 @@ export default async function ClientLeadsPage({ searchParams }: ClientLeadsPageP
                 {[
                   ["Outcome", selectedLead.details.action],
                   ["Status", selectedLead.details.status],
-                  ["Captured", formatDateTime(selectedLead.qualifiedMessage.createdAt)],
+                  ["Captured", formatDateTime(selectedLead.outcomeEvent.occurredAt)],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-white/[0.08] bg-black/16 p-4">
                     <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/38">

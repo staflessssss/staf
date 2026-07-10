@@ -1,5 +1,6 @@
 import { openai } from "@ai-sdk/openai";
 import {
+  AgentEventType,
   AgentStatus,
   ChannelType,
   ConversationStatus,
@@ -33,12 +34,7 @@ import { getChannelAdapter } from "@/lib/channels";
 import { parseInstagramCredentials } from "@/lib/channels/instagram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
-import {
-  extractAndSaveConversationMemoryWithDb,
-  isConversationMemoryEligibleChannel,
-  loadConversationMemoryWithDb,
-} from "@/lib/conversation-memory";
-import { recordExecutionTraceWithDb } from "@/lib/execution-traces";
+import { recordAgentEventsBestEffort } from "@/lib/agent-events";
 import {
   buildMyndfulGuideConfig,
   getMyndfulGuide,
@@ -63,6 +59,10 @@ import {
   shouldPauseAfterBusinessManualMessage,
 } from "@/lib/business-handoff";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
+import {
+  recordDeliveryFailedWithDb,
+  recordSuccessfulRuntimeTurnWithDb,
+} from "@/lib/runtime-observability";
 import {
   OWNER_HANDOFF_REQUEST_TOOL_NAME,
   hasConnectedOwnerTelegram,
@@ -2074,7 +2074,7 @@ async function recordInboundMessageWithDb(
     conversationStatus?: ConversationStatus;
   },
 ) {
-  return database.$transaction(async (tx) => {
+  const result = await database.$transaction(async (tx) => {
     const existing = await tx.conversation.findUnique({
       where: { agentId_contactId: { agentId: args.agentId, contactId: args.contactId } },
     });
@@ -2098,7 +2098,7 @@ async function recordInboundMessageWithDb(
       });
     }
 
-    await tx.message.create({
+    const inboundMessage = await tx.message.create({
       data: {
         conversationId: conversation.id,
         role: MessageRole.USER,
@@ -2112,8 +2112,33 @@ async function recordInboundMessageWithDb(
       },
     });
 
-    return conversation;
+    return { conversation, inboundMessage, isNew: !existing };
   });
+
+  await recordAgentEventsBestEffort({
+    database,
+    agentId: args.agentId,
+    conversationId: result.conversation.id,
+    channel: args.channel,
+    events: [
+      ...(result.isNew
+        ? [
+            {
+              type: AgentEventType.CONVERSATION_STARTED,
+              dedupeKey: `conversation-started:${result.conversation.id}`,
+              occurredAt: result.conversation.createdAt,
+            },
+          ]
+        : []),
+      {
+        type: AgentEventType.INBOUND_RECEIVED,
+        dedupeKey: `inbound:${result.inboundMessage.id}`,
+        occurredAt: result.inboundMessage.createdAt,
+      },
+    ],
+  });
+
+  return result.conversation;
 }
 
 function isPartialDeliveryResult(delivery: unknown): delivery is {
@@ -3379,37 +3404,36 @@ async function handleIncomingEventWithDeps(
   const outboundChannelConfig = agent.channelConfig;
   const formattedReply = adapter.formatReply(result.message, outboundChannelConfig);
   const outboundMessage = formattedReply as string | string[] | { text: string; html?: string };
-  const shouldRecordConversationMemory =
-    Boolean(result.conversationId) && isConversationMemoryEligibleChannel(args.channel);
-  let memoryBefore: unknown;
-
-  if (shouldRecordConversationMemory && result.conversationId) {
-    try {
-      memoryBefore = await loadConversationMemoryWithDb({
+  let delivery: unknown;
+  try {
+    delivery = await adapter.sendReply({
+      credentials:
+        args.channel === ChannelType.GMAIL
+          ? agent.channel.credentialsEnc
+          : deps.decrypt(agent.channel.credentialsEnc),
+      contactId: incoming.contactId,
+      message: outboundMessage,
+      messageId: incoming.messageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
+      attachments:
+        messageBehavior.allowAttachments || args.channel === ChannelType.INSTAGRAM
+          ? result.attachments
+          : undefined,
+      channelConfig: outboundChannelConfig,
+    });
+  } catch (error) {
+    if (result.conversationId) {
+      await recordDeliveryFailedWithDb({
         database: deps.db,
+        agentId: agent.id,
         conversationId: result.conversationId,
+        channel: args.channel,
+        error: error instanceof Error ? error.message : String(error),
       });
-    } catch (error) {
-      console.warn("[conversation-memory] failed to load memory before reply", error);
     }
+    throw error;
   }
-
-  const delivery = await adapter.sendReply({
-    credentials:
-      args.channel === ChannelType.GMAIL
-        ? agent.channel.credentialsEnc
-        : deps.decrypt(agent.channel.credentialsEnc),
-    contactId: incoming.contactId,
-    message: outboundMessage,
-    messageId: incoming.messageId,
-    threadId: incoming.threadId,
-    subject: incoming.subject,
-    attachments:
-      messageBehavior.allowAttachments || args.channel === ChannelType.INSTAGRAM
-        ? result.attachments
-        : undefined,
-    channelConfig: outboundChannelConfig,
-  });
 
   if (args.channel === ChannelType.INSTAGRAM && result.conversationId) {
     await recordInstagramOutboundDeliveries({
@@ -3419,45 +3443,20 @@ async function handleIncomingEventWithDeps(
     });
   }
 
-  let memoryUpdate: unknown;
-
-  if (shouldRecordConversationMemory && result.conversationId) {
-    try {
-      memoryUpdate = await extractAndSaveConversationMemoryWithDb({
-        database: deps.db,
-        conversationId: result.conversationId,
-        latestUserMessage: incoming.message,
-        assistantReply: result.message,
-      });
-    } catch (error) {
-      memoryUpdate = {
-        status: "error",
-        message: error instanceof Error ? error.message : String(error),
-      };
-      console.warn("[conversation-memory] failed to extract memory after reply", error);
-    }
-  }
-
   if (result.conversationId) {
-    try {
-      await recordExecutionTraceWithDb({
-        database: deps.db,
-        conversationId: result.conversationId,
-        agentId: agent.id,
-        channel: args.channel,
-        inboundMessage: incoming.message,
-        memoryBefore,
-        promptPreview: result.promptPreview,
-        toolExecutions: result.toolExecutions,
-        modelRawText: result.message,
-        finalMessage: result.message,
-        attachments: result.attachments,
-        delivery,
-        memoryUpdate,
-      });
-    } catch (error) {
-      console.warn("[execution-trace] failed to record runtime trace", error);
-    }
+    await recordSuccessfulRuntimeTurnWithDb({
+      database: deps.db,
+      conversationId: result.conversationId,
+      agentId: agent.id,
+      channel: args.channel,
+      inboundMessage: incoming.message,
+      assistantReply: result.message,
+      promptPreview: result.promptPreview,
+      model: result.model,
+      toolExecutions: result.toolExecutions,
+      attachments: result.attachments,
+      delivery,
+    });
   }
 
   if (isPartialDeliveryResult(delivery)) {

@@ -139,6 +139,7 @@ model Agent {
   features      Feature[]
   conversations Conversation[]
   delayedDeliveries DelayedDelivery[]
+  events          AgentEvent[]
 
   @@unique([channelId])
 }
@@ -183,6 +184,7 @@ model Conversation {
   messages           Message[]
   memory             ConversationMemory?
   executionTraces    ExecutionTrace[]
+  events             AgentEvent[]
 
   @@unique([agentId, contactId])
 }
@@ -216,6 +218,54 @@ model ExecutionTrace {
 
   @@index([conversationId, createdAt])
   @@index([agentId, createdAt])
+}
+
+model AgentEvent {
+  id             String           @id @default(cuid())
+  agentId        String
+  conversationId String?
+  channel        ChannelType
+  type           AgentEventType
+  status         AgentEventStatus @default(SUCCEEDED)
+  source         AgentEventSource @default(LIVE)
+  dedupeKey      String?          @unique
+  durationMs     Int?
+  metadata       Json?
+  occurredAt     DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  agent          Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  conversation   Conversation?    @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([agentId, occurredAt])
+  @@index([conversationId, occurredAt])
+  @@index([type, status, occurredAt])
+}
+
+enum AgentEventType {
+  CONVERSATION_STARTED
+  INBOUND_RECEIVED
+  REPLY_SENT
+  AVAILABILITY_CHECKED
+  PRICING_GUIDE_SENT
+  LEAD_QUALIFIED
+  CONSULTATION_CHECKED
+  CONSULTATION_BOOKED
+  HANDOFF_REQUESTED
+  HANDOFF_RESOLVED
+  FOLLOW_UP_SENT
+  DELIVERY_FAILED
+}
+
+enum AgentEventStatus {
+  SUCCEEDED
+  FAILED
+  BLOCKED
+}
+
+enum AgentEventSource {
+  LIVE
+  TEST
+  BACKFILL
 }
 
 model Message {

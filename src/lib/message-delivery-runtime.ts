@@ -26,6 +26,11 @@ import { saveMessages } from "@/lib/agent-memory";
 import type { InvokeAgentResult } from "@/lib/ai-runtime";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
+import {
+  recordDeliveryFailedWithDb,
+  recordFollowUpSentWithDb,
+  recordSuccessfulRuntimeTurnWithDb,
+} from "@/lib/runtime-observability";
 
 type RuntimeInvokeAgent = typeof import("@/lib/ai-runtime").invokeAgent;
 
@@ -762,7 +767,7 @@ async function processBufferedReply(args: {
     throw new Error("buffered_reply_empty_message");
   }
 
-  await deliverThroughChannel({
+  const channelDelivery = await deliverThroughChannel({
     database: args.deps.db,
     conversationId: args.delivery.conversationId,
     agent: args.delivery.agent,
@@ -771,6 +776,20 @@ async function processBufferedReply(args: {
     replyContext: payload.replyContext,
     text: result.message,
     attachments: result.attachments,
+  });
+
+  await recordSuccessfulRuntimeTurnWithDb({
+    database: args.deps.db,
+    conversationId: args.delivery.conversationId,
+    agentId: args.delivery.agentId,
+    channel: args.delivery.agent.channel.type,
+    inboundMessage: combinedMessage,
+    assistantReply: result.message,
+    promptPreview: result.promptPreview,
+    model: result.model,
+    toolExecutions: result.toolExecutions,
+    attachments: result.attachments,
+    delivery: channelDelivery,
   });
 
   const agentActiveAfterDelivery = await args.deps.db.agent.findFirst({
@@ -1144,6 +1163,14 @@ async function processFollowUp(args: {
     attachments: result.attachments,
   });
 
+  await recordFollowUpSentWithDb({
+    database: args.deps.db,
+    agentId: args.delivery.agentId,
+    conversationId: args.delivery.conversationId,
+    channel: args.delivery.agent.channel.type,
+    deliveryId: args.deliveryId,
+  });
+
   await markDeliverySentIfProcessing({
     database: args.deps.db,
     deliveryId: args.deliveryId,
@@ -1211,6 +1238,16 @@ export async function processDelayedDeliveryByIdWithDeps(
         status: DelayedDeliveryStatus.FAILED,
         error: errorMessage,
       });
+      if (delivery?.agent) {
+        await recordDeliveryFailedWithDb({
+          database: deps.db,
+          agentId: delivery.agentId,
+          conversationId: delivery.conversationId,
+          channel: delivery.agent.channel.type,
+          deliveryId,
+          error: errorMessage,
+        });
+      }
 
       return {
         ok: false,
@@ -1247,6 +1284,16 @@ export async function processDelayedDeliveryByIdWithDeps(
       status: DelayedDeliveryStatus.FAILED,
       error: errorMessage,
     });
+    if (delivery?.agent) {
+      await recordDeliveryFailedWithDb({
+        database: deps.db,
+        agentId: delivery.agentId,
+        conversationId: delivery.conversationId,
+        channel: delivery.agent.channel.type,
+        deliveryId,
+        error: errorMessage,
+      });
+    }
 
     return {
       ok: false,

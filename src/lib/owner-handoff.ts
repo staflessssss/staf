@@ -1,4 +1,5 @@
 import {
+  AgentEventType,
   ChannelType,
   ConnectionStatus,
   ConversationStatus,
@@ -12,6 +13,7 @@ import { getChannelAdapter } from "@/lib/channels";
 import { type TelegramReplyMarkup, telegramAdapter } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import { recordAgentEventsBestEffort } from "@/lib/agent-events";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import {
@@ -427,6 +429,19 @@ export async function requestOwnerHandoffWithDb(args: {
     conversationId: conversation.id,
     handoffReason: "unanswered_business_question",
   });
+  await recordAgentEventsBestEffort({
+    database: args.database,
+    agentId: args.agent.id,
+    conversationId: conversation.id,
+    channel: conversation.channel,
+    events: [
+      {
+        type: AgentEventType.HANDOFF_REQUESTED,
+        dedupeKey: requestMessageId ? `handoff-requested:${requestMessageId}` : undefined,
+        metadata: { reason: args.reason },
+      },
+    ],
+  });
 
   return {
     status: "owner_handoff_requested" as const,
@@ -510,6 +525,18 @@ async function sendReplyThroughConversationChannel(args: {
     conversationId: conversation.id,
     text: args.text,
     source: "telegram_owner",
+  });
+  await recordAgentEventsBestEffort({
+    database: db,
+    agentId: conversation.agent.id,
+    conversationId: conversation.id,
+    channel: conversation.channel,
+    events: [
+      {
+        type: AgentEventType.HANDOFF_RESOLVED,
+        metadata: { resolution: "owner_reply" },
+      },
+    ],
   });
 
   return conversation;

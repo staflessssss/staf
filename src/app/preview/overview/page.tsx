@@ -7,11 +7,17 @@ export default function PreviewOverviewPage() {
       userInitials="BF"
       userName="Behalfy Client"
       data={{
+        period: "30d",
+        channel: "all",
         activeAgents: 3,
         totalAgents: 4,
-        totalConversations: 128,
-        totalMessages: 1463,
-        totalTools: 312,
+        newConversations: 128,
+        repliesSent: 116,
+        availabilityChecks: 72,
+        guidesSent: 59,
+        qualifiedLeads: 31,
+        bookedCalls: 14,
+        automationRate: 84,
         agents: [
           {
             id: "1",
@@ -19,8 +25,9 @@ export default function PreviewOverviewPage() {
             channelType: "GMAIL",
             status: "ACTIVE",
             conversations: 64,
-            messages: 812,
-            tools: 187,
+            replies: 58,
+            qualified: 16,
+            booked: 8,
             lastActivity: new Date(),
           },
           {
@@ -29,8 +36,9 @@ export default function PreviewOverviewPage() {
             channelType: "INSTAGRAM",
             status: "ACTIVE",
             conversations: 41,
-            messages: 409,
-            tools: 88,
+            replies: 39,
+            qualified: 10,
+            booked: 4,
             lastActivity: new Date(Date.now() - 3600_000),
           },
           {
@@ -39,8 +47,9 @@ export default function PreviewOverviewPage() {
             channelType: "GMAIL",
             status: "PAUSED",
             conversations: 14,
-            messages: 162,
-            tools: 24,
+            replies: 12,
+            qualified: 3,
+            booked: 1,
             lastActivity: new Date(Date.now() - 86_400_000),
           },
           {
@@ -49,18 +58,27 @@ export default function PreviewOverviewPage() {
             channelType: "GMAIL",
             status: "ACTIVE",
             conversations: 9,
-            messages: 80,
-            tools: 13,
+            replies: 7,
+            qualified: 2,
+            booked: 1,
             lastActivity: new Date(Date.now() - 3 * 86_400_000),
           },
         ],
-        topFunctions: [
-          { toolName: "check_availability", count: 142 },
-          { toolName: "book_call", count: 76 },
-          { toolName: "qualify_lead", count: 54 },
-          { toolName: "send_pricing", count: 28 },
-          { toolName: "create_contact", count: 12 },
+        funnel: [
+          { label: "New inquiries", count: 128 },
+          { label: "Availability checked", count: 72 },
+          { label: "Pricing sent", count: 59 },
+          { label: "Qualified", count: 31 },
+          { label: "Consultations booked", count: 14 },
         ],
+        health: {
+          escalated: 3,
+          failedDeliveries: 1,
+          pendingFollowUps: 8,
+          handoffs: 4,
+          medianResponseMs: 82_000,
+          lastSuccessfulReply: new Date(),
+        },
       }}
     />
   );
