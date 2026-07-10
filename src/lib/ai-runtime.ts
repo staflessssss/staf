@@ -59,7 +59,7 @@ import {
   shouldPauseAfterBusinessManualMessage,
 } from "@/lib/business-handoff";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
-import { notifyAgentMonitorInbound } from "@/lib/agent-monitor";
+import { notifyAgentMonitorAlert, notifyAgentMonitorInbound } from "@/lib/agent-monitor";
 import {
   recordDeliveryFailedWithDb,
   recordSuccessfulRuntimeTurnWithDb,
@@ -2149,6 +2149,8 @@ async function recordInboundMessageWithDb(
     database,
     conversationId: result.conversation.id,
     message: args.message,
+    sourceMessageId: result.inboundMessage.id,
+    receivedAt: result.inboundMessage.createdAt,
   });
 
   return result.conversation;
@@ -2998,6 +3000,12 @@ async function handleIncomingEventWithDeps(
       conversationId: conversation.id,
       customerMessage: incoming.message,
     });
+    await notifyAgentMonitorAlert({
+      database: deps.db,
+      conversationId: conversation.id,
+      title: "Needs attention: human review",
+      reason: args.manualReviewReason ?? "This conversation was routed to human review before an agent reply.",
+    });
     await cancelPendingDelayedDeliveriesWithDb({
       database: deps.db,
       conversationId: conversation.id,
@@ -3390,6 +3398,15 @@ async function handleIncomingEventWithDeps(
         database: deps.db,
         conversationId: result.conversationId,
         kinds: [DelayedDeliveryKind.FOLLOW_UP],
+      });
+    }
+
+    if (result.conversationId && (result.model ?? "").startsWith("unavailable")) {
+      await notifyAgentMonitorAlert({
+        database: deps.db,
+        conversationId: result.conversationId,
+        title: "Needs attention: model unavailable",
+        reason: "The model could not generate a reply, so no customer message was sent.",
       });
     }
 

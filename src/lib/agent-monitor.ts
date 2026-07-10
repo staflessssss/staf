@@ -1,4 +1,12 @@
-import type { ChannelType, PrismaClient } from "@prisma/client";
+import {
+  AgentStatus,
+  ChannelType,
+  ConversationStatus,
+  DelayedDeliveryKind,
+  DelayedDeliveryStatus,
+  MessageRole,
+  type PrismaClient,
+} from "@prisma/client";
 
 import type { RuntimeToolExecution } from "@/lib/agent-events";
 
@@ -8,6 +16,8 @@ type MonitorConfig = {
   botToken: string;
   chatId: string;
 };
+
+const UNANSWERED_RESPONSE_THRESHOLD_MS = 3 * 60 * 1_000;
 
 function getMonitorConfig(): MonitorConfig | null {
   const botToken = process.env.AGENT_MONITOR_TELEGRAM_BOT_TOKEN?.trim();
@@ -107,6 +117,8 @@ export async function notifyAgentMonitorInbound(args: {
   database: MonitorDatabase;
   conversationId: string;
   message: string;
+  sourceMessageId?: string;
+  receivedAt?: Date;
 }) {
   const config = getMonitorConfig();
   if (!config) return;
@@ -135,14 +147,53 @@ export async function notifyAgentMonitorInbound(args: {
         conversationId: conversation.id,
         telegramChatId: config.chatId,
         latestInboundMessageId: telegramMessageId,
+        ...(args.sourceMessageId ? { latestInboundSourceMessageId: args.sourceMessageId } : {}),
+        ...(args.receivedAt ? { latestInboundAt: args.receivedAt } : {}),
       },
       update: {
         telegramChatId: config.chatId,
         latestInboundMessageId: telegramMessageId,
+        latestInboundSourceMessageId: args.sourceMessageId ?? null,
+        latestInboundAt: args.receivedAt ?? null,
+        responseAlertedAt: null,
       },
     });
   } catch (error) {
     console.warn("[agent-monitor] inbound notification failed", error);
+  }
+}
+
+export async function notifyAgentMonitorAlert(args: {
+  database: MonitorDatabase;
+  conversationId: string;
+  title: string;
+  reason: string;
+}) {
+  const config = getMonitorConfig();
+  if (!config) return false;
+
+  try {
+    const [thread, conversation] = await Promise.all([
+      args.database.agentMonitorThread.findUnique({
+        where: { conversationId: args.conversationId },
+      }),
+      loadConversationForMonitor(args),
+    ]);
+    if (!thread || thread.telegramChatId !== config.chatId || !conversation) return false;
+
+    await sendRichMonitorMessage({
+      config,
+      replyToMessageId: thread.latestInboundMessageId,
+      html: [
+        `<h3>${escapeHtml(args.title)}</h3>`,
+        `<p><b>Agent:</b> ${escapeHtml(conversation.agent.name)}<br/><b>Client:</b> ${escapeHtml(conversation.agent.tenant.name)}<br/><b>Customer:</b> ${escapeHtml(customerLabel(conversation))}</p>`,
+        `<blockquote>${escapeHtml(truncate(args.reason, 600))}</blockquote>`,
+      ].join("\n"),
+    });
+    return true;
+  } catch (error) {
+    console.warn("[agent-monitor] attention notification failed", error);
+    return false;
   }
 }
 
@@ -199,12 +250,107 @@ export async function notifyAgentMonitorFailure(args: {
       config,
       replyToMessageId: thread.latestInboundMessageId,
       html: [
-        "<h3>Delivery failed</h3>",
-        `<p><b>Status:</b> Needs attention</p>`,
+        "<h3>Needs attention: delivery failed</h3>",
         `<blockquote>${escapeHtml(truncate(args.error, 600))}</blockquote>`,
       ].join("\n"),
     });
   } catch (monitorError) {
     console.warn("[agent-monitor] failure notification failed", monitorError);
   }
+}
+
+function unansweredReplyReason(args: {
+  conversationStatus: ConversationStatus;
+  agentStatus: AgentStatus;
+  hasPendingBufferedReply: boolean;
+}) {
+  if (args.conversationStatus === ConversationStatus.ESCALATED) {
+    return "This conversation is paused for human review and has no delivered agent reply.";
+  }
+  if (args.agentStatus !== AgentStatus.ACTIVE) {
+    return "The agent is paused, so this customer message has no delivered reply.";
+  }
+  if (args.hasPendingBufferedReply) {
+    return "A buffered reply is still pending after the expected response window.";
+  }
+  return "No delivered agent reply was recorded within three minutes of the customer message.";
+}
+
+export async function alertOnUnansweredMonitorThreadsWithDb(args: {
+  database: MonitorDatabase;
+  now?: Date;
+  thresholdMs?: number;
+  limit?: number;
+}) {
+  const config = getMonitorConfig();
+  if (!config) return { scanned: 0, alerted: 0 };
+
+  const now = args.now ?? new Date();
+  const cutoff = new Date(now.getTime() - (args.thresholdMs ?? UNANSWERED_RESPONSE_THRESHOLD_MS));
+  const threads = await args.database.agentMonitorThread.findMany({
+    where: {
+      telegramChatId: config.chatId,
+      latestInboundSourceMessageId: { not: null },
+      latestInboundAt: { lte: cutoff },
+      responseAlertedAt: null,
+    },
+    include: {
+      conversation: {
+        select: {
+          id: true,
+          status: true,
+          agent: { select: { status: true } },
+        },
+      },
+    },
+    orderBy: { latestInboundAt: "asc" },
+    take: args.limit ?? 50,
+  });
+
+  let alerted = 0;
+  for (const thread of threads) {
+    if (!thread.latestInboundAt || !thread.latestInboundSourceMessageId) continue;
+
+    const assistantReply = await args.database.message.findFirst({
+      where: {
+        conversationId: thread.conversationId,
+        role: MessageRole.ASSISTANT,
+        createdAt: { gte: thread.latestInboundAt },
+      },
+      select: { id: true },
+    });
+    if (assistantReply) continue;
+
+    const pendingBufferedReply = await args.database.delayedDelivery.findFirst({
+      where: {
+        conversationId: thread.conversationId,
+        kind: DelayedDeliveryKind.BUFFERED_REPLY,
+        status: { in: [DelayedDeliveryStatus.PENDING, DelayedDeliveryStatus.PROCESSING] },
+      },
+      select: { id: true },
+    });
+    const sent = await notifyAgentMonitorAlert({
+      database: args.database,
+      conversationId: thread.conversationId,
+      title: "Needs attention: no reply",
+      reason: unansweredReplyReason({
+        conversationStatus: thread.conversation.status,
+        agentStatus: thread.conversation.agent.status,
+        hasPendingBufferedReply: Boolean(pendingBufferedReply),
+      }),
+    });
+    if (!sent) continue;
+
+    const marked = await args.database.agentMonitorThread.updateMany({
+      where: {
+        id: thread.id,
+        latestInboundSourceMessageId: thread.latestInboundSourceMessageId,
+        responseAlertedAt: null,
+      },
+      data: { responseAlertedAt: now },
+    });
+    if (marked.count === 1) alerted += 1;
+  }
+
+  return { scanned: threads.length, alerted };
 }

@@ -8,6 +8,7 @@ import { invokeAgent } from "@/lib/ai-runtime";
 import { saveMessages } from "@/lib/agent-memory";
 import { renewDueGmailWatches } from "@/lib/gmail-watch";
 import { cleanupExpiredRateLimits } from "@/lib/rate-limit";
+import { alertOnUnansweredMonitorThreadsWithDb } from "@/lib/agent-monitor";
 
 export const dynamic = "force-dynamic";
 
@@ -46,12 +47,14 @@ export async function GET(request: NextRequest) {
   );
   const gmailWatchRenewal = await renewDueGmailWatches();
   const rateLimitCleanup = await cleanupExpiredRateLimits();
+  const monitorAlerts = await alertOnUnansweredMonitorThreadsWithDb({ database: db });
 
   return NextResponse.json({
     ok: true,
     processed: results.length,
     gmailWatchRenewal,
     expiredRateLimitBucketsDeleted: rateLimitCleanup.count,
+    monitorAlerts,
     results,
   });
 }

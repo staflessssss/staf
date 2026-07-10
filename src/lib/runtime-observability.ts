@@ -18,7 +18,11 @@ import {
   type ConversationMemory,
 } from "@/lib/conversation-memory";
 import { recordExecutionTraceWithDb } from "@/lib/execution-traces";
-import { notifyAgentMonitorFailure, notifyAgentMonitorReply } from "@/lib/agent-monitor";
+import {
+  notifyAgentMonitorAlert,
+  notifyAgentMonitorFailure,
+  notifyAgentMonitorReply,
+} from "@/lib/agent-monitor";
 
 function readMemoryAfter(value: unknown): ConversationMemory | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -26,6 +30,15 @@ function readMemoryAfter(value: unknown): ConversationMemory | undefined {
   return memoryAfter && typeof memoryAfter === "object" && !Array.isArray(memoryAfter)
     ? (memoryAfter as ConversationMemory)
     : undefined;
+}
+
+function readToolFailureStatus(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const status = (value as { status?: unknown }).status;
+  if (typeof status !== "string") return null;
+
+  const normalized = status.toLowerCase();
+  return /(error|fail|misconfig|unavailable)/.test(normalized) ? status : null;
 }
 
 export async function recordSuccessfulRuntimeTurnWithDb(args: {
@@ -141,6 +154,34 @@ export async function recordSuccessfulRuntimeTurnWithDb(args: {
     toolExecutions: args.toolExecutions,
     attachmentCount: args.attachments?.length ?? 0,
   });
+
+  if (
+    args.toolExecutions?.some(
+      (execution) => execution.toolName === "tool_4_owner_handoff_request",
+    )
+  ) {
+    await notifyAgentMonitorAlert({
+      database: args.database,
+      conversationId: args.conversationId,
+      title: "Needs attention: human handoff",
+      reason: "The agent requested a human handoff and paused this conversation for the owner/team.",
+    });
+  }
+
+  const failedTool = args.toolExecutions
+    ?.map((execution) => ({
+      name: execution.toolName,
+      status: readToolFailureStatus(execution.toolResult),
+    }))
+    .find((execution) => execution.status);
+  if (failedTool?.status) {
+    await notifyAgentMonitorAlert({
+      database: args.database,
+      conversationId: args.conversationId,
+      title: "Needs attention: tool failed",
+      reason: `${failedTool.name} returned ${failedTool.status}. Review the customer reply and the integration.`,
+    });
+  }
 
   return { memoryBefore, memoryUpdate };
 }
