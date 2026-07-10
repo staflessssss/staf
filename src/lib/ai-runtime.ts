@@ -59,6 +59,7 @@ import {
   shouldPauseAfterBusinessManualMessage,
 } from "@/lib/business-handoff";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
+import { notifyAgentMonitorInbound } from "@/lib/agent-monitor";
 import {
   recordDeliveryFailedWithDb,
   recordSuccessfulRuntimeTurnWithDb,
@@ -2142,6 +2143,12 @@ async function recordInboundMessageWithDb(
         occurredAt: result.inboundMessage.createdAt,
       },
     ],
+  });
+
+  await notifyAgentMonitorInbound({
+    database,
+    conversationId: result.conversation.id,
+    message: args.message,
   });
 
   return result.conversation;

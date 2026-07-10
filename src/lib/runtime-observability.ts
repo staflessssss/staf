@@ -18,6 +18,7 @@ import {
   type ConversationMemory,
 } from "@/lib/conversation-memory";
 import { recordExecutionTraceWithDb } from "@/lib/execution-traces";
+import { notifyAgentMonitorFailure, notifyAgentMonitorReply } from "@/lib/agent-monitor";
 
 function readMemoryAfter(value: unknown): ConversationMemory | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
@@ -133,6 +134,14 @@ export async function recordSuccessfulRuntimeTurnWithDb(args: {
     console.warn("[execution-trace] failed to record runtime trace", error);
   }
 
+  await notifyAgentMonitorReply({
+    database: args.database,
+    conversationId: args.conversationId,
+    assistantReply: args.assistantReply,
+    toolExecutions: args.toolExecutions,
+    attachmentCount: args.attachments?.length ?? 0,
+  });
+
   return { memoryBefore, memoryUpdate };
 }
 
@@ -160,6 +169,7 @@ export async function recordFollowUpSentWithDb(args: {
       },
     ],
   });
+
 }
 
 export async function recordDeliveryFailedWithDb(args: {
@@ -183,5 +193,11 @@ export async function recordDeliveryFailedWithDb(args: {
         metadata: { error: args.error },
       },
     ],
+  });
+
+  await notifyAgentMonitorFailure({
+    database: args.database,
+    conversationId: args.conversationId,
+    error: args.error,
   });
 }
