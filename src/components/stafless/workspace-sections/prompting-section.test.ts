@@ -13,6 +13,7 @@ type ReactNodeLike = {
   props?: Record<string, unknown> & {
     children?: unknown;
     onChange?: (event: { target: { value: string } }) => void;
+    onCheckedChange?: (value: boolean) => void;
   };
 };
 
@@ -62,13 +63,14 @@ test("prompting section does not expose fake actions or runtime visibility toggl
   assert.doesNotMatch(source, /href="#"/);
 });
 
-test("prompting section wires only instruction, persona, tone, and operator notes", async () => {
+test("prompting section wires voice-first mode with the prompt controls", async () => {
   const { WorkspacePromptingSection } = await loadPromptingSection();
   const changes: Record<string, string[]> = {
     instruction: [],
     notes: [],
     persona: [],
     tone: [],
+    voiceFirst: [],
   };
 
   const tree = WorkspacePromptingSection({
@@ -77,10 +79,12 @@ test("prompting section wires only instruction, persona, tone, and operator note
     persona: "Support operator",
     promptingInstruction: "Answer clearly.",
     promptingNotes: "Keep it short.",
+    preserveModelVoice: true,
     onToneChange: (value) => changes.tone.push(value),
     onPersonaChange: (value) => changes.persona.push(value),
     onPromptingInstructionChange: (value) => changes.instruction.push(value),
     onPromptingNotesChange: (value) => changes.notes.push(value),
+    onPreserveModelVoiceChange: (value) => changes.voiceFirst.push(String(value)),
   });
 
   const editable = collectElements(
@@ -89,10 +93,12 @@ test("prompting section wires only instruction, persona, tone, and operator note
   );
   const buttons = collectElements(tree, (element) => element.type === "button");
   const links = collectElements(tree, (element) => element.type === "a");
+  const toggles = collectElements(tree, (element) => Boolean(element.props?.onCheckedChange));
 
   assert.equal(editable.length, 4);
   assert.equal(buttons.length, 0);
   assert.equal(links.length, 0);
+  assert.equal(toggles.length, 1);
 
   editable.forEach((element, index) => {
     element.props?.onChange?.({ target: { value: `value-${index}` } });
@@ -102,4 +108,7 @@ test("prompting section wires only instruction, persona, tone, and operator note
   assert.deepEqual(changes.persona, ["value-1"]);
   assert.deepEqual(changes.tone, ["value-2"]);
   assert.deepEqual(changes.notes, ["value-3"]);
+
+  toggles[0]?.props?.onCheckedChange?.(false);
+  assert.deepEqual(changes.voiceFirst, ["false"]);
 });

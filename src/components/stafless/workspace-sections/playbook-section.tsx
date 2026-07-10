@@ -137,6 +137,7 @@ export function PlaybookSection({
   playbook,
   discoveryFieldLabels,
   isReadOnlyMode,
+  isPlaybookActive = true,
   onApplyPreset,
   onUpdatePlaybook,
   onToggleDiscoveryField,
@@ -146,6 +147,7 @@ export function PlaybookSection({
   playbook: ConversationPlaybookConfig;
   discoveryFieldLabels: Record<DiscoveryField, string>;
   isReadOnlyMode: boolean;
+  isPlaybookActive?: boolean;
   onApplyPreset: (preset: ConversationPlaybookConfig["preset"]) => void;
   onUpdatePlaybook: (patch: Partial<ConversationPlaybookConfig>) => void;
   onToggleDiscoveryField: (field: DiscoveryField, checked: boolean) => void;
@@ -178,6 +180,14 @@ export function PlaybookSection({
             </p>
           </div>
         </div>
+
+        {!isPlaybookActive ? (
+          <div className="rounded-[12px] border border-[#dbe3ef] bg-[#f8fafc] px-4 py-3 text-sm leading-6 text-[#475467]">
+            This agent is in Voice-first conversation mode. Playbook values are preserved for a
+            future guided mode, but they are not sent to the model. Change the mode in Prompting
+            before editing these settings.
+          </div>
+        ) : null}
 
         <div className="space-y-3">
           <SectionHeader

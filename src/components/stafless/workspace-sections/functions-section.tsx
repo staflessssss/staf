@@ -32,6 +32,7 @@ import {
   functionPostActionOptions,
   functionReactionActionOptions,
 } from "@/lib/agent-config";
+import type { RuntimeActionProfile } from "@/lib/agent-runtime-profile";
 import {
   GoogleCalendarParams,
   GoogleSheetsColumnMappingDraft,
@@ -420,6 +421,7 @@ export function FunctionsSection({
   getFunctionStepKey,
   getGoogleSheetsParams,
   getGoogleCalendarParams,
+  runtimeActions,
 }: {
   functionBlocks: FunctionDraft[];
   isReadOnlyMode: boolean;
@@ -475,6 +477,7 @@ export function FunctionsSection({
   getFunctionStepKey: (functionIndex: number, stepIndex: number) => string;
   getGoogleSheetsParams: (step: ToolStepDraft) => GoogleSheetsParams;
   getGoogleCalendarParams: (step: ToolStepDraft) => GoogleCalendarParams;
+  runtimeActions: RuntimeActionProfile[];
 }) {
   const [selectedFunctionUiId, setSelectedFunctionUiId] = useState<string | null>(null);
 
@@ -580,8 +583,8 @@ export function FunctionsSection({
   return (
     <SurfaceCard
       className="border-0 bg-transparent p-0 shadow-none"
-      title="Functions"
-      description="Define business actions in a compact operator workspace, then bind execution to tenant integrations."
+      title="Actions"
+      description="The complete set of business actions the model can use in a live conversation."
       action={
         isReadOnlyMode ? null : (
           <button className={secondaryButtonClassName} onClick={onAddFunctionBlock} type="button">
@@ -593,6 +596,56 @@ export function FunctionsSection({
     >
       <div className={sectionCanvasClassName}>
         <div className="space-y-5">
+          {isWorkspaceMode ? (
+            <div className="rounded-[14px] border border-[#dbe3ef] bg-[#f8fafc] px-4 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#111827]">Live action map</p>
+                  <p className="mt-1 text-sm leading-6 text-[#667085]">
+                    System actions are supplied by the runtime. Configured actions can be edited below.
+                  </p>
+                </div>
+                <span className="rounded-[8px] bg-white px-2.5 py-1 text-xs font-semibold text-[#526173]">
+                  {runtimeActions.filter((action) => action.active).length} active
+                </span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {runtimeActions.map((action) => (
+                  <div
+                    className="rounded-[12px] border border-[#e1e7f0] bg-white px-3 py-3"
+                    key={action.id}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-[#111827]">{action.name}</p>
+                      <span className="rounded-[7px] bg-[#eef2f7] px-2 py-0.5 text-xs font-medium text-[#526173]">
+                        {action.source === "system" ? "System" : "Configured"}
+                      </span>
+                      <span
+                        className={
+                          action.active
+                            ? "rounded-[7px] bg-[#eaf7ee] px-2 py-0.5 text-xs font-medium text-[#247144]"
+                            : "rounded-[7px] bg-[#f3f4f6] px-2 py-0.5 text-xs font-medium text-[#667085]"
+                        }
+                      >
+                        {action.active ? "Active" : "Paused"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-[#667085]">{action.description}</p>
+                    <p className="mt-2 text-xs leading-5 text-[#667085]">
+                      <span className="font-semibold text-[#475467]">When:</span> {action.trigger}
+                    </p>
+                    {action.requirements.length > 0 ? (
+                      <p className="mt-1 text-xs leading-5 text-[#667085]">
+                        <span className="font-semibold text-[#475467]">Needs:</span>{" "}
+                        {action.requirements.join(", ")}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {functionBlocks.length === 0 ? (
             <EmptyState
               title="No functions configured yet"
@@ -618,7 +671,7 @@ export function FunctionsSection({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h1 className="text-[18px] font-semibold tracking-[-0.02em] text-[#101828]">
-                      Functions
+                      Configured actions
                     </h1>
                     <CircleQuestionMark className="size-4 text-[#98a2b3]" />
                   </div>
@@ -730,7 +783,7 @@ export function FunctionsSection({
                     type="button"
                   >
                     <ArrowLeft className="size-4" />
-                    Back to functions
+                    Back to actions
                   </button>
                   <div className="mt-3 flex items-center gap-2">
                     <h1 className="truncate text-[18px] font-semibold tracking-[-0.02em] text-[#101828]">

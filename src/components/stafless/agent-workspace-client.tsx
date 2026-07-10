@@ -80,6 +80,7 @@ import type {
   SafeChannelConnection,
   SafeIntegrationConnection,
 } from "@/components/stafless/agent-editor-shared";
+import type { AgentRuntimeProfile } from "@/lib/agent-runtime-profile";
 
 type SerializableTenant = {
   id: string;
@@ -292,8 +293,8 @@ const workspaceSections: Array<{
   },
   {
     id: "functions",
-    title: "Functions",
-    description: "Business actions and their integration-backed execution paths.",
+    title: "Actions",
+    description: "Every live business action available to this agent.",
     kind: "live",
     icon: Boxes,
   },
@@ -679,10 +680,12 @@ export function AgentWorkspaceClient({
   tenant,
   agent,
   initialWorkspaceSection,
+  runtimeProfile,
 }: {
   tenant: SerializableTenant;
   agent?: SerializableAgent;
   initialWorkspaceSection?: string;
+  runtimeProfile: AgentRuntimeProfile;
 }) {
   const router = useRouter();
   const isReadOnlyMode = false;
@@ -1836,8 +1839,10 @@ export function AgentWorkspaceClient({
               functionCount={draft.channelConfig.functionBlocks.length}
               isDirty={isDirty}
               knowledgeCount={draft.knowledgeBlocks.length}
+              runtimeProfile={runtimeProfile}
               selectedChannel={selectedChannel}
               softInfoPanelClassName={softInfoPanelClassName}
+              status={draft.status}
             />
           ) : null}
 
@@ -1899,6 +1904,14 @@ export function AgentWorkspaceClient({
                   }),
                 })
               }
+              onPreserveModelVoiceChange={(value) =>
+                updateChannelConfig({
+                  prompting: normalizePromptingConfig({
+                    ...draft.channelConfig.prompting,
+                    preserveModelVoice: value,
+                  }),
+                })
+              }
               onPersonaChange={(value) => {
                 updateDraft("persona", value);
                 updateChannelConfig({
@@ -1920,6 +1933,7 @@ export function AgentWorkspaceClient({
               persona={draft.persona}
               promptingInstruction={draft.channelConfig.prompting.instruction ?? ""}
               promptingNotes={draft.channelConfig.prompting.notes ?? ""}
+              preserveModelVoice={draft.channelConfig.prompting.preserveModelVoice}
               tone={draft.tone}
             />
           ) : null}
@@ -1947,6 +1961,7 @@ export function AgentWorkspaceClient({
             <WorkspaceMessagesSection
               channelBehavior={draft.channelConfig.channelBehavior}
               isReadOnlyMode={isReadOnlyMode}
+              modelStyleManagedByPrompt={draft.channelConfig.prompting.preserveModelVoice}
               onUpdateChannelBehavior={updateChannelBehavior}
             />
           ) : null}
@@ -1962,7 +1977,8 @@ export function AgentWorkspaceClient({
           {showWorkspacePlaybook ? (
             <PlaybookSection
               discoveryFieldLabels={discoveryFieldLabels}
-              isReadOnlyMode={isReadOnlyMode}
+              isReadOnlyMode={isReadOnlyMode || draft.channelConfig.prompting.preserveModelVoice}
+              isPlaybookActive={!draft.channelConfig.prompting.preserveModelVoice}
               onApplyPreset={applyConversationPlaybookPreset}
               onMoveDiscoveryOrder={moveDiscoveryOrder}
               onToggleDiscoveryField={toggleDiscoveryField}
@@ -2013,10 +2029,11 @@ export function AgentWorkspaceClient({
                 onUpdateFunctionStep={updateFunctionStep}
                 onUpdateFunctionStepParams={updateFunctionStepParams}
                 onUpdateGoogleSheetsColumnMapping={updateGoogleSheetsColumnMapping}
-                onUpdateGoogleSheetsFilter={updateGoogleSheetsFilter}
-                sectionCanvasClassName={sectionCanvasClassName}
-                sheetInspectors={sheetInspectors}
-              />
+              onUpdateGoogleSheetsFilter={updateGoogleSheetsFilter}
+              sectionCanvasClassName={sectionCanvasClassName}
+              sheetInspectors={sheetInspectors}
+              runtimeActions={runtimeProfile.actions}
+            />
           ) : null}
 
           {shouldShowWorkspaceIntegrations ? (

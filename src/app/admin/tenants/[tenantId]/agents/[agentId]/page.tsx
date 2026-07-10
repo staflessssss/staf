@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AgentWorkbenchShell } from "@/components/stafless/agent-workbench-shell";
 import { AgentWorkspace } from "@/components/stafless/agent-workspace";
 import { requireAdminSession } from "@/lib/admin-auth";
+import { buildAgentRuntimeProfile } from "@/lib/agent-runtime-profile";
 import { db } from "@/lib/db";
 
 type AgentDetailPageProps = {
@@ -67,6 +68,10 @@ export default async function AgentDetailPage({
       <AgentWorkspace
         agent={agent}
         initialWorkspaceSection={resolvedSearchParams?.section}
+        runtimeProfile={buildAgentRuntimeProfile({
+          agent,
+          channels: tenant.channelConnections,
+        })}
         tenant={tenant}
       />
     </AgentWorkbenchShell>

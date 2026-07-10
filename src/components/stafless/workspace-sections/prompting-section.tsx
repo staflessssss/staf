@@ -1,5 +1,6 @@
 import {
   FormField,
+  ToggleSwitch,
   inputClassName,
   textareaClassName,
 } from "@/components/stafless/foundation";
@@ -12,20 +13,24 @@ export function WorkspacePromptingSection({
   persona,
   promptingInstruction,
   promptingNotes,
+  preserveModelVoice = false,
   onToneChange,
   onPersonaChange,
   onPromptingInstructionChange,
   onPromptingNotesChange,
+  onPreserveModelVoiceChange,
 }: {
   isReadOnlyMode: boolean;
   tone: string;
   persona: string;
   promptingInstruction: string;
   promptingNotes: string;
+  preserveModelVoice?: boolean;
   onToneChange: (value: string) => void;
   onPersonaChange: (value: string) => void;
   onPromptingInstructionChange: (value: string) => void;
   onPromptingNotesChange: (value: string) => void;
+  onPreserveModelVoiceChange?: (value: boolean) => void;
 }) {
   return (
     <div className="mx-auto max-w-[1040px] space-y-8">
@@ -58,6 +63,23 @@ export function WorkspacePromptingSection({
               />
             </div>
           </FormField>
+        </div>
+
+        <div className={rowClassName}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#111827]">Voice-first conversation</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Keep the model led by this voice, knowledge, and actions. Turn this off only when
+                this agent should also follow the structured Playbook settings.
+              </p>
+            </div>
+            <ToggleSwitch
+              checked={preserveModelVoice}
+              disabled={isReadOnlyMode}
+              onCheckedChange={(checked) => onPreserveModelVoiceChange?.(checked)}
+            />
+          </div>
         </div>
       </section>
 

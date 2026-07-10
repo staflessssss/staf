@@ -87,10 +87,12 @@ function HelpHint({ label }: { label: string }) {
 export function WorkspaceMessagesSection({
   channelBehavior,
   isReadOnlyMode,
+  modelStyleManagedByPrompt = false,
   onUpdateChannelBehavior,
 }: {
   channelBehavior: ChannelBehaviorConfig;
   isReadOnlyMode: boolean;
+  modelStyleManagedByPrompt?: boolean;
   onUpdateChannelBehavior: (patch: Partial<ChannelBehaviorConfig>) => void;
 }) {
   const splitMessagesEnabled = getSplitMessagesEnabled(channelBehavior);
@@ -106,6 +108,13 @@ export function WorkspaceMessagesSection({
             Messages
           </h1>
         </div>
+
+        {modelStyleManagedByPrompt ? (
+          <div className="rounded-[12px] border border-[#dbe3ef] bg-[#f8fafc] px-4 py-3 text-sm leading-6 text-[#475467]">
+            This agent is Voice-first. Reply tone, length, and emoji choices are controlled in
+            Prompting. The delivery timing and follow-up settings below still apply.
+          </div>
+        ) : null}
 
         <div className="space-y-3">
           <h2 className={sectionTitleClassName}>Message delivery</h2>
