@@ -2,11 +2,6 @@ import {
   readMessageBehaviorConfig,
   splitOutgoingMessage,
 } from "@/lib/channels/message-behavior";
-import type {
-  InstagramDeliveryPlan,
-  InstagramDeliveryPart,
-} from "@/lib/agents/wedding-sales-simple/delivery-plan";
-import type { WeddingSalesSimpleDeliveryExecution } from "@/lib/agents/wedding-sales-simple/contracts";
 
 type InstagramCredentials = {
   pageAccessToken: string;
@@ -51,6 +46,38 @@ type InstagramAttachment = {
   fileName?: string;
   mimeType?: string;
 };
+
+type InstagramDeliveryPart =
+  | {
+      kind: "sender_action";
+      action: "mark_seen" | "typing_on" | "typing_off";
+      delayMsBefore: number;
+      reason?: string;
+    }
+  | {
+      kind: "text";
+      text: string;
+      delayMsBefore: number;
+      typingMsBefore: number;
+      reason?: string;
+    }
+  | {
+      kind: "attachment";
+      attachment: { type: string; url: string; purpose?: string; label?: string };
+      delayMsBefore: number;
+      reason?: string;
+    };
+
+type InstagramDeliveryPlan = {
+  channel: "instagram";
+  mode: "semantic_split" | "single_message";
+  enabled: boolean;
+  textPartCount: number;
+  attachmentPartCount: number;
+  totalDelayMs: number;
+  parts: InstagramDeliveryPart[];
+};
+type InstagramDeliveryExecution = Record<string, unknown>;
 
 type InstagramDeliveryPacing = "fast" | "human" | "slow";
 
@@ -418,7 +445,7 @@ async function executeInstagramDeliveryPlan(args: {
   const actualDelaysMs: number[] = [];
   const startedAtDate = new Date();
   const startedAtMs = Date.now();
-  const partTimings: Extract<WeddingSalesSimpleDeliveryExecution, { executed: true }>["parts"] = [];
+  const partTimings: Array<Record<string, unknown>> = [];
 
   const effectiveDelayMs = (delayMs: number, minDelayMs = 0) => {
     return Math.max(minDelayMs, Math.round(delayMs * delayScale));
@@ -590,7 +617,7 @@ async function executeInstagramDeliveryPlan(args: {
   }
   const finishedAtDate = new Date();
 
-  const deliveryExecution: WeddingSalesSimpleDeliveryExecution = {
+  const deliveryExecution: InstagramDeliveryExecution = {
     enabled: true,
     executed: true,
     usedExecutor: true,
@@ -673,14 +700,55 @@ export const instagramAdapter = {
 
     const messageParts = getTextPayload(params.message).filter((part) => part.trim());
     const imageAttachments = getImageAttachments(params.attachments);
-    const splitDelayMs = readMessageBehaviorConfig(params.channelConfig).splitMessageDelaySeconds * 1000;
+    const behaviorConfig = readMessageBehaviorConfig(params.channelConfig);
+    const splitDelayMs = behaviorConfig.splitMessageDelaySeconds * 1000;
+    const typingDelayMs = behaviorConfig.typingDelaySeconds * 1000;
+    const useSenderActions =
+      Boolean(params.channelConfig) &&
+      process.env.DISABLE_INSTAGRAM_SENDER_ACTIONS !== "true";
     const deliveries = [];
     const totalParts = messageParts.length + imageAttachments.length;
+    let senderActionsSent = false;
+
+    const sendInitialSenderActions = async (includeTyping: boolean) => {
+      if (!useSenderActions || senderActionsSent) {
+        return false;
+      }
+
+      senderActionsSent = true;
+
+      try {
+        await sendInstagramSenderAction({
+          credentials,
+          contactId: params.contactId,
+          action: "mark_seen",
+        });
+
+        if (includeTyping) {
+          await sendInstagramSenderAction({
+            credentials,
+            contactId: params.contactId,
+            action: "typing_on",
+          });
+        }
+        return includeTyping;
+      } catch {
+        // Sender actions are best-effort; never block the actual customer reply.
+        return false;
+      }
+    };
 
     for (let index = 0; index < messageParts.length; index += 1) {
       const part = messageParts[index];
 
       try {
+        if (index === 0) {
+          const typingShown = await sendInitialSenderActions(true);
+          if (typingShown && typingDelayMs > 0) {
+            await wait(typingDelayMs);
+          }
+        }
+
         if (index > 0 && splitDelayMs > 0) {
           await wait(splitDelayMs);
         }
@@ -711,6 +779,10 @@ export const instagramAdapter = {
 
     for (const attachment of imageAttachments) {
       try {
+        if (messageParts.length === 0) {
+          await sendInitialSenderActions(false);
+        }
+
         if (deliveries.length > 0 && splitDelayMs > 0) {
           await wait(splitDelayMs);
         }

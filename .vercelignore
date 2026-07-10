@@ -1,0 +1,14 @@
+# Local debug exports and agent investigation artifacts
+*-debug.json
+*-safety-log.json
+*before-*.json
+*backup*.json
+*analysis.json
+*review*.json
+tmp-*/
+test-results/
+*.zip
+
+# Local planning / Codex workflow state
+.planning/
+.codex/

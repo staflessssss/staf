@@ -15,6 +15,8 @@ type FollowUpRuleConfig = {
   sendLimit: FollowUpSendLimit;
   outOfHoursBehavior: FollowUpOutOfHoursBehavior;
   instruction: string;
+  requiresPricingGuideContext: boolean;
+  requiresOpenQuestion: boolean;
 };
 
 function asObject(value: unknown) {
@@ -68,6 +70,8 @@ function asFollowUpRule(value: unknown): FollowUpRuleConfig | null {
     sendLimit,
     outOfHoursBehavior,
     instruction,
+    requiresPricingGuideContext: parsed.requiresPricingGuideContext === true,
+    requiresOpenQuestion: parsed.requiresOpenQuestion === true,
   };
 }
 
@@ -88,6 +92,11 @@ export function readMessageBehaviorConfig(config: unknown) {
       typeof channelBehavior?.splitMessageDelaySeconds === "number" &&
       Number.isFinite(channelBehavior.splitMessageDelaySeconds)
         ? Math.max(0, Math.min(30, Math.floor(channelBehavior.splitMessageDelaySeconds)))
+        : 0,
+    typingDelaySeconds:
+      typeof channelBehavior?.typingDelaySeconds === "number" &&
+      Number.isFinite(channelBehavior.typingDelaySeconds)
+        ? Math.max(0, Math.min(15, Math.floor(channelBehavior.typingDelaySeconds)))
         : 0,
     bufferDelaySeconds:
       typeof channelBehavior?.bufferDelaySeconds === "number" &&

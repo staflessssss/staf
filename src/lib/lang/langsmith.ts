@@ -1,6 +1,6 @@
 import { traceable } from "langsmith/traceable";
 
-export type LangRuntimeType = "legacy" | "langgraph_wedding_sales";
+export type LangRuntimeType = "gpt_agent";
 
 export type LangRuntimeTraceMetadata = {
   tenantId?: string;

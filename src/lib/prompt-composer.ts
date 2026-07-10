@@ -237,7 +237,6 @@ export function buildRuntimeExecutionPolicy() {
 
 export function buildSystemPrompt(agent: AgentPromptInput) {
   const knowledgeBlocks = agent.knowledgeBlocks ?? [];
-  const playbook = normalizeConversationPlaybook(agent.conversationPlaybook);
   const promptingIdentity = resolvePromptingIdentity({
     prompting: agent.prompting,
     persona: agent.persona,
@@ -246,6 +245,35 @@ export function buildSystemPrompt(agent: AgentPromptInput) {
   });
   const functionBlocks = agent.functionBlocks ?? [];
   const channelLabel = agent.channel?.type ? formatEnumLabel(agent.channel.type) : "Unassigned";
+
+  if (promptingIdentity.prompting.preserveModelVoice) {
+    return [
+      `Agent identity: ${agent.name}`,
+      `Channel: ${channelLabel}`,
+      `Language behavior: ${buildMultilingualGuidance({
+        languagePreference: promptingIdentity.languagePreference,
+        channel: agent.channel ?? null,
+      })}`,
+      "Use the business knowledge and successful tool outputs as the source of truth. Never invent a business fact or action result.",
+      "Return only the customer-facing reply. Do not describe internal reasoning, tools, safety, or automation.",
+      "",
+      "Prompting",
+      renderPromptingSection(agent),
+      "",
+      "Business knowledge",
+      renderKnowledgeSection(knowledgeBlocks),
+      "",
+      "Available functions",
+      functionBlocks.length > 0
+        ? functionBlocks
+            .filter((fn) => fn.active !== false)
+            .map((fn) => `- ${fn.name}: ${fn.description}`)
+            .join("\n")
+        : "No business functions are configured.",
+    ].join("\n");
+  }
+
+  const playbook = normalizeConversationPlaybook(agent.conversationPlaybook);
 
   return [
     `Agent identity: ${agent.name}`,

@@ -15,8 +15,15 @@ import { requireClientSession } from "@/lib/client-auth";
 import { normalizeInternalRedirect } from "@/lib/auth-redirect";
 import { getInstagramCredentialsValidationError } from "@/lib/channels/instagram";
 import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
-import { upsertChannelConnection, upsertIntegrationConnection } from "@/lib/connection-store";
-import { encrypt } from "@/lib/crypto";
+import {
+  revokeChannelConnection,
+  upsertChannelConnection,
+  upsertIntegrationConnection,
+} from "@/lib/connection-store";
+import {
+  buildGmailWorkspacePresetIntegrations,
+  buildPresetChannelConnection,
+} from "@/lib/connection-presets";
 import { db } from "@/lib/db";
 import { mergeOwnerHandoffMetadata } from "@/lib/owner-handoff";
 
@@ -212,30 +219,11 @@ export async function connectPresetChannelAction(formData: FormData) {
     redirect(`${redirectTo}?error=instagram-operator-managed`);
   }
 
-  await upsertChannelConnection({
-    tenantId,
-    type,
-    status: ConnectionStatus.CONNECTED,
-    credentials: `preset:${type.toLowerCase()}:connected`,
-    metadata:
-      type === ChannelType.GMAIL
-        ? { provider: "google", access: ["gmail", "calendar", "sheets", "drive"] }
-        : { provider: type.toLowerCase() },
-  });
+  await upsertChannelConnection(buildPresetChannelConnection(tenantId, type));
 
   if (type === ChannelType.GMAIL) {
-    for (const integrationType of [
-      IntegrationType.GOOGLE_CALENDAR,
-      IntegrationType.GOOGLE_SHEETS,
-      IntegrationType.GOOGLE_DRIVE,
-    ]) {
-      await upsertIntegrationConnection({
-        tenantId,
-        type: integrationType,
-        status: ConnectionStatus.CONNECTED,
-        credentials: `preset:${integrationType.toLowerCase()}:connected`,
-        metadata: { provider: "google", via: "gmail_workspace" },
-      });
+    for (const integration of buildGmailWorkspacePresetIntegrations(tenantId)) {
+      await upsertIntegrationConnection(integration);
     }
   }
 
@@ -289,22 +277,9 @@ export async function revokeChannelConnectionAction(formData: FormData) {
     redirect(`${redirectTo}?error=channel`);
   }
 
-  await db.channelConnection.upsert({
-    where: {
-      tenantId_type: {
-        tenantId,
-        type: parsed.data.type,
-      },
-    },
-    update: {
-      status: ConnectionStatus.REVOKED,
-    },
-    create: {
-      tenantId,
-      type: parsed.data.type,
-      status: ConnectionStatus.REVOKED,
-      credentialsEnc: encrypt("revoked"),
-    },
+  await revokeChannelConnection({
+    tenantId,
+    type: parsed.data.type,
   });
 
   revalidatePath("/client");

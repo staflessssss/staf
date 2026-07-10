@@ -5,8 +5,13 @@ import { z } from "zod";
 
 import { requireAdminApiSession } from "@/lib/admin-api-auth";
 import { getInstagramCredentialsValidationError } from "@/lib/channels/instagram";
-import { encrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
+import {
+  safeConnectionSelect,
+  upsertChannelConnectionWithDeps,
+  upsertIntegrationConnectionWithDeps,
+} from "@/lib/connection-store";
+import { encrypt } from "@/lib/crypto";
 
 type ConnectionsRouteContext = {
   params: Promise<{ tenantId: string }>;
@@ -28,16 +33,6 @@ const createConnectionSchema = z.discriminatedUnion("scope", [
     type: z.nativeEnum(IntegrationType),
   }),
 ]);
-
-const safeConnectionSelect = {
-  id: true,
-  tenantId: true,
-  type: true,
-  status: true,
-  metadata: true,
-  createdAt: true,
-  updatedAt: true,
-} as const;
 
 export async function GET(_: Request, context: ConnectionsRouteContext) {
   const session = await requireAdminApiSession();
@@ -105,52 +100,34 @@ export async function POST(request: Request, context: ConnectionsRouteContext) {
       }
     }
 
-    const item = await db.channelConnection.upsert({
-      where: {
-        tenantId_type: {
-          tenantId,
-          type: parsed.data.type,
-        },
-      },
-      update: {
-        status: parsed.data.status,
-        credentialsEnc: encrypt(parsed.data.credentials),
-        metadata,
-      },
-      create: {
+    const item = await upsertChannelConnectionWithDeps(
+      db,
+      encrypt,
+      {
         tenantId,
         type: parsed.data.type,
         status: parsed.data.status,
-        credentialsEnc: encrypt(parsed.data.credentials),
+        credentials: parsed.data.credentials,
         metadata,
       },
-      select: safeConnectionSelect,
-    });
+      safeConnectionSelect,
+    );
 
     return NextResponse.json({ item }, { status: 201 });
   }
 
-  const item = await db.integrationConnection.upsert({
-    where: {
-      tenantId_type: {
-        tenantId,
-        type: parsed.data.type,
-      },
-    },
-    update: {
-      status: parsed.data.status,
-      credentialsEnc: encrypt(parsed.data.credentials),
-      metadata,
-    },
-    create: {
+  const item = await upsertIntegrationConnectionWithDeps(
+    db,
+    encrypt,
+    {
       tenantId,
       type: parsed.data.type,
       status: parsed.data.status,
-      credentialsEnc: encrypt(parsed.data.credentials),
+      credentials: parsed.data.credentials,
       metadata,
     },
-    select: safeConnectionSelect,
-  });
+    safeConnectionSelect,
+  );
 
   return NextResponse.json({ item }, { status: 201 });
 }

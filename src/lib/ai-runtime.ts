@@ -6,8 +6,10 @@ import {
   DelayedDeliveryKind,
   FeatureType,
   MessageRole,
+  Prisma,
 } from "@prisma/client";
-import { generateText, stepCountIs } from "ai";
+import { APICallError, generateText, stepCountIs, tool, type ToolSet } from "ai";
+import { z } from "zod";
 
 import {
   agentConfigInclude,
@@ -24,17 +26,25 @@ import {
   normalizeFunctionBlocks,
   normalizePromptingConfig,
   PromptingConfig,
+  type RuntimeToolFeature,
 } from "@/lib/agent-config";
 import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { parseInstagramCredentials } from "@/lib/channels/instagram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
-import { selectWeddingSalesGuide } from "@/lib/lang/graphs/wedding-sales/config";
-import { buildWeddingSalesConfigFromChannelConfig } from "@/lib/lang/graphs/wedding-sales/config-from-agent";
-import { invokeWeddingSalesGraph } from "@/lib/lang/graphs/wedding-sales/graph";
-import type { WeddingSalesState } from "@/lib/lang/graphs/wedding-sales/state";
-import { createWeddingSalesToolContextFromFeatures } from "@/lib/lang/graphs/wedding-sales/tools";
+import {
+  extractAndSaveConversationMemoryWithDb,
+  isConversationMemoryEligibleChannel,
+  loadConversationMemoryWithDb,
+} from "@/lib/conversation-memory";
+import { recordExecutionTraceWithDb } from "@/lib/execution-traces";
+import {
+  buildMyndfulGuideConfig,
+  getMyndfulGuide,
+  normalizeMyndfulServiceRegion,
+  type MyndfulServiceRegion,
+} from "@/lib/agents/myndful/guide-config";
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
 import { resolveTools } from "@/lib/tools";
@@ -59,20 +69,6 @@ import {
   requestOwnerHandoffWithDb,
   shouldRequestOwnerHandoff,
 } from "@/lib/owner-handoff";
-import { invokeWeddingSalesSimpleAdapter } from "@/lib/agents/wedding-sales-simple/invoke";
-import type {
-  NormalizedWeddingSalesIncomingMessage,
-  NormalizedWeddingSalesOutboundMessage,
-  WeddingSalesSimpleDeliveryExecution,
-  WeddingSalesSimpleSafetyLogEntry,
-} from "@/lib/agents/wedding-sales-simple/contracts";
-import type { ChannelDeliveryPlan } from "@/lib/agents/wedding-sales-simple/delivery-plan";
-import {
-  loadWeddingSalesSimpleStateWithDb,
-  saveWeddingSalesSimpleStateWithDb,
-} from "@/lib/agents/wedding-sales-simple/state-store";
-import { scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb } from "@/lib/agents/wedding-sales-simple/followups";
-import type { SimpleWeddingSalesState } from "@/lib/lang/graphs/wedding-sales-simple/state";
 
 type LightweightKnowledgeBlock = {
   name: string;
@@ -123,6 +119,33 @@ type RuntimeAttachment = {
   publicUrl?: string;
 };
 
+export type RuntimeHistoryMessage = {
+  role: MessageRole;
+  content: string;
+  toolName?: string | null;
+  toolResult?: unknown;
+  durationMs?: number;
+  createdAt?: Date;
+  model?: string | null;
+};
+
+export type InvokeAgentResult = {
+  message: string;
+  promptPreview: string;
+  usedTooling: string[];
+  toolExecutions?: Array<{
+    toolName: string;
+    toolInput: unknown;
+    toolResult: unknown;
+    durationMs?: number;
+  }>;
+  conversationId?: string;
+  model?: string;
+  attachments?: RuntimeAttachment[];
+  historyAppend?: RuntimeHistoryMessage[];
+  suppressReply?: boolean;
+};
+
 function buildPublicGoogleDriveDownloadUrl(fileId?: string) {
   const trimmed = fileId?.trim();
 
@@ -133,12 +156,12 @@ function buildPublicGoogleDriveDownloadUrl(fileId?: string) {
   return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(trimmed)}`;
 }
 
-function getWeddingSalesGuideAttachment(args: {
+function getMyndfulGuideAttachment(args: {
   channel: ChannelType | string;
   message: string;
-  config: ReturnType<typeof buildWeddingSalesConfigFromChannelConfig>;
+  config: ReturnType<typeof buildMyndfulGuideConfig>;
   allowAttachments: boolean;
-  state?: Pick<WeddingSalesState, "location" | "venue" | "availabilityRegion">;
+  region: MyndfulServiceRegion;
 }) {
   if (
     (!args.allowAttachments && args.channel !== ChannelType.INSTAGRAM) ||
@@ -147,7 +170,10 @@ function getWeddingSalesGuideAttachment(args: {
     return [];
   }
 
-  const guide = selectWeddingSalesGuide(args.config, args.state);
+  const guide = getMyndfulGuide(args.config, args.region);
+  if (!guide) {
+    return [];
+  }
   const publicUrl = guide.imageUrl ?? buildPublicGoogleDriveDownloadUrl(guide.fileId);
 
   if (!guide.fileId && !publicUrl) {
@@ -165,17 +191,191 @@ function getWeddingSalesGuideAttachment(args: {
   ] satisfies RuntimeAttachment[];
 }
 
-function getSimpleWeddingSalesAttachments(
-  attachments?: NormalizedWeddingSalesOutboundMessage["attachments"],
-) {
-  return attachments
-    ?.filter((attachment) => attachment.type === "image" && attachment.url)
-    .map((attachment) => ({
-      fileId: attachment.url,
-      fileName: attachment.label,
-      mimeType: "image/png",
-      publicUrl: attachment.url,
-    })) satisfies RuntimeAttachment[] | undefined;
+function getConfiguredGuideRegionsFromCustomerMessages(args: {
+  agent: AgentWithConfigData;
+  customerMessages: string[];
+}) {
+  const rawChannelConfig = getChannelConfigObject(args.agent.channelConfig as never);
+  const functionBlocks = Array.isArray(rawChannelConfig.functionBlocks)
+    ? rawChannelConfig.functionBlocks
+    : [];
+  const availabilityBlock = functionBlocks.find(
+    (block) =>
+      block &&
+      typeof block === "object" &&
+      !Array.isArray(block) &&
+      "name" in block &&
+      String(block.name).trim().toLowerCase() === "check wedding availability",
+  );
+  const steps =
+    availabilityBlock && typeof availabilityBlock === "object" && "steps" in availabilityBlock &&
+    Array.isArray(availabilityBlock.steps)
+      ? availabilityBlock.steps
+      : [];
+  const configuredAliases = steps.flatMap((step) => {
+    if (!step || typeof step !== "object" || Array.isArray(step) || !("params" in step)) {
+      return [];
+    }
+
+    const rawParams = step.params;
+    if (typeof rawParams !== "string") {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(rawParams) as { capacityRules?: unknown };
+      if (!Array.isArray(parsed.capacityRules)) {
+        return [];
+      }
+
+      return parsed.capacityRules.flatMap((rule) => {
+        if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+          return [];
+        }
+
+        const record = rule as Record<string, unknown>;
+        const region = normalizeMyndfulServiceRegion(
+          typeof record.region === "string" ? record.region : undefined,
+        );
+        const aliases = Array.isArray(record.aliases)
+          ? record.aliases.filter((alias): alias is string => typeof alias === "string")
+          : [];
+
+        return region ? aliases.map((alias) => ({ region, alias: alias.toLowerCase() })) : [];
+      });
+    } catch {
+      return [];
+    }
+  });
+  const customerText = args.customerMessages.join("\n").toLowerCase();
+
+  return new Set(
+    configuredAliases
+      .filter(({ alias }) => alias.length > 0 && customerText.includes(alias))
+      .map(({ region }) => region),
+  );
+}
+
+function buildConfiguredCollectionsGuideTool(args: {
+  agent: AgentWithConfigData;
+  establishedRegions: ReadonlySet<string>;
+  onToolResult: (entry: {
+    toolName: string;
+    toolInput: Prisma.JsonValue;
+    toolResult: Prisma.JsonValue;
+    durationMs?: number;
+  }) => void;
+}) {
+  const config = buildMyndfulGuideConfig(args.agent.channelConfig);
+  const rawChannelConfig = getChannelConfigObject(args.agent.channelConfig as never);
+  const configuredRegions = ["FL", "NC_SC_GA"] as const;
+  const hasGuide = configuredRegions.some((serviceRegion) =>
+    getMyndfulGuideAttachment({
+      channel: args.agent.channel.type,
+      message: "collections guide",
+      config,
+      allowAttachments: true,
+      region: serviceRegion,
+    }).length > 0,
+  );
+
+  if (!hasGuide) {
+    return null;
+  }
+
+  return tool({
+    description:
+      "Send the configured regional Myndful collections guide as an attachment. Use only when the customer has stated a wedding city/state that establishes this region in the current or recent conversation, or when a successful availability result for this region is present in the current conversation. Never choose a default region or infer one solely because the customer asked for pricing. If region is not established, ask for the wedding city/state instead.",
+    inputSchema: z.object({
+      serviceRegion: z
+        .enum(["FL", "NC_SC_GA"])
+        .describe("FL for Florida, or NC_SC_GA for North Carolina, South Carolina, or Georgia."),
+    }),
+    execute: async ({ serviceRegion }) => {
+      const startedAt = Date.now();
+      const isEstablishedRegion = args.establishedRegions.has(serviceRegion);
+      if (!isEstablishedRegion) {
+        const output = {
+          status: "blocked_precondition",
+          serviceRegion,
+          missing: ["wedding city/state or a prior availability result for this region"],
+          summary:
+            "Do not attach a regional guide yet. The customer has not established this wedding region. Give the approved starting prices and ask naturally for the wedding city/state.",
+        };
+
+        args.onToolResult({
+          toolName: "send_collections_guide",
+          toolInput: { serviceRegion },
+          toolResult: output,
+          durationMs: Date.now() - startedAt,
+        });
+
+        return output;
+      }
+      const attachment = getMyndfulGuideAttachment({
+        channel: args.agent.channel.type,
+        message: "collections guide",
+        config,
+        allowAttachments: true,
+        region: serviceRegion,
+      })[0];
+      const pricing = config.pricingByRegion?.[serviceRegion];
+      const rawPricingByRegion =
+        rawChannelConfig.pricingByRegion &&
+        typeof rawChannelConfig.pricingByRegion === "object" &&
+        !Array.isArray(rawChannelConfig.pricingByRegion)
+          ? (rawChannelConfig.pricingByRegion as Record<string, unknown>)
+          : {};
+      const rawRegionalPricing = rawPricingByRegion[serviceRegion];
+      const rawPromotionText =
+        rawRegionalPricing &&
+        typeof rawRegionalPricing === "object" &&
+        !Array.isArray(rawRegionalPricing) &&
+        "promotionText" in rawRegionalPricing
+          ? (rawRegionalPricing as Record<string, unknown>).promotionText
+          : undefined;
+      const promotionText = typeof rawPromotionText === "string" ? rawPromotionText.trim() : "";
+      const output = attachment
+        ? {
+            status: "ready_to_attach",
+            serviceRegion,
+            ...(pricing?.startPrice ? { startPrice: pricing.startPrice } : {}),
+            ...(promotionText ? { promotionText } : {}),
+            attachment,
+            summary: "The correct regional collections guide will be attached to this reply.",
+          }
+        : {
+            status: "not_configured",
+            serviceRegion,
+            summary: "No collections guide is configured for that region.",
+          };
+
+      args.onToolResult({
+        toolName: "send_collections_guide",
+        toolInput: { serviceRegion },
+        toolResult: output,
+        durationMs: Date.now() - startedAt,
+      });
+
+      return output;
+    },
+  });
+}
+
+function mergeRuntimeAttachments(...groups: Array<RuntimeAttachment[] | undefined>) {
+  const merged = new Map<string, RuntimeAttachment>();
+
+  for (const group of groups) {
+    for (const attachment of group ?? []) {
+      const key = attachment.publicUrl ?? attachment.fileId;
+
+      if (key) {
+        merged.set(key, attachment);
+      }
+    }
+  }
+
+  return [...merged.values()];
 }
 
 type ParsedIncomingMessage = {
@@ -205,27 +405,8 @@ type RuntimeChannelAdapter = {
     subject?: string;
     attachments?: RuntimeAttachment[];
     channelConfig?: unknown;
-    channelDeliveryPlan?: ChannelDeliveryPlan;
   }) => Promise<unknown>;
 };
-
-function normalizeOptionalText(value?: string) {
-  const normalized = value?.trim();
-  return normalized || undefined;
-}
-
-function buildContactProfileUpdate(args: {
-  contactUsername?: string;
-  contactDisplayName?: string;
-}) {
-  const contactUsername = normalizeOptionalText(args.contactUsername);
-  const contactDisplayName = normalizeOptionalText(args.contactDisplayName);
-
-  return {
-    ...(contactUsername ? { contactUsername } : {}),
-    ...(contactDisplayName ? { contactDisplayName } : {}),
-  };
-}
 
 type GmailClientClassification =
   | {
@@ -268,206 +449,14 @@ type InstagramConversationPreflightResult =
       error?: string;
     };
 
-type LangGraphToolObservation = {
-  toolName: string;
-  result: string;
-};
-
-const WEDDING_SALES_TEST_STATE_TOOL_NAME = "__wedding_sales_state";
-const WEDDING_SALES_SIMPLE_SAFETY_LOG_TOOL_NAME = "__wedding_sales_simple_safety_log";
-
-function getWeddingSalesOwnerHandoffReason(state: WeddingSalesState) {
-  return (
-    state.lastActionPlan?.actions.find(
-      (action) => action.type === "recommend_owner_handoff",
-    )?.reason ?? null
-  );
-}
-
-export type InvokeAgentResult = {
-  message: string;
-  promptPreview: string;
-  usedTooling: string[];
-  conversationId?: string;
-  model?: string;
-  attachments?: RuntimeAttachment[];
-  channelDeliveryPlan?: ChannelDeliveryPlan;
-  historyAppend?: RuntimeHistoryMessage[];
-  suppressReply?: boolean;
-  weddingSalesSimpleFollowUpState?: Partial<SimpleWeddingSalesState>;
-  weddingSalesSimpleAssistantMessageId?: string;
-};
-
-export type RuntimeHistoryMessage = {
-  role: MessageRole;
-  content: string;
-  toolName?: string | null;
-  toolResult?: unknown;
-  durationMs?: number;
-  createdAt?: Date;
-  model?: string | null;
-};
-
+const OWNER_HANDOFF_RUNTIME_TOOL_NAME = "tool_4_owner_handoff_request";
 const ALLOWED_EMOJIS = ["🤍", "✨", "🎥"] as const;
 const FALSE_CONFIRMATION_PATTERNS = [
   /\b(?:you(?:'re| are)\s+all\s+set|all\s+set for)\b/i,
-  /\b(?:booked|booking is confirmed|confirmed)\b/i,
-  /\blet'?s consider it set\b/i,
-  /\binvite (?:is|will be) (?:on the way|coming|sent)\b/i,
+  /\bbooking is confirmed\b/i,
+  /\b(?:call|consultation|meeting|appointment|slot|calendar|invite)\s+(?:is\s+)?booked\b/i,
+  /\b(?:call|consultation|meeting|appointment|slot|calendar|invite)\s+(?:is\s+)?confirmed\b/i,
 ] as const;
-
-function parseLangGraphToolResult(result: string) {
-  try {
-    return JSON.parse(result);
-  } catch {
-    return { raw: result };
-  }
-}
-
-function summarizeLangGraphToolResult(toolName: string, result: string) {
-  const parsed = parseLangGraphToolResult(result);
-
-  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-    const objectValue = parsed as Record<string, unknown>;
-    const summary = typeof objectValue.summary === "string" ? objectValue.summary : null;
-    const status = typeof objectValue.status === "string" ? objectValue.status : null;
-
-    if (summary) {
-      return summary;
-    }
-
-    if (status) {
-      return `${toolName}: ${status}`;
-    }
-  }
-
-  return `${toolName} completed`;
-}
-
-async function recordLangGraphToolObservationsWithDb(args: {
-  database: typeof db;
-  conversationId: string;
-  observations: LangGraphToolObservation[];
-}) {
-  for (const observation of args.observations) {
-    await args.database.message.create({
-      data: {
-        conversationId: args.conversationId,
-        role: MessageRole.TOOL,
-        content: summarizeLangGraphToolResult(observation.toolName, observation.result),
-        toolName: observation.toolName,
-        toolResult: parseLangGraphToolResult(observation.result),
-        model: "langgraph_wedding_sales",
-      },
-    });
-  }
-}
-
-async function recordWeddingSalesSimpleSafetyLogWithDb(args: {
-  database: typeof db;
-  conversationId: string;
-  entry: WeddingSalesSimpleSafetyLogEntry;
-}) {
-  await args.database.message.create({
-    data: {
-      conversationId: args.conversationId,
-      role: MessageRole.TOOL,
-      toolName: WEDDING_SALES_SIMPLE_SAFETY_LOG_TOOL_NAME,
-      content: `wedding-sales-simple: ${args.entry.decisionTrace?.replyType ?? "unknown"}`,
-      toolResult: args.entry,
-      model: "wedding_sales_simple",
-    },
-  });
-}
-
-function extractWeddingSalesSimpleDeliveryExecution(
-  delivery: unknown,
-): WeddingSalesSimpleDeliveryExecution | undefined {
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-    return undefined;
-  }
-
-  const execution = (delivery as { deliveryExecution?: unknown }).deliveryExecution;
-
-  if (!execution || typeof execution !== "object" || Array.isArray(execution)) {
-    return undefined;
-  }
-
-  return execution as WeddingSalesSimpleDeliveryExecution;
-}
-
-async function updateLatestWeddingSalesSimpleSafetyLogDeliveryExecution(args: {
-  database: typeof db;
-  conversationId: string;
-  deliveryExecution?: WeddingSalesSimpleDeliveryExecution;
-}) {
-  if (!args.deliveryExecution) {
-    return;
-  }
-
-  const safetyLog = await args.database.message.findFirst({
-    where: {
-      conversationId: args.conversationId,
-      role: MessageRole.TOOL,
-      toolName: WEDDING_SALES_SIMPLE_SAFETY_LOG_TOOL_NAME,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    select: {
-      id: true,
-      toolResult: true,
-    },
-  });
-
-  if (!safetyLog?.toolResult || typeof safetyLog.toolResult !== "object" || Array.isArray(safetyLog.toolResult)) {
-    return;
-  }
-
-  await args.database.message.update({
-    where: {
-      id: safetyLog.id,
-    },
-    data: {
-      toolResult: {
-        ...(safetyLog.toolResult as Record<string, unknown>),
-        deliveryExecution: args.deliveryExecution,
-      },
-    },
-  });
-}
-
-async function hasProcessedWeddingSalesSimpleIncomingWithDb(args: {
-  database: typeof db;
-  agentId: string;
-  contactId: string;
-  messageId?: string;
-}) {
-  const messageId = args.messageId?.trim();
-
-  if (!messageId) {
-    return false;
-  }
-
-  const existing = await args.database.message.findFirst({
-    where: {
-      role: MessageRole.USER,
-      conversation: {
-        agentId: args.agentId,
-        contactId: args.contactId,
-      },
-      toolInput: {
-        path: ["messageId"],
-        equals: messageId,
-      },
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  return Boolean(existing);
-}
 
 function splitSignature(text: string) {
   const signatureStart = text.search(/\n{2,}[A-Z][A-Za-z .'-]+\nFounder & Creative Director/i);
@@ -498,6 +487,19 @@ function sanitizeAllowedEmojis(text: string) {
   }
 
   return sanitized;
+}
+
+function stripDecorativeQuestionMarkEmoji(text: string) {
+  return text.replace(/([A-Za-z])\s+\?(?=\s{2,}|\s*\n|$)/g, "$1");
+}
+
+function stripInternalPlanningPreamble(text: string) {
+  return text
+    .replace(
+      /^\s*(?:we need|need to|we should|should)\b[\s\S]{0,400}?(?=(?:absolutely|of course|sure|hey|hi|got|totally|happy|i\b|what|could|can|once|that|perfect|ah)\b)/i,
+      "",
+    )
+    .trim();
 }
 
 function getStepResults(toolResult: unknown) {
@@ -1017,12 +1019,21 @@ function getAntiSpamIntercept(args: {
 function finalizeAssistantText(args: {
   text: string;
   currentMessage?: string;
+  historyMessages?: RuntimeHistoryMessage[];
+  preserveModelVoice?: boolean;
   toolExecutions: Array<{
     toolName: string;
     toolResult: unknown;
   }>;
 }) {
-  const noRogueEmoji = sanitizeAllowedEmojis(args.text);
+  if (args.preserveModelVoice) {
+    return args.text.trim();
+  }
+
+  const customerFacingText = stripInternalPlanningPreamble(args.text);
+  const noDecorativeQuestionMark = stripDecorativeQuestionMarkEmoji(customerFacingText);
+  const noUnexpectedScript = stripUnexpectedScriptFragments(noDecorativeQuestionMark);
+  const noRogueEmoji = sanitizeAllowedEmojis(noUnexpectedScript);
   const guardedText = softenFalseBookingConfirmation({
     text: noRogueEmoji,
     toolExecutions: args.toolExecutions,
@@ -1031,11 +1042,123 @@ function finalizeAssistantText(args: {
     text: guardedText,
     toolExecutions: args.toolExecutions,
   });
+  const availabilityPronounSafeText = rewriteCustomerOpenAvailabilityPhrase(simulatedText);
 
   return rewriteIncompleteWeddingDateReply({
-    text: simulatedText,
+    text: availabilityPronounSafeText,
     currentMessage: args.currentMessage,
+    historyMessages: args.historyMessages,
+    toolExecutions: args.toolExecutions,
   });
+}
+
+function stripUnexpectedScriptFragments(text: string) {
+  return text
+    .replace(/[\u0530-\u058f\u0400-\u04ff\u0590-\u05ff\u0600-\u06ff\u0900-\u097f]+/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([,.!?])/g, "$1")
+    .trim();
+}
+
+function rewriteCustomerOpenAvailabilityPhrase(text: string) {
+  return text
+    .replace(
+      /\bYou(?:['’]re| are)\s+open\s+for\s+((?:[A-Z][a-z]+\s+)?[A-Z][a-z]+\s+\d{1,2}(?:,\s*)?\s+\d{4})/g,
+      "That date is open for $1",
+    )
+    .replace(
+      /\byou(?:['’]re| are)\s+open\s+for\s+((?:[A-Z][a-z]+\s+)?[A-Z][a-z]+\s+\d{1,2}(?:,\s*)?\s+\d{4})/gi,
+      "that date is open for $1",
+    );
+}
+
+function looksLikeServiceCapabilityQuestion(text: string) {
+  return /\b(?:do you|can you|could you|are you able to|do y'all|do you guys)\b[\s\S]{0,80}\b(?:offer|provide|do|film|shoot|capture|include)\b/i.test(
+    text,
+  );
+}
+
+function looksLikeDirectServiceCapabilityDenial(text: string) {
+  const normalized = text.replace(/[’]/g, "'");
+
+  return (
+    /\b(?:we|i)\s+(?:don'?t|do not)\s+(?:usually\s+|normally\s+|currently\s+)?(?:offer|provide|do|film|shoot|capture|include)\b/i.test(
+      normalized,
+    ) ||
+    /\bi\s+haven'?t\s+done\b[\s\S]{0,120}\b(?:but|though)\b/i.test(normalized) ||
+    /\b(?:i'?d|we'?d)\s+love\s+to\b[\s\S]{0,120}\b(?:see|check|double-check|talk)\b[\s\S]{0,120}\b(?:possible|make it happen)\b/i.test(
+      normalized,
+    )
+  );
+}
+
+function looksLikeUngroundedServiceDenial(text: string) {
+  return /\b(?:we|i)\s+(?:don['’]?t|do not)\s+(?:offer|provide|do|film|shoot|capture|include)\b|\bnot\s+(?:a\s+)?standard\s+service\b|^\s*not\s+[\s\S]{0,120}\bno\b/i.test(
+    text,
+  );
+}
+
+function shouldPostModelHandoffForUnknownFact(args: {
+  currentMessage: string;
+  assistantText: string;
+  toolExecutions: Array<{ toolName: string; toolInput: unknown; toolResult: unknown }>;
+}) {
+  if (hasOwnerHandoffToolExecution(args.toolExecutions)) {
+    return false;
+  }
+
+  return (
+    looksLikeServiceCapabilityQuestion(args.currentMessage) &&
+    (looksLikeDirectServiceCapabilityDenial(args.assistantText) ||
+      looksLikeUngroundedServiceDenial(args.assistantText))
+  );
+}
+
+async function requestPostModelUnknownFactHandoff(args: {
+  agent: AgentWithConfigData;
+  input: InvokeAgentInput;
+  conversationId?: string;
+}) {
+  const toolInput = {
+    reason: "unknown_business_fact",
+    question: args.input.message,
+    noteForOwner:
+      "The model produced an ungrounded service-capability denial. Owner/team should confirm instead.",
+  } satisfies Prisma.JsonObject;
+  let toolResult: Prisma.JsonObject;
+
+  if (args.input.testMode || !args.conversationId) {
+    toolResult = {
+      status: "owner_handoff_test_mode",
+      reason: "unknown_business_fact",
+      question: args.input.message,
+      summary: "Owner handoff would be requested and the conversation would pause.",
+    };
+  } else {
+    const handoff = await requestOwnerHandoffWithDb({
+      database: db,
+      agent: args.agent,
+      conversationId: args.conversationId,
+      customerMessage: args.input.message,
+      reason: "unknown_business_fact",
+    });
+    toolResult = {
+      status: handoff.status,
+      reason: "unknown_business_fact",
+      question: args.input.message,
+      summary:
+        handoff.status === "owner_handoff_requested"
+          ? "Owner handoff was requested and the conversation was paused."
+          : "Owner handoff could not be completed.",
+    };
+  }
+
+  return {
+    toolName: OWNER_HANDOFF_REQUEST_TOOL_NAME,
+    toolInput,
+    toolResult,
+    durationMs: 0,
+  };
 }
 
 function buildFallbackResponse(args: {
@@ -1097,90 +1220,6 @@ function isGmailClientClassifierEnabled(channelConfig: unknown) {
       : null;
 
   return classifier?.enabled === true;
-}
-
-function getRuntimeType(channelConfig: unknown) {
-  const rawChannelConfig = getChannelConfigObject(channelConfig as never);
-
-  if (rawChannelConfig.runtimeType === "langgraph_wedding_sales") {
-    return "langgraph_wedding_sales";
-  }
-
-  if (rawChannelConfig.runtimeType === "wedding_sales_simple") {
-    return "wedding_sales_simple";
-  }
-
-  return "legacy";
-}
-
-function shouldUseWeddingSalesRuntime(args: {
-  channel: ChannelType;
-  runtimeType: ReturnType<typeof getRuntimeType>;
-}) {
-  return (
-    (args.channel === ChannelType.GMAIL || args.channel === ChannelType.INSTAGRAM) &&
-    args.runtimeType === "langgraph_wedding_sales"
-  );
-}
-
-function shouldUseWeddingSalesSimpleRuntime(args: {
-  channel: ChannelType;
-  runtimeType: ReturnType<typeof getRuntimeType>;
-}) {
-  return (
-    process.env.DISABLE_WEDDING_SALES_SIMPLE_INSTAGRAM !== "true" &&
-    args.channel === ChannelType.INSTAGRAM &&
-    args.runtimeType === "wedding_sales_simple"
-  );
-}
-
-function getOutboundChannelConfig(args: {
-  channelConfig: unknown;
-  result: Pick<InvokeAgentResult, "model">;
-}) {
-  if (args.result.model !== "wedding_sales_simple") {
-    return args.channelConfig;
-  }
-
-  const rawChannelConfig = getChannelConfigObject(args.channelConfig as never);
-  const channelBehavior =
-    rawChannelConfig.channelBehavior &&
-    typeof rawChannelConfig.channelBehavior === "object" &&
-    !Array.isArray(rawChannelConfig.channelBehavior)
-      ? (rawChannelConfig.channelBehavior as Record<string, unknown>)
-      : {};
-
-  return {
-    ...rawChannelConfig,
-    channelBehavior: {
-      ...channelBehavior,
-      messageFormat: "single_message",
-      splitMessageDelaySeconds: 0,
-    },
-  };
-}
-
-function getWeddingSalesGraphChannel(channel: ChannelType) {
-  return channel === ChannelType.INSTAGRAM ? "instagram" : "gmail";
-}
-
-function isValidRuntimeEmail(value?: string) {
-  return Boolean(value && /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value));
-}
-
-function resolveWeddingSalesDefaultEmail(args: {
-  channel: ChannelType;
-  incoming: Pick<ParsedIncomingMessage, "contactEmail" | "contactId">;
-}) {
-  if (isValidRuntimeEmail(args.incoming.contactEmail)) {
-    return args.incoming.contactEmail;
-  }
-
-  if (args.channel === ChannelType.GMAIL && isValidRuntimeEmail(args.incoming.contactId)) {
-    return args.incoming.contactId;
-  }
-
-  return undefined;
 }
 
 function classifyGmailClientMessage(args: {
@@ -1325,45 +1364,657 @@ function messageHasWeddingMonthDayWithoutYear(message: string) {
   return !hasYear && (monthDay.test(withoutQuotedHeader) || dayMonth.test(withoutQuotedHeader));
 }
 
-function buildIncompleteWeddingDateNudge(currentMessage: string) {
-  if (!messageHasWeddingMonthDayWithoutYear(currentMessage)) {
-    return "";
-  }
-
-  return `Wedding date nudge:
-- The incoming customer message gives a wedding month/day without a year.
-- Ask which year the wedding is before checking availability, pricing availability, or saying the date is available.
-- Ignore any year that appears only in quoted Gmail headers or email metadata.`;
-}
-
-function extractIncompleteWeddingDateLabel(message: string) {
+function messageHasWeddingMonthYearWithoutDay(message: string) {
   const withoutQuotedHeader = message
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")
     .filter((line) => !/<[^>\s]+@[^>]+>:\s*$/.test(line.trim()))
-    .join("\n");
+    .join("\n")
+    .toLowerCase();
   const monthName =
     "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
-  const monthDay = new RegExp(`\\b(${monthName}\\s+\\d{1,2}(?:st|nd|rd|th)?)\\b`, "i");
-  const dayMonth = new RegExp(`\\b(\\d{1,2}(?:st|nd|rd|th)?\\s+${monthName})\\b`, "i");
+  const monthYear = new RegExp(`\\b${monthName}\\s+(?:19|20)\\d{2}\\b`, "i");
+  const yearMonth = new RegExp(`\\b(?:19|20)\\d{2}\\s+${monthName}\\b`, "i");
+  const monthDayYear = new RegExp(
+    `\\b(?:${monthName}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+(?:19|20)\\d{2}|\\d{1,2}(?:st|nd|rd|th)?\\s+${monthName}\\s+(?:19|20)\\d{2})\\b`,
+    "i",
+  );
 
-  return withoutQuotedHeader.match(monthDay)?.[1] ?? withoutQuotedHeader.match(dayMonth)?.[1] ?? "that date";
+  return !monthDayYear.test(withoutQuotedHeader) && (monthYear.test(withoutQuotedHeader) || yearMonth.test(withoutQuotedHeader));
+}
+
+function messageHasWeddingExactDateWithYear(message: string) {
+  const withoutQuotedHeader = message
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => !/<[^>\s]+@[^>]+>:\s*$/.test(line.trim()))
+    .join("\n")
+    .toLowerCase();
+  const monthName =
+    "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+  const monthDayYear = new RegExp(
+    `\\b(?:${monthName}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,)?\\s+(?:19|20)\\d{2}|\\d{1,2}(?:st|nd|rd|th)?\\s+${monthName}\\s+(?:19|20)\\d{2})\\b`,
+    "i",
+  );
+  const isoDate = /\b(?:19|20)\d{2}-\d{2}-\d{2}\b/;
+
+  return monthDayYear.test(withoutQuotedHeader) || isoDate.test(withoutQuotedHeader);
+}
+
+function textHasMyndfulServiceRegion(text: string) {
+  return /\b(?:raleigh|charlotte|asheville|north carolina|south carolina|georgia|charleston|greenville|atlanta|nc\b|sc\b|ga\b|florida|tampa|miami|orlando|palm beach|fort lauderdale|\bfl\b)\b/i.test(
+    text,
+  );
+}
+
+function recentHistoryHasMyndfulServiceRegion(historyMessages?: RuntimeHistoryMessage[]) {
+  return [...(historyMessages ?? [])]
+    .reverse()
+    .filter((message) => message.role === MessageRole.USER || message.role === MessageRole.ASSISTANT)
+    .slice(0, 10)
+    .some((message) => textHasMyndfulServiceRegion(message.content));
+}
+
+function messageLooksLikeConsultationTimeSelection(message: string) {
+  return (
+    /\b(?:consult|consultation|call|zoom|meet|meeting|chat)\b/i.test(message) ||
+    /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i.test(message)
+  );
+}
+
+function extractWeddingMonthYearPhrase(message: string) {
+  const monthName =
+    "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+  const normalized = message.replace(/\s+/g, " ");
+  const monthYear = new RegExp(`\\b${monthName}\\s+((?:19|20)\\d{2})\\b`, "i").exec(normalized);
+  if (monthYear?.[1] && monthYear[2]) {
+    return `${monthYear[1][0]?.toUpperCase()}${monthYear[1].slice(1)} ${monthYear[2]}`;
+  }
+  const yearMonth = new RegExp(`\\b((?:19|20)\\d{2})\\s+${monthName}\\b`, "i").exec(normalized);
+  if (yearMonth?.[1] && yearMonth[2]) {
+    return `${yearMonth[2][0]?.toUpperCase()}${yearMonth[2].slice(1)} ${yearMonth[1]}`;
+  }
+  return "that month";
+}
+
+const weddingMonthNumbers: Record<string, string> = {
+  jan: "01",
+  january: "01",
+  feb: "02",
+  february: "02",
+  mar: "03",
+  march: "03",
+  apr: "04",
+  april: "04",
+  may: "05",
+  jun: "06",
+  june: "06",
+  jul: "07",
+  july: "07",
+  aug: "08",
+  august: "08",
+  sep: "09",
+  sept: "09",
+  september: "09",
+  oct: "10",
+  october: "10",
+  nov: "11",
+  november: "11",
+  dec: "12",
+  december: "12",
+};
+
+function extractMonthDayKeysFromText(message: string) {
+  const withoutQuotedHeader = message
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => !/<[^>\s]+@[^>]+>:\s*$/.test(line.trim()))
+    .join("\n")
+    .toLowerCase();
+  const monthName =
+    "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+  const keys = new Set<string>();
+
+  for (const match of withoutQuotedHeader.matchAll(new RegExp(`\\b${monthName}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "gi"))) {
+    const month = weddingMonthNumbers[String(match[1]).toLowerCase()];
+    const day = String(match[2]).padStart(2, "0");
+    if (month) {
+      keys.add(`${month}-${day}`);
+    }
+  }
+
+  for (const match of withoutQuotedHeader.matchAll(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${monthName}\\b`, "gi"))) {
+    const day = String(match[1]).padStart(2, "0");
+    const month = weddingMonthNumbers[String(match[2]).toLowerCase()];
+    if (month) {
+      keys.add(`${month}-${day}`);
+    }
+  }
+
+  return keys;
+}
+
+function getStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function collectSuggestedWeddingDates(value: unknown, dates = new Set<string>()) {
+  if (!value || typeof value !== "object") {
+    return dates;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectSuggestedWeddingDates(entry, dates);
+    }
+    return dates;
+  }
+
+  const record = value as Record<string, unknown>;
+  for (const date of getStringArray(record.suggestedDates)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      dates.add(date);
+    }
+  }
+
+  if (record.nearestAvailableDates && typeof record.nearestAvailableDates === "object" && !Array.isArray(record.nearestAvailableDates)) {
+    const nearest = record.nearestAvailableDates as Record<string, unknown>;
+    for (const date of [nearest.before, nearest.after]) {
+      if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        dates.add(date);
+      }
+    }
+  }
+
+  for (const entry of Object.values(record)) {
+    if (entry && typeof entry === "object") {
+      collectSuggestedWeddingDates(entry, dates);
+    }
+  }
+
+  return dates;
+}
+
+function selectedRecentSuggestedWeddingDate(args: {
+  historyMessages?: RuntimeHistoryMessage[];
+  currentMessage: string;
+}) {
+  const selectedMonthDays = extractMonthDayKeysFromText(args.currentMessage);
+  if (selectedMonthDays.size === 0) {
+    return null;
+  }
+
+  const recentTools = [...(args.historyMessages ?? [])]
+    .reverse()
+    .filter((message) => message.role === MessageRole.TOOL)
+    .slice(0, 6);
+
+  for (const message of recentTools) {
+    const dates = collectSuggestedWeddingDates(message.toolResult);
+    const matchedDate = [...dates].find((date) => selectedMonthDays.has(date.slice(5, 10)));
+
+    if (matchedDate) {
+      return matchedDate;
+    }
+  }
+
+  return null;
+}
+
+function latestWeddingAvailabilitySnapshot(historyMessages?: RuntimeHistoryMessage[]) {
+  const recentTools = [...(historyMessages ?? [])]
+    .reverse()
+    .filter((message) => message.role === MessageRole.TOOL)
+    .slice(0, 8);
+
+  for (const message of recentTools) {
+    if (!/(wedding|availability)/i.test(message.toolName ?? "")) {
+      continue;
+    }
+
+    if (/(calendar|consultation)/i.test(message.toolName ?? "")) {
+      continue;
+    }
+
+    const toolResult =
+      message.toolResult && typeof message.toolResult === "object" && !Array.isArray(message.toolResult)
+        ? message.toolResult as Record<string, unknown>
+        : {};
+    const result = getStepResults(message.toolResult).find((entry) =>
+      ["available", "unavailable"].includes(String(entry.status ?? "")),
+    );
+
+    if (!result) {
+      continue;
+    }
+
+    const date = String(result.date ?? result.requestedDate ?? toolResult.weddingDate ?? toolResult.date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      continue;
+    }
+
+    return {
+      date,
+      status: String(result.status ?? ""),
+      location: String(toolResult.location ?? result.location ?? result.requestedRegion ?? result.region ?? ""),
+      region: String(result.region ?? result.requestedRegion ?? ""),
+      suggestedDates: getStringArray(result.suggestedDates),
+    };
+  }
+
+  return null;
+}
+
+function currentMessageReferencesLatestAvailability(args: {
+  currentMessage: string;
+  historyMessages?: RuntimeHistoryMessage[];
+}) {
+  const snapshot = latestWeddingAvailabilitySnapshot(args.historyMessages);
+  if (!snapshot) {
+    return null;
+  }
+
+  const selectedMonthDays = extractMonthDayKeysFromText(args.currentMessage);
+  if (!selectedMonthDays.has(snapshot.date.slice(5, 10))) {
+    return null;
+  }
+
+  return snapshot;
+}
+
+function buildRecentWeddingAvailabilityContext(args: {
+  currentMessage: string;
+  historyMessages?: RuntimeHistoryMessage[];
+}) {
+  const snapshot = latestWeddingAvailabilitySnapshot(args.historyMessages);
+  if (!snapshot) {
+    return "";
+  }
+
+  const referencesLatest = currentMessageReferencesLatestAvailability(args);
+  const lines = [
+    "Recent wedding availability context:",
+    `- Last checked wedding date: ${snapshot.date}.`,
+    snapshot.location ? `- Location/region: ${snapshot.location}.` : "",
+    snapshot.region ? `- Capacity region: ${snapshot.region}.` : "",
+    `- Last check result: ${snapshot.status}.`,
+    snapshot.suggestedDates.length > 0
+      ? `- Nearby dates offered by the tool: ${snapshot.suggestedDates.join(", ")}.`
+      : "",
+    referencesLatest
+      ? "- The incoming customer message appears to refer to that same already-checked date."
+      : "",
+  ].filter(Boolean);
+
+  return lines.join("\n");
+}
+
+function buildRequiredWeddingAvailabilityActionNudge(args: {
+  currentMessage: string;
+  historyMessages?: RuntimeHistoryMessage[];
+}) {
+  if (!messageHasWeddingExactDateWithYear(args.currentMessage)) {
+    return "";
+  }
+
+  if (messageLooksLikeConsultationTimeSelection(args.currentMessage)) {
+    return "";
+  }
+
+  if (
+    !textHasMyndfulServiceRegion(args.currentMessage) &&
+    !recentHistoryHasMyndfulServiceRegion(args.historyMessages)
+  ) {
+    return "";
+  }
+
+  const latestReference = currentMessageReferencesLatestAvailability(args);
+  if (latestReference) {
+    return "";
+  }
+
+  return `Wedding availability ACTION REQUIRED:
+- The customer just provided an exact wedding date and the recent conversation already has a supported wedding city/region.
+- Call the wedding availability tool now before asking for names, pricing, or next steps.
+- Do not say "I'm checking" or imply availability unless the tool runs and returns a result.`;
+}
+
+function buildRequiredConsultationCalendarActionNudge(args: {
+  currentMessage: string;
+}) {
+  if (!messageLooksLikeConsultationTimeSelection(args.currentMessage)) {
+    return "";
+  }
+
+  if (!/\b(?:consult|consultation|call|zoom|meet|meeting|chat|book|schedule|lock)\b/i.test(args.currentMessage)) {
+    return "";
+  }
+
+  return `Consultation calendar ACTION REQUIRED:
+- The incoming customer message appears to propose or confirm a consultation call time.
+- Call the consultation calendar tool before saying the time works or asking for email.
+- If the tool says the time is missing or unclear, ask naturally for the exact day/time.`;
+}
+
+function getRequiredWeddingAvailabilityToolName(args: {
+  requiredActionNudge: string;
+  toolFeatures: RuntimeToolFeature[];
+}) {
+  if (!args.requiredActionNudge) {
+    return null;
+  }
+
+  return (
+    args.toolFeatures.find((feature) => {
+      const text = `${feature.name} ${feature.description}`.toLowerCase();
+
+      return text.includes("wedding") && text.includes("availability");
+    })?.name ?? null
+  );
+}
+
+function getRequiredConsultationCalendarToolName(args: {
+  requiredActionNudge: string;
+  toolFeatures: RuntimeToolFeature[];
+}) {
+  if (!args.requiredActionNudge) {
+    return null;
+  }
+
+  return (
+    args.toolFeatures.find((feature) => {
+      const text = `${feature.name} ${feature.description}`.toLowerCase();
+
+      return text.includes("consultation") && text.includes("calendar");
+    })?.name ?? null
+  );
+}
+
+function getRequiredWeddingAvailabilityToolKey(args: {
+  requiredActionNudge: string;
+  availableTools: ToolSet;
+}) {
+  if (!args.requiredActionNudge) {
+    return null;
+  }
+
+  return (
+    Object.keys(args.availableTools).find((toolName) => {
+      const normalized = toolName.toLowerCase();
+      return normalized.includes("wedding") && normalized.includes("availability");
+    }) ?? null
+  );
+}
+
+function getRequiredConsultationCalendarToolKey(args: {
+  requiredActionNudge: string;
+  availableTools: ToolSet;
+}) {
+  if (!args.requiredActionNudge) {
+    return null;
+  }
+
+  return (
+    Object.keys(args.availableTools).find((toolName) => {
+      const normalized = toolName.toLowerCase();
+      return normalized.includes("consultation") && normalized.includes("calendar");
+    }) ?? null
+  );
+}
+
+function shouldExposeOwnerHandoffTool(input: InvokeAgentInput) {
+  const channel = String(input.channel).toUpperCase();
+  return channel === ChannelType.INSTAGRAM || channel === ChannelType.GMAIL;
+}
+
+function isExplicitHumanRequest(text: string) {
+  return /\b(?:real person|human|person|someone|manager|owner|representative|team member)\b/i.test(
+    text,
+  );
+}
+
+function hasOwnerHandoffToolExecution(
+  toolExecutions: Array<{ toolName: string; toolInput: unknown; toolResult: unknown }>,
+) {
+  return toolExecutions.some((execution) => execution.toolName === OWNER_HANDOFF_REQUEST_TOOL_NAME);
+}
+
+function ownerHandoffCustomerReply() {
+  return "Absolutely — I’ll have Taras/the team step in for you 🤍";
+}
+
+function getFallbackModelId(args: { hasTools: boolean; primaryModelId: string }) {
+  const fallbackModelId = args.hasTools
+    ? process.env.OPENAI_TOOL_FALLBACK_MODEL || process.env.OPENAI_FALLBACK_MODEL
+    : process.env.OPENAI_FALLBACK_MODEL;
+
+  const normalizedFallback = fallbackModelId?.trim();
+  if (!normalizedFallback || normalizedFallback === args.primaryModelId) {
+    return null;
+  }
+
+  return normalizedFallback;
+}
+
+function customerReplyForOwnerHandoff(args: { explicitHumanRequest: boolean }) {
+  return args.explicitHumanRequest
+    ? "Absolutely - I'll have Taras/the team step in for you."
+    : "I want to make sure I give you the right answer, so I'm checking with the team and will get back to you shortly.";
+}
+
+function collectErrorValues(error: unknown, seen: Set<unknown> = new Set<unknown>()): unknown[] {
+  if (!error || seen.has(error)) {
+    return [];
+  }
+
+  seen.add(error);
+  const values: unknown[] = [error];
+  const record = error as { cause?: unknown; errors?: unknown };
+
+  if (record.cause) {
+    values.push(...collectErrorValues(record.cause, seen));
+  }
+
+  if (Array.isArray(record.errors)) {
+    for (const nested of record.errors) {
+      values.push(...collectErrorValues(nested, seen));
+    }
+  }
+
+  return values;
+}
+
+function isTechnicalModelFailure(error: unknown) {
+  const values = collectErrorValues(error);
+
+  return values.some((value) => {
+    const statusCode =
+      APICallError.isInstance(value) && typeof value.statusCode === "number"
+        ? value.statusCode
+        : typeof (value as { statusCode?: unknown })?.statusCode === "number"
+          ? ((value as { statusCode: number }).statusCode)
+          : null;
+
+    if (statusCode && statusCode >= 500) {
+      return true;
+    }
+
+    const message = value instanceof Error ? value.message : String(value);
+    return /\b(?:server_error|overloaded|timeout|timed out|ECONNRESET|ETIMEDOUT|socket hang up)\b/i.test(
+      message,
+    );
+  });
+}
+
+function buildOwnerHandoffTool(args: {
+  agent: AgentWithConfigData;
+  input: InvokeAgentInput;
+  conversationId?: string;
+  onToolResult?: (entry: {
+    toolName: string;
+    toolInput: Prisma.JsonValue;
+    toolResult: Prisma.JsonValue;
+    durationMs?: number;
+  }) => void;
+}) {
+  if (!shouldExposeOwnerHandoffTool(args.input)) {
+    return null;
+  }
+
+  return tool({
+    description: [
+      "Use this when the customer explicitly asks for a real person, human, owner, representative, or team member.",
+      "Use this when the customer asks a specific Myndful business fact that is not clearly present in the prompt, knowledge, recent history, or other tools.",
+      "Do not use this for normal greetings, pricing, availability, package inclusions, consultation scheduling, thanks, or objections that can be answered from knowledge.",
+      "This transfers the conversation to the owner/team with context.",
+    ].join(" "),
+    inputSchema: z.object({
+      reason: z
+        .string()
+        .trim()
+        .min(1)
+        .describe("Why the conversation needs owner/team review, for example customer_requests_human or unknown_business_fact."),
+      question: z
+        .string()
+        .trim()
+        .min(1)
+        .describe("The customer's exact question or request that needs human review."),
+      noteForOwner: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe("Short private context for the owner/team."),
+    }),
+    execute: async ({ reason, question, noteForOwner }) => {
+      const startedAt = Date.now();
+      const toolInput = {
+        reason,
+        question,
+        ...(noteForOwner ? { noteForOwner } : {}),
+      } satisfies Prisma.JsonObject;
+      let output: Prisma.JsonObject;
+
+      if (args.input.testMode || !args.conversationId) {
+        output = {
+          status: "owner_handoff_test_mode",
+          reason,
+          question,
+          ...(noteForOwner ? { noteForOwner } : {}),
+          summary: "Owner handoff would be requested and the conversation would pause.",
+        };
+      } else {
+        const handoff = await requestOwnerHandoffWithDb({
+          database: db,
+          agent: args.agent,
+          conversationId: args.conversationId,
+          customerMessage: args.input.message,
+          reason,
+        });
+        output = {
+          status: handoff.status,
+          reason,
+          question,
+          ...(noteForOwner ? { noteForOwner } : {}),
+          summary:
+            handoff.status === "owner_handoff_requested"
+              ? "Owner handoff was requested and the conversation was paused."
+              : "Owner handoff could not be completed. Do not invent an answer.",
+        };
+      }
+
+      args.onToolResult?.({
+        toolName: OWNER_HANDOFF_REQUEST_TOOL_NAME,
+        toolInput,
+        toolResult: output,
+        durationMs: Date.now() - startedAt,
+      });
+
+      return output;
+    },
+  });
 }
 
 function rewriteIncompleteWeddingDateReply(args: {
   text: string;
   currentMessage?: string;
+  historyMessages?: RuntimeHistoryMessage[];
+  toolExecutions?: Array<{
+    toolName: string;
+    toolResult: unknown;
+  }>;
 }) {
-  if (!args.currentMessage || !messageHasWeddingMonthDayWithoutYear(args.currentMessage)) {
+  if (!args.currentMessage) {
     return args.text;
   }
 
-  const dateLabel = extractIncompleteWeddingDateLabel(args.currentMessage);
+  const needsExactDateToolResult = args.toolExecutions?.some((execution) =>
+    getStepResults(execution.toolResult).length === 0 &&
+    typeof execution.toolResult === "object" &&
+    execution.toolResult !== null &&
+    !Array.isArray(execution.toolResult) &&
+    (execution.toolResult as { status?: unknown }).status === "needs_exact_date",
+  );
+  const monthDayWithoutYear = messageHasWeddingMonthDayWithoutYear(args.currentMessage);
+  const monthYearWithoutDay = messageHasWeddingMonthYearWithoutDay(args.currentMessage) || needsExactDateToolResult;
+
+  if (!monthDayWithoutYear && !monthYearWithoutDay) {
+    return args.text;
+  }
+
+  const claimsIncompleteDateAvailability =
+    /\b(?:works?|could\s+work|works?\s+(?:on\s+my\s+end|for\s+(?:us|me))|is\s+(?:open|available)|looks?\s+(?:open|available))\b/i.test(
+      args.text,
+    );
+
+  if (monthYearWithoutDay && claimsIncompleteDateAvailability) {
+    const monthYear = extractWeddingMonthYearPhrase(args.currentMessage);
+    return [
+      `${monthYear} is helpful рџ¤Ќ`,
+      "I just need the exact wedding date before I can check availability properly.",
+      "What day are they looking at?",
+    ].join("\n\n");
+  }
+
+  const alreadyAsksForMissingDatePart =
+    /\b(?:what|which|confirm|share|send|know|need)\b[\s\S]{0,80}\b(?:year|exact\s+(?:wedding\s+)?date|wedding\s+date|day)\b/i.test(
+      args.text,
+    ) ||
+    /\b(?:year|exact\s+(?:wedding\s+)?date|wedding\s+date|day)\b[\s\S]{0,80}\b(?:what|which|confirm|share|send|know|need)\b/i.test(
+      args.text,
+    ) ||
+    /\b(?:this year|next year|or\s+(?:19|20)\d{2})\b/i.test(args.text);
+
+  if (alreadyAsksForMissingDatePart) {
+    return args.text;
+  }
+
+  if (
+    monthDayWithoutYear &&
+    selectedRecentSuggestedWeddingDate({
+      currentMessage: args.currentMessage,
+      historyMessages: args.historyMessages,
+    })
+  ) {
+    return args.text;
+  }
+
+  if (monthYearWithoutDay) {
+    const monthYear = extractWeddingMonthYearPhrase(args.currentMessage);
+    return [
+      `${monthYear} is helpful 🤍`,
+      "I just need the exact wedding date before I can check availability properly.",
+      "What day are they looking at?",
+    ].join("\n\n");
+  }
 
   return [
-    "Thank you for sharing that.",
-    `Could you confirm which year your wedding is on ${dateLabel}? Once I have the year, I can check availability for you.`,
+    "That date is helpful 🤍",
+    "I just need the wedding year before I can check availability properly.",
+    "What year should I use?",
   ].join("\n\n");
 }
 
@@ -1384,7 +2035,7 @@ function buildHistoryAppend(args: {
     toolResult: unknown;
     durationMs?: number;
   }>;
-  assistantText: string;
+  assistantText?: string;
 }) {
   return [
     ...args.toolExecutions.map(
@@ -1396,205 +2047,54 @@ function buildHistoryAppend(args: {
         durationMs: execution.durationMs,
       }),
     ),
-    {
-      role: MessageRole.ASSISTANT,
-      content: args.assistantText,
-    } satisfies RuntimeHistoryMessage,
+    ...(args.assistantText
+      ? [
+          {
+            role: MessageRole.ASSISTANT,
+            content: args.assistantText,
+          } satisfies RuntimeHistoryMessage,
+        ]
+      : []),
   ];
-}
-
-function parseToolObservationResult(result: string) {
-  try {
-    return JSON.parse(result) as unknown;
-  } catch {
-    return result;
-  }
-}
-
-function extractWeddingSalesTestState(historyMessages?: RuntimeHistoryMessage[]) {
-  const stateMessage = [...(historyMessages ?? [])]
-    .reverse()
-    .find((message) => message.role === MessageRole.TOOL && message.toolName === WEDDING_SALES_TEST_STATE_TOOL_NAME);
-
-  const rawState =
-    stateMessage?.toolResult &&
-    typeof stateMessage.toolResult === "object" &&
-    !Array.isArray(stateMessage.toolResult) &&
-    "state" in stateMessage.toolResult
-      ? stateMessage.toolResult.state
-      : stateMessage?.toolResult;
-
-  return rawState && typeof rawState === "object" && !Array.isArray(rawState)
-    ? (rawState as Partial<WeddingSalesState>)
-    : undefined;
-}
-
-function buildWeddingSalesTestHistoryAppend(args: {
-  state: WeddingSalesState;
-  assistantText: string;
-}) {
-  const toolMessages = args.state.turnToolObservations.map((observation): RuntimeHistoryMessage => {
-    const parsedResult = parseToolObservationResult(observation.result);
-
-    return {
-      role: MessageRole.TOOL,
-      content: typeof parsedResult === "string" ? parsedResult : JSON.stringify(parsedResult),
-      toolName: observation.toolName,
-      toolResult: parsedResult,
-    };
-  });
-
-  return [
-    ...toolMessages,
-    {
-      role: MessageRole.TOOL,
-      content: JSON.stringify({ state: args.state }),
-      toolName: WEDDING_SALES_TEST_STATE_TOOL_NAME,
-      toolResult: { state: args.state },
-      model: "langgraph_wedding_sales_state",
-    },
-    {
-      role: MessageRole.ASSISTANT,
-      content: args.assistantText,
-      model: "langgraph_wedding_sales",
-    },
-  ] satisfies RuntimeHistoryMessage[];
-}
-
-async function runWeddingSalesTestRuntime(args: {
-  agent: IncomingEventAgent;
-  input: InvokeAgentInput;
-  toolFeatures: RuntimeBlocks["toolFeatures"];
-}) {
-  const defaultEmail = resolveWeddingSalesDefaultEmail({
-    channel: args.agent.channel.type,
-    incoming: {
-      contactId: args.input.contactId,
-      contactEmail: args.input.contactEmail,
-    },
-  });
-  const toolContext = createWeddingSalesToolContextFromFeatures({
-    tenantId: args.agent.tenantId,
-    toolFeatures: args.toolFeatures,
-    testMode: true,
-    defaultEmail,
-  });
-  const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
-  const conversationContext = renderHistory(
-    (args.input.historyMessages ?? []).filter(
-      (message) => message.toolName !== WEDDING_SALES_TEST_STATE_TOOL_NAME,
-    ),
-  );
-  const graphResult = await invokeWeddingSalesGraph({
-    tenantId: args.agent.tenantId,
-    agentId: args.agent.id,
-    contactId: args.input.contactId,
-    runtimeMode: "unified_v2",
-    channel: getWeddingSalesGraphChannel(args.agent.channel.type),
-    message: args.input.message,
-    customerEmail: defaultEmail,
-    conversationContext,
-    previousState: extractWeddingSalesTestState(args.input.historyMessages),
-    config,
-    toolContext,
-    checkpoint: false,
-  });
-  const message = graphResult.responseDraft ?? "";
-
-  return {
-    message,
-    promptPreview: "langgraph_wedding_sales",
-    usedTooling: graphResult.turnToolObservations.map((observation) => observation.toolName),
-    model: "langgraph_wedding_sales",
-    attachments: getWeddingSalesGuideAttachment({
-      channel: args.agent.channel.type,
-      message,
-      config,
-      allowAttachments: readMessageBehaviorConfig(args.agent.channelConfig).allowAttachments,
-      state: graphResult,
-    }),
-    historyAppend: buildWeddingSalesTestHistoryAppend({
-      state: graphResult,
-      assistantText: message,
-    }),
-    suppressReply: !message,
-  } satisfies InvokeAgentResult;
-}
-
-function isPartialDeliveryResult(
-  delivery: unknown,
-): delivery is {
-  ok: false;
-  mode: string;
-  deliveredCount: number;
-  totalParts: number;
-  error?: string;
-} {
-  if (!delivery || typeof delivery !== "object" || Array.isArray(delivery)) {
-    return false;
-  }
-
-  return (
-    "ok" in delivery &&
-    delivery.ok === false &&
-    "deliveredCount" in delivery &&
-    typeof delivery.deliveredCount === "number" &&
-    "totalParts" in delivery &&
-    typeof delivery.totalParts === "number"
-  );
 }
 
 async function recordInboundMessageWithDb(
   database: typeof db,
   args: {
-  agentId: string;
-  contactId: string;
-  contactUsername?: string;
-  contactDisplayName?: string;
-  channel: ChannelType;
-  message: string;
-  messageId?: string;
-  gmailMessageId?: string;
-  threadId?: string;
-  subject?: string;
-  conversationStatus?: ConversationStatus;
-}) {
+    agentId: string;
+    contactId: string;
+    contactUsername?: string;
+    contactDisplayName?: string;
+    channel: ChannelType;
+    message: string;
+    messageId?: string;
+    gmailMessageId?: string;
+    threadId?: string;
+    subject?: string;
+    conversationStatus?: ConversationStatus;
+  },
+) {
   return database.$transaction(async (tx) => {
-    const contactProfileUpdate = buildContactProfileUpdate(args);
-    const existingConversation = await tx.conversation.findUnique({
-      where: {
-        agentId_contactId: {
-          agentId: args.agentId,
-          contactId: args.contactId,
-        },
-      },
+    const existing = await tx.conversation.findUnique({
+      where: { agentId_contactId: { agentId: args.agentId, contactId: args.contactId } },
     });
-
     const conversation =
-      existingConversation ??
+      existing ??
       (await tx.conversation.create({
         data: {
           agentId: args.agentId,
           contactId: args.contactId,
-          ...contactProfileUpdate,
+          contactUsername: args.contactUsername,
+          contactDisplayName: args.contactDisplayName,
           channel: args.channel,
           status: args.conversationStatus ?? ConversationStatus.ACTIVE,
         },
       }));
 
-    if (
-      args.conversationStatus &&
-      existingConversation &&
-      existingConversation.status !== args.conversationStatus
-    ) {
+    if (existing && args.conversationStatus && existing.status !== args.conversationStatus) {
       await tx.conversation.update({
-        where: { id: existingConversation.id },
-        data: { status: args.conversationStatus, ...contactProfileUpdate },
-      });
-    } else if (existingConversation && Object.keys(contactProfileUpdate).length > 0) {
-      await tx.conversation.update({
-        where: { id: existingConversation.id },
-        data: contactProfileUpdate,
+        where: { id: existing.id },
+        data: { status: args.conversationStatus },
       });
     }
 
@@ -1603,79 +2103,12 @@ async function recordInboundMessageWithDb(
         conversationId: conversation.id,
         role: MessageRole.USER,
         content: args.message,
-        toolInput:
-          args.messageId || args.gmailMessageId || args.threadId || args.subject
-            ? {
-                ...(args.messageId ? { messageId: args.messageId } : {}),
-                ...(args.gmailMessageId ? { gmailMessageId: args.gmailMessageId } : {}),
-                ...(args.threadId ? { threadId: args.threadId } : {}),
-                ...(args.subject ? { subject: args.subject } : {}),
-              }
-            : undefined,
-      },
-    });
-
-    return existingConversation ?? conversation;
-  });
-}
-
-async function recordBusinessManualMessageWithDb(
-  database: typeof db,
-  args: {
-  agentId: string;
-  contactId: string;
-  contactUsername?: string;
-  contactDisplayName?: string;
-  channel: ChannelType;
-  message: string;
-  messageId?: string;
-  gmailMessageId?: string;
-  threadId?: string;
-  subject?: string;
-}) {
-  return database.$transaction(async (tx) => {
-    const contactProfileUpdate = buildContactProfileUpdate(args);
-    const existingConversation = await tx.conversation.findUnique({
-      where: {
-        agentId_contactId: {
-          agentId: args.agentId,
-          contactId: args.contactId,
+        toolInput: {
+          ...(args.messageId ? { messageId: args.messageId } : {}),
+          ...(args.gmailMessageId ? { gmailMessageId: args.gmailMessageId } : {}),
+          ...(args.threadId ? { threadId: args.threadId } : {}),
+          ...(args.subject ? { subject: args.subject } : {}),
         },
-      },
-    });
-    const conversation =
-      existingConversation ??
-      (await tx.conversation.create({
-        data: {
-          agentId: args.agentId,
-          contactId: args.contactId,
-          ...contactProfileUpdate,
-          channel: args.channel,
-        },
-      }));
-
-    if (existingConversation && Object.keys(contactProfileUpdate).length > 0) {
-      await tx.conversation.update({
-        where: { id: existingConversation.id },
-        data: contactProfileUpdate,
-      });
-    }
-
-    await tx.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: MessageRole.TOOL,
-        toolName: BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
-        content: args.message,
-        toolInput:
-          args.messageId || args.gmailMessageId || args.threadId || args.subject
-            ? {
-                ...(args.messageId ? { messageId: args.messageId } : {}),
-                ...(args.gmailMessageId ? { gmailMessageId: args.gmailMessageId } : {}),
-                ...(args.threadId ? { threadId: args.threadId } : {}),
-                ...(args.subject ? { subject: args.subject } : {}),
-              }
-            : undefined,
       },
     });
 
@@ -1683,388 +2116,67 @@ async function recordBusinessManualMessageWithDb(
   });
 }
 
-async function runWeddingSalesRuntime(args: {
-  database: typeof db;
-  agent: IncomingEventAgent;
-  incoming: ParsedIncomingMessage;
-  channel: ChannelType;
-  existingConversationStatus?: ConversationStatus;
-  skipInboundPersistence?: boolean;
-  conversationId?: string;
-  runtimeEvent?: InvokeAgentInput["runtimeEvent"];
-}): Promise<InvokeAgentResult> {
-  const conversation =
-    args.skipInboundPersistence && args.conversationId
-      ? { id: args.conversationId }
-      : await recordInboundMessageWithDb(args.database, {
-          agentId: args.agent.id,
-          contactId: args.incoming.contactId,
-          contactUsername: args.incoming.contactUsername,
-          contactDisplayName: args.incoming.contactDisplayName,
-          channel: args.agent.channel.type,
-          message: args.incoming.message,
-          messageId: args.incoming.messageId,
-          gmailMessageId: args.incoming.gmailMessageId,
-          threadId: args.incoming.threadId,
-          subject: args.incoming.subject,
-          conversationStatus: args.existingConversationStatus ?? ConversationStatus.ACTIVE,
-        });
-
-  if (!args.skipInboundPersistence) {
-    await cancelPendingDelayedDeliveriesWithDb({
-      database: args.database,
-      conversationId: conversation.id,
-      kinds: [DelayedDeliveryKind.FOLLOW_UP],
-    });
-  }
-
-  const delayedFollowUpGuidance =
-    args.runtimeEvent?.type === "follow_up"
-      ? args.runtimeEvent.guidance ?? ""
-      : args.skipInboundPersistence
-        ? extractDelayedFollowUpGuidance(args.incoming.message)
-        : "";
-
-  if (delayedFollowUpGuidance && args.runtimeEvent?.type !== "follow_up") {
-    await args.database.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: MessageRole.ASSISTANT,
-        content: delayedFollowUpGuidance,
-        model: "langgraph_wedding_sales_follow_up",
-      },
-    });
-
-    return {
-      message: delayedFollowUpGuidance,
-      promptPreview: "langgraph_wedding_sales_follow_up",
-      usedTooling: [],
-      conversationId: conversation.id,
-      model: "langgraph_wedding_sales_follow_up",
-    };
-  }
-
-  const toolFeatures = await hydrateFunctionBlocksForRuntime(
-    {
-      id: args.agent.id,
-      tenantId: args.agent.tenantId,
-      channelConfig: args.agent.channelConfig,
-    },
-    args.database,
+function isPartialDeliveryResult(delivery: unknown): delivery is {
+  ok: false;
+  deliveredCount: number;
+  totalParts: number;
+} {
+  return Boolean(
+    delivery &&
+      typeof delivery === "object" &&
+      "ok" in delivery &&
+      delivery.ok === false &&
+      "deliveredCount" in delivery &&
+      "totalParts" in delivery,
   );
-  const defaultEmail = resolveWeddingSalesDefaultEmail({
-    channel: args.channel,
-    incoming: args.incoming,
-  });
-  const toolContext = createWeddingSalesToolContextFromFeatures({
-    tenantId: args.agent.tenantId,
-    toolFeatures,
-    defaultEmail,
-  });
-  const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
-  const recentConversationMessages =
-    typeof args.database.message.findMany === "function"
-      ? await args.database.message.findMany({
-          where: {
-            conversationId: conversation.id,
-            OR: [
-              {
-                role: {
-                  in: [MessageRole.USER, MessageRole.ASSISTANT],
-                },
-              },
-              {
-                role: MessageRole.TOOL,
-                toolName: BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
-              },
-            ],
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 12,
-        })
-      : [];
-  const conversationContext = renderHistory(
-    [...recentConversationMessages].reverse().map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      toolName: message.toolName,
-      toolInput: message.toolInput,
-      toolResult: message.toolResult,
-      model: message.model,
-      createdAt: message.createdAt,
-    })),
-  );
-
-  const graphResult = await invokeWeddingSalesGraph({
-    tenantId: args.agent.tenantId,
-    agentId: args.agent.id,
-    contactId: args.incoming.contactId,
-    runtimeMode: "unified_v2",
-    channel: getWeddingSalesGraphChannel(args.channel),
-    message: args.incoming.message,
-    runtimeEvent: args.runtimeEvent,
-    customerEmail: defaultEmail,
-    conversationContext,
-    config,
-    toolContext,
-    checkpoint: args.database === db,
-  });
-  const message = graphResult.responseDraft ?? "";
-  const ownerHandoffReason = getWeddingSalesOwnerHandoffReason(graphResult);
-
-  if (!message) {
-    if (ownerHandoffReason) {
-      const handoff = await requestOwnerHandoffWithDb({
-        database: args.database,
-        agent: args.agent,
-        conversationId: conversation.id,
-        customerMessage: args.incoming.message,
-        reason: ownerHandoffReason,
-      });
-
-      if (handoff.status === "owner_handoff_requested") {
-        return {
-          message: "",
-          promptPreview: "langgraph_wedding_sales",
-          usedTooling: [OWNER_HANDOFF_REQUEST_TOOL_NAME],
-          conversationId: conversation.id,
-          model: "langgraph_wedding_sales",
-          suppressReply: true,
-        };
-      }
-    }
-
-    return {
-      message: "",
-      promptPreview: "langgraph_wedding_sales",
-      usedTooling: [],
-      conversationId: conversation.id,
-      model: "langgraph_wedding_sales",
-      suppressReply: true,
-    };
-  }
-
-  await recordLangGraphToolObservationsWithDb({
-    database: args.database,
-    conversationId: conversation.id,
-    observations: graphResult.turnToolObservations,
-  });
-
-  await args.database.message.create({
-    data: {
-      conversationId: conversation.id,
-      role: MessageRole.ASSISTANT,
-      content: message,
-      model: "langgraph_wedding_sales",
-    },
-  });
-
-  const usedTooling = graphResult.toolObservations.map((observation) => observation.toolName);
-
-  if (ownerHandoffReason) {
-    const handoff = await requestOwnerHandoffWithDb({
-      database: args.database,
-      agent: args.agent,
-      conversationId: conversation.id,
-      customerMessage: args.incoming.message,
-      reason: ownerHandoffReason,
-    });
-
-    if (handoff.status === "owner_handoff_requested") {
-      usedTooling.push(OWNER_HANDOFF_REQUEST_TOOL_NAME);
-    }
-  }
-
-  return {
-    message,
-    promptPreview: "langgraph_wedding_sales",
-    usedTooling,
-    conversationId: conversation.id,
-    model: "langgraph_wedding_sales",
-    attachments: getWeddingSalesGuideAttachment({
-      channel: args.channel,
-      message,
-      config,
-      allowAttachments: readMessageBehaviorConfig(args.agent.channelConfig).allowAttachments,
-      state: graphResult,
-    }),
-  };
 }
 
-async function runWeddingSalesSimpleRuntime(args: {
-  database: typeof db;
-  agent: IncomingEventAgent;
-  incoming: ParsedIncomingMessage;
-  channel: ChannelType;
-  existingConversationStatus?: ConversationStatus;
-  skipInboundPersistence?: boolean;
-  conversationId?: string;
-}): Promise<InvokeAgentResult> {
-  if (args.channel !== ChannelType.INSTAGRAM) {
-    throw new Error("wedding-sales-simple runtime is currently enabled only for Instagram.");
-  }
-
-  if (
-    !args.skipInboundPersistence &&
-    (await hasProcessedWeddingSalesSimpleIncomingWithDb({
-      database: args.database,
-      agentId: args.agent.id,
-      contactId: args.incoming.contactId,
-      messageId: args.incoming.messageId,
-    }))
-  ) {
-    return {
-      message: "",
-      promptPreview: "wedding_sales_simple_duplicate",
-      usedTooling: [],
-      model: "wedding_sales_simple",
-      suppressReply: true,
-    };
-  }
-
-  const conversation =
-    args.skipInboundPersistence && args.conversationId
-      ? { id: args.conversationId }
-      : await recordInboundMessageWithDb(args.database, {
-          agentId: args.agent.id,
-          contactId: args.incoming.contactId,
-          contactUsername: args.incoming.contactUsername,
-          contactDisplayName: args.incoming.contactDisplayName,
-          channel: args.agent.channel.type,
-          message: args.incoming.message,
-          messageId: args.incoming.messageId,
-          gmailMessageId: args.incoming.gmailMessageId,
-          threadId: args.incoming.threadId,
-          subject: args.incoming.subject,
-          conversationStatus: args.existingConversationStatus ?? ConversationStatus.ACTIVE,
-        });
-
-  if (!args.skipInboundPersistence) {
-    await cancelPendingDelayedDeliveriesWithDb({
-      database: args.database,
-      conversationId: conversation.id,
-      kinds: [DelayedDeliveryKind.FOLLOW_UP],
+async function recordBusinessManualMessageWithDb(
+  database: typeof db,
+  args: {
+    agentId: string;
+    contactId: string;
+    contactUsername?: string;
+    contactDisplayName?: string;
+    channel: ChannelType;
+    message: string;
+    messageId?: string;
+    gmailMessageId?: string;
+    threadId?: string;
+    subject?: string;
+  },
+) {
+  return database.$transaction(async (tx) => {
+    const existing = await tx.conversation.findUnique({
+      where: { agentId_contactId: { agentId: args.agentId, contactId: args.contactId } },
     });
-  }
-
-  const toolFeatures = await hydrateFunctionBlocksForRuntime(
-    {
-      id: args.agent.id,
-      tenantId: args.agent.tenantId,
-      channelConfig: args.agent.channelConfig,
-    },
-    args.database,
-  );
-  const defaultEmail = resolveWeddingSalesDefaultEmail({
-    channel: args.channel,
-    incoming: args.incoming,
-  });
-  const toolContext = createWeddingSalesToolContextFromFeatures({
-    tenantId: args.agent.tenantId,
-    toolFeatures,
-    defaultEmail,
-  });
-  const config = buildWeddingSalesConfigFromChannelConfig(args.agent.channelConfig);
-  const incoming: NormalizedWeddingSalesIncomingMessage = {
-    channel: "instagram",
-    tenantId: args.agent.tenantId,
-    agentId: args.agent.id,
-    contactId: args.incoming.contactId,
-    conversationId: conversation.id,
-    text: args.incoming.message,
-    incomingMessageId: args.incoming.messageId,
-    senderName: args.incoming.contactDisplayName ?? args.incoming.contactUsername,
-    senderEmail: defaultEmail,
-    receivedAt: new Date().toISOString(),
-  };
-  const adapterResult = await invokeWeddingSalesSimpleAdapter({
-    incoming,
-    toolContext,
-    config,
-    channelConfig: args.agent.channelConfig,
-    features: args.agent.features ?? [],
-    deps: {
-      loadState: () =>
-        loadWeddingSalesSimpleStateWithDb({
-          database: args.database,
-          conversationId: conversation.id,
-        }),
-      saveState: ({ state }) =>
-        saveWeddingSalesSimpleStateWithDb({
-          database: args.database,
-          conversationId: conversation.id,
-          state,
-        }),
-      recordSafetyLog: (entry) =>
-        recordWeddingSalesSimpleSafetyLogWithDb({
-          database: args.database,
-          conversationId: conversation.id,
-          entry,
-        }),
-    },
-  });
-
-  if (adapterResult.status === "duplicate") {
-    return {
-      message: "",
-      promptPreview: "wedding_sales_simple_duplicate",
-      usedTooling: [],
-      conversationId: conversation.id,
-      model: "wedding_sales_simple",
-      suppressReply: true,
-    };
-  }
-
-  const message = adapterResult.outbound.text;
-  await recordLangGraphToolObservationsWithDb({
-    database: args.database,
-    conversationId: conversation.id,
-    observations: adapterResult.state.toolObservations,
-  });
-
-  const assistantMessage = message
-    ? await args.database.message.create({
+    const conversation =
+      existing ??
+      (await tx.conversation.create({
+        data: {
+          agentId: args.agentId,
+          contactId: args.contactId,
+          contactUsername: args.contactUsername,
+          contactDisplayName: args.contactDisplayName,
+          channel: args.channel,
+        },
+      }));
+    await tx.message.create({
       data: {
         conversationId: conversation.id,
-        role: MessageRole.ASSISTANT,
-        content: message,
-        model: "wedding_sales_simple",
+        role: MessageRole.TOOL,
+        content: args.message,
+        toolName: BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
+        toolInput: {
+          ...(args.messageId ? { messageId: args.messageId } : {}),
+          ...(args.gmailMessageId ? { gmailMessageId: args.gmailMessageId } : {}),
+          ...(args.threadId ? { threadId: args.threadId } : {}),
+          ...(args.subject ? { subject: args.subject } : {}),
+        },
       },
-    })
-    : null;
-
-  const usedTooling = adapterResult.state.toolObservations.map(
-    (observation) => observation.toolName,
-  );
-
-  if (adapterResult.state.mode === "bot_paused") {
-    const handoff = await requestOwnerHandoffWithDb({
-      database: args.database,
-      agent: args.agent,
-      conversationId: conversation.id,
-      customerMessage: args.incoming.message,
-      reason: adapterResult.state.handoffReason ?? "wedding_sales_simple_handoff",
     });
-
-    if (handoff.status === "owner_handoff_requested") {
-      usedTooling.push(OWNER_HANDOFF_REQUEST_TOOL_NAME);
-    }
-  }
-
-  return {
-    message,
-    promptPreview: "wedding_sales_simple",
-    usedTooling,
-    conversationId: conversation.id,
-    model: "wedding_sales_simple",
-    attachments: getSimpleWeddingSalesAttachments(adapterResult.outbound.attachments),
-    channelDeliveryPlan: adapterResult.outbound.channelDeliveryPlan,
-    weddingSalesSimpleFollowUpState: adapterResult.state,
-    weddingSalesSimpleAssistantMessageId: assistantMessage?.id,
-  };
+    return conversation;
+  });
 }
 
 async function recordInboundMessage(args: {
@@ -2093,6 +2205,29 @@ function extractAttachments(
   for (const execution of toolExecutions) {
     if (!execution.toolResult || typeof execution.toolResult !== "object" || Array.isArray(execution.toolResult)) {
       continue;
+    }
+
+    const directAttachment = "attachment" in execution.toolResult
+      ? execution.toolResult.attachment
+      : undefined;
+    if (directAttachment && typeof directAttachment === "object" && !Array.isArray(directAttachment)) {
+      const fileId = "fileId" in directAttachment ? String(directAttachment.fileId ?? "") : "";
+
+      if (fileId) {
+        attachments.set(fileId, {
+          source:
+            "source" in directAttachment && directAttachment.source === "google_drive"
+              ? "google_drive"
+              : undefined,
+          fileId,
+          fileName:
+            "fileName" in directAttachment ? String(directAttachment.fileName ?? "") || undefined : undefined,
+          mimeType:
+            "mimeType" in directAttachment ? String(directAttachment.mimeType ?? "") || undefined : undefined,
+          publicUrl:
+            "publicUrl" in directAttachment ? String(directAttachment.publicUrl ?? "") || undefined : undefined,
+        });
+      }
     }
 
     const steps = "steps" in execution.toolResult ? execution.toolResult.steps : undefined;
@@ -2128,6 +2263,7 @@ function extractAttachments(
         fileId,
         fileName: "fileName" in attachment ? String(attachment.fileName ?? "") || undefined : undefined,
         mimeType: "mimeType" in attachment ? String(attachment.mimeType ?? "") || undefined : undefined,
+        publicUrl: "publicUrl" in attachment ? String(attachment.publicUrl ?? "") || undefined : undefined,
       });
     }
   }
@@ -2190,6 +2326,7 @@ async function runModelInvocation(args: {
   agent: AgentWithConfigData;
   toolFeatures: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>;
   input: InvokeAgentInput;
+  conversationId?: string;
   promptPreview: string;
   historyText: string;
   historyMessages: RuntimeHistoryMessage[];
@@ -2208,7 +2345,7 @@ async function runModelInvocation(args: {
     contactId: args.input.contactId,
     channel: String(args.input.channel),
     testMode: Boolean(args.input.testMode),
-    runtimeType: "legacy" as const,
+    runtimeType: "gpt_agent" as const,
   };
   const tools = resolveTools({
     tenantId: args.agent.tenantId,
@@ -2225,19 +2362,47 @@ async function runModelInvocation(args: {
       toolExecutions.push(entry);
     },
   });
-  const hasTools = Object.keys(tools).length > 0;
+  const ownerHandoffTool = buildOwnerHandoffTool({
+    agent: args.agent,
+    input: args.input,
+    conversationId: args.conversationId,
+    onToolResult: (entry) => {
+      toolExecutions.push(entry);
+    },
+  });
+  const collectionsGuideTool = buildConfiguredCollectionsGuideTool({
+    agent: args.agent,
+    establishedRegions: getConfiguredGuideRegionsFromCustomerMessages({
+      agent: args.agent,
+      customerMessages: [
+        ...args.historyMessages
+          .filter((message) => message.role === MessageRole.USER)
+          .map((message) => message.content),
+        args.input.message,
+      ],
+    }),
+    onToolResult: (entry) => {
+      toolExecutions.push(entry);
+    },
+  });
+  const availableTools: ToolSet = {
+    ...tools,
+    ...(collectionsGuideTool ? { send_collections_guide: collectionsGuideTool } : {}),
+    ...(ownerHandoffTool ? { [OWNER_HANDOFF_RUNTIME_TOOL_NAME]: ownerHandoffTool } : {}),
+  };
+  const hasTools = Object.keys(availableTools).length > 0;
   const modelId = hasTools
-    ? process.env.OPENAI_TOOL_MODEL || "gpt-4.1"
-    : process.env.OPENAI_MODEL || "gpt-4.1-mini";
+    ? process.env.OPENAI_TOOL_MODEL || "gpt-5.4-mini"
+    : process.env.OPENAI_MODEL || "gpt-5.4-mini";
+  const fallbackModelId = getFallbackModelId({ hasTools, primaryModelId: modelId });
+  let usedModelId = modelId;
 
   if (!process.env.OPENAI_API_KEY) {
     return {
-      text: buildFallbackResponse({
-        input: args.input,
-        usedTools: [],
-      }),
-      modelId: "fallback-no-openai-key",
+      text: "",
+      modelId: "unavailable-no-openai-key",
       toolExecutions,
+      unavailable: true,
     };
   }
 
@@ -2245,21 +2410,24 @@ async function runModelInvocation(args: {
     historyMessages: args.historyMessages,
     currentMessage: args.input.message,
   });
-  const incompleteWeddingDateNudge = buildIncompleteWeddingDateNudge(args.input.message);
-
+  const recentWeddingAvailabilityContext = buildRecentWeddingAvailabilityContext({
+    historyMessages: args.historyMessages,
+    currentMessage: args.input.message,
+  });
   const controlRuntimeRules = buildControlRuntimeRules(args.control);
   const runtimeContextLines = buildRuntimeContextLines({
     prompting: args.prompting,
     input: args.input,
   });
 
-  const result = await traceLangRuntime("legacy.model.invoke", traceMetadata, () =>
-    generateText({
-      model: openai(modelId),
+  const modelRequest = {
       system: `${args.promptPreview}
 
 Runtime application note:
 - Respect the runtime execution policy already defined in the composed system prompt.
+- Return only the customer-facing ${args.input.channel === ChannelType.GMAIL ? "email reply" : "Instagram DM text"}. Do not include planning notes, analysis, labels, or internal reasoning before the reply.
+- If the customer explicitly asks for a real person/human, use the ${OWNER_HANDOFF_REQUEST_TOOL_NAME} tool.
+- If the customer asks a specific Myndful business fact that is not clearly present in the prompt, knowledge, recent history, or tools, use the ${OWNER_HANDOFF_REQUEST_TOOL_NAME} tool instead of guessing or saying no.
 ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`,
       prompt: `Conversation history:
   ${args.historyText}
@@ -2267,19 +2435,45 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
   ${runtimeContextLines ? `${runtimeContextLines}\n` : ""}Incoming customer message:
   ${args.input.message}
 
-  ${[schedulingNudge, incompleteWeddingDateNudge].filter(Boolean).join("\n\n")}`.trim(),
+  ${[
+    recentWeddingAvailabilityContext,
+    schedulingNudge,
+  ].filter(Boolean).join("\n\n")}`.trim(),
     ...(hasTools
       ? {
-          tools,
+          tools: availableTools,
           stopWhen: stepCountIs(5),
         }
       : {}),
-    }),
-  );
+    };
+  const toolExecutionStartIndex = toolExecutions.length;
+  const result = await traceLangRuntime("gpt_agent.model.invoke", traceMetadata, async () => {
+    try {
+      return await generateText({
+        ...modelRequest,
+        model: openai.chat(modelId),
+      });
+    } catch (error) {
+      if (!fallbackModelId || !isTechnicalModelFailure(error)) {
+        throw error;
+      }
+
+      toolExecutions.splice(toolExecutionStartIndex);
+      usedModelId = fallbackModelId;
+      console.warn(
+        `[ai-runtime] primary model ${modelId} failed with a technical error; retrying with ${fallbackModelId}`,
+      );
+
+      return generateText({
+        ...modelRequest,
+        model: openai.chat(fallbackModelId),
+      });
+    }
+  });
 
   return {
     text: result.text,
-    modelId,
+    modelId: usedModelId,
     toolExecutions,
   };
 }
@@ -2327,52 +2521,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     throw new Error(input.allowDraftAgent ? "Saved agent not found." : "Active deployed agent not found.");
   }
 
-  const runtimeType = getRuntimeType(agent.channelConfig);
-  if (
-    !input.testMode &&
-    shouldUseWeddingSalesSimpleRuntime({ channel: agent.channel.type, runtimeType })
-  ) {
-    return runWeddingSalesSimpleRuntime({
-      database: db,
-      agent,
-      incoming: {
-        contactId: input.contactId,
-        contactEmail: input.contactEmail,
-        message: input.message,
-        messageId: input.messageId,
-        gmailMessageId: input.gmailMessageId,
-        threadId: input.threadId,
-        subject: input.subject,
-      },
-      channel: agent.channel.type,
-      skipInboundPersistence: input.skipInboundPersistence,
-      conversationId: input.conversationId,
-    });
-  }
-
   const runtimeBlocks = await mapAgentToRuntimeBlocks(agent);
-  if (
-    !input.testMode &&
-    shouldUseWeddingSalesRuntime({ channel: agent.channel.type, runtimeType })
-  ) {
-    return runWeddingSalesRuntime({
-      database: db,
-      agent,
-      incoming: {
-        contactId: input.contactId,
-        contactEmail: input.contactEmail,
-        message: input.message,
-        messageId: input.messageId,
-        gmailMessageId: input.gmailMessageId,
-        threadId: input.threadId,
-        subject: input.subject,
-      },
-      channel: agent.channel.type,
-      skipInboundPersistence: input.skipInboundPersistence,
-      conversationId: input.conversationId,
-      runtimeEvent: input.runtimeEvent,
-    });
-  }
 
   if (input.testMode) {
     const historyMessages = applyControlToHistory({
@@ -2410,17 +2559,6 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       };
     }
 
-    if (shouldUseWeddingSalesRuntime({ channel: agent.channel.type, runtimeType })) {
-      return runWeddingSalesTestRuntime({
-        agent,
-        input: {
-          ...input,
-          historyMessages,
-        },
-        toolFeatures: runtimeBlocks.toolFeatures,
-      });
-    }
-
     const modelResult = await runModelInvocation({
       agent,
       toolFeatures: runtimeBlocks.toolFeatures,
@@ -2431,22 +2569,59 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       prompting: runtimeBlocks.prompting,
       control: runtimeBlocks.control,
     });
-    const finalizedText = finalizeAssistantText({
+    if (modelResult.unavailable) {
+      return {
+        message: "",
+        promptPreview: runtimeBlocks.promptPreview,
+        usedTooling: [],
+        model: modelResult.modelId,
+        suppressReply: true,
+      };
+    }
+    let finalizedText = finalizeAssistantText({
       text: modelResult.text,
       currentMessage: input.message,
       toolExecutions: modelResult.toolExecutions,
+      historyMessages,
+      preserveModelVoice: runtimeBlocks.prompting.preserveModelVoice,
     });
+    const modelInitiatedOwnerHandoff = hasOwnerHandoffToolExecution(modelResult.toolExecutions);
+    if (
+      shouldPostModelHandoffForUnknownFact({
+        currentMessage: input.message,
+        assistantText: finalizedText,
+        toolExecutions: modelResult.toolExecutions,
+      })
+    ) {
+      modelResult.toolExecutions.push(
+        await requestPostModelUnknownFactHandoff({
+          agent,
+          input,
+        }),
+      );
+    }
+    const ownerHandoffRequested = hasOwnerHandoffToolExecution(modelResult.toolExecutions);
+    if (
+      ownerHandoffRequested &&
+      !(runtimeBlocks.prompting.preserveModelVoice && modelInitiatedOwnerHandoff && finalizedText.trim())
+    ) {
+      finalizedText = customerReplyForOwnerHandoff({
+        explicitHumanRequest: isExplicitHumanRequest(input.message),
+      });
+    }
 
     return {
       message: finalizedText,
       promptPreview: runtimeBlocks.promptPreview,
       usedTooling: modelResult.toolExecutions.map((execution) => execution.toolName),
       model: modelResult.modelId,
-      attachments: extractAttachments(modelResult.toolExecutions),
+      suppressReply: false,
+      attachments: mergeRuntimeAttachments(extractAttachments(modelResult.toolExecutions)),
       historyAppend: buildHistoryAppend({
         toolExecutions: modelResult.toolExecutions,
         assistantText: finalizedText,
       }),
+      toolExecutions: modelResult.toolExecutions,
     };
   }
 
@@ -2514,30 +2689,73 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     agent,
     toolFeatures: runtimeBlocks.toolFeatures,
     input,
+    conversationId: conversation.id,
     promptPreview: runtimeBlocks.promptPreview,
     historyText: renderHistory(historyMessages),
     historyMessages,
     prompting: runtimeBlocks.prompting,
     control: runtimeBlocks.control,
   });
-  const finalizedText = finalizeAssistantText({
+  if (modelResult.unavailable) {
+    return {
+      message: "",
+      promptPreview: runtimeBlocks.promptPreview,
+      usedTooling: [],
+      conversationId: conversation.id,
+      model: modelResult.modelId,
+      suppressReply: true,
+    };
+  }
+  let finalizedText = finalizeAssistantText({
     text: modelResult.text,
     currentMessage: input.message,
     toolExecutions: modelResult.toolExecutions,
+    historyMessages,
+    preserveModelVoice: runtimeBlocks.prompting.preserveModelVoice,
   });
+  const modelInitiatedOwnerHandoff = hasOwnerHandoffToolExecution(modelResult.toolExecutions);
+  if (
+    shouldPostModelHandoffForUnknownFact({
+      currentMessage: input.message,
+      assistantText: finalizedText,
+      toolExecutions: modelResult.toolExecutions,
+    })
+  ) {
+    modelResult.toolExecutions.push(
+      await requestPostModelUnknownFactHandoff({
+        agent,
+        input,
+        conversationId: conversation.id,
+      }),
+    );
+  }
+  const ownerHandoffRequested = hasOwnerHandoffToolExecution(modelResult.toolExecutions);
+  if (
+    ownerHandoffRequested &&
+    !(runtimeBlocks.prompting.preserveModelVoice && modelInitiatedOwnerHandoff && finalizedText.trim())
+  ) {
+    finalizedText = customerReplyForOwnerHandoff({
+      explicitHumanRequest: isExplicitHumanRequest(input.message),
+    });
+  }
 
   if (modelResult.toolExecutions.length > 0) {
-    await saveMessages(
-      conversation.id,
-      modelResult.toolExecutions.map((execution) => ({
-        role: MessageRole.TOOL,
-        content: JSON.stringify(execution.toolResult),
-        toolName: execution.toolName,
-        toolInput: execution.toolInput as never,
-        toolResult: execution.toolResult as never,
-        durationMs: execution.durationMs,
-      })),
+    const toolExecutionsToPersist = modelResult.toolExecutions.filter(
+      (execution) => execution.toolName !== OWNER_HANDOFF_REQUEST_TOOL_NAME,
     );
+    if (toolExecutionsToPersist.length > 0) {
+      await saveMessages(
+        conversation.id,
+        toolExecutionsToPersist.map((execution) => ({
+          role: MessageRole.TOOL,
+          content: JSON.stringify(execution.toolResult),
+          toolName: execution.toolName,
+          toolInput: execution.toolInput as never,
+          toolResult: execution.toolResult as never,
+          durationMs: execution.durationMs,
+        })),
+      );
+    }
   }
 
   await saveMessages(conversation.id, [
@@ -2554,32 +2772,44 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     usedTooling: modelResult.toolExecutions.map((execution) => execution.toolName),
     conversationId: conversation.id,
     model: modelResult.modelId,
-    attachments: extractAttachments(modelResult.toolExecutions),
+    suppressReply: false,
+    attachments: mergeRuntimeAttachments(extractAttachments(modelResult.toolExecutions)),
     historyAppend: buildHistoryAppend({
       toolExecutions: modelResult.toolExecutions,
       assistantText: finalizedText,
     }),
+    toolExecutions: modelResult.toolExecutions,
   };
 }
 
 export const aiRuntimeTestHelpers = {
   sanitizeAllowedEmojis,
+  stripDecorativeQuestionMarkEmoji,
+  stripUnexpectedScriptFragments,
+  stripInternalPlanningPreamble,
   softenFalseBookingConfirmation,
   extractDelayedFollowUpGuidance,
   finalizeAssistantText,
   getInboundConversationPolicy,
   classifyInstagramPriorMessages,
   inspectInstagramConversationHistory,
-  getWeddingSalesOwnerHandoffReason,
   handleIncomingEventWithDeps,
   isWithinAgentSchedule,
   buildRuntimeContextLines,
   getAntiSpamIntercept,
   classifyGmailClientMessage,
-  getRuntimeType,
-  getOutboundChannelConfig,
-  shouldUseWeddingSalesSimpleRuntime,
-  shouldUseWeddingSalesRuntime,
+  buildRecentWeddingAvailabilityContext,
+  buildRequiredWeddingAvailabilityActionNudge,
+  buildRequiredConsultationCalendarActionNudge,
+  getRequiredWeddingAvailabilityToolName,
+  getRequiredConsultationCalendarToolName,
+  getRequiredWeddingAvailabilityToolKey,
+  getRequiredConsultationCalendarToolKey,
+  isTechnicalModelFailure,
+  ownerHandoffCustomerReply,
+  buildConfiguredCollectionsGuideTool,
+  rewriteCustomerOpenAvailabilityPhrase,
+  shouldPostModelHandoffForUnknownFact,
 };
 
 async function handleIncomingEventWithDeps(
@@ -2587,6 +2817,8 @@ async function handleIncomingEventWithDeps(
   agentId: string;
   channel: ChannelType;
   payload: unknown;
+  forceManualReview?: boolean;
+  manualReviewReason?: string;
 },
   deps: HandleIncomingEventDeps,
 ) {
@@ -2705,6 +2937,36 @@ async function handleIncomingEventWithDeps(
     },
   });
 
+  if (args.forceManualReview && !incoming.isBusinessManualReply) {
+    const conversation = await recordInboundMessageWithDb(deps.db, {
+      agentId: agent.id,
+      contactId: incoming.contactId,
+      contactUsername: incoming.contactUsername,
+      contactDisplayName: incoming.contactDisplayName,
+      channel: agent.channel.type,
+      message: incoming.message,
+      messageId: incoming.messageId,
+      gmailMessageId: incoming.gmailMessageId,
+      threadId: incoming.threadId,
+      subject: incoming.subject,
+      conversationStatus: ConversationStatus.ESCALATED,
+    });
+    await cancelPendingDelayedDeliveriesWithDb({
+      database: deps.db,
+      conversationId: conversation.id,
+      kinds: [DelayedDeliveryKind.FOLLOW_UP],
+      excludeBusinessAutoResume: true,
+    });
+
+    return {
+      ok: true,
+      agentId: agent.id,
+      conversationId: conversation.id,
+      status: "manual_review_required",
+      reason: args.manualReviewReason ?? "manual_review_requested",
+    };
+  }
+
   if (
     args.channel === ChannelType.INSTAGRAM &&
     !incoming.isBusinessManualReply &&
@@ -2784,11 +3046,6 @@ async function handleIncomingEventWithDeps(
   const agentSettings = getRuntimeAgentSettingsConfig(agent.channelConfig);
   const control = getRuntimeControlConfig(agent.channelConfig);
   const messageBehavior = readMessageBehaviorConfig(agent.channelConfig);
-  const runtimeType = getRuntimeType(agent.channelConfig);
-  const useWeddingSalesSimpleRuntime = shouldUseWeddingSalesSimpleRuntime({
-    channel: args.channel,
-    runtimeType,
-  });
   const replyContext = {
     contactId: incoming.contactId,
     contactEmail: incoming.contactEmail,
@@ -3009,11 +3266,7 @@ async function handleIncomingEventWithDeps(
     }
   }
 
-  if (
-    !useWeddingSalesSimpleRuntime &&
-    args.channel !== ChannelType.GMAIL &&
-    messageBehavior.bufferDelaySeconds > 0
-  ) {
+  if (args.channel !== ChannelType.GMAIL && messageBehavior.bufferDelaySeconds > 0) {
     const conversation = await recordInboundMessageWithDb(deps.db, {
       agentId: agent.id,
       contactId: incoming.contactId,
@@ -3065,35 +3318,18 @@ async function handleIncomingEventWithDeps(
     };
   }
 
-  const result =
-    useWeddingSalesSimpleRuntime
-      ? await runWeddingSalesSimpleRuntime({
-          database: deps.db,
-          agent,
-          incoming,
-          channel: args.channel,
-          existingConversationStatus: existingConversation?.status,
-        })
-      : shouldUseWeddingSalesRuntime({ channel: args.channel, runtimeType })
-      ? await runWeddingSalesRuntime({
-          database: deps.db,
-          agent,
-          incoming,
-          channel: args.channel,
-          existingConversationStatus: existingConversation?.status,
-        })
-      : await deps.invokeAgent({
-          tenantId: agent.tenantId,
-          agentId: agent.id,
-          channel: args.channel,
-          contactId: incoming.contactId,
-          contactEmail: incoming.contactEmail,
-          message: incoming.message,
-          messageId: incoming.messageId,
-          gmailMessageId: incoming.gmailMessageId,
-          threadId: incoming.threadId,
-          subject: incoming.subject,
-        });
+  const result = await deps.invokeAgent({
+    tenantId: agent.tenantId,
+    agentId: agent.id,
+    channel: args.channel,
+    contactId: incoming.contactId,
+    contactEmail: incoming.contactEmail,
+    message: incoming.message,
+    messageId: incoming.messageId,
+    gmailMessageId: incoming.gmailMessageId,
+    threadId: incoming.threadId,
+    subject: incoming.subject,
+  });
 
   if (result.suppressReply) {
     if (result.conversationId) {
@@ -3140,12 +3376,23 @@ async function handleIncomingEventWithDeps(
     };
   }
 
-  const outboundChannelConfig = getOutboundChannelConfig({
-    channelConfig: agent.channelConfig,
-    result,
-  });
+  const outboundChannelConfig = agent.channelConfig;
   const formattedReply = adapter.formatReply(result.message, outboundChannelConfig);
   const outboundMessage = formattedReply as string | string[] | { text: string; html?: string };
+  const shouldRecordConversationMemory =
+    Boolean(result.conversationId) && isConversationMemoryEligibleChannel(args.channel);
+  let memoryBefore: unknown;
+
+  if (shouldRecordConversationMemory && result.conversationId) {
+    try {
+      memoryBefore = await loadConversationMemoryWithDb({
+        database: deps.db,
+        conversationId: result.conversationId,
+      });
+    } catch (error) {
+      console.warn("[conversation-memory] failed to load memory before reply", error);
+    }
+  }
 
   const delivery = await adapter.sendReply({
     credentials:
@@ -3162,7 +3409,6 @@ async function handleIncomingEventWithDeps(
         ? result.attachments
         : undefined,
     channelConfig: outboundChannelConfig,
-    channelDeliveryPlan: result.channelDeliveryPlan,
   });
 
   if (args.channel === ChannelType.INSTAGRAM && result.conversationId) {
@@ -3173,12 +3419,45 @@ async function handleIncomingEventWithDeps(
     });
   }
 
-  if (result.model === "wedding_sales_simple" && result.conversationId) {
-    await updateLatestWeddingSalesSimpleSafetyLogDeliveryExecution({
-      database: deps.db,
-      conversationId: result.conversationId,
-      deliveryExecution: extractWeddingSalesSimpleDeliveryExecution(delivery),
-    });
+  let memoryUpdate: unknown;
+
+  if (shouldRecordConversationMemory && result.conversationId) {
+    try {
+      memoryUpdate = await extractAndSaveConversationMemoryWithDb({
+        database: deps.db,
+        conversationId: result.conversationId,
+        latestUserMessage: incoming.message,
+        assistantReply: result.message,
+      });
+    } catch (error) {
+      memoryUpdate = {
+        status: "error",
+        message: error instanceof Error ? error.message : String(error),
+      };
+      console.warn("[conversation-memory] failed to extract memory after reply", error);
+    }
+  }
+
+  if (result.conversationId) {
+    try {
+      await recordExecutionTraceWithDb({
+        database: deps.db,
+        conversationId: result.conversationId,
+        agentId: agent.id,
+        channel: args.channel,
+        inboundMessage: incoming.message,
+        memoryBefore,
+        promptPreview: result.promptPreview,
+        toolExecutions: result.toolExecutions,
+        modelRawText: result.message,
+        finalMessage: result.message,
+        attachments: result.attachments,
+        delivery,
+        memoryUpdate,
+      });
+    } catch (error) {
+      console.warn("[execution-trace] failed to record runtime trace", error);
+    }
   }
 
   if (isPartialDeliveryResult(delivery)) {
@@ -3210,22 +3489,7 @@ async function handleIncomingEventWithDeps(
       },
     });
 
-    if (
-      agentActiveAfterDelivery &&
-      result.model === "wedding_sales_simple" &&
-      result.weddingSalesSimpleFollowUpState &&
-      result.weddingSalesSimpleAssistantMessageId
-    ) {
-      await scheduleWeddingSalesSimpleSlotFollowUpsForReplyWithDb({
-        database: deps.db,
-        agentId: agent.id,
-        conversationId: result.conversationId,
-        replyContext,
-        anchorCreatedAt: new Date(),
-        anchorAssistantMessageId: result.weddingSalesSimpleAssistantMessageId,
-        state: result.weddingSalesSimpleFollowUpState,
-      });
-    } else if (agentActiveAfterDelivery) {
+    if (agentActiveAfterDelivery) {
       await scheduleFollowUpsForReplyWithDb({
         database: deps.db,
         agentId: agent.id,
@@ -3234,6 +3498,8 @@ async function handleIncomingEventWithDeps(
         replyContext,
         anchorCreatedAt: new Date(),
         usedTooling: result.usedTooling,
+        outboundText: result.message,
+        attachments: result.attachments,
       });
     }
   }
@@ -3252,6 +3518,8 @@ export async function handleIncomingEvent(args: {
   agentId: string;
   channel: ChannelType;
   payload: unknown;
+  forceManualReview?: boolean;
+  manualReviewReason?: string;
 }) {
   return handleIncomingEventWithDeps(args, {
     db,

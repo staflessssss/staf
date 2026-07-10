@@ -87,6 +87,14 @@ type CalendarEventSummary = {
   summary: string;
 };
 
+function buildToolPreconditionFailure(missingFields: string[], message: string) {
+  return {
+    status: "PRECONDITION_FAILED",
+    missing_fields: missingFields,
+    message,
+  };
+}
+
 function asObject(value: Prisma.JsonValue | null | undefined) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -418,6 +426,23 @@ function inferRequestedDate(request: string, explicitDate?: string) {
     let candidate = toIsoDate(year, month, day);
 
     if (!namedMonthMatch[3] && candidate < now.toISOString().slice(0, 10)) {
+      candidate = toIsoDate(year + 1, month, day);
+    }
+
+    return candidate;
+  }
+
+  const monthNamedMatch = trimmed.match(
+    /\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)\s+(\d{1,2})(?:,?\s+(\d{4}))?\b/u,
+  );
+
+  if (monthNamedMatch) {
+    const month = monthMap[monthNamedMatch[1]];
+    const day = Number(monthNamedMatch[2]);
+    const year = monthNamedMatch[3] ? Number(monthNamedMatch[3]) : now.getUTCFullYear();
+    let candidate = toIsoDate(year, month, day);
+
+    if (!monthNamedMatch[3] && candidate < now.toISOString().slice(0, 10)) {
       candidate = toIsoDate(year + 1, month, day);
     }
 
@@ -786,10 +811,6 @@ function extractEmail(args: CalendarExecutionArgs) {
 }
 
 function resolveAvailabilityDate(args: CalendarExecutionArgs, config: SchedulingConfig) {
-  if (args.date && /^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
-    return args.date;
-  }
-
   if (config.availabilityDateSource === "literal" && /^\d{4}-\d{2}-\d{2}$/.test(config.availabilityDateValue)) {
     return config.availabilityDateValue;
   }
@@ -798,20 +819,24 @@ function resolveAvailabilityDate(args: CalendarExecutionArgs, config: Scheduling
     return inferRequestedDate(args.timeText || args.request);
   }
 
-  return args.date || inferRequestedDate(args.request);
-}
-
-function resolveBookingDate(args: CalendarExecutionArgs, config: SchedulingConfig) {
   if (args.date && /^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
     return args.date;
   }
 
+  return args.date || inferRequestedDate(args.request);
+}
+
+function resolveBookingDate(args: CalendarExecutionArgs, config: SchedulingConfig) {
   if (config.bookingDateSource === "literal" && /^\d{4}-\d{2}-\d{2}$/.test(config.bookingDateValue)) {
     return config.bookingDateValue;
   }
 
   if (config.bookingDateSource === "time_text") {
     return inferRequestedDate(args.timeText || args.request);
+  }
+
+  if (args.date && /^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
+    return args.date;
   }
 
   return args.date || inferRequestedDate(args.request);
@@ -823,6 +848,35 @@ function resolveBookingTimeText(args: CalendarExecutionArgs, config: SchedulingC
   }
 
   return args.timeText || args.request;
+}
+
+function parseSchedulingRequestWithFallback(args: {
+  request: string;
+  timeText?: string;
+  explicitDate?: string;
+  timeZone: string;
+  slotDurationMinutes: number;
+  referenceDate?: Date;
+}) {
+  const primary = parseSchedulingRequest({
+    request: args.request,
+    timeText: args.timeText,
+    explicitDate: args.explicitDate,
+    timeZone: args.timeZone,
+    slotDurationMinutes: args.slotDurationMinutes,
+    referenceDate: args.referenceDate,
+  });
+
+  if (primary || !args.timeText || normalizeTimeSelectionText(args.timeText) === normalizeTimeSelectionText(args.request)) {
+    return primary;
+  }
+
+  return parseSchedulingRequest({
+    request: args.request,
+    timeZone: args.timeZone,
+    slotDurationMinutes: args.slotDurationMinutes,
+    referenceDate: args.referenceDate,
+  });
 }
 
 function resolveInviteEmail(args: CalendarExecutionArgs, config: SchedulingConfig) {
@@ -1071,7 +1125,7 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
   }
 
   const requestedDate = resolveAvailabilityDate(args, config);
-  const parsed = parseSchedulingRequest({
+  const parsed = parseSchedulingRequestWithFallback({
     request: args.request,
     timeText: args.timeText,
     explicitDate: requestedDate ?? undefined,
@@ -1110,6 +1164,10 @@ async function runCheckCalendar(args: CalendarExecutionArgs, config: SchedulingC
       mode: "live",
       status: "needs_time",
       action: args.action,
+      precondition: buildToolPreconditionFailure(
+        ["proposedCallTime"],
+        "Cannot check the consultation calendar yet. Ask the client naturally for a specific consultation date and time.",
+      ),
       summary: "I could not safely parse a consultation date and time from the request.",
       request: args.request,
       params: args.params,
@@ -1317,7 +1375,7 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
   }
 
   const bookingDate = resolveBookingDate(args, config);
-  const parsed = parseSchedulingRequest({
+  const parsed = parseSchedulingRequestWithFallback({
     request: args.request,
     timeText: resolveBookingTimeText(args, config),
     explicitDate: bookingDate ?? undefined,
@@ -1346,6 +1404,10 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
       mode: "live",
       status: "needs_time",
       action: args.action,
+      precondition: buildToolPreconditionFailure(
+        ["proposedCallTime"],
+        "Cannot book the consultation yet. Ask the client naturally for a specific consultation date and time.",
+      ),
       summary: "I could not safely parse a consultation date and time from the request.",
       request: args.request,
       params: args.params,
@@ -1372,6 +1434,24 @@ async function runBookCall(args: CalendarExecutionArgs, config: SchedulingConfig
   const weddingDate = extractWeddingDate(args);
   const location = extractLocation(args);
   const channel = args.channel ?? "gmail";
+
+  if (!email) {
+    return {
+      integration: "GOOGLE_CALENDAR",
+      mode: "live",
+      status: "needs_email",
+      action: args.action,
+      date: parsed.date,
+      time: parsed.time,
+      precondition: buildToolPreconditionFailure(
+        ["customerEmail"],
+        "Cannot book the consultation yet. Ask the client naturally for the best email for the calendar invite.",
+      ),
+      summary: "I cannot book the consultation until I have the customer's email address.",
+      request: args.request,
+      params: args.params,
+    };
+  }
 
   const calendar = createCalendarClient(args.credentialsEnc);
   const exactSlotBusy = config.checkConflictsBeforeBooking
@@ -1524,9 +1604,11 @@ export async function executeGoogleCalendarStep(args: CalendarExecutionArgs) {
 
 export const calendarSchedulingTestHelpers = {
   parseSchedulingRequest,
+  parseSchedulingRequestWithFallback,
   validateSchedulingWindow,
   inferRequestedDate,
   resolveAvailabilityDate,
+  resolveBookingDate,
   buildCalendarInsertPayload,
 };
 

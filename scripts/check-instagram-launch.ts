@@ -136,9 +136,9 @@ async function main() {
 
     addCheck(
       checks,
-      "Wedding runtime",
-      channelConfig.runtimeType === "langgraph_wedding_sales",
-      `runtimeType=${String(channelConfig.runtimeType ?? "legacy")}.`,
+      "Shared AI runtime",
+      !channelConfig.runtimeType || channelConfig.runtimeType === "gpt_agent",
+      `runtimeType=${String(channelConfig.runtimeType ?? "gpt_agent")}.`,
     );
     addCheck(
       checks,

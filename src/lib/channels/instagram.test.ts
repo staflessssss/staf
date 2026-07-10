@@ -151,6 +151,92 @@ test("instagram adapter sends plain text through Meta Graph API", async () => {
   assert.deepEqual(result, { recipient_id: "ig-user-1", message_id: "mid-1" });
 });
 
+test("instagram adapter sends best-effort seen and typing actions when channel config is present", async () => {
+  const requestBodies: unknown[] = [];
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")));
+
+    return {
+      ok: true,
+      json: async () => ({ recipient_id: "ig-user-1", message_id: `mid-${requestBodies.length}` }),
+    } as Response;
+  }) as typeof fetch;
+
+  await instagramAdapter.sendReply({
+    credentials: JSON.stringify({
+      instagramUserAccessToken: "ig-token",
+      pageId: "page-1",
+      igUserId: "ig-user",
+      graphApiVersion: "v22.0",
+    }),
+    contactId: "ig-user-1",
+    message: "Hey there.",
+    channelConfig: {
+      channelBehavior: {
+        splitMessageDelaySeconds: 0,
+      },
+    },
+  });
+
+  assert.deepEqual(
+    requestBodies.map((body) => {
+      const record = body as Record<string, unknown>;
+      return record.sender_action ?? (record.message as Record<string, unknown>)?.text;
+    }),
+    ["mark_seen", "typing_on", "Hey there."],
+  );
+});
+
+test("instagram adapter waits after typing before the first text message when configured", async () => {
+  const requestBodies: unknown[] = [];
+  const delays: number[] = [];
+
+  global.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")));
+
+    return {
+      ok: true,
+      json: async () => ({ recipient_id: "ig-user-1", message_id: `mid-${requestBodies.length}` }),
+    } as Response;
+  }) as typeof fetch;
+  global.setTimeout = ((handler: TimerHandler, timeout?: number) => {
+    delays.push(Number(timeout ?? 0));
+
+    if (typeof handler === "function") {
+      handler();
+    }
+
+    return 0 as never;
+  }) as unknown as typeof setTimeout;
+
+  await instagramAdapter.sendReply({
+    credentials: JSON.stringify({
+      instagramUserAccessToken: "ig-token",
+      pageId: "page-1",
+      igUserId: "ig-user",
+      graphApiVersion: "v22.0",
+    }),
+    contactId: "ig-user-1",
+    message: "Hey there.",
+    channelConfig: {
+      channelBehavior: {
+        splitMessageDelaySeconds: 0,
+        typingDelaySeconds: 8,
+      },
+    },
+  });
+
+  assert.deepEqual(delays, [8000]);
+  assert.deepEqual(
+    requestBodies.map((body) => {
+      const record = body as Record<string, unknown>;
+      return record.sender_action ?? (record.message as Record<string, unknown>)?.text;
+    }),
+    ["mark_seen", "typing_on", "Hey there."],
+  );
+});
+
 test("instagram adapter sends image attachments as separate Meta messages", async () => {
   const requestBodies: unknown[] = [];
 

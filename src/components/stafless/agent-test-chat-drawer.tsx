@@ -50,7 +50,7 @@ type InvokeResponse = {
   error?: string;
 };
 
-const HIDDEN_WEDDING_SALES_STATE_TOOL_NAME = "__wedding_sales_state";
+const HIDDEN_AGENT_STATE_TOOL_NAME = "__agent_state";
 
 export function shouldSubmitTestChatKey(
   event: Pick<KeyboardEvent<HTMLTextAreaElement>, "altKey" | "ctrlKey" | "key" | "metaKey" | "shiftKey">,
@@ -88,7 +88,7 @@ function buildVisibleTraceMessages(args: {
   attachments?: TestChatAttachment[];
 }) {
   const visible = args.historyAppend
-    .filter((entry) => entry.toolName !== HIDDEN_WEDDING_SALES_STATE_TOOL_NAME)
+    .filter((entry) => entry.toolName !== HIDDEN_AGENT_STATE_TOOL_NAME)
     .filter((entry) => entry.role === "TOOL" || entry.role === "ASSISTANT")
     .map((entry, index): VisibleChatMessage => {
       if (entry.role === "TOOL") {

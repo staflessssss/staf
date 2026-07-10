@@ -152,6 +152,62 @@ test("buildSystemPrompt defaults prompting visibility flags to no when not confi
   assert.doesNotMatch(prompt, /Show channel context in runtime prompt/);
 });
 
+test("buildSystemPrompt keeps a preserve-model-voice agent focused on prompt, knowledge, and functions", () => {
+  const prompt = buildSystemPrompt({
+    name: "Myndful Instagram Agent",
+    persona: "Taras",
+    tone: "warm",
+    channel: { type: "INSTAGRAM" },
+    prompting: {
+      instruction: "Speak naturally as Taras.",
+      preserveModelVoice: true,
+      showContactIdentity: false,
+      showChannelContext: false,
+    },
+    channelBehavior: {
+      followUpEnabled: true,
+      followUpRules: [
+        {
+          delayDays: 1,
+          delayHours: 0,
+          delayMinutes: 0,
+          sendLimit: "once_per_dialog",
+          outOfHoursBehavior: "send_immediately_ignore_schedule",
+          instruction: "Long delayed follow-up that does not belong in every reply.",
+        },
+      ],
+    },
+    knowledgeBlocks: [
+      {
+        name: "Pricing",
+        description: "Regional collections",
+        knowledgeContent: "Florida starts at $2,800.",
+      },
+    ],
+    functionBlocks: [
+      {
+        name: "Check availability",
+        description: "Verify the wedding date.",
+        active: true,
+        parameters: [],
+        reactionAction: "ai_agent_decides",
+        postAction: "continue_dialog",
+        disableDelayedMessages: false,
+        resultTargets: [],
+        steps: [],
+      },
+    ],
+  });
+
+  assert.match(prompt, /Speak naturally as Taras/);
+  assert.match(prompt, /Florida starts at \$2,800/);
+  assert.match(prompt, /Check availability: Verify the wedding date/);
+  assert.doesNotMatch(prompt, /Channel behavior/);
+  assert.doesNotMatch(prompt, /Follow-up rules/);
+  assert.doesNotMatch(prompt, /Conversation playbook/);
+  assert.doesNotMatch(prompt, /Runtime execution policy/);
+});
+
 test("buildRuntimeExecutionPolicy exposes shared live-prompt rules in one place", () => {
   const policy = buildRuntimeExecutionPolicy();
 

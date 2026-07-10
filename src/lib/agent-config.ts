@@ -163,6 +163,8 @@ export type FollowUpRuleConfig = {
   sendLimit: (typeof followUpSendLimitOptions)[number];
   outOfHoursBehavior: (typeof followUpOutOfHoursBehaviorOptions)[number];
   instruction: string;
+  requiresPricingGuideContext?: boolean;
+  requiresOpenQuestion?: boolean;
 };
 
 export type ChannelBehaviorConfig = {
@@ -173,6 +175,7 @@ export type ChannelBehaviorConfig = {
   ctaStyle: (typeof ctaStyleOptions)[number];
   emojiUsage: (typeof emojiUsageOptions)[number];
   splitMessageDelaySeconds: number;
+  typingDelaySeconds: number;
   bufferDelaySeconds: number;
   useSignature: boolean;
   useRichFormatting: boolean;
@@ -250,6 +253,7 @@ export type PromptingConfig = {
   tone?: string | null;
   languagePreference?: string | null;
   instruction?: string | null;
+  preserveModelVoice: boolean;
   showContactIdentity: boolean;
   showChannelContext: boolean;
   notes?: string | null;
@@ -313,13 +317,19 @@ export function getDefaultChannelBehaviorConfig(
 ): ChannelBehaviorConfig {
   const base = {
     splitMessageDelaySeconds: 2,
+    typingDelaySeconds: 0,
     bufferDelaySeconds: 0,
     followUpEnabled: false,
     followUpRules: [],
     notes: null,
   } satisfies Pick<
     ChannelBehaviorConfig,
-    "splitMessageDelaySeconds" | "bufferDelaySeconds" | "followUpEnabled" | "followUpRules" | "notes"
+    | "splitMessageDelaySeconds"
+    | "typingDelaySeconds"
+    | "bufferDelaySeconds"
+    | "followUpEnabled"
+    | "followUpRules"
+    | "notes"
   >;
 
   switch (channelType) {
@@ -346,6 +356,7 @@ export function getDefaultChannelBehaviorConfig(
         emojiUsage: "limited",
         ...base,
         splitMessageDelaySeconds: 6,
+        typingDelaySeconds: 8,
         bufferDelaySeconds: 8,
         useSignature: false,
         useRichFormatting: false,
@@ -630,6 +641,14 @@ export function normalizeFollowUpRule(
         : base.delayMinutes,
     instruction:
       typeof value?.instruction === "string" ? value.instruction.trim() : base.instruction,
+    requiresPricingGuideContext:
+      typeof value?.requiresPricingGuideContext === "boolean"
+        ? value.requiresPricingGuideContext
+        : base.requiresPricingGuideContext,
+    requiresOpenQuestion:
+      typeof value?.requiresOpenQuestion === "boolean"
+        ? value.requiresOpenQuestion
+        : base.requiresOpenQuestion,
   };
 }
 
@@ -647,6 +666,10 @@ export function normalizeChannelBehavior(
       Number.isFinite(value.splitMessageDelaySeconds)
         ? Math.max(0, Math.min(30, Math.floor(value.splitMessageDelaySeconds)))
         : base.splitMessageDelaySeconds,
+    typingDelaySeconds:
+      typeof value?.typingDelaySeconds === "number" && Number.isFinite(value.typingDelaySeconds)
+        ? Math.max(0, Math.min(15, Math.floor(value.typingDelaySeconds)))
+        : base.typingDelaySeconds,
     bufferDelaySeconds:
       typeof value?.bufferDelaySeconds === "number" && Number.isFinite(value.bufferDelaySeconds)
         ? Math.max(0, Math.min(300, Math.floor(value.bufferDelaySeconds)))
@@ -812,6 +835,8 @@ export function normalizePromptingConfig(
       typeof value?.instruction === "string" && value.instruction.trim().length > 0
         ? value.instruction.trim()
         : null,
+    preserveModelVoice:
+      typeof value?.preserveModelVoice === "boolean" ? value.preserveModelVoice : false,
     showContactIdentity:
       typeof value?.showContactIdentity === "boolean" ? value.showContactIdentity : false,
     showChannelContext:
@@ -950,9 +975,12 @@ const scheduleWindowSchema = z.object({
 export const channelConfigSchema = z
   .object({
     runtimeType: z
-      .enum(["legacy", "langgraph_wedding_sales", "wedding_sales_simple"])
+      .enum(["gpt_agent"])
       .optional()
-      .default("legacy"),
+      .default("gpt_agent"),
+    gmailInboundPolicy: z
+      .enum(["new_threads_only"])
+      .optional(),
     enableInstagramSemanticDeliveryPlan: z.boolean().optional().default(false),
     priceAttachmentFileId: z
       .string()
@@ -1043,6 +1071,7 @@ export const channelConfigSchema = z
         ctaStyle: z.enum(ctaStyleOptions).default("ask_a_question"),
         emojiUsage: z.enum(emojiUsageOptions).default("limited"),
         splitMessageDelaySeconds: z.number().int().min(0).max(30).default(2),
+        typingDelaySeconds: z.number().int().min(0).max(15).default(0),
         bufferDelaySeconds: z.number().int().min(0).max(300).default(0),
         useSignature: z.boolean().default(false),
         useRichFormatting: z.boolean().default(false),
@@ -1059,6 +1088,8 @@ export const channelConfigSchema = z
                 .enum(followUpOutOfHoursBehaviorOptions)
                 .default("send_immediately_ignore_schedule"),
               instruction: z.string().trim().max(2000).default(""),
+              requiresPricingGuideContext: z.boolean().optional(),
+              requiresOpenQuestion: z.boolean().optional(),
             }),
           )
           .default([]),
@@ -1164,6 +1195,7 @@ export const channelConfigSchema = z
           .nullable()
           .optional()
           .transform((value) => (value ? value : undefined)),
+        preserveModelVoice: z.boolean().default(false),
         showContactIdentity: z.boolean().default(false),
         showChannelContext: z.boolean().default(false),
         notes: z
@@ -1248,7 +1280,8 @@ export const channelConfigSchema = z
     functionBlocks: z.array(functionBlockSchema).optional(),
   })
   .default({
-    runtimeType: "legacy",
+    runtimeType: "gpt_agent",
+    gmailInboundPolicy: undefined,
     enableInstagramSemanticDeliveryPlan: false,
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
@@ -1267,6 +1300,7 @@ export const channelConfigSchema = z
 
 const agentManagedChannelConfigKeys = [
   "runtimeType",
+  "gmailInboundPolicy",
   "enableInstagramSemanticDeliveryPlan",
   "priceAttachmentFileId",
   "priceAttachmentFileName",
@@ -1297,7 +1331,8 @@ export const agentDraftSchema = z.object({
   channelId: z.string().trim().min(1),
   status: z.nativeEnum(AgentStatus).optional().default(AgentStatus.ACTIVE),
   channelConfig: channelConfigSchema.optional().default({
-    runtimeType: "legacy",
+    runtimeType: "gpt_agent",
+    gmailInboundPolicy: undefined,
     enableInstagramSemanticDeliveryPlan: false,
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,

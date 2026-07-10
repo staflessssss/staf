@@ -4,12 +4,8 @@ import { google } from "googleapis";
 
 import {
   createGoogleOAuthClientFromEncryptedCredentials,
-  parseGoogleDriveFileId,
 } from "@/lib/google-api-client";
 import { readMessageBehaviorConfig } from "@/lib/channels/message-behavior";
-
-const DEFAULT_PRICING_ATTACHMENT_FILE_ID = "1m3EBiPTnIVq-8i2qD-3CMMKJ6UfYgZxi";
-const DEFAULT_PRICING_ATTACHMENT_FILE_NAME = "Myndful Films Pricing Guide";
 
 type GmailIncomingPayload =
   | {
@@ -40,14 +36,14 @@ type GmailIncomingPayload =
 
 type GmailFormatConfig = {
   signatureText?: string;
-  pricingTextBlock?: string;
 };
 
 type GmailAttachmentDescriptor = {
-  source?: "google_drive";
+  source?: "google_drive" | "remote_url";
   fileId: string;
   fileName?: string;
   mimeType?: string;
+  publicUrl?: string;
 };
 
 type GmailSendReplyParams = {
@@ -75,11 +71,7 @@ type GmailDeliveryAttachment = {
 };
 
 type GmailChannelConfig = {
-  priceAttachmentFileId?: string;
-  priceAttachmentFileName?: string;
-  priceAttachmentMimeType?: string;
   signatureText?: string;
-  pricingTextBlock?: string;
 };
 
 function asObject(value: unknown) {
@@ -138,21 +130,7 @@ function parseChannelConfig(config: unknown): GmailChannelConfig {
   const parsed = asObject(config);
 
   return {
-    priceAttachmentFileId:
-      typeof parsed?.priceAttachmentFileId === "string"
-        ? parseGoogleDriveFileId(parsed.priceAttachmentFileId)
-        : undefined,
-    priceAttachmentFileName:
-      typeof parsed?.priceAttachmentFileName === "string" ? parsed.priceAttachmentFileName : undefined,
-    priceAttachmentMimeType:
-      typeof parsed?.priceAttachmentMimeType === "string" ? parsed.priceAttachmentMimeType : undefined,
     signatureText: typeof parsed?.signatureText === "string" ? parsed.signatureText : undefined,
-    pricingTextBlock:
-      typeof parsed?.pricingTextBlock === "string"
-        ? parsed.pricingTextBlock
-        : typeof parsed?.collectionsGuideTextBlock === "string"
-          ? parsed.collectionsGuideTextBlock
-          : undefined,
   };
 }
 
@@ -344,39 +322,6 @@ function looksLikeQuotedReplyOnly(text: string) {
   return /^from:\s+/im.test(normalized) || /^sent:\s+/im.test(normalized) || /^subject:\s+/im.test(normalized);
 }
 
-function isPricingReply(text: string) {
-  if (!text) {
-    return false;
-  }
-
-  const normalized = text.toLowerCase();
-
-  return (
-    normalized.includes("collections guide") ||
-    normalized.includes("pricing guide") ||
-    normalized.includes("pricing") ||
-    normalized.includes("starting price") ||
-    normalized.includes("starting at") ||
-    normalized.includes("$2,750")
-  );
-}
-
-function appendPricingBlock(text: string, config: GmailFormatConfig) {
-  if (!isPricingReply(text)) {
-    return text;
-  }
-
-  if (text.includes("galleries.vidflow.co")) {
-    return text;
-  }
-
-  if (config.pricingTextBlock?.trim()) {
-    return `${text.trim()}\n\n${config.pricingTextBlock.trim()}`;
-  }
-
-  return text;
-}
-
 function appendSignature(text: string, config: GmailFormatConfig) {
   if (!config.signatureText?.trim()) {
     return text.trim();
@@ -519,7 +464,7 @@ async function downloadDriveAttachment(credentials: string, descriptor: GmailAtt
     fileName:
       descriptor.fileName ??
       metadata.data.name ??
-      DEFAULT_PRICING_ATTACHMENT_FILE_NAME,
+      "attachment",
     mimeType:
       descriptor.mimeType ??
       metadata.data.mimeType ??
@@ -528,31 +473,43 @@ async function downloadDriveAttachment(credentials: string, descriptor: GmailAtt
   } satisfies GmailDeliveryAttachment;
 }
 
+async function downloadRemoteAttachment(descriptor: GmailAttachmentDescriptor) {
+  const publicUrl = descriptor.publicUrl?.trim();
+
+  if (!publicUrl) {
+    throw new Error("Remote attachment is missing a public URL.");
+  }
+
+  const url = new URL(publicUrl);
+  if (url.protocol !== "https:") {
+    throw new Error("Remote attachment URL must use HTTPS.");
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Remote attachment download failed with ${response.status}.`);
+  }
+
+  return {
+    fileId: descriptor.fileId,
+    fileName: descriptor.fileName ?? url.pathname.split("/").pop() ?? "attachment",
+    mimeType: descriptor.mimeType ?? response.headers.get("content-type") ?? "application/octet-stream",
+    content: Buffer.from(await response.arrayBuffer()),
+  } satisfies GmailDeliveryAttachment;
+}
+
 function collectAutoAttachments(args: {
-  text: string;
   attachments?: GmailAttachmentDescriptor[];
-  channelConfig?: unknown;
 }) {
-  const config = parseChannelConfig(args.channelConfig);
   const dedupe = new Map<string, GmailAttachmentDescriptor>();
 
   for (const attachment of args.attachments ?? []) {
-    if (!attachment.fileId) {
+    const key = attachment.publicUrl?.trim() || attachment.fileId?.trim();
+    if (!key) {
       continue;
     }
 
-    dedupe.set(attachment.fileId, attachment);
-  }
-
-  if (isPricingReply(args.text) && dedupe.size === 0) {
-    const fileId = config.priceAttachmentFileId ?? DEFAULT_PRICING_ATTACHMENT_FILE_ID;
-
-    dedupe.set(fileId, {
-      source: "google_drive",
-      fileId,
-      fileName: config.priceAttachmentFileName,
-      mimeType: config.priceAttachmentMimeType,
-    });
+    dedupe.set(key, attachment);
   }
 
   return [...dedupe.values()];
@@ -580,8 +537,7 @@ function normalizeReplyMessage(message: GmailSendReplyParams["message"], config:
       : message.text;
   const html = Array.isArray(message) || typeof message === "string" ? undefined : message.html;
   const cleanText = cleanGeneratedEmailText(rawText, config);
-  const withPricingBlock = appendPricingBlock(cleanText, config);
-  const withSignature = appendSignature(withPricingBlock, config);
+  const withSignature = appendSignature(cleanText, config);
 
   return {
     text: htmlAnchorsToPlainText(withSignature),
@@ -593,11 +549,9 @@ export const gmailAdapterTestHelpers = {
   convertMarkdownishToHtml,
   cleanGeneratedEmailText,
   htmlAnchorsToPlainText,
-  appendPricingBlock,
   appendSignature,
   collectAutoAttachments,
   collectDeliveryAttachments,
-  isPricingReply,
   stripQuotedReply,
   looksLikeQuotedReplyOnly,
 };
@@ -647,7 +601,11 @@ export const gmailAdapter = {
 
     for (const descriptor of attachmentDescriptors) {
       try {
-        attachments.push(await downloadDriveAttachment(params.credentials, descriptor));
+        attachments.push(
+          descriptor.publicUrl
+            ? await downloadRemoteAttachment(descriptor)
+            : await downloadDriveAttachment(params.credentials, descriptor),
+        );
       } catch (error) {
         skippedAttachments.push({
           fileId: descriptor.fileId,

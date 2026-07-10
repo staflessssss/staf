@@ -25,3 +25,18 @@ test("preset channel action blocks Instagram placeholder credentials", () => {
   assert.match(source, /instagram-operator-managed/);
   assert.match(source, /getInstagramCredentialsValidationError/);
 });
+
+test("client connection actions delegate credential persistence to vault helpers", () => {
+  const source = readFileSync(connectionActionsPath, "utf8");
+
+  assert.match(source, /requireClientSession\(\)/);
+  assert.match(source, /const tenantId = session\.user\.tenantId/);
+  assert.match(source, /upsertChannelConnection/);
+  assert.match(source, /upsertIntegrationConnection/);
+  assert.match(source, /revokeChannelConnection/);
+  assert.match(source, /buildPresetChannelConnection/);
+  assert.match(source, /buildGmailWorkspacePresetIntegrations/);
+  assert.doesNotMatch(source, /db\.channelConnection\.upsert/);
+  assert.doesNotMatch(source, /db\.integrationConnection\.upsert/);
+  assert.doesNotMatch(source, /encrypt\("revoked"\)/);
+});

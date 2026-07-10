@@ -126,7 +126,7 @@ test("parseSchedulingRequest respects an explicit bound date when the request te
   assert.equal(parsed?.time, "10:30");
 });
 
-test("structured calendar date takes priority over time-text source configuration", () => {
+test("structured calendar date takes priority for request-date source configuration", () => {
   const date = calendarSchedulingTestHelpers.resolveAvailabilityDate(
     {
       tenantId: "tenant-1",
@@ -137,11 +137,61 @@ test("structured calendar date takes priority over time-text source configuratio
       timeText: "13:00",
     },
     schedulingConfig({
-      availabilityDateSource: "time_text",
+      availabilityDateSource: "request_date",
     }),
   );
 
   assert.equal(date, "2026-06-24");
+});
+
+test("time-text configured calendar checks ignore stale structured model dates", () => {
+  const date = calendarSchedulingTestHelpers.resolveAvailabilityDate(
+    {
+      tenantId: "tenant-1",
+      action: "check consultation calendar",
+      params: {},
+      request: "Check consultation calendar for July 3, 2026 at 1pm ET",
+      date: "2024-06-12",
+      timeText: "July 3, 2026 at 1pm ET",
+    },
+    schedulingConfig({
+      availabilityDateSource: "time_text",
+    }),
+  );
+
+  assert.equal(date, "2026-07-03");
+});
+
+test("time-text configured bookings ignore stale structured model dates", () => {
+  const date = calendarSchedulingTestHelpers.resolveBookingDate(
+    {
+      tenantId: "tenant-1",
+      action: "book consultation call",
+      params: {},
+      request: "Book the consultation for July 3, 2026 at 1pm ET",
+      date: "2024-06-12",
+      timeText: "July 3, 2026 at 1pm ET",
+    },
+    schedulingConfig({
+      bookingDateSource: "time_text",
+    }),
+  );
+
+  assert.equal(date, "2026-07-03");
+});
+
+test("parseSchedulingRequestWithFallback recovers from stale model timeText using the raw request", () => {
+  const parsed = calendarSchedulingTestHelpers.parseSchedulingRequestWithFallback({
+    request: "Tomorrow at 1pm ET works for me",
+    timeText: "June 13, 2024 at 1pm ET",
+    timeZone: "America/New_York",
+    slotDurationMinutes: 30,
+    referenceDate: new Date("2026-07-02T16:00:00Z"),
+  });
+
+  assert.ok(parsed);
+  assert.equal(parsed?.date, "2026-07-03");
+  assert.equal(parsed?.time, "13:00");
 });
 
 test("parseSchedulingRequest uses same-day weekday time while future and next week after it passes", () => {
@@ -239,8 +289,8 @@ test("executeGoogleCalendarStep does not check or book a mismatched weekday and 
   const result = await executeGoogleCalendarStep({
     tenantId: "tenant-1",
     action: "check_calendar",
-    request: "Tuesday June 24 at 12:30 works",
-    timeText: "Tuesday June 24 at 12:30",
+    request: "Tuesday June 24 2026 at 12:30 works",
+    timeText: "Tuesday June 24 2026 at 12:30",
     params: {
       calendarId: "primary",
       businessDays: [1, 2, 3, 4, 5],

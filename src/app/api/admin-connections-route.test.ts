@@ -47,3 +47,12 @@ test("admin connections route never returns encrypted credentials", () => {
   assert.match(source, /safeConnectionSelect/);
   assert.doesNotMatch(source, /credentialsEnc: true/);
 });
+
+test("admin connections route delegates credential writes to the vault", () => {
+  const source = readFileSync(routePath, "utf8");
+
+  assert.match(source, /upsertChannelConnectionWithDeps/);
+  assert.match(source, /upsertIntegrationConnectionWithDeps/);
+  assert.doesNotMatch(source, /db\.channelConnection\.upsert/);
+  assert.doesNotMatch(source, /db\.integrationConnection\.upsert/);
+});

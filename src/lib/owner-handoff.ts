@@ -15,10 +15,10 @@ import { db } from "@/lib/db";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import {
-  pauseWeddingSalesSimpleStateForConversation,
-  recordOwnerReplyInWeddingSalesSimpleState,
-  resumeWeddingSalesSimpleStateForConversation,
-} from "@/lib/agents/wedding-sales-simple/state-store";
+  recordConversationHandoffPause,
+  recordConversationHandoffResume,
+  recordConversationOwnerReply,
+} from "@/lib/conversation-handoff-state";
 
 export const OWNER_HANDOFF_REQUEST_TOOL_NAME = "owner_handoff_request";
 export const OWNER_HANDOFF_RESPONSE_TOOL_NAME = "owner_handoff_response";
@@ -422,7 +422,7 @@ export async function requestOwnerHandoffWithDb(args: {
       },
     });
   }
-  await pauseWeddingSalesSimpleStateForConversation({
+  await recordConversationHandoffPause({
     database: args.database,
     conversationId: conversation.id,
     handoffReason: "unanswered_business_question",
@@ -506,7 +506,7 @@ async function sendReplyThroughConversationChannel(args: {
       },
     ],
   });
-  await recordOwnerReplyInWeddingSalesSimpleState({
+  await recordConversationOwnerReply({
     conversationId: conversation.id,
     text: args.text,
     source: "telegram_owner",
@@ -617,7 +617,7 @@ export async function handleOwnerTelegramCommand(args: {
       where: { id: conversation.id },
       data: { status: ConversationStatus.ESCALATED },
     });
-    await pauseWeddingSalesSimpleStateForConversation({
+    await recordConversationHandoffPause({
       conversationId: conversation.id,
       handoffReason: "unanswered_business_question",
     });
@@ -646,7 +646,7 @@ export async function handleOwnerTelegramCommand(args: {
       where: { id: conversation.id },
       data: { status: ConversationStatus.ACTIVE },
     });
-    await resumeWeddingSalesSimpleStateForConversation({
+    await recordConversationHandoffResume({
       conversationId: conversation.id,
     });
 
@@ -705,7 +705,7 @@ export async function handleOwnerTelegramCallback(args: {
       where: { id: conversation.id },
       data: { status: ConversationStatus.ESCALATED },
     });
-    await pauseWeddingSalesSimpleStateForConversation({
+    await recordConversationHandoffPause({
       conversationId: conversation.id,
       handoffReason: "unanswered_business_question",
     });
@@ -720,7 +720,7 @@ export async function handleOwnerTelegramCallback(args: {
     where: { id: conversation.id },
     data: { status: ConversationStatus.ACTIVE },
   });
-  await resumeWeddingSalesSimpleStateForConversation({
+  await recordConversationHandoffResume({
     conversationId: conversation.id,
   });
 

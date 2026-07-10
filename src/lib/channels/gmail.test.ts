@@ -82,27 +82,16 @@ test("gmail helper strips localized Gmail quoted reply headers", () => {
   assert.equal(cleaned, "Sure, we are Anna and Mark. Our wedding is June 14 in Charlotte.");
 });
 
-test("gmail helper recognizes pricing replies beyond one exact phrase", () => {
-  assert.equal(
-    gmailAdapterTestHelpers.isPricingReply("Our pricing starts at $2,750 and I can send more details."),
-    true,
-  );
-  assert.equal(gmailAdapterTestHelpers.isPricingReply("Just checking in on the venue."), false);
-});
-
-test("gmail helper auto-adds pricing attachment when pricing is mentioned", () => {
+test("gmail helper never infers an attachment from pricing language", () => {
   const attachments = gmailAdapterTestHelpers.collectAutoAttachments({
-    text: "Our pricing starts at $2,750 and I just sent over details.",
-    channelConfig: {},
+    attachments: [],
   });
 
-  assert.equal(attachments.length, 1);
-  assert.equal(attachments[0]?.fileId, "1m3EBiPTnIVq-8i2qD-3CMMKJ6UfYgZxi");
+  assert.equal(attachments.length, 0);
 });
 
-test("gmail helper does not add default pricing attachment when graph supplied a regional guide", () => {
+test("gmail helper preserves only an explicit collections-guide attachment", () => {
   const attachments = gmailAdapterTestHelpers.collectAutoAttachments({
-    text: "Our collections start at $2,950 and I can send over the collections guide.",
     attachments: [
       {
         source: "google_drive",
@@ -111,10 +100,6 @@ test("gmail helper does not add default pricing attachment when graph supplied a
         mimeType: "image/png",
       },
     ],
-    channelConfig: {
-      priceAttachmentFileId: "legacy-price",
-      priceAttachmentFileName: "price.png",
-    },
   });
 
   assert.equal(attachments.length, 1);
@@ -124,7 +109,8 @@ test("gmail helper does not add default pricing attachment when graph supplied a
 
 test("gmail delivery attachments respect message-layer attachment permission", () => {
   const blocked = gmailAdapterTestHelpers.collectDeliveryAttachments({
-    text: "Our pricing starts at $2,750 and I just sent over details.",
+    text: "",
+    attachments: [{ fileId: "guide", source: "google_drive" }],
     channelConfig: {
       channelBehavior: {
         allowAttachments: false,
@@ -136,7 +122,8 @@ test("gmail delivery attachments respect message-layer attachment permission", (
   });
 
   const allowed = gmailAdapterTestHelpers.collectDeliveryAttachments({
-    text: "Our pricing starts at $2,750 and I just sent over details.",
+    text: "",
+    attachments: [{ fileId: "guide", source: "google_drive" }],
     channelConfig: {
       channelBehavior: {
         allowAttachments: true,

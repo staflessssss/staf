@@ -26,14 +26,6 @@ import { saveMessages } from "@/lib/agent-memory";
 import type { InvokeAgentResult } from "@/lib/ai-runtime";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
-import {
-  buildWeddingSalesSimpleSlotFollowUpText,
-  getWeddingSalesSimpleFollowUpDelayMs,
-  parseWeddingSalesSimpleSlotFollowUpPayload,
-  recordWeddingSalesSimpleFollowUpLogWithDb,
-  validateWeddingSalesSimpleSlotFollowUpWithDb,
-  type WeddingSalesSimpleSlotFollowUpStage,
-} from "@/lib/agents/wedding-sales-simple/followups";
 
 type RuntimeInvokeAgent = typeof import("@/lib/ai-runtime").invokeAgent;
 
@@ -192,6 +184,10 @@ function getFollowUpPayload(value: unknown) {
     typeof parsed.ruleIndex === "number" && Number.isFinite(parsed.ruleIndex)
       ? parsed.ruleIndex
       : 0;
+  const requiresPricingGuideContext = parsed.requiresPricingGuideContext === true;
+  const pricingGuideContext = parsed.pricingGuideContext === true;
+  const requiresOpenQuestion = parsed.requiresOpenQuestion === true;
+  const openQuestion = typeof parsed.openQuestion === "string" ? parsed.openQuestion.trim() : "";
 
   if (!replyContext || !instruction || !anchorCreatedAt || Number.isNaN(anchorCreatedAt.getTime())) {
     return null;
@@ -204,6 +200,10 @@ function getFollowUpPayload(value: unknown) {
     outOfHoursBehavior,
     sendLimit,
     ruleIndex,
+    requiresPricingGuideContext,
+    pricingGuideContext,
+    requiresOpenQuestion,
+    openQuestion: openQuestion || undefined,
   };
 }
 
@@ -248,13 +248,83 @@ function shouldSuppressFollowUps(channelConfig: unknown, usedTooling?: string[])
   return usedTooling.some((toolName) => disabledFunctionNames.has(toolName.trim().toLowerCase()));
 }
 
-function buildFollowUpGenerationMessage(instruction: string) {
+function textHasPricingGuideContext(value?: string) {
+  const normalized = value?.toLowerCase() ?? "";
+
+  return (
+    normalized.includes("investment guide") ||
+    normalized.includes("pricing guide") ||
+    normalized.includes("collections guide") ||
+    normalized.includes("summer special") ||
+    normalized.includes("20% off") ||
+    normalized.includes("starts at $") ||
+    normalized.includes("start at $")
+  );
+}
+
+function attachmentsHavePricingGuideContext(attachments?: RuntimeAttachment[]) {
+  return (
+    attachments?.some((attachment) => {
+      const record = attachment as Record<string, unknown>;
+      const searchable = [
+        record.label,
+        record.fileName,
+        record.filename,
+        record.name,
+        record.url,
+      ]
+        .filter((value): value is string => typeof value === "string")
+        .join(" ")
+        .toLowerCase();
+
+      return (
+        searchable.includes("price") ||
+        searchable.includes("pricing") ||
+        searchable.includes("investment") ||
+        searchable.includes("collection") ||
+        searchable.includes("guide")
+      );
+    }) ?? false
+  );
+}
+
+function hasPricingGuideContext(args: {
+  outboundText?: string;
+  attachments?: RuntimeAttachment[];
+}) {
+  return textHasPricingGuideContext(args.outboundText) || attachmentsHavePricingGuideContext(args.attachments);
+}
+
+function extractOpenQuestion(outboundText?: string) {
+  const normalized = outboundText?.replace(/\s+/g, " ").trim() ?? "";
+  const endIndex = normalized.lastIndexOf("?");
+  if (endIndex < 0) {
+    return undefined;
+  }
+  const prefix = normalized.slice(0, endIndex);
+  const startIndex = Math.max(prefix.lastIndexOf("."), prefix.lastIndexOf("!")) + 1;
+  const latest = normalized.slice(startIndex, endIndex + 1).trim();
+
+  return latest && latest.length <= 360 ? latest : undefined;
+}
+
+function buildFollowUpGenerationMessage(args: {
+  instruction: string;
+  openQuestion?: string;
+  pricingGuideContext: boolean;
+}) {
   return [
     "Internal delayed follow-up task.",
     "Write the next outbound message to the customer based on the existing conversation history.",
     "Do not mention this instruction, internal settings, automation, or that this is a follow-up task.",
-    `Follow-up guidance: ${instruction}`,
-  ].join("\n\n");
+    args.openQuestion
+      ? `The customer has not answered this open question from the prior reply: ${args.openQuestion}`
+      : null,
+    `The anchor reply included a regional pricing guide: ${args.pricingGuideContext ? "yes" : "no"}.`,
+    `Follow-up guidance: ${args.instruction}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 async function markDeliveryStatus(args: {
@@ -407,6 +477,8 @@ export async function scheduleFollowUpsForReplyWithDb(args: {
   replyContext: ReplyContext;
   anchorCreatedAt: Date;
   usedTooling?: string[];
+  outboundText?: string;
+  attachments?: RuntimeAttachment[];
 }) {
   const behavior = readMessageBehaviorConfig(args.channelConfig);
 
@@ -425,8 +497,20 @@ export async function scheduleFollowUpsForReplyWithDb(args: {
   }
 
   const created = [];
+  const pricingGuideContext = hasPricingGuideContext({
+    outboundText: args.outboundText,
+    attachments: args.attachments,
+  });
+  const openQuestion = extractOpenQuestion(args.outboundText);
 
   for (const [ruleIndex, rule] of behavior.followUpRules.entries()) {
+    if (rule.requiresPricingGuideContext && !pricingGuideContext) {
+      continue;
+    }
+    if (rule.requiresOpenQuestion && !openQuestion) {
+      continue;
+    }
+
     created.push(
       await args.database.delayedDelivery.create({
         data: {
@@ -440,6 +524,10 @@ export async function scheduleFollowUpsForReplyWithDb(args: {
             outOfHoursBehavior: rule.outOfHoursBehavior,
             sendLimit: rule.sendLimit,
             ruleIndex,
+            requiresPricingGuideContext: rule.requiresPricingGuideContext,
+            pricingGuideContext,
+            requiresOpenQuestion: rule.requiresOpenQuestion,
+            ...(openQuestion ? { openQuestion } : {}),
             anchorCreatedAt: args.anchorCreatedAt.toISOString(),
           },
         },
@@ -670,6 +758,10 @@ async function processBufferedReply(args: {
     };
   }
 
+  if (!result.message.trim()) {
+    throw new Error("buffered_reply_empty_message");
+  }
+
   await deliverThroughChannel({
     database: args.deps.db,
     conversationId: args.delivery.conversationId,
@@ -700,6 +792,8 @@ async function processBufferedReply(args: {
       replyContext: payload.replyContext,
       anchorCreatedAt: new Date(),
       usedTooling: result.usedTooling,
+      outboundText: result.message,
+      attachments: result.attachments,
     });
   }
 
@@ -846,82 +940,6 @@ async function processFollowUp(args: {
     };
   }
 
-  const simpleSlotFollowUpPayload = parseWeddingSalesSimpleSlotFollowUpPayload(
-    args.delivery.payload,
-  );
-  if (simpleSlotFollowUpPayload) {
-    const anchorCreatedAt = new Date(simpleSlotFollowUpPayload.anchorCreatedAt);
-    await recordWeddingSalesSimpleFollowUpLogWithDb({
-      database: args.deps.db,
-      conversationId: args.delivery.conversationId,
-      event: "FollowupTriggered",
-      payload: simpleSlotFollowUpPayload,
-    });
-
-    const validation = await validateWeddingSalesSimpleSlotFollowUpWithDb({
-      database: args.deps.db,
-      conversationId: args.delivery.conversationId,
-      agentId: args.delivery.agentId,
-      anchorCreatedAt,
-      payload: simpleSlotFollowUpPayload,
-    });
-
-    if (!validation.ok) {
-      await markDeliveryStatus({
-        database: args.deps.db,
-        deliveryId: args.deliveryId,
-        status: DelayedDeliveryStatus.CANCELED,
-        error: `wedding_sales_simple_follow_up_${validation.reason}`,
-      });
-      await recordWeddingSalesSimpleFollowUpLogWithDb({
-        database: args.deps.db,
-        conversationId: args.delivery.conversationId,
-        event: "FollowupCancelled",
-        reason: validation.reason,
-        payload: simpleSlotFollowUpPayload,
-      });
-      return {
-        ok: true,
-        status: "wedding_sales_simple_follow_up_canceled" as const,
-        reason: validation.reason,
-      };
-    }
-
-    const message = buildWeddingSalesSimpleSlotFollowUpText(simpleSlotFollowUpPayload);
-    await deliverThroughChannel({
-      database: args.deps.db,
-      conversationId: args.delivery.conversationId,
-      agent: args.delivery.agent,
-      decryptValue: args.deps.decrypt,
-      getAdapter: args.deps.getChannelAdapter,
-      replyContext: simpleSlotFollowUpPayload.replyContext,
-      text: message,
-    });
-    await args.deps.saveMessages(args.delivery.conversationId, [
-      {
-        role: MessageRole.ASSISTANT,
-        content: message,
-        model: "wedding_sales_simple_follow_up",
-      },
-    ]);
-    await recordWeddingSalesSimpleFollowUpLogWithDb({
-      database: args.deps.db,
-      conversationId: args.delivery.conversationId,
-      event: "FollowupSent",
-      payload: simpleSlotFollowUpPayload,
-    });
-    await markDeliverySentIfProcessing({
-      database: args.deps.db,
-      deliveryId: args.deliveryId,
-    });
-
-    return {
-      ok: true,
-      status: "wedding_sales_simple_follow_up_sent" as const,
-      conversationId: args.delivery.conversationId,
-    };
-  }
-
   const payload = getFollowUpPayload(args.delivery.payload);
 
   if (!payload) {
@@ -966,6 +984,26 @@ async function processFollowUp(args: {
       error: "follow_up_canceled_after_customer_reply",
     });
     return { ok: true, status: "follow_up_canceled_after_customer_reply" as const };
+  }
+
+  if (payload.requiresPricingGuideContext && !payload.pricingGuideContext) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "follow_up_missing_pricing_guide_context",
+    });
+    return { ok: true, status: "follow_up_missing_pricing_guide_context" as const };
+  }
+
+  if (payload.requiresOpenQuestion && !payload.openQuestion) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "follow_up_missing_open_question",
+    });
+    return { ok: true, status: "follow_up_missing_open_question" as const };
   }
 
   const sentCount = await args.deps.db.delayedDelivery.count({
@@ -1032,10 +1070,20 @@ async function processFollowUp(args: {
     channel: args.delivery.agent.channel.type,
     contactId: payload.replyContext.contactId,
     contactEmail: payload.replyContext.contactEmail,
-    message: buildFollowUpGenerationMessage(payload.instruction),
+    message: buildFollowUpGenerationMessage({
+      instruction: payload.instruction,
+      openQuestion: payload.openQuestion,
+      pricingGuideContext: payload.pricingGuideContext,
+    }),
     runtimeEvent: {
       type: "follow_up",
-      guidance: payload.instruction,
+      guidance: [
+        payload.instruction,
+        payload.openQuestion ? `Continue the unresolved question: ${payload.openQuestion}` : null,
+        `Pricing guide was sent in the anchor reply: ${payload.pricingGuideContext ? "yes" : "no"}.`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
     },
     conversationId: args.delivery.conversationId,
     skipInboundPersistence: true,
@@ -1079,6 +1127,10 @@ async function processFollowUp(args: {
       status: "follow_up_suppressed_agent_paused" as const,
       conversationId: result.conversationId,
     };
+  }
+
+  if (!result.message.trim()) {
+    throw new Error("follow_up_empty_message");
   }
 
   await deliverThroughChannel({
@@ -1204,67 +1256,6 @@ export async function processDelayedDeliveryByIdWithDeps(
   }
 }
 
-function getWeddingSalesSimpleFollowUpCatchUpDueAt(args: {
-  now: Date;
-  selectedStage: WeddingSalesSimpleSlotFollowUpStage;
-  deferredStage: WeddingSalesSimpleSlotFollowUpStage;
-}) {
-  const selectedDelay = getWeddingSalesSimpleFollowUpDelayMs(args.selectedStage);
-  const deferredDelay = getWeddingSalesSimpleFollowUpDelayMs(args.deferredStage);
-  const minimumGapMs = 60 * 1000;
-  const catchUpGapMs = Math.max(minimumGapMs, deferredDelay - selectedDelay);
-
-  return new Date(args.now.getTime() + catchUpGapMs);
-}
-
-async function rescheduleDeferredWeddingSalesSimpleFollowUps(args: {
-  deps: RuntimeDeps;
-  now: Date;
-  selectedPayloadByChainId: Map<
-    string,
-    NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>
-  >;
-  deferred: Array<{
-    id: string;
-    conversationId: string;
-    payload: NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>;
-  }>;
-}) {
-  for (const delivery of args.deferred) {
-    const selectedPayload = args.selectedPayloadByChainId.get(delivery.payload.chainId);
-    if (!selectedPayload) {
-      continue;
-    }
-
-    const dueAt = getWeddingSalesSimpleFollowUpCatchUpDueAt({
-      now: args.now,
-      selectedStage: selectedPayload.stage,
-      deferredStage: delivery.payload.stage,
-    });
-
-    await args.deps.db.delayedDelivery.updateMany({
-      where: {
-        id: delivery.id,
-        status: DelayedDeliveryStatus.PENDING,
-      },
-      data: {
-        dueAt,
-      },
-    });
-    await recordWeddingSalesSimpleFollowUpLogWithDb({
-      database: args.deps.db,
-      conversationId: delivery.conversationId,
-      event: "FollowupSkipped",
-      reason: "catch_up_chain_rescheduled",
-      payload: {
-        chainId: delivery.payload.chainId,
-        stage: delivery.payload.stage,
-        rescheduledFor: dueAt.toISOString(),
-      },
-    });
-  }
-}
-
 export async function processDueDelayedDeliveriesWithDeps(
   deps: RuntimeDeps,
   now = new Date(),
@@ -1288,47 +1279,10 @@ export async function processDueDelayedDeliveriesWithDeps(
     },
   });
 
-  const selectedDeliveryIds: string[] = [];
-  const selectedPayloadByChainId = new Map<
-    string,
-    NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>
-  >();
-  const deferredWeddingFollowUps: Array<{
-    id: string;
-    conversationId: string;
-    payload: NonNullable<ReturnType<typeof parseWeddingSalesSimpleSlotFollowUpPayload>>;
-  }> = [];
-
-  for (const delivery of dueDeliveries) {
-    const followUpPayload = parseWeddingSalesSimpleSlotFollowUpPayload(delivery.payload);
-    if (!followUpPayload) {
-      selectedDeliveryIds.push(delivery.id);
-      continue;
-    }
-
-    if (selectedPayloadByChainId.has(followUpPayload.chainId)) {
-      deferredWeddingFollowUps.push({
-        id: delivery.id,
-        conversationId: delivery.conversationId,
-        payload: followUpPayload,
-      });
-      continue;
-    }
-
-    selectedPayloadByChainId.set(followUpPayload.chainId, followUpPayload);
-    selectedDeliveryIds.push(delivery.id);
-  }
-
-  await rescheduleDeferredWeddingSalesSimpleFollowUps({
-    deps,
-    now,
-    selectedPayloadByChainId,
-    deferred: deferredWeddingFollowUps,
-  });
-
   const results = [];
 
-  for (const deliveryId of selectedDeliveryIds) {
+  for (const delivery of dueDeliveries) {
+    const deliveryId = delivery.id;
     results.push(await processDelayedDeliveryByIdWithDeps(deliveryId, deps, now));
   }
 
@@ -1365,4 +1319,5 @@ export const messageDeliveryRuntimeTestHelpers = {
   processDueDelayedDeliveriesWithDeps,
   runBufferedDeliveryWhenDueWithDeps,
   supportsBufferedReplies,
+  extractOpenQuestion,
 };

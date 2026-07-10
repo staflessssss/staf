@@ -132,7 +132,7 @@ type FunctionResultTargetDraft = FunctionBlockConfig["resultTargets"][number] & 
   uiId: string;
 };
 
-type AgentRuntimeType = "legacy" | "langgraph_wedding_sales";
+type AgentRuntimeType = "gpt_agent";
 
 type ChannelConfigDraft = {
   runtimeType: AgentRuntimeType;
@@ -508,10 +508,7 @@ function createInitialDraft(tenant: SerializableTenant, agent?: SerializableAgen
     status: (agent?.status as AgentStatus) ?? AgentStatus.DRAFT,
     channelId: selectedChannelId,
     channelConfig: {
-      runtimeType:
-        rawChannelConfig.runtimeType === "langgraph_wedding_sales"
-          ? "langgraph_wedding_sales"
-          : "legacy",
+      runtimeType: "gpt_agent",
       priceAttachmentFileId:
         typeof rawChannelConfig.priceAttachmentFileId === "string"
           ? rawChannelConfig.priceAttachmentFileId
@@ -1683,6 +1680,61 @@ export function AgentWorkspaceClient({
     }
   }
 
+  async function updateAgentStatus(nextStatus: AgentStatus) {
+    if (!agent) {
+      updateDraft("status", nextStatus);
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/tenants/${tenant.id}/agents/${agent.id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: nextStatus }),
+        },
+      );
+
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string; item?: { status?: AgentStatus } }
+        | null;
+
+      if (!response.ok || !result?.item?.status) {
+        setError(result?.error || "Could not update agent status.");
+        return;
+      }
+
+      const updatedStatus = result.item.status;
+      setDraft((current) => ({ ...current, status: updatedStatus }));
+      try {
+        const savedDraft = JSON.parse(savedDraftSnapshot) as WorkspaceDraft;
+        setSavedDraftSnapshot(JSON.stringify({ ...savedDraft, status: updatedStatus }));
+      } catch {
+        setSavedDraftSnapshot(JSON.stringify({ ...draft, status: updatedStatus }));
+      }
+      setSuccess(updatedStatus === AgentStatus.ACTIVE ? "Agent resumed." : "Agent paused.");
+
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (statusError) {
+      setError(
+        statusError instanceof Error
+          ? statusError.message
+          : "Could not update agent status.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function checkDeployReadiness() {
     if (!agent) {
       setError("Save this draft first, then open the workspace to check deployment readiness.");
@@ -1822,7 +1874,7 @@ export function AgentWorkspaceClient({
               name={draft.name}
               onAgentSettingsChange={updateAgentSettings}
               onNameChange={(value) => updateDraft("name", value)}
-              onStatusChange={(status) => updateDraft("status", status)}
+              onStatusChange={updateAgentStatus}
               status={draft.status}
               tenantTimezone={tenant.timezone}
             />

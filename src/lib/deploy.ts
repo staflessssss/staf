@@ -10,7 +10,7 @@ import {
 import { parseTelegramBotToken, registerTelegramWebhook } from "@/lib/channels/telegram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
-import { registerGmailWatchForChannel } from "@/lib/gmail-watch";
+import { establishGmailNewThreadCutover, registerGmailWatchForChannel } from "@/lib/gmail-watch";
 
 type ReadinessItem = {
   key: string;
@@ -282,14 +282,30 @@ export async function deployAgent(
   }
 
   if (agent.channel.type === ChannelType.GMAIL) {
-    const watch = await registerGmailWatchForChannel({
-      channelId: agent.channel.id,
-      credentialsEnc: agent.channel.credentialsEnc,
-    });
+    const gmailInboundPolicy =
+      channelConfig.gmailInboundPolicy === "new_threads_only" ? "new_threads_only" : null;
+    const watch = gmailInboundPolicy
+      ? await establishGmailNewThreadCutover({
+          channelId: agent.channel.id,
+          credentialsEnc: agent.channel.credentialsEnc,
+        })
+      : await registerGmailWatchForChannel({
+          channelId: agent.channel.id,
+          credentialsEnc: agent.channel.credentialsEnc,
+        });
+
+    if (!watch.ok) {
+      return {
+        ...readiness,
+        deployed: false,
+        nextStatus: agent.status,
+        message: "Gmail watch registration failed. The agent remains paused.",
+      };
+    }
 
     channelConfig = {
       ...channelConfig,
-      inboundMode: watch.ok ? "gmail_watch_pubsub" : "gmail_watch_pending",
+      inboundMode: "gmail_watch_pubsub",
       gmailWatch: watch,
     };
   }

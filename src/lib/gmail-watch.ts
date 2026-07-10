@@ -10,6 +10,9 @@ type GmailWatchMetadata = {
   historyId?: string;
   expiration?: string;
   registeredAt?: string;
+  automationMode?: "new_threads_only";
+  activationAt?: string;
+  activationHistoryId?: string;
   lastRenewalAttemptAt?: string;
   lastNotificationAt?: string;
   lastProcessedAt?: string;
@@ -41,6 +44,15 @@ type ParsedGmailInboundMessage = {
   subject: string;
   gmailMessageId: string;
   internalDate: number;
+};
+
+type GmailThreadCutoverDecision = {
+  mode: "auto_reply" | "manual_review";
+  reason?:
+    | "gmail_cutover_not_initialized"
+    | "gmail_message_before_cutover"
+    | "gmail_thread_before_cutover"
+    | "gmail_thread_timestamp_unavailable";
 };
 
 function getGmailPubSubTopic() {
@@ -84,6 +96,14 @@ function getWatchMetadata(metadata: Prisma.JsonValue | null | undefined): GmailW
           ? String(value.expiration)
           : undefined,
     registeredAt: typeof value.registeredAt === "string" ? value.registeredAt : undefined,
+    automationMode: value.automationMode === "new_threads_only" ? "new_threads_only" : undefined,
+    activationAt: typeof value.activationAt === "string" ? value.activationAt : undefined,
+    activationHistoryId:
+      typeof value.activationHistoryId === "string"
+        ? value.activationHistoryId
+        : typeof value.activationHistoryId === "number"
+          ? String(value.activationHistoryId)
+          : undefined,
     lastRenewalAttemptAt:
       typeof value.lastRenewalAttemptAt === "string" ? value.lastRenewalAttemptAt : undefined,
     lastNotificationAt: typeof value.lastNotificationAt === "string" ? value.lastNotificationAt : undefined,
@@ -177,6 +197,41 @@ function getIsoTimestamp(value?: string) {
 
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function usesNewThreadsOnlyPolicy(channelConfig: Prisma.JsonValue | null | undefined) {
+  const config = asObject(channelConfig);
+  return config?.gmailInboundPolicy === "new_threads_only";
+}
+
+function getGmailThreadCutoverDecision(args: {
+  policyEnabled: boolean;
+  activationAt?: string;
+  messageInternalDate: number;
+  threadStartedAt?: number;
+}): GmailThreadCutoverDecision {
+  if (!args.policyEnabled) {
+    return { mode: "auto_reply" };
+  }
+
+  const activationTimestamp = getIsoTimestamp(args.activationAt);
+  if (!activationTimestamp) {
+    return { mode: "manual_review", reason: "gmail_cutover_not_initialized" };
+  }
+
+  if (!args.messageInternalDate || args.messageInternalDate < activationTimestamp) {
+    return { mode: "manual_review", reason: "gmail_message_before_cutover" };
+  }
+
+  if (!args.threadStartedAt) {
+    return { mode: "manual_review", reason: "gmail_thread_timestamp_unavailable" };
+  }
+
+  if (args.threadStartedAt < activationTimestamp) {
+    return { mode: "manual_review", reason: "gmail_thread_before_cutover" };
+  }
+
+  return { mode: "auto_reply" };
 }
 
 function normalizeHeaderValue(headers: Array<{ name?: string | null; value?: string | null }> | undefined, name: string) {
@@ -360,6 +415,28 @@ async function fetchHistoryMessages(args: {
   return results;
 }
 
+async function fetchGmailThreadStartedAt(args: {
+  credentialsEnc: string;
+  threadId: string;
+}) {
+  if (!args.threadId.trim()) {
+    return undefined;
+  }
+
+  const auth = createGoogleOAuthClientFromEncryptedCredentials(args.credentialsEnc);
+  const gmail = google.gmail({ version: "v1", auth });
+  const response = await gmail.users.threads.get({
+    userId: "me",
+    id: args.threadId,
+    format: "minimal",
+  });
+  const timestamps = (response.data.messages ?? [])
+    .map((message) => Number(message.internalDate ?? 0))
+    .filter((timestamp) => Number.isFinite(timestamp) && timestamp > 0);
+
+  return timestamps.length > 0 ? Math.min(...timestamps) : undefined;
+}
+
 async function fetchRecentInboxMessages(args: {
   credentialsEnc: string;
   mailboxEmail: string;
@@ -427,6 +504,7 @@ async function fetchRecentInboxMessages(args: {
 export async function registerGmailWatchForChannel(args: {
   channelId: string;
   credentialsEnc: string;
+  resetHistoryCursor?: boolean;
 }) {
   const topicName = getGmailPubSubTopic();
 
@@ -451,12 +529,19 @@ export async function registerGmailWatchForChannel(args: {
       },
     });
 
+    const currentChannel = await db.channelConnection.findUnique({
+      where: { id: args.channelId },
+      select: { metadata: true },
+    });
+    const existingWatch = getWatchMetadata(currentChannel?.metadata);
+    const watchHistoryId = String(response.data.historyId ?? "");
+    const shouldResetHistoryCursor = args.resetHistoryCursor || !existingWatch.historyId;
     const patch: Partial<GmailWatchMetadata> = {
       topicName,
-      historyId: String(response.data.historyId ?? ""),
       expiration: response.data.expiration ? String(response.data.expiration) : undefined,
-      registeredAt: new Date().toISOString(),
+      registeredAt: existingWatch.registeredAt ?? new Date().toISOString(),
       lastError: null,
+      ...(shouldResetHistoryCursor && watchHistoryId ? { historyId: watchHistoryId } : {}),
     };
 
     await updateChannelWatchMetadata(args.channelId, patch);
@@ -464,6 +549,7 @@ export async function registerGmailWatchForChannel(args: {
     return {
       ok: true,
       mode: "gmail_watch",
+      historyId: watchHistoryId,
       ...patch,
     };
   } catch (error) {
@@ -479,6 +565,37 @@ export async function registerGmailWatchForChannel(args: {
       reason: message,
     };
   }
+}
+
+export async function establishGmailNewThreadCutover(args: {
+  channelId: string;
+  credentialsEnc: string;
+}) {
+  const watch = await registerGmailWatchForChannel({
+    channelId: args.channelId,
+    credentialsEnc: args.credentialsEnc,
+    resetHistoryCursor: true,
+  });
+
+  if (!watch.ok || !("historyId" in watch) || !watch.historyId) {
+    return watch;
+  }
+
+  const activationAt = new Date().toISOString();
+  await updateChannelWatchMetadata(args.channelId, {
+    automationMode: "new_threads_only",
+    activationAt,
+    activationHistoryId: watch.historyId,
+    historyId: watch.historyId,
+    lastProcessedAt: activationAt,
+    lastError: null,
+  });
+
+  return {
+    ...watch,
+    activationAt,
+    activationHistoryId: watch.historyId,
+  };
 }
 
 export async function renewDueGmailWatches(args: {
@@ -654,7 +771,10 @@ export async function processGmailPubSubNotification(args: {
             threadId: message.threadId,
             subject: message.subject,
             gmailMessageId: message.gmailMessageId,
+            internalDate: message.internalDate,
           },
+          forceManualReview: usesNewThreadsOnlyPolicy(agent.channelConfig),
+          manualReviewReason: "gmail_history_recovery_requires_review",
         });
       }
     }
@@ -704,8 +824,36 @@ export async function processGmailPubSubNotification(args: {
         ) === index,
     );
 
+    const threadStartedAt = new Map<string, number | undefined>();
+
     if (agent) {
       for (const message of combinedMessages) {
+        const policyEnabled = usesNewThreadsOnlyPolicy(agent.channelConfig);
+        let decision: GmailThreadCutoverDecision = { mode: "auto_reply" };
+
+        if (policyEnabled) {
+          if (!threadStartedAt.has(message.threadId)) {
+            try {
+              threadStartedAt.set(
+                message.threadId,
+                await fetchGmailThreadStartedAt({
+                  credentialsEnc: channel.credentialsEnc,
+                  threadId: message.threadId,
+                }),
+              );
+            } catch {
+              threadStartedAt.set(message.threadId, undefined);
+            }
+          }
+
+          decision = getGmailThreadCutoverDecision({
+            policyEnabled,
+            activationAt: watchMetadata.activationAt,
+            messageInternalDate: message.internalDate,
+            threadStartedAt: threadStartedAt.get(message.threadId),
+          });
+        }
+
         await handleIncomingEvent({
           agentId: agent.id,
           channel: ChannelType.GMAIL,
@@ -716,7 +864,10 @@ export async function processGmailPubSubNotification(args: {
             threadId: message.threadId,
             subject: message.subject,
             gmailMessageId: message.gmailMessageId,
+            internalDate: message.internalDate,
           },
+          forceManualReview: decision.mode === "manual_review",
+          manualReviewReason: decision.reason,
         });
       }
     }
@@ -771,5 +922,6 @@ export function assertPubSubWebhookSecret(token?: string | null) {
 }
 
 export const gmailWatchTestHelpers = {
+  getGmailThreadCutoverDecision,
   shouldRenewGmailWatch,
 };

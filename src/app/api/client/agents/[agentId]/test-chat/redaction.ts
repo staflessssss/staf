@@ -1,6 +1,6 @@
 import type { InvokeAgentResult, RuntimeHistoryMessage } from "@/lib/ai-runtime";
 
-const HIDDEN_WEDDING_SALES_STATE_TOOL_NAME = "__wedding_sales_state";
+const HIDDEN_AGENT_STATE_TOOL_NAME = "__agent_state";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -26,7 +26,7 @@ function pickRecordFields(source: Record<string, unknown>, fields: string[]) {
   }, {});
 }
 
-function sanitizeWeddingSalesState(value: unknown) {
+function sanitizeAgentState(value: unknown) {
   const state = asRecord(value);
 
   if (!state) {
@@ -129,9 +129,9 @@ function sanitizeHistoryEntryForClient(entry: RuntimeHistoryMessage): RuntimeHis
 
   const rawToolResult = entry.toolResult ?? parseJsonRecord(entry.content);
 
-  if (entry.toolName === HIDDEN_WEDDING_SALES_STATE_TOOL_NAME) {
+  if (entry.toolName === HIDDEN_AGENT_STATE_TOOL_NAME) {
     const stateWrapper = asRecord(rawToolResult);
-    const sanitizedState = sanitizeWeddingSalesState(stateWrapper?.state ?? rawToolResult);
+    const sanitizedState = sanitizeAgentState(stateWrapper?.state ?? rawToolResult);
     const toolResult = { state: sanitizedState };
 
     return {
