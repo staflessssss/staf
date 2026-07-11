@@ -44,17 +44,24 @@ const channels: ConnectionNode[] = [
 
 const systems: ConnectionNode[] = [
   {
-    label: "amoCRM",
+    label: "HubSpot",
     icon: (
-      <span className="relative block h-8 w-[112px] overflow-hidden">
-        <Image src="/brands/amocrm.svg" alt="amoCRM" fill sizes="112px" className="object-cover" />
+      <span aria-hidden="true" className="flex items-center gap-2.5">
+        <Image
+          src="/brands/hubspot.svg"
+          alt=""
+          width={30}
+          height={30}
+          style={{ width: 30, height: 30 }}
+        />
+        <span className="text-[18px] font-extrabold tracking-[-0.04em] text-white">HubSpot</span>
       </span>
     ),
     wordmark: true,
   },
   {
-    label: "Bitrix24",
-    icon: <Image src="/brands/bitrix24.svg" alt="Bitrix24" width={132} height={25} className="h-auto w-[132px]" />,
+    label: "Salesforce",
+    icon: <Image src="/brands/salesforce.svg" alt="Salesforce" width={76} height={53} className="h-[53px] w-[76px]" />,
     wordmark: true,
   },
   {
@@ -70,7 +77,7 @@ const systems: ConnectionNode[] = [
     icon: <Image src="/brands/google-drive.svg" alt="" width={30} height={30} style={{ width: 30, height: 30 }} />,
   },
   {
-    label: "Custom business API",
+    label: "Any CRM with an API",
     icon: <Database className="size-[30px] stroke-[1.5]" />,
   },
 ];
