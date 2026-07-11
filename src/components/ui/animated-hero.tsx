@@ -1,75 +1,50 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
-const demoHref = "mailto:contact@behalfy.io?subject=Book%20a%20Behalfy%20demo";
+const demoHref =
+  "mailto:contact@behalfy.io?subject=Behalfy%2020-minute%20demo&body=Tell%20us%20which%20customer%20channels%2C%20business%20systems%2C%20and%20workflows%20you%20want%20to%20connect.";
 
 export function AnimatedHero() {
-  const [titleNumber, setTitleNumber] = useState(0);
-  const titles = useMemo(
-    () => ["a qualified lead", "a booked call", "a clear next step"],
-    [],
-  );
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setTitleNumber((current) => (current === titles.length - 1 ? 0 : current + 1));
-    }, 2200);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [titleNumber, titles]);
+  const shouldReduceMotion = useReducedMotion();
 
   return (
-    <div className="mx-auto max-w-5xl text-center lg:text-left">
-      <h1 className="font-serif text-[3.25rem] font-normal leading-[0.98] tracking-[-0.055em] text-black md:text-[5.7rem] lg:text-[6.7rem]">
-        <span className="block">Turn every inquiry into</span>
-        <span className="relative mx-auto mt-1 flex h-[1.1em] w-full justify-center overflow-hidden px-4 pb-3 text-black md:px-8 lg:mx-0 lg:justify-start lg:px-0">
-          {titles.map((title, index) => (
-            <motion.span
-              key={title}
-              className="absolute whitespace-nowrap px-3 font-normal"
-              initial={{ opacity: 0, y: 80 }}
-              transition={{ type: "spring", stiffness: 58, damping: 18 }}
-              animate={
-                titleNumber === index
-                  ? {
-                      y: 0,
-                      opacity: 1,
-                    }
-                  : {
-                      y: titleNumber > index ? -110 : 110,
-                      opacity: 0,
-                    }
-              }
-            >
-              {title}
-            </motion.span>
-          ))}
-        </span>
+    <motion.div
+      className="mx-auto max-w-6xl text-center lg:text-left"
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 28 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <h1 className="font-serif text-[3.15rem] font-normal leading-[0.96] tracking-[-0.055em] text-black sm:text-[4.2rem] md:text-[5.7rem] lg:text-[6.55rem]">
+        Stop losing customers <br className="sm:hidden" />in{" "}
+        <span className="text-[#f0c995] sm:block">unanswered messages.</span>
       </h1>
 
-      <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-black/58 md:text-lg lg:mx-0">
-        Behalfy gives your business an AI assistant that replies to customers, collects the details, and helps book the next step across your connected channels.
+      <p className="mx-auto mt-7 max-w-[44rem] text-base leading-8 text-black/58 md:text-lg lg:mx-0">
+        Behalfy gives your business a fully managed AI assistant that answers customers, qualifies inquiries, and moves the work forward across your channels, CRM, calendars, and business systems.
       </p>
 
       <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
         <Link
           href={demoHref}
-          className="inline-flex items-center gap-2 rounded-full bg-black px-6 py-3.5 text-sm font-black text-white shadow-[0_18px_44px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5"
+          className="inline-flex min-h-[52px] items-center gap-2 rounded-full bg-black px-6 text-sm font-extrabold text-white shadow-[0_18px_44px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-behalfy-gold"
         >
-          Book a demo
+          Book a 20-minute demo
           <ArrowRight className="size-4" />
         </Link>
         <a
-          href="#workflow"
-          className="inline-flex items-center gap-2 rounded-full border border-black/[0.1] bg-white/80 px-6 py-3.5 text-sm font-black text-black transition hover:-translate-y-0.5"
+          href="#how-it-works"
+          className="inline-flex min-h-[52px] items-center gap-2 rounded-full border border-black/[0.12] bg-white/80 px-6 text-sm font-extrabold text-black transition hover:-translate-y-0.5 hover:border-black/25 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-behalfy-gold"
         >
           See how it works
         </a>
       </div>
-    </div>
+
+      <p className="mt-5 text-xs font-semibold tracking-[0.01em] text-white/62">
+        Setup, integrations, and ongoing improvements are handled for you.
+      </p>
+    </motion.div>
   );
 }

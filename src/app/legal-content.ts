@@ -16,13 +16,13 @@ export const legalPages: Record<LegalPageContent["slug"], LegalPageContent> = {
     title: "Privacy Policy",
     eyebrow: "Privacy",
     summary:
-      "Behalfy by Stafless helps operators run AI agents for small and midsize businesses. This policy explains what we collect, how connected channels are used, and how customers can request access or deletion.",
+      "Behalfy provides managed AI assistants for small and midsize businesses. This policy explains what we collect, how connected channels are used, and how customers can request access or deletion.",
     lastUpdated: "June 2, 2026",
     sections: [
       {
         title: "What Behalfy does",
         body: [
-          "Behalfy is an operator-managed AI-agent platform for SMBs. Operators configure agents that can answer customer messages, qualify leads, and use connected business tools under approved rules.",
+          "Behalfy is a managed AI assistant service for small and midsize businesses. We configure assistants that can answer customer messages, qualify leads, and use connected business tools under approved rules.",
           "The platform may connect to services such as Gmail, Instagram, and Facebook through OAuth or platform APIs when an authorized business user chooses to connect those channels.",
         ],
       },
@@ -37,7 +37,7 @@ export const legalPages: Record<LegalPageContent["slug"], LegalPageContent> = {
       {
         title: "How we use information",
         body: [
-          "We use information to deliver AI-agent responses, route conversations, preserve conversation isolation by agent and contact, show operators and clients conversation history, maintain security, and improve reliability.",
+          "We use information to deliver AI-assistant responses, route conversations, preserve conversation isolation by assistant and contact, show authorized business users conversation history, maintain security, and improve reliability.",
           "Message content from Gmail, Instagram, Facebook, or other connected channels is used only to provide the requested agent workflow and related support or diagnostics.",
         ],
       },
@@ -68,14 +68,14 @@ export const legalPages: Record<LegalPageContent["slug"], LegalPageContent> = {
     title: "Terms of Service",
     eyebrow: "Terms",
     summary:
-      "These terms describe the early access use of Behalfy, an operator-managed AI-agent platform for business messaging and workflow automation.",
+      "These terms describe the early access use of Behalfy, a managed AI assistant service for business messaging and workflow automation.",
     lastUpdated: "June 2, 2026",
     sections: [
       {
         title: "Service",
         body: [
-          "Behalfy by Stafless provides managed AI agents for small and midsize businesses. Agents may respond to customer messages, collect lead information, and use approved integrations such as Gmail, Instagram, Facebook, calendars, spreadsheets, or other business APIs.",
-          "The service is intended for business use by authorized operators, admins, and client users.",
+          "Behalfy provides managed AI assistants for small and midsize businesses. Assistants may respond to customer messages, collect lead information, and use approved integrations such as Gmail, Instagram, Facebook, calendars, spreadsheets, or other business APIs.",
+          "The service is intended for business use by authorized business users.",
         ],
       },
       {
@@ -95,14 +95,14 @@ export const legalPages: Record<LegalPageContent["slug"], LegalPageContent> = {
       {
         title: "AI outputs and human oversight",
         body: [
-          "AI responses can be incomplete or incorrect. Behalfy is designed for operator-managed workflows with visibility, rules, and human takeover when needed.",
+          "AI responses can be incomplete or incorrect. Behalfy is designed for managed workflows with visibility, rules, and human takeover when needed.",
           "You remain responsible for reviewing agent configuration, approving business rules, and handling conversations that require human judgment.",
         ],
       },
       {
         title: "Availability and changes",
         body: [
-          "Behalfy is an early platform and may change as we improve reliability, integrations, and operator controls.",
+          "Behalfy is an early service and may change as we improve reliability, integrations, and customer controls.",
           "We may suspend access to protect customers, comply with law, or prevent misuse of the service.",
         ],
       },

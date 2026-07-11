@@ -36,7 +36,7 @@ export function LegalPage({ page }: { page: LegalPageContent }) {
         </article>
 
         <footer className="mt-auto flex flex-col gap-4 border-t border-black/10 py-6 text-sm text-black/46 sm:flex-row sm:items-center sm:justify-between">
-          <p>(c) 2026 Behalfy by Stafless.</p>
+          <p>© 2026 Behalfy.</p>
           <nav className="flex gap-5">
             <Link href="/privacy" className="transition hover:text-black">
               Privacy

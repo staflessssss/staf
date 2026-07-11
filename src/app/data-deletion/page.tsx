@@ -4,8 +4,11 @@ import { legalPages } from "../legal-content";
 import { LegalPage } from "../legal-page";
 
 export const metadata: Metadata = {
-  title: "Data Deletion Instructions | Behalfy",
-  description: "Data deletion instructions for Behalfy by Stafless.",
+  title: "Data Deletion Instructions",
+  description: "Learn how to request deletion of data processed by Behalfy.",
+  alternates: {
+    canonical: "/data-deletion",
+  },
 };
 
 export default function DataDeletionPage() {

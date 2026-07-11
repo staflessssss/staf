@@ -3,79 +3,35 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
-  BarChart3,
-  Bot,
-  CalendarCheck2,
-  CalendarDays,
-  ChevronDown,
-  ClipboardCheck,
-  Eye,
-  Globe2,
-  Hand,
-  Home,
-  Inbox,
-  LinkIcon,
-  Mail,
-  MessageSquareText,
-  MoreVertical,
-  PhoneCall,
-  Plug,
-  Search,
-  ShieldCheck,
-  Send,
-  Settings,
-  Settings2,
-  UsersRound,
+  Braces,
+  ChevronRight,
+  MessagesSquare,
+  Workflow,
 } from "lucide-react";
 
 import { AnimatedHero } from "@/components/ui/animated-hero";
+import { ConnectionEcosystem } from "@/components/ui/connection-ecosystem";
+import { ConversationScenarios } from "@/components/ui/conversation-scenarios";
 import { Entropy } from "@/components/ui/entropy";
 
-const channelIcons = [MessageSquareText, Send, Inbox, Mail, PhoneCall];
-const demoHref = "mailto:contact@behalfy.io?subject=Book%20a%20Behalfy%20demo";
-
-const cockpitConversations = [
-  {
-    name: "Sarah Mitchell",
-    channel: "Web Chat · 2m",
-    preview: "Do you offer installation in my area?",
-    status: "New",
-  },
-  {
-    name: "James Carter",
-    channel: "WhatsApp · 5m",
-    preview: "I'd like a quote for 8 windows.",
-    status: "Lead",
-  },
-  {
-    name: "Priya Shah",
-    channel: "Instagram · 15m",
-    preview: "What's the timeline for a full home install?",
-    status: "New",
-  },
-  {
-    name: "Daniel Kim",
-    channel: "Email · 28m",
-    preview: "Can you send pricing and availability?",
-    status: "Lead",
-  },
-  {
-    name: "Olivia Bennett",
-    channel: "Phone · 1h",
-    preview: "Looking to book a consultation.",
-    status: "Booked",
-  },
+const connectionHighlights = [
+  { name: "Any customer channel", icon: MessagesSquare },
+  { name: "CRM, booking & operations", icon: Workflow },
+  { name: "Direct APIs & webhooks", icon: Braces },
 ];
 
+const demoHref =
+  "mailto:contact@behalfy.io?subject=Behalfy%2020-minute%20demo&body=Tell%20us%20which%20customer%20channels%2C%20business%20systems%2C%20and%20workflows%20you%20want%20to%20connect.";
+
 export default function HomePage() {
-  const [capabilitiesActive, setCapabilitiesActive] = useState(0);
   const [controlInteractiveActive, setControlInteractiveActive] = useState(0);
+  const shouldReduceMotion = useReducedMotion();
 
   return (
-    <main className="min-h-screen bg-[#f8f8f6] text-[#111111]">
-      <section className="relative min-h-screen overflow-hidden bg-black text-white">
+    <main className="behalfy-landing min-h-screen overflow-x-clip bg-[#f8f8f6] text-behalfy-panel">
+      <section className="relative overflow-hidden bg-black text-white md:min-h-screen">
         <Image src="/assets/behalfy-hero-coast.png" alt="" fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,13,16,0.44)_0%,rgba(8,13,16,0.12)_38%,rgba(8,13,16,0.72)_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,0.12),transparent_32%)]" />
@@ -95,11 +51,11 @@ export default function HomePage() {
             </Link>
 
             <nav className="hidden items-center gap-9 text-sm font-semibold text-white/78 md:flex">
-              <a href="#workflow" className="transition hover:text-white">
-                Product
+              <a href="#how-it-works" className="transition hover:text-white">
+                How it works
               </a>
-              <a href="#portal" className="transition hover:text-white">
-                Portal
+              <a href="#connections" className="transition hover:text-white">
+                Connections
               </a>
               <a href="#control" className="transition hover:text-white">
                 Control
@@ -108,42 +64,49 @@ export default function HomePage() {
 
             <div className="flex items-center gap-4">
               <Link href="/login" className="hidden text-sm font-semibold text-white/78 transition hover:text-white sm:inline">
-                Sign in
+                Client login
               </Link>
               <Link
                 href={demoHref}
-                className="rounded-full bg-white px-5 py-3 text-sm font-black text-black shadow-[0_18px_48px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5"
+                aria-label="Book a 20-minute demo"
+                className="inline-flex min-h-11 items-center rounded-full bg-white px-5 text-sm font-extrabold text-black shadow-[0_18px_48px_rgba(0,0,0,0.18)] transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-behalfy-gold"
               >
-                Book a demo
+                <span className="md:hidden">Book a demo</span>
+                <span className="hidden md:inline">Book a 20-minute demo</span>
               </Link>
             </div>
           </div>
         </header>
 
-        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-6.5rem)] max-w-7xl flex-col items-center justify-center px-5 pb-28 text-center md:px-8">
-          <div className="rounded-full border border-white/12 bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/78 backdrop-blur-md">
-            A managed AI assistant for your business
+        <div className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-5 pb-10 pt-10 text-center sm:pt-14 md:min-h-[calc(100vh-6.5rem)] md:justify-center md:px-8 md:pb-28 md:pt-0">
+          <div className="rounded-full border border-white/12 bg-white/10 px-4 py-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/78 backdrop-blur-md">
+            Managed AI for busy service businesses
           </div>
-          <div className="mt-8 [&_h1]:text-white [&_p]:text-white/82 [&_a:first-of-type]:bg-white [&_a:first-of-type]:text-black [&_a:last-of-type]:border-white/18 [&_a:last-of-type]:bg-white/10 [&_a:last-of-type]:text-white [&_a]:backdrop-blur-md [&_span.relative]:text-white">
+          <div className="mt-8 [&_h1]:text-white [&_p]:text-white/82 [&_a:first-of-type]:bg-white [&_a:first-of-type]:text-black [&_a:last-of-type]:border-white/18 [&_a:last-of-type]:bg-white/10 [&_a:last-of-type]:text-white [&_a]:backdrop-blur-md">
             <AnimatedHero />
           </div>
 
         </div>
 
-        <div className="absolute bottom-10 left-1/2 z-10 w-full max-w-4xl -translate-x-1/2 px-5 text-center md:px-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/55">
-            Works across your connected channels
+        <div id="channels" className="relative z-10 mx-auto w-full max-w-5xl px-5 pb-10 text-center md:absolute md:bottom-10 md:left-1/2 md:-translate-x-1/2 md:px-8 md:pb-0">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/68">
+            Connected around the way your business already works
           </p>
-          <div className="mt-5 flex justify-center gap-8 text-white/78">
-            {channelIcons.map((Icon, index) => (
-              <Icon key={index} className="size-5" />
+          <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-3 text-white/78 sm:gap-x-8">
+            {connectionHighlights.map(({ name, icon: Icon }) => (
+              <span key={name} className="inline-flex items-center gap-2 text-xs font-bold">
+                <span className="grid size-7 place-items-center rounded-full border border-white/12 bg-white/10 text-behalfy-gold-light backdrop-blur-md">
+                  <Icon className="size-3.5" />
+                </span>
+                {name}
+              </span>
             ))}
           </div>
         </div>
       </section>
 
       {/* The Response Gap */}
-      <section className="bg-[#070707] px-5 pt-12 pb-24 text-white md:px-8 md:pt-16 md:pb-28">
+      <section className="bg-behalfy-ink px-5 pt-12 pb-24 text-white md:px-8 md:pt-16 md:pb-28">
         <div className="mx-auto max-w-[1440px]">
           {/* Header */}
           <div className="mx-auto max-w-2xl text-center">
@@ -156,20 +119,21 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Stats */}
+          {/* Where the lead gets lost */}
           <div className="mx-auto mt-14 grid max-w-5xl gap-4 md:grid-cols-3">
             {[
-              { stat: "30–71%", label: "of leads are lost due to slow or no response" },
-              { stat: "21×", label: "more likely to convert when contacted within 5 minutes" },
-              { stat: "78%", label: "of buyers choose the first business that responds" },
+              { step: "01", title: "A message arrives", label: "Your team is serving customers, on calls, or finishing the work that pays the bills." },
+              { step: "02", title: "The reply waits", label: "Details sit across inboxes and nobody has time to own the next step." },
+              { step: "03", title: "The customer moves on", label: "A warm inquiry quietly becomes someone else’s booked customer." },
             ].map((item, index) => (
               <div
                 key={index}
-                className="rounded-2xl border border-white/[0.07] bg-[#121212] px-8 py-8"
+                className="group rounded-2xl border border-white/[0.07] bg-[#121212] px-8 py-8 transition-colors hover:border-behalfy-gold/30"
               >
-                <div className="text-[56px] leading-none font-medium tracking-[-0.045em] text-[#d4a66f]">
-                  {item.stat}
+                <div className="font-mono text-xs font-semibold tracking-[0.18em] text-behalfy-gold">
+                  {item.step}
                 </div>
+                <h3 className="mt-8 font-serif text-2xl font-normal tracking-[-0.04em] text-white">{item.title}</h3>
                 <p className="mt-5 text-[15px] leading-snug text-white/65">
                   {item.label}
                 </p>
@@ -181,11 +145,11 @@ export default function HomePage() {
           <div className="mt-16">
             <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-16">
               {/* Left: With Behalfy */}
-              <div className="max-w-[240px] text-right">
-                <div className="text-sm font-medium text-[#d4a66f] mb-2 tracking-[0.1em] uppercase">With Behalfy</div>
+              <div className="max-w-[260px] text-center lg:text-right">
+                <div className="mb-2 text-sm font-medium uppercase tracking-[0.1em] text-behalfy-gold">With Behalfy</div>
                 <div className="text-lg font-medium tracking-tight">Organized. Clear. Handled.</div>
                 <p className="mt-3 text-sm text-white/60">
-                  Every inquiry is caught and qualified. Only what matters reaches you.
+                  Connected inquiries receive a fast first response, consistent qualification, and a clear next step.
                 </p>
               </div>
 
@@ -195,540 +159,177 @@ export default function HomePage() {
               </div>
 
               {/* Right: Without Behalfy */}
-              <div className="max-w-[240px] text-left">
+              <div className="max-w-[260px] text-center lg:text-left">
                 <div className="text-sm font-medium text-white/50 mb-2 tracking-[0.1em] uppercase">Without Behalfy</div>
                 <div className="text-lg font-medium tracking-tight">Scattered. Unanswered. Forgotten.</div>
                 <p className="mt-3 text-sm text-white/60">
-                  Messages pile up across channels. Most disappear before anyone sees them.
+                  Messages wait across channels until someone finds enough time to answer.
                 </p>
               </div>
             </div>
 
             <p className="mt-10 text-center text-sm text-white/50 max-w-md mx-auto">
-              This is the real cost. Not the leads you never got — the ones you already had and quietly lost.
+              The expensive leads are often not the ones you never received. They are the ones already waiting in your inbox.
             </p>
           </div>
         </div>
       </section>
 
-      <section id="workflow" className="bg-[#070707] px-5 pb-24 pt-12 text-white md:px-8 md:pb-32 md:pt-16">
+      <section id="how-it-works" className="bg-behalfy-warm px-5 py-24 text-[#15130f] md:px-8 md:py-32">
+        <div className="mx-auto grid max-w-[1320px] gap-16 lg:grid-cols-[0.78fr_1.22fr] lg:gap-24">
+          <div className="lg:sticky lg:top-12 lg:self-start">
+            <p className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#80603c]">
+              <span className="size-2 rounded-full bg-[#b87531]" />
+              Fully managed
+            </p>
+            <h2 className="mt-7 max-w-[12ch] font-serif text-5xl font-normal leading-[0.98] tracking-[-0.055em] md:text-6xl">
+              You get the assistant. We handle the setup.
+            </h2>
+            <p className="mt-7 max-w-lg text-base leading-8 text-black/62">
+              Behalfy is not another bot builder for your team to learn. We study how your business sells, connect the right channels and tools, launch the assistant, and keep improving it after go-live.
+            </p>
+            <Link
+              href={demoHref}
+              className="mt-9 inline-flex min-h-[52px] items-center gap-2 rounded-full bg-[#15130f] px-6 text-sm font-extrabold text-white transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-behalfy-gold"
+            >
+              Book a 20-minute demo
+              <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+
+          <ol className="border-t border-black/15">
+            {[
+              {
+                number: "01",
+                title: "We learn the conversations that matter",
+                body: "Your offers, frequent questions, qualification criteria, tone, handoff rules, and the moments where customers usually get stuck.",
+              },
+              {
+                number: "02",
+                title: "We connect Behalfy to the work",
+                body: "Customer channels, CRM, calendars, booking tools, documents, and internal systems—connected through native integrations, direct APIs, or webhooks.",
+              },
+              {
+                number: "03",
+                title: "We launch, watch, and improve",
+                body: "You see the conversations and can take over at any time. We refine the assistant as your business, offers, and customer questions change.",
+              },
+            ].map((step) => (
+              <li key={step.number} className="grid gap-5 border-b border-black/15 py-9 sm:grid-cols-[72px_1fr] sm:py-11">
+                <span className="font-mono text-sm font-semibold text-[#9a6b36]">{step.number}</span>
+                <div>
+                  <h3 className="font-serif text-3xl font-normal tracking-[-0.045em]">{step.title}</h3>
+                  <p className="mt-4 max-w-2xl text-[15px] leading-7 text-black/58">{step.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section id="workflow" className="bg-behalfy-ink px-5 pb-24 pt-12 text-white md:px-8 md:pb-32 md:pt-16">
         <div className="mx-auto max-w-[1440px]">
-          <div className="grid gap-10 border-b border-white/[0.08] pb-20 lg:grid-cols-[minmax(0,1fr)_560px] lg:items-start">
+          <ConnectionEcosystem />
+          <div className="mt-24 grid gap-10 border-b border-white/[0.08] pb-20 md:mt-32 lg:grid-cols-[minmax(0,1fr)_560px] lg:items-start">
             <p className="max-w-[38ch] font-serif text-2xl font-normal tracking-[-0.03em] leading-relaxed text-white">
-              Launch a managed AI assistant that answers customers, qualifies leads, and books the next step without exposing technical setup to your team.
+              Give every connected inquiry a fast, useful first response—without adding another inbox, tool, or technical project to your team.
             </p>
             <div className="grid grid-cols-2 border-l border-white/[0.08]">
               {[
-                ["Deflection rate", "97%"],
-                ["Supported languages", "Many"],
+                ["Typical first reply", "Seconds"],
+                ["Setup and upkeep", "Managed"],
               ].map(([label, value]) => (
-                <div key={label} className="border-r border-white/[0.08] px-10">
+                <div key={label} className="border-r border-white/[0.08] px-5 sm:px-8 lg:px-10">
                   <p className="text-sm font-medium tracking-[0.08em] text-white/60">{label}</p>
-                  <p className="mt-3 text-5xl font-serif font-normal leading-[1.02] tracking-[-0.055em] text-white md:text-6xl">{value}</p>
+                  <p className="mt-3 font-serif text-4xl font-normal leading-[1.02] tracking-[-0.055em] text-white sm:text-5xl md:text-6xl">{value}</p>
                   <p className="mt-4 text-sm leading-relaxed text-white/55">
-                    {label === "Deflection rate"
-                      ? "Target automation rate for conversations handled without manual takeover"
-                      : "Reply in the customer's language when configured"}
+                    {label === "Typical first reply"
+                      ? "Across the customer channels connected to Behalfy"
+                      : "From initial setup through ongoing improvements"}
                   </p>
                 </div>
               ))}
             </div>
           </div>
+          <ConversationScenarios demoHref={demoHref} />
+        </div>
+      </section>
 
-          <div className="mt-28 grid gap-10 lg:grid-cols-[0.55fr_1fr] lg:items-end">
-            <div>
-              <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/62">
-                <span className="size-2 rounded-full bg-[#ff6a1a]" />
-                Managed agents
-              </p>
-              <h2 className="mt-7 font-serif text-5xl font-normal leading-[1.02] tracking-[-0.055em] text-white md:text-6xl max-w-[18ch]">
-                Built to handle real customer conversations
-              </h2>
-            </div>
-
-            <div className="grid gap-8 lg:gap-10 md:grid-cols-3">
-              {[
-                [Settings2, "Business-specific rules", "Tone, timing, handoff, qualification fields, and channel limits."],
-                [ClipboardCheck, "Lead data capture", "Names, dates, locations, needs, budget, and next-step readiness."],
-                [Bot, "Tool-backed actions", "Calendar checks, availability lookup, guide sending, and booked outcomes."],
-              ].map(([Icon, title, body]) => (
-                <div key={title as string} className="border-l border-white/[0.1] pl-6">
-                  <Icon className="size-5 text-white/72" />
-                  <h3 className="mt-5 text-sm font-black text-white">{title as string}</h3>
-                  <p className="mt-3 text-sm leading-6 text-white/48">{body as string}</p>
-                </div>
-              ))}
-            </div>
+      <section id="control" className="bg-behalfy-ink px-5 pb-12 pt-24 text-white md:px-8 md:pt-32">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="max-w-3xl">
+            <p className="mb-4 flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/68">
+              <span className="size-2 rounded-full bg-behalfy-gold" />
+              Control
+            </p>
+            <h2 className="font-serif text-5xl font-normal leading-[1.02] tracking-[-0.055em] md:text-6xl">
+              Behalfy handles the routine. Your team steps in when it matters.
+            </h2>
           </div>
 
-          <div className="relative left-1/2 mt-14 w-[min(1820px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-[1.6rem] border border-[#d7a96d]/55 bg-[#0a0a09] shadow-[0_0_0_1px_rgba(255,255,255,0.035),0_0_46px_rgba(215,169,109,0.18),0_58px_150px_rgba(0,0,0,0.72)]">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(215,169,109,0.08),transparent_28%),linear-gradient(120deg,rgba(255,255,255,0.026),transparent_36%)]" />
-            <div className="relative grid min-h-[760px] xl:grid-cols-[315px_500px_minmax(520px,1fr)_390px]">
-              <aside className="relative hidden bg-[#0d0f0f]/96 p-8 after:absolute after:right-0 after:top-6 after:bottom-6 after:w-px after:rounded-full after:bg-white/[0.085] xl:flex xl:flex-col">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <Image
-                      src="/assets/landing/behalfy-gold-mark.png"
-                      alt=""
-                      width={48}
-                      height={48}
-                      className="size-12 object-contain drop-shadow-[0_6px_16px_rgba(212,166,111,0.3)]"
-                    />
-                    <span className="font-serif text-[2.2rem] font-normal tracking-[-0.065em] text-white">Behalfy</span>
-                  </div>
-                  <span className="text-3xl text-white/64">‹</span>
-                </div>
-
-                <nav className="mt-14 space-y-3 text-[18px]">
+          <div className="relative mt-12 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0a]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(212,166,111,0.16),transparent_36%),linear-gradient(125deg,#080808,#15110d)]" />
+            <div className="relative z-10 grid min-h-[410px] lg:grid-cols-12">
+              <div className="flex flex-col justify-center p-6 sm:p-8 lg:col-span-5 lg:p-10 lg:pr-12">
+                <div className="space-y-2 text-[15.5px]">
                   {[
-                    { label: "Overview", icon: Home, badge: null },
-                    { label: "Conversations", icon: MessageSquareText, badge: "24" },
-                    { label: "Leads", icon: UsersRound, badge: null },
-                    { label: "Bookings", icon: CalendarDays, badge: null },
-                    { label: "Outcomes", icon: LinkIcon, badge: null },
-                    { label: "Analytics", icon: BarChart3, badge: null },
-                  ].map(({ label, icon: Icon, badge }, index) => (
-                    <div
-                      key={label}
-                      className={[
-                        "flex items-center gap-5 rounded-xl px-4 py-3.5 transition",
-                        index === 1
-                          ? "bg-[#3b2d20] text-white ring-1 ring-[#d7a96d]/28 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                          : "text-white/72",
-                      ].join(" ")}
-                    >
-                      <Icon className={index === 1 ? "size-5 text-[#e9be86]" : "size-5 text-white/74"} />
-                      <span className="flex-1">{label}</span>
-                      {badge ? (
-                        <span className="rounded-md border border-[#d7a96d]/48 px-2 py-0.5 text-sm text-[#e9be86]">{badge}</span>
-                      ) : null}
-                    </div>
-                  ))}
-                </nav>
-
-                <div className="mt-9 border-t border-white/[0.09] pt-7">
-                  <div className="space-y-3 text-[18px] text-white/72">
-                    {[
-                      { label: "Integrations", icon: Plug },
-                      { label: "Settings", icon: Settings },
-                    ].map(({ label, icon: Icon }) => (
-                      <div key={label} className="flex items-center gap-5 rounded-xl px-4 py-3.5">
-                        <Icon className="size-5 text-white/74" />
-                        <span>{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-auto border-t border-white/[0.09] pt-5">
-                  <div className="flex items-center gap-4">
-                    <span className="relative grid size-12 place-items-center rounded-full border border-[#d7a96d]/28 bg-[#181a1a] text-sm font-semibold text-white/78">
-                      SL
-                      <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-[#0d0f0f] bg-[#35d37a]" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-lg font-medium text-white">Samantha Lee</div>
-                      <div className="text-base text-white/48">Admin</div>
-                    </div>
-                    <ChevronDown className="ml-auto size-5 text-white/52" />
-                  </div>
-                </div>
-              </aside>
-
-              <div className="relative bg-[#0c0e0e]/96 after:absolute after:right-0 after:top-6 after:bottom-6 after:w-px after:rounded-full after:bg-white/[0.085]">
-                <div className="border-b border-white/[0.08]">
-                  <div className="px-9 py-8">
-                    <h3 className="text-[2rem] font-medium tracking-[-0.055em] text-white">Conversations</h3>
-                  </div>
-                  <div className="flex items-center gap-7 border-t border-white/[0.055] px-9 py-5">
-                    <span className="inline-flex items-center gap-3 rounded-lg border border-white/[0.1] bg-black/12 px-4 py-2.5 text-lg text-white/70">
-                      All channels <ChevronDown className="size-4" />
-                    </span>
-                    <span className="inline-flex items-center gap-3 rounded-lg border border-white/[0.1] bg-black/12 px-4 py-2.5 text-lg text-white/70">
-                      Newest <ChevronDown className="size-4" />
-                    </span>
-                    <Search className="ml-auto size-6 text-white/58" />
-                  </div>
-                </div>
-
-                <div>
-                  {cockpitConversations.map(({ name, channel, preview, status }, index) => {
-                    const initials = name.split(" ").map((part) => part[0]).join("");
-                    const hasCrown = name === "Sarah Mitchell" || name === "James Carter";
-                    const channelName = channel.split(" · ")[0];
-                    const channelTime = channel.split(" · ")[1];
-
+                    { num: "01", label: "See every conversation" },
+                    { num: "02", label: "Works within your rules" },
+                    { num: "03", label: "Take over anytime" },
+                  ].map((item, index) => {
+                    const isActive = controlInteractiveActive === index;
                     return (
-                      <div
-                        key={name}
-                        className={[
-                          "relative border-b border-white/[0.065]",
-                          index === 0
-                            ? "bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.075),transparent_28%),linear-gradient(115deg,rgba(58,45,32,0.78),rgba(24,24,23,0.82)_54%,rgba(10,12,12,0.94))]"
-                            : "bg-[linear-gradient(115deg,rgba(255,255,255,0.018),rgba(255,255,255,0)_45%)]",
-                        ].join(" ")}
+                      <button
+                        key={item.num}
+                        type="button"
+                        onClick={() => setControlInteractiveActive(index)}
+                        aria-pressed={isActive}
+                        aria-controls="control-detail"
+                        className={`group flex min-h-14 w-full items-center gap-4 rounded-xl border px-4 py-3 text-left font-bold transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-behalfy-gold ${
+                          isActive
+                            ? "border-behalfy-gold/35 bg-behalfy-gold/[0.09] text-white"
+                            : "border-transparent text-white/68 hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
+                        }`}
                       >
-                        <div
-                          className={[
-                            "relative flex min-h-[142px] items-start gap-5 px-9 py-6 pr-28",
-                            index === 0 ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]" : "",
-                          ].join(" ")}
-                        >
-                          <span className="mt-0.5 grid size-[52px] shrink-0 place-items-center rounded-full border border-white/[0.1] bg-[#1d1f1f] text-sm font-semibold text-white/78">
-                            {initials}
-                          </span>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="truncate text-xl font-semibold tracking-[-0.025em] text-white">{name}</span>
-                                {hasCrown ? <span className="text-sm text-[#e9be86]">♛</span> : null}
-                              </div>
-                              <p className="mt-1 text-lg text-white/48">
-                                {channelName} · {channelTime}
-                              </p>
-                            </div>
-                            <p className="mt-2 max-w-[245px] text-lg leading-7 text-white/76">{preview}</p>
-                          </div>
-
-                          <span
-                            className={[
-                              "absolute bottom-6 right-8 rounded-md border px-4 py-2 text-lg font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur",
-                              status === "Booked"
-                                ? "border-[#47c978]/34 bg-[linear-gradient(135deg,rgba(42,119,73,0.34),rgba(15,42,28,0.44))] text-[#62d990]"
-                                : status === "Lead"
-                                  ? "border-[#4b82d8]/34 bg-[linear-gradient(135deg,rgba(44,87,150,0.34),rgba(14,29,54,0.44))] text-[#7fb0ff]"
-                                  : "border-[#d7a96d]/42 bg-[linear-gradient(135deg,rgba(116,78,38,0.4),rgba(45,31,20,0.48))] text-[#e9be86]",
-                            ].join(" ")}
-                          >
-                            {status}
-                          </span>
-                        </div>
-                      </div>
+                        <span className={`font-mono text-xs tabular-nums ${isActive ? "text-behalfy-gold-light" : "text-white/48"}`}>
+                          {item.num}
+                        </span>
+                        <span className="flex-1">{item.label}</span>
+                        <ChevronRight className={`size-4 transition ${isActive ? "translate-x-0 text-behalfy-gold" : "-translate-x-1 text-white/35 group-hover:translate-x-0"}`} />
+                      </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="relative flex min-h-[760px] flex-col bg-[#0c0e0e]/96 after:absolute after:right-0 after:top-6 after:bottom-6 after:w-px after:rounded-full after:bg-white/[0.085]">
-                <div className="border-b border-white/[0.08] px-8 pb-0 pt-8">
-                  <div className="flex items-start justify-between gap-5">
-                    <div className="flex items-center gap-5">
-                      <span className="grid size-16 shrink-0 place-items-center rounded-full border border-[#d7a96d]/28 bg-[#20201d] text-lg font-semibold text-[#e9be86]">
-                        SM
-                      </span>
-                      <div>
-                        <h3 className="text-3xl font-medium tracking-[-0.055em] text-white">Sarah Mitchell</h3>
-                        <p className="mt-2 flex items-center gap-2 text-lg text-white/56">
-                          <Globe2 className="size-5 text-[#e9be86]" />
-                          Web Chat · 2m ago
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="rounded-lg border border-[#d7a96d]/48 px-4 py-2 text-lg text-[#e9be86]">New</span>
-                      <span className="grid size-10 place-items-center rounded-full border border-white/[0.1] text-white/54">
-                        <MoreVertical className="size-5" />
-                      </span>
-                    </div>
+              <div className="flex items-center p-6 pt-0 sm:p-8 sm:pt-0 lg:col-span-7 lg:p-12">
+                <div id="control-detail" className="w-full rounded-2xl border border-white/10 bg-behalfy-panel p-7 sm:p-9">
+                  <div className="mb-7 flex items-center gap-2">
+                    <div className="size-1.5 rounded-full bg-behalfy-gold" />
+                    <span className="text-xs font-bold uppercase tracking-[2px] text-white/58">Your oversight</span>
                   </div>
-
-                  <div className="mt-12 flex gap-14 text-xl">
-                    {["Conversation", "Lead details", "Notes", "Activity"].map((tab, index) => (
-                      <span
-                        key={tab}
-                        className={index === 0 ? "border-b-2 border-[#e9be86] pb-5 text-[#e9be86]" : "pb-5 text-white/52"}
-                      >
-                        {tab}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-8 px-10 py-9 pb-12 text-[18px]">
-                  {[
-                    ["Sarah", "Do you offer installation in my area?", "left"],
-                    ["Behalfy AI", "Yes! We install in your area. Can I get a few details so I can share the best options?", "right"],
-                    ["Sarah", "Sure, what do you need?", "left"],
-                    ["Behalfy AI", "Great! What's your property postcode and how many windows are you looking to install?", "right"],
-                  ].map(([sender, text, side], index) => (
-                    <div key={`${sender}-${index}`} className={side === "right" ? "flex justify-end" : "flex items-start gap-4"}>
-                      {side === "left" ? (
-                        <span className="mt-1 grid size-12 shrink-0 place-items-center rounded-full border border-white/[0.1] bg-[#20201d] text-sm font-semibold text-white/68">
-                          SM
-                        </span>
-                      ) : null}
-                      <div
-                        className={[
-                          "max-w-[66%] rounded-xl px-5 py-4 leading-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
-                          side === "right"
-                            ? "bg-[linear-gradient(135deg,#62472d,#3d2c1d)] text-white"
-                            : "bg-[#202122] text-white/88",
-                        ].join(" ")}
-                      >
-                        <p className="mb-2 text-base text-white/46">
-                          <span className={side === "right" ? "text-[#e9be86]" : ""}>{sender}</span> · 10:2{index + 1} AM
-                        </p>
-                        <p>{text}</p>
-                        {side === "right" ? <p className="mt-1 text-right text-[#e9be86]">✓</p> : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-              </div>
-
-              <aside className="bg-[#0f1111]/96 p-6">
-                <div className="rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xl font-medium text-white">Lead score</p>
-                    <MoreVertical className="size-5 text-white/50" />
-                  </div>
-                  <div className="mt-8 flex items-center gap-7">
-                    <div className="grid size-24 place-items-center rounded-full border-[6px] border-[#d7a96d] text-4xl font-normal tracking-[-0.04em] text-white shadow-[inset_0_0_0_8px_rgba(0,0,0,0.18)]">
-                      86
-                    </div>
-                    <div>
-                      <div className="text-2xl font-medium tracking-[-0.04em] text-white">High intent</div>
-                      <div className="mt-2 text-xl leading-8 text-white/52">Strong fit<br />Likely to convert</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
-                  <p className="text-xl font-medium text-white">Lead details</p>
-                  <div className="mt-8 space-y-4 text-lg">
-                    {[
-                      ["Name", "Sarah Mitchell"],
-                      ["Email", "sarah.mitchell@email.com"],
-                      ["Phone", "+61 412 555 019"],
-                      ["Postcode", "3000"],
-                      ["Project type", "Full home installation"],
-                      ["Budget", "$8k – $12k"],
-                    ].map(([label, value]) => (
-                      <div key={label} className="grid grid-cols-[116px_minmax(0,1fr)] gap-4">
-                        <span className="text-white/46">{label}</span>
-                        <span className="truncate text-white">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <button className="mt-8 w-full rounded-lg bg-[linear-gradient(135deg,#3c342c,#2a241f)] px-5 py-4 text-lg font-medium text-white transition-colors">
-                    View full profile <span className="ml-3">→</span>
-                  </button>
-                </div>
-
-                <div className="mt-4 rounded-2xl border border-white/[0.09] bg-[#111313] p-6">
-                  <p className="text-xl font-medium text-white">Next step</p>
-                  <div className="mt-8 flex gap-5">
-                    <div className="grid size-[3.25rem] shrink-0 place-items-center rounded-xl border border-[#d7a96d]/28 bg-[#171716] text-[#e9be86]">
-                      <CalendarCheck2 className="size-6" />
-                    </div>
-                    <div>
-                      <div className="text-lg text-white">Book a measure & quote</div>
-                      <div className="mt-4 text-lg leading-8 text-white/50">Thu, 23 May 2024<br />10:00 AM AEST</div>
-                    </div>
-                  </div>
-                  <button className="mt-8 w-full rounded-lg bg-[linear-gradient(135deg,#3c342c,#2a241f)] px-5 py-4 text-lg font-medium text-[#e9be86] transition-colors">
-                    Booking confirmed <span className="ml-3">→</span>
-                  </button>
-                </div>
-              </aside>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Control Section */}
-      <section id="control" className="bg-[#070707] py-20 text-white">
-        <div className="mx-auto max-w-[1440px] px-5 md:px-8">
-          {/* Надпись и заголовок */}
-          <div className="mb-6">
-            <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/62 mb-3">
-              <span className="size-2 rounded-full bg-[#ff6a1a]" />
-              CONTROL
-            </p>
-            <h2 className="font-serif text-5xl font-normal leading-[1.02] tracking-[-0.055em] md:text-6xl max-w-3xl">
-              AI handles the flow.<br />You stay in control when it matters.
-            </h2>
-          </div>
-
-          {/* 3 пункта под заголовком (как было раньше) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="border-l border-white/[0.1] pl-5">
-              <Eye className="size-5 text-white/72 mb-3" />
-              <div className="text-sm font-black text-white">Full Visibility</div>
-              <p className="mt-2 text-sm leading-6 text-white/48">See every conversation, decision, and outcome in real time.</p>
-            </div>
-            <div className="border-l border-white/[0.1] pl-5">
-              <ShieldCheck className="size-5 text-white/72 mb-3" />
-              <div className="text-sm font-black text-white">Rules Enforced</div>
-              <p className="mt-2 text-sm leading-6 text-white/48">The agent can only operate inside your approved playbook and tone.</p>
-            </div>
-            <div className="border-l border-white/[0.1] pl-5">
-              <Hand className="size-5 text-white/72 mb-3" />
-              <div className="text-sm font-black text-white">Instant Takeover</div>
-              <p className="mt-2 text-sm leading-6 text-white/48">Pause the agent and continue the conversation yourself at any moment.</p>
-            </div>
-          </div>
-
-          {/* Интерактивный блок в стиле Capabilities (кнопки слева) */}
-          <div className="mt-10">
-            <div className="relative left-1/2 w-[min(1720px,calc(100vw-40px))] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0a]">
-              <div className="absolute inset-0 bg-[url('/assets/behalfy-hero-coast.png')] bg-cover bg-center opacity-25" />
-              <div className="absolute inset-0 bg-[#070707]/85" />
-
-              <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 min-h-[440px]">
-                {/* Левые 3 кнопки */}
-                <div className="lg:col-span-5 p-10 md:pr-14 flex flex-col justify-center">
-                  <div className="space-y-px text-[15.5px]">
-                    {[
-                      { num: "1", label: "Full Visibility" },
-                      { num: "2", label: "Rules Enforced" },
-                      { num: "3", label: "Instant Takeover" },
-                    ].map((item, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setControlInteractiveActive(index)}
-                        className={`block w-full text-left py-3.5 transition-all duration-200 border-b border-white/10 last:border-b-0
-                          ${controlInteractiveActive === index 
-                            ? "text-white font-medium" 
-                            : "text-white/65 hover:text-white/90"}`}
-                      >
-                        <span className="font-mono text-white/35 mr-3 tabular-nums">{item.num}.</span>
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Правая большая карточка */}
-                <div className="lg:col-span-7 p-10 md:p-14 flex items-center">
-                  <div className="bg-[#111111] border border-white/10 rounded-2xl p-9 w-full">
-                    <div className="flex items-center gap-2 mb-6">
-                      <div className="size-1.5 rounded-full bg-[#d4a66f]" />
-                      <span className="text-xs uppercase tracking-[2px] text-white/50">Control</span>
-                    </div>
-
-                    <motion.div
-                      key={controlInteractiveActive}
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 2, ease: [0.25, 0.1, 0.25, 1] }}
-                      className="min-h-[130px]"
-                    >
-                      <div className="text-3xl font-semibold tracking-[-0.4px] mb-5">
-                        {[
-                          "Full Visibility",
-                          "Rules Enforced",
-                          "Instant Takeover",
-                        ][controlInteractiveActive]}
-                      </div>
-                      <p className="text-[15.5px] leading-relaxed text-white/70 max-w-[52ch]">
-                        {[
-                          "See every conversation, decision, and outcome in real time.",
-                          "The agent can only operate inside your approved playbook and tone.",
-                          "Pause the agent and continue the conversation yourself at any moment.",
-                        ][controlInteractiveActive]}
-                      </p>
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Capabilities Section */}
-      <section id="capabilities" className="bg-[#070707] py-20 text-white">
-        <div className="mx-auto max-w-[1440px] px-5 md:px-8">
-          {/* Заголовок */}
-          <div className="mb-6">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#d4a66f]/70 mb-3">CAPABILITIES</p>
-            <h2 className="font-serif text-5xl font-normal leading-[1.02] tracking-[-0.055em] md:text-6xl max-w-3xl">
-              The agent can connect to almost any system and handle real business tasks.
-            </h2>
-          </div>
-
-          {/* 3 статичных трейта (как было) */}
-          <div className="mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-              <div className="border-l-2 border-white/20 pl-6">
-                <div className="text-sm font-semibold">Any System via API</div>
-                <p className="text-white/60 text-sm mt-1">Connect to any CRM, ERP, calendar or service that has an API.</p>
-              </div>
-              <div className="border-l-2 border-white/20 pl-6">
-                <div className="text-sm font-semibold">Dedicated Agent per Channel</div>
-                <p className="text-white/60 text-sm mt-1">Each channel can have its own agent with separate rules and tone.</p>
-              </div>
-              <div className="border-l-2 border-white/20 pl-6">
-                <div className="text-sm font-semibold">Unlimited Business Logic</div>
-                <p className="text-white/60 text-sm mt-1">We can build almost any workflow your business needs through API connections.</p>
-              </div>
-            </div>
-
-            {/* Интерактивный блок (левая карточка + 3 плоские строки справа) */}
-            <div className="mt-10">
-              <div className="relative left-1/2 w-[min(1720px,calc(100vw-40px))] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0a]">
-                <div className="absolute inset-0 bg-[url('/assets/behalfy-hero-coast.png')] bg-cover bg-center opacity-25" />
-                <div className="absolute inset-0 bg-[#070707]/85" />
-
-                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 min-h-[440px]">
-                  {/* Левая большая карточка */}
-                  <div className="lg:col-span-7 p-10 md:p-14 flex items-center">
-                    <div className="bg-[#111111] border border-white/10 rounded-2xl p-9 w-full">
-                      <div className="flex items-center gap-2 mb-6">
-                        <div className="size-1.5 rounded-full bg-[#d4a66f]" />
-                        <span className="text-xs uppercase tracking-[2px] text-white/50">Capability</span>
-                      </div>
-
-                      <motion.div
-                        key={capabilitiesActive}
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 2, ease: [0.25, 0.1, 0.25, 1] }}
-                        className="min-h-[130px]"
-                      >
-                        <div className="text-3xl font-semibold tracking-[-0.4px] mb-5">
-                          {[
-                            "CRM & Business Systems",
-                            "Calendar & Booking Tools",
-                            "Documents & Custom Logic",
-                          ][capabilitiesActive]}
-                        </div>
-                        <p className="text-[15.5px] leading-relaxed text-white/70 max-w-[52ch]">
-                          {[
-                            "Connect to any system through API (AmoCRM, Bitrix, Google Sheets, Notion and others).",
-                            "Work with calendars, check real-time availability, and book appointments instantly.",
-                            "Use your data, documents and build any business logic your workflow requires.",
-                          ][capabilitiesActive]}
-                        </p>
-                      </motion.div>
-                    </div>
-                  </div>
-
-                  {/* Правые 3 плоские строки */}
-                  <div className="lg:col-span-5 p-10 md:pr-14 flex flex-col justify-center">
-                    <div className="space-y-px text-[15.5px]">
+                  <motion.div
+                    key={controlInteractiveActive}
+                    initial={shouldReduceMotion ? false : { opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+                    className="min-h-[130px]"
+                  >
+                    <h3 className="mb-5 font-serif text-4xl font-normal tracking-[-0.04em]">
                       {[
-                        { num: "1", label: "CRM & Business Systems" },
-                        { num: "2", label: "Calendar & Booking Tools" },
-                        { num: "3", label: "Documents & Custom Logic" },
-                      ].map((item, index) => (
-                        <button
-                          key={index}
-                          onClick={() => setCapabilitiesActive(index)}
-                          className={`block w-full text-left py-3.5 transition-all duration-200 border-b border-white/10 last:border-b-0
-                            ${capabilitiesActive === index 
-                              ? "text-white font-medium" 
-                              : "text-white/65 hover:text-white/90"}`}
-                        >
-                          <span className="font-mono text-white/35 mr-3 tabular-nums">{item.num}.</span>
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                        "See every conversation",
+                        "Works within your rules",
+                        "Take over anytime",
+                      ][controlInteractiveActive]}
+                    </h3>
+                    <p className="max-w-[52ch] text-[15.5px] leading-7 text-white/72">
+                      {[
+                        "Follow every customer conversation and next step from one clear view.",
+                        "Your approved knowledge, tone, qualification, and handoff rules define what Behalfy can do.",
+                        "Pause the assistant and continue the conversation yourself whenever human judgment is needed.",
+                      ][controlInteractiveActive]}
+                    </p>
+                  </motion.div>
                 </div>
               </div>
             </div>
@@ -736,121 +337,138 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="relative overflow-hidden border-t border-white/[0.06] bg-[#070908] text-white">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_50%_0%,rgba(212,166,111,0.1),transparent_44%)]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center overflow-hidden pt-4 select-none">
-          <span className="font-serif text-[150px] font-normal leading-none tracking-[-0.08em] text-white/[0.045] md:text-[280px] lg:text-[360px]">
-            Behalfy
-          </span>
+      <section id="faq" className="bg-behalfy-ivory px-5 py-24 text-[#15130f] md:px-8 md:py-32">
+        <div className="mx-auto grid max-w-[1240px] gap-14 lg:grid-cols-[0.68fr_1.32fr] lg:gap-24">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#80603c]">Questions before you trust an AI assistant</p>
+            <h2 className="mt-6 max-w-[9ch] font-serif text-5xl font-normal leading-[0.98] tracking-[-0.055em] md:text-6xl">
+              Clear answers. No black box.
+            </h2>
+            <p className="mt-7 max-w-md text-base leading-8 text-black/58">
+              Behalfy is designed to reduce routine without hiding what is happening from the people responsible for the customer.
+            </p>
+          </div>
+
+          <div className="border-t border-black/15">
+            {[
+              {
+                question: "Will it sound like our business?",
+                answer: "Yes. We configure the assistant around your offers, knowledge, tone, qualification questions, timing, and channel-specific behavior—not a generic chatbot script.",
+              },
+              {
+                question: "What happens when Behalfy does not know the answer?",
+                answer: "The assistant follows the boundaries we agree with you. It can ask a clarifying question or hand the conversation to a person instead of inventing a business fact.",
+              },
+              {
+                question: "Can our team take over a conversation?",
+                answer: "At any time. Your team can see the conversation, pause the assistant, and continue with the customer when judgment or a personal touch matters.",
+              },
+              {
+                question: "Can Behalfy connect to our existing systems?",
+                answer: "Yes. Behalfy is designed to work across customer channels, CRM, calendars, booking tools, files, databases, and internal systems. We use a native connection where it fits, or connect directly through an available API or webhook.",
+              },
+              {
+                question: "Do we need technical staff to run it?",
+                answer: "No. We handle configuration, connections, testing, launch, and ongoing improvements. Your team provides the business knowledge and stays in control of customer decisions.",
+              },
+            ].map((item) => (
+              <details key={item.question} className="group border-b border-black/15 py-1">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-7 text-left text-lg font-bold marker:content-none">
+                  {item.question}
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full border border-black/15 font-mono text-lg font-normal transition-transform group-open:rotate-45" aria-hidden="true">
+                    +
+                  </span>
+                </summary>
+                <p className="max-w-2xl pb-8 pr-12 text-[15px] leading-7 text-black/58">{item.answer}</p>
+              </details>
+            ))}
+          </div>
         </div>
+      </section>
+      <section id="demo" className="bg-behalfy-ivory px-5 py-24 text-[#15130f] md:px-8 md:py-32">
+        <div className="mx-auto grid max-w-[1240px] gap-12 border-y border-black/15 py-14 md:py-20 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:gap-20">
+          <div>
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#8b6337]">Start with your real inbox</p>
+            <h2 className="mt-7 max-w-[12ch] font-serif text-5xl font-normal leading-[0.98] tracking-[-0.055em] md:text-7xl">
+              See how Behalfy would handle your next ten inquiries.
+            </h2>
+          </div>
+          <div className="max-w-xl">
+            <p className="text-base leading-8 text-black/62 md:text-lg">
+              Bring three customer questions your team answers every week. We will show you how Behalfy can reply, clarify what matters, and move each conversation toward the right next step.
+            </p>
+            <Link
+              href={demoHref}
+              className="mt-9 inline-flex min-h-[52px] items-center gap-3 rounded-full bg-[#15130f] px-7 text-sm font-extrabold text-white transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-behalfy-gold"
+            >
+              Book a 20-minute demo
+              <span aria-hidden="true">→</span>
+            </Link>
+            <p className="mt-5 text-xs font-semibold text-black/58">No technical preparation. No commitment.</p>
+          </div>
+        </div>
+      </section>
 
-        <div className="relative mt-36 border-t border-white/[0.07] bg-[linear-gradient(180deg,rgba(18,21,20,0.94),rgba(10,12,11,0.98))] shadow-[0_-40px_120px_rgba(0,0,0,0.46)] md:mt-52">
-          <div className="mx-auto max-w-[1440px] px-5 py-12 md:px-8 md:py-16">
-            <div className="grid gap-14 lg:grid-cols-[1fr_1.15fr]">
-              <div className="flex min-h-[270px] flex-col justify-between">
-                <div>
-                  <Link href="/" className="inline-flex items-center gap-3">
-                    <Image
-                      src="/assets/landing/behalfy-gold-mark.png"
-                      alt=""
-                      width={32}
-                      height={32}
-                      className="size-8 object-contain drop-shadow-[0_4px_14px_rgba(212,166,111,0.28)]"
-                    />
-                    <span className="font-serif text-2xl font-normal tracking-[-0.055em]">Behalfy</span>
-                  </Link>
-                  <p className="mt-6 max-w-sm text-sm leading-7 text-white/48">
-                    Managed AI assistants for customer conversations, qualified leads, and booked next steps.
-                  </p>
-                </div>
+      <footer className="border-t border-white/[0.07] bg-[#070908] text-white">
+        <div className="mx-auto max-w-[1440px] px-5 py-14 md:px-8 md:py-18">
+          <div className="grid gap-14 md:grid-cols-[1.35fr_0.7fr_0.7fr] md:gap-10">
+            <div>
+              <Link href="/" className="inline-flex items-center gap-3">
+                <Image
+                  src="/assets/landing/behalfy-gold-mark.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="size-9 object-contain"
+                />
+                <span className="font-serif text-3xl font-normal tracking-[-0.055em]">Behalfy</span>
+              </Link>
+              <p className="mt-6 max-w-sm text-sm leading-7 text-white/58">
+                Fully managed AI agents across customer channels and business systems.
+              </p>
+              <Link href="mailto:contact@behalfy.io" className="mt-6 inline-block text-sm font-bold text-behalfy-gold transition hover:text-behalfy-gold-light focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-behalfy-gold">
+                contact@behalfy.io
+              </Link>
+            </div>
 
-                <div className="mt-10">
-                  <div className="mb-5 flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-[#b8f56a] shadow-[0_0_18px_rgba(184,245,106,0.55)]" />
-                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-white/42">Operational safeguards</span>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {["Tenant isolated", "Audit trails", "Human handoff", "Private by design"].map((item) => (
-                      <span
-                        key={item}
-                        className="rounded-full border border-white/[0.08] bg-white/[0.045] px-4 py-2 text-xs font-semibold text-white/58"
-                      >
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-10 sm:grid-cols-3 lg:pt-1">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-behalfy-gold">Product</p>
+              <div className="mt-6 space-y-4">
                 {[
-                  {
-                    title: "Product",
-                    links: [
-                      ["Managed agents", "#workflow"],
-                      ["Client portal", "#portal"],
-                      ["Control", "#control"],
-                      ["Capabilities", "#capabilities"],
-                    ],
-                  },
-                  {
-                    title: "Company",
-                    links: [
-                      ["Book a demo", demoHref],
-                      ["Sign in", "/login"],
-                      ["Contact", "mailto:contact@behalfy.io"],
-                    ],
-                  },
-                  {
-                    title: "Resources",
-                    links: [
-                      ["Gmail agents", "#workflow"],
-                      ["Instagram agents", "#workflow"],
-                      ["Lead qualification", "#portal"],
-                      ["Calendar booking", "#control"],
-                    ],
-                  },
-                ].map((column) => (
-                  <div key={column.title}>
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-white/34">{column.title}</p>
-                    <div className="mt-6 space-y-4">
-                      {column.links.map(([label, href]) => (
-                        <Link
-                          key={label}
-                          href={href}
-                          className="block text-sm font-semibold text-white/72 transition hover:text-white"
-                        >
-                          {label}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
+                  ["How it works", "#how-it-works"],
+                  ["Connections", "#connections"],
+                  ["Example conversations", "#workflow"],
+                  ["Control", "#control"],
+                  ["FAQ", "#faq"],
+                ].map(([label, href]) => (
+                  <Link key={label} href={href} className="block text-sm font-semibold text-white/66 transition hover:text-white">
+                    {label}
+                  </Link>
                 ))}
               </div>
             </div>
 
-            <div className="mt-16 flex flex-col gap-6 border-t border-white/[0.07] pt-8 text-sm text-white/32 md:flex-row md:items-center md:justify-between">
-              <p>(c) 2026 Behalfy by Stafless. All rights reserved.</p>
-              <div className="flex items-center gap-5">
-                <Link href={demoHref} className="transition hover:text-white/70">
-                  Demo
-                </Link>
-                <span className="h-4 w-px bg-white/[0.12]" />
-                <Link href="/login" className="transition hover:text-white/70">
-                  App
-                </Link>
-                <span className="h-4 w-px bg-white/[0.12]" />
-                <Link href="/privacy" className="transition hover:text-white/70">
-                  Privacy
-                </Link>
-                <Link href="/terms" className="transition hover:text-white/70">
-                  Terms
-                </Link>
-                <Link href="/data-deletion" className="transition hover:text-white/70">
-                  Data deletion
-                </Link>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-behalfy-gold">Legal</p>
+              <div className="mt-6 space-y-4">
+                {[
+                  ["Privacy", "/privacy"],
+                  ["Terms", "/terms"],
+                  ["Data deletion", "/data-deletion"],
+                ].map(([label, href]) => (
+                  <Link key={label} href={href} className="block text-sm font-semibold text-white/66 transition hover:text-white">
+                    {label}
+                  </Link>
+                ))}
               </div>
             </div>
+          </div>
+
+          <div className="mt-14 flex flex-col gap-5 border-t border-white/[0.08] pt-7 text-sm text-white/58 sm:flex-row sm:items-center sm:justify-between">
+            <p>© 2026 Behalfy. All rights reserved.</p>
+            <Link href="/login" className="font-semibold transition hover:text-white/72">
+              Client login
+            </Link>
           </div>
         </div>
       </footer>

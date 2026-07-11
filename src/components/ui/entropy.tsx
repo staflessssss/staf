@@ -7,192 +7,309 @@ interface EntropyProps {
   size?: number
 }
 
-export function Entropy({ className = "", size = 400 }: EntropyProps) {
+const MAX_DEVICE_PIXEL_RATIO = 2
+const GRID_SIZE = 25
+const INFLUENCE_RADIUS = 100
+const LINK_RADIUS = 50
+
+export function Entropy({ className = '', size = 400 }: EntropyProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const logicalSize = Math.max(1, size)
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    const context = ctx
+    const currentContainer = containerRef.current
+    const currentCanvas = canvasRef.current
+    if (!currentContainer || !currentCanvas) return
 
-    // 基础设置
-    const dpr = window.devicePixelRatio || 1
-    canvas.width = size * dpr
-    canvas.height = size * dpr
-    canvas.style.width = `${size}px`
-    canvas.style.height = `${size}px`
-    context.scale(dpr, dpr)
+    const currentContext = currentCanvas.getContext('2d')
+    if (!currentContext) return
 
-    // 使用黑色主题
+    // Stable non-null aliases are safe to capture in animation callbacks.
+    const container = currentContainer
+    const canvas = currentCanvas
+    const context = currentContext
+
     const particleColor = '#ffffff'
 
     class Particle {
       x: number
       y: number
-      size: number
+      size = 2
       order: boolean
       velocity: { x: number; y: number }
       originalX: number
       originalY: number
-      influence: number
-      neighbors: Particle[]
+      influence = 0
+      influencers: Particle[] = []
 
       constructor(x: number, y: number, order: boolean) {
         this.x = x
         this.y = y
         this.originalX = x
         this.originalY = y
-        this.size = 2
         this.order = order
         this.velocity = {
           x: (Math.random() - 0.5) * 2,
-          y: (Math.random() - 0.5) * 2
+          y: (Math.random() - 0.5) * 2,
         }
-        this.influence = 0
-        this.neighbors = []
       }
 
       update() {
         if (this.order) {
-          // 有序粒子受混沌影响的运动
           const dx = this.originalX - this.x
           const dy = this.originalY - this.y
-
-          // 计算来自混沌粒子的影响
           const chaosInfluence = { x: 0, y: 0 }
-          this.neighbors.forEach(neighbor => {
-            if (!neighbor.order) {
-              const distance = Math.hypot(this.x - neighbor.x, this.y - neighbor.y)
-              const strength = Math.max(0, 1 - distance / 100)
-              chaosInfluence.x += (neighbor.velocity.x * strength)
-              chaosInfluence.y += (neighbor.velocity.y * strength)
-              this.influence = Math.max(this.influence, strength)
-            }
+
+          this.influencers.forEach((neighbor) => {
+            const distance = Math.hypot(this.x - neighbor.x, this.y - neighbor.y)
+            const strength = Math.max(0, 1 - distance / INFLUENCE_RADIUS)
+            chaosInfluence.x += neighbor.velocity.x * strength
+            chaosInfluence.y += neighbor.velocity.y * strength
+            this.influence = Math.max(this.influence, strength)
           })
 
-          // 混合有序运动和混沌影响
           this.x += dx * 0.05 * (1 - this.influence) + chaosInfluence.x * this.influence
           this.y += dy * 0.05 * (1 - this.influence) + chaosInfluence.y * this.influence
-
-          // 影响逐渐减弱
           this.influence *= 0.99
-        } else {
-          // 混沌运动
-          this.velocity.x += (Math.random() - 0.5) * 0.5
-          this.velocity.y += (Math.random() - 0.5) * 0.5
-          this.velocity.x *= 0.95
-          this.velocity.y *= 0.95
-          this.x += this.velocity.x
-          this.y += this.velocity.y
+          return
+        }
 
-          // 边界检查
-          if (this.x < size / 2 || this.x > size) this.velocity.x *= -1
-          if (this.y < 0 || this.y > size) this.velocity.y *= -1
-          this.x = Math.max(size / 2, Math.min(size, this.x))
-          this.y = Math.max(0, Math.min(size, this.y))
+        this.velocity.x += (Math.random() - 0.5) * 0.5
+        this.velocity.y += (Math.random() - 0.5) * 0.5
+        this.velocity.x *= 0.95
+        this.velocity.y *= 0.95
+        this.x += this.velocity.x
+        this.y += this.velocity.y
+
+        if (this.x < logicalSize / 2 || this.x > logicalSize) this.velocity.x *= -1
+        if (this.y < 0 || this.y > logicalSize) this.velocity.y *= -1
+        this.x = Math.max(logicalSize / 2, Math.min(logicalSize, this.x))
+        this.y = Math.max(0, Math.min(logicalSize, this.y))
+      }
+
+      draw() {
+        const alpha = this.order ? 0.8 - this.influence * 0.5 : 0.8
+        context.fillStyle = `${particleColor}${Math.round(alpha * 255)
+          .toString(16)
+          .padStart(2, '0')}`
+        context.beginPath()
+        context.arc(this.x, this.y, this.size, 0, Math.PI * 2)
+        context.fill()
+      }
+    }
+
+    const particles: Particle[] = []
+    const spacing = logicalSize / GRID_SIZE
+
+    for (let column = 0; column < GRID_SIZE; column++) {
+      for (let row = 0; row < GRID_SIZE; row++) {
+        const x = spacing * column + spacing / 2
+        const y = spacing * row + spacing / 2
+        particles.push(new Particle(x, y, x < logicalSize / 2))
+      }
+    }
+
+    // Flat index pairs avoid allocating thousands of short-lived pair objects.
+    const linkedParticleIndexes: number[] = []
+
+    function updateRelationships() {
+      linkedParticleIndexes.length = 0
+      particles.forEach((particle) => {
+        particle.influencers = []
+      })
+
+      for (let firstIndex = 0; firstIndex < particles.length; firstIndex++) {
+        const first = particles[firstIndex]
+
+        for (let secondIndex = firstIndex + 1; secondIndex < particles.length; secondIndex++) {
+          const second = particles[secondIndex]
+          const dx = first.x - second.x
+          const dy = first.y - second.y
+          const distanceSquared = dx * dx + dy * dy
+
+          if (distanceSquared < LINK_RADIUS * LINK_RADIUS) {
+            linkedParticleIndexes.push(firstIndex, secondIndex)
+          }
+
+          if (distanceSquared >= INFLUENCE_RADIUS * INFLUENCE_RADIUS) continue
+          if (first.order && !second.order) first.influencers.push(second)
+          if (second.order && !first.order) second.influencers.push(first)
         }
       }
-
-      draw(ctx: CanvasRenderingContext2D) {
-        const alpha = this.order ?
-          0.8 - this.influence * 0.5 :
-          0.8
-        ctx.fillStyle = `${particleColor}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`
-        ctx.beginPath()
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-        ctx.fill()
-      }
     }
 
-    // 创建粒子网格
-    const particles: Particle[] = []
-    const gridSize = 25
-    const spacing = size / gridSize
+    function drawLinks() {
+      const opacityBuckets = [0.035, 0.085, 0.135, 0.185]
+      const paths = opacityBuckets.map(() => new Path2D())
 
-    for (let i = 0; i < gridSize; i++) {
-      for (let j = 0; j < gridSize; j++) {
-        const x = spacing * i + spacing / 2
-        const y = spacing * j + spacing / 2
-        const order = x < size / 2
-        particles.push(new Particle(x, y, order))
+      context.lineWidth = 0.5
+
+      for (let index = 0; index < linkedParticleIndexes.length; index += 2) {
+        const first = particles[linkedParticleIndexes[index]]
+        const second = particles[linkedParticleIndexes[index + 1]]
+        const distance = Math.hypot(first.x - second.x, first.y - second.y)
+        if (distance >= LINK_RADIUS) continue
+
+        const strength = 1 - distance / LINK_RADIUS
+        const bucketIndex = Math.min(
+          opacityBuckets.length - 1,
+          Math.floor(strength * opacityBuckets.length),
+        )
+        const path = paths[bucketIndex]
+        path.moveTo(first.x, first.y)
+        path.lineTo(second.x, second.y)
       }
-    }
 
-    // 更新邻居关系
-    function updateNeighbors() {
-      particles.forEach(particle => {
-        particle.neighbors = particles.filter(other => {
-          if (other === particle) return false
-          const distance = Math.hypot(particle.x - other.x, particle.y - other.y)
-          return distance < 100
-        })
+      paths.forEach((path, index) => {
+        context.strokeStyle = `rgba(255, 255, 255, ${opacityBuckets[index]})`
+        context.stroke(path)
       })
     }
 
-    let time = 0
-    let animationId: number
-    
-    function animate() {
-      context.clearRect(0, 0, size, size)
+    function drawScene(advance: boolean, time: number) {
+      context.clearRect(0, 0, logicalSize, logicalSize)
 
-      // 更新邻居关系
-      if (time % 30 === 0) {
-        updateNeighbors()
+      if (advance) {
+        if (time % 30 === 0) updateRelationships()
+        particles.forEach((particle) => particle.update())
       }
 
-      // 更新和绘制所有粒子
-      particles.forEach(particle => {
-        particle.update()
-        particle.draw(context)
+      drawLinks()
+      particles.forEach((particle) => particle.draw())
 
-        // 绘制连接线
-        particle.neighbors.forEach(neighbor => {
-          const distance = Math.hypot(particle.x - neighbor.x, particle.y - neighbor.y)
-          if (distance < 50) {
-            const alpha = 0.2 * (1 - distance / 50)
-            context.strokeStyle = `${particleColor}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`
-            context.beginPath()
-            context.moveTo(particle.x, particle.y)
-            context.lineTo(neighbor.x, neighbor.y)
-            context.stroke()
-          }
-        })
-      })
-
-      // 添加分隔线和文字
       context.strokeStyle = `${particleColor}4D`
       context.lineWidth = 0.5
       context.beginPath()
-      context.moveTo(size / 2, 0)
-      context.lineTo(size / 2, size)
+      context.moveTo(logicalSize / 2, 0)
+      context.lineTo(logicalSize / 2, logicalSize)
       context.stroke()
-
-      context.font = '12px monospace'
-      context.fillStyle = '#ffffff'
-      context.textAlign = 'center'
-
-      time++
-      animationId = requestAnimationFrame(animate)
     }
 
-    animate()
+    function resizeCanvas() {
+      const bounds = canvas.getBoundingClientRect()
+      const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), MAX_DEVICE_PIXEL_RATIO)
+      const backingWidth = Math.max(1, Math.round(bounds.width * dpr))
+      const backingHeight = Math.max(1, Math.round(bounds.height * dpr))
+
+      if (canvas.width !== backingWidth) canvas.width = backingWidth
+      if (canvas.height !== backingHeight) canvas.height = backingHeight
+
+      context.setTransform(
+        backingWidth / logicalSize,
+        0,
+        0,
+        backingHeight / logicalSize,
+        0,
+        0,
+      )
+    }
+
+    const motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let prefersReducedMotion = motionPreference.matches
+    let isDocumentVisible = document.visibilityState === 'visible'
+    let isIntersecting = typeof IntersectionObserver === 'undefined'
+    let animationFrame: number | null = null
+    let time = 0
+
+    updateRelationships()
+
+    if (prefersReducedMotion) {
+      // Establish the ordered/chaotic contrast without presenting visible motion.
+      for (let step = 0; step < 45; step++) {
+        if (step % 15 === 0) updateRelationships()
+        particles.forEach((particle) => particle.update())
+      }
+      time = 45
+      updateRelationships()
+    }
+
+    resizeCanvas()
+    drawScene(false, time)
+
+    const shouldAnimate = () => !prefersReducedMotion && isDocumentVisible && isIntersecting
+
+    function stopAnimation() {
+      if (animationFrame === null) return
+      cancelAnimationFrame(animationFrame)
+      animationFrame = null
+    }
+
+    function animate() {
+      animationFrame = null
+      if (!shouldAnimate()) return
+
+      drawScene(true, time)
+      time += 1
+      animationFrame = requestAnimationFrame(animate)
+    }
+
+    function syncAnimation() {
+      if (!shouldAnimate()) {
+        stopAnimation()
+        return
+      }
+
+      if (animationFrame === null) animationFrame = requestAnimationFrame(animate)
+    }
+
+    function handleVisibilityChange() {
+      isDocumentVisible = document.visibilityState === 'visible'
+      syncAnimation()
+    }
+
+    function handleMotionPreferenceChange(event: MediaQueryListEvent) {
+      prefersReducedMotion = event.matches
+      if (prefersReducedMotion) drawScene(false, time)
+      syncAnimation()
+    }
+
+    function handleResize() {
+      resizeCanvas()
+      drawScene(false, time)
+    }
+
+    const resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(container)
+
+    const intersectionObserver =
+      typeof IntersectionObserver === 'undefined'
+        ? null
+        : new IntersectionObserver(
+            ([entry]) => {
+              isIntersecting = entry.isIntersecting
+              syncAnimation()
+            },
+            { threshold: 0.01 },
+          )
+
+    intersectionObserver?.observe(container)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('resize', handleResize, { passive: true })
+    motionPreference.addEventListener('change', handleMotionPreferenceChange)
+    syncAnimation()
 
     return () => {
-      if (animationId) {
-        cancelAnimationFrame(animationId)
-      }
+      stopAnimation()
+      resizeObserver.disconnect()
+      intersectionObserver?.disconnect()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('resize', handleResize)
+      motionPreference.removeEventListener('change', handleMotionPreferenceChange)
     }
-  }, [size])
+  }, [logicalSize])
 
   return (
-    <div className={`relative ${className}`} style={{ width: size, height: size }}>
-      <canvas
-        ref={canvasRef}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-      />
+    <div
+      ref={containerRef}
+      className={`relative min-w-0 ${className}`}
+      style={{
+        width: `clamp(1px, calc(100vw - 2rem), ${logicalSize}px)`,
+        maxWidth: '100%',
+        aspectRatio: '1 / 1',
+      }}
+    >
+      <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full" />
     </div>
   )
 }

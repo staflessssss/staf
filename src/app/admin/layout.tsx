@@ -1,7 +1,22 @@
+import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { LogoutButton } from "@/components/auth/logout-button";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: null,
+  },
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
+  },
+};
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
