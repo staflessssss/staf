@@ -41,6 +41,18 @@ function readToolFailureStatus(value: unknown) {
   return /(error|fail|misconfig|unavailable)/.test(normalized) ? status : null;
 }
 
+function isPartialDelivery(value: unknown) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "ok" in value &&
+      value.ok === false &&
+      "deliveredCount" in value &&
+      "totalParts" in value,
+  );
+}
+
 export async function recordSuccessfulRuntimeTurnWithDb(args: {
   database: PrismaClient;
   conversationId: string;
@@ -55,6 +67,22 @@ export async function recordSuccessfulRuntimeTurnWithDb(args: {
   delivery?: unknown;
   updateMemory?: boolean;
 }) {
+  const mappedToolEvents = (args.toolExecutions ?? []).flatMap(mapToolExecutionToAgentEvents);
+  const toolEvents = mappedToolEvents.filter(
+    (event) =>
+      event.type !== AgentEventType.HANDOFF_REQUESTED &&
+      event.type !== AgentEventType.HANDOFF_RESOLVED,
+  );
+  const pricingGuideToolSucceeded = mappedToolEvents.some(
+    (event) =>
+      event.type === AgentEventType.PRICING_GUIDE_SENT &&
+      event.status === AgentEventStatus.SUCCEEDED,
+  );
+  const consultationBookingSucceeded = mappedToolEvents.some(
+    (event) =>
+      event.type === AgentEventType.CONSULTATION_BOOKED &&
+      event.status === AgentEventStatus.SUCCEEDED,
+  );
   const shouldUpdateMemory =
     args.updateMemory !== false && isConversationMemoryEligibleChannel(args.channel);
   let memoryBefore: ConversationMemory | undefined;
@@ -71,6 +99,13 @@ export async function recordSuccessfulRuntimeTurnWithDb(args: {
         conversationId: args.conversationId,
         latestUserMessage: args.inboundMessage,
         assistantReply: args.assistantReply,
+        operationalEvidence: {
+          guideDelivered:
+            pricingGuideToolSucceeded &&
+            (args.attachments?.length ?? 0) > 0 &&
+            !isPartialDelivery(args.delivery),
+          consultationBooked: consultationBookingSucceeded,
+        },
       });
     } catch (error) {
       memoryUpdate = {
@@ -81,13 +116,6 @@ export async function recordSuccessfulRuntimeTurnWithDb(args: {
     }
   }
 
-  const toolEvents = (args.toolExecutions ?? [])
-    .flatMap(mapToolExecutionToAgentEvents)
-    .filter(
-      (event) =>
-        event.type !== AgentEventType.HANDOFF_REQUESTED &&
-        event.type !== AgentEventType.HANDOFF_RESOLVED,
-    );
   const memoryAfter = readMemoryAfter(memoryUpdate);
   const qualifiesLead = isQualifiedLeadMemory(memoryAfter);
   const events = [

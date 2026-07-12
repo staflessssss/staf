@@ -1,7 +1,16 @@
 import { openai } from "@ai-sdk/openai";
-import { ChannelType, MessageRole, Prisma, type PrismaClient } from "@prisma/client";
+import {
+  AgentEventStatus,
+  AgentEventType,
+  ChannelType,
+  MessageRole,
+  Prisma,
+  type PrismaClient,
+} from "@prisma/client";
 import { generateText, Output } from "ai";
 import { z } from "zod";
+
+import { mapToolExecutionToAgentEvents } from "@/lib/agent-events";
 
 const conversationMemorySchema = z
   .object({
@@ -39,16 +48,65 @@ const conversationMemoryFieldSchema = z.enum([
   "booked",
 ]);
 
-const memoryExtractionSchema = z
+// OpenAI strict structured outputs require every object property to be required.
+// Null is the explicit "no update" value for the extractor contract.
+const conversationMemorySetOutputSchema = z
   .object({
-    memorySet: conversationMemorySchema.partial().default({}),
-    memoryClear: z.array(conversationMemoryFieldSchema).default([]),
-    confidence: z.number().min(0).max(1).default(0.8),
+    contactRole: z.enum(["couple", "third_party", "unknown"]).nullable(),
+    customerName: z.string().nullable(),
+    partnerName: z.string().nullable(),
+    weddingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    location: z.string().nullable(),
+    serviceRegion: z.enum(["FL", "NC_SC_GA", "unknown"]).nullable(),
+    venue: z.string().nullable(),
+    venueStatus: z.enum(["known", "not_finalized", "unknown"]).nullable(),
+    proposedCallTime: z.string().nullable(),
+    customerEmail: z.string().nullable(),
+    bookingConfirmed: z.boolean().nullable(),
+    pricingShown: z.boolean().nullable(),
+    guideSent: z.boolean().nullable(),
+    booked: z.boolean().nullable(),
+  })
+  .strict();
+
+const memoryExtractionOutputSchema = z
+  .object({
+    memorySet: conversationMemorySetOutputSchema,
+    memoryClear: z.array(conversationMemoryFieldSchema),
+    confidence: z.number().min(0).max(1),
   })
   .strict();
 
 export type ConversationMemory = z.infer<typeof conversationMemorySchema>;
-export type ConversationMemoryExtraction = z.infer<typeof memoryExtractionSchema>;
+type ConversationMemoryField = z.infer<typeof conversationMemoryFieldSchema>;
+type MemoryExtractionStatus =
+  | "success"
+  | "skipped_no_api_key"
+  | "schema_error"
+  | "timeout"
+  | "model_error";
+
+export type ConversationMemoryExtraction = {
+  status: MemoryExtractionStatus;
+  memorySet: ConversationMemory;
+  memoryClear: ConversationMemoryField[];
+  confidence: number;
+  error?: {
+    code: string;
+    message: string;
+  };
+};
+
+type MemoryHistoryMessage = {
+  role: "user" | "assistant" | "tool";
+  content: string;
+  toolName?: string | null;
+};
+
+export type OperationalMemoryEvidence = {
+  guideDelivered?: boolean;
+  consultationBooked?: boolean;
+};
 
 type DbWithOptionalMemory = PrismaClient & {
   conversationMemory?: PrismaClient["conversationMemory"];
@@ -65,6 +123,124 @@ function toJsonValue(value: unknown): Prisma.InputJsonValue {
   }
 
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function emptyMemoryExtraction(
+  status: Exclude<MemoryExtractionStatus, "success">,
+  error?: ConversationMemoryExtraction["error"],
+): ConversationMemoryExtraction {
+  return {
+    status,
+    memorySet: {},
+    memoryClear: [],
+    confidence: 0,
+    ...(error ? { error } : {}),
+  };
+}
+
+function normalizeMemoryExtractionOutput(
+  output: z.infer<typeof memoryExtractionOutputSchema>,
+): ConversationMemoryExtraction {
+  const memorySetCandidate = Object.fromEntries(
+    Object.entries(output.memorySet).filter(([, value]) => value !== null),
+  );
+  const parsedMemorySet = conversationMemorySchema.safeParse(memorySetCandidate);
+
+  if (!parsedMemorySet.success) {
+    const invalidFields = parsedMemorySet.error.issues
+      .map((issue) => issue.path.join("."))
+      .filter(Boolean)
+      .join(",");
+    throw new Error(
+      invalidFields
+        ? `memory_output_validation_failed:${invalidFields}`
+        : "memory_output_validation_failed",
+    );
+  }
+
+  return {
+    status: "success",
+    memorySet: parsedMemorySet.data,
+    memoryClear: output.memoryClear,
+    confidence: output.confidence,
+  };
+}
+
+function classifyMemoryExtractionError(error: unknown): ConversationMemoryExtraction {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const message = rawMessage
+    .replace(/sk-[A-Za-z0-9_-]+/g, "[redacted]")
+    .slice(0, 500);
+  const normalized = message.toLowerCase();
+  const status: Exclude<MemoryExtractionStatus, "success" | "skipped_no_api_key"> =
+    /(timeout|timed out|abort)/.test(normalized)
+      ? "timeout"
+      : /(schema|response_format|validation|json)/.test(normalized)
+        ? "schema_error"
+        : "model_error";
+
+  return emptyMemoryExtraction(status, {
+    code: error instanceof Error && error.name ? error.name : "unknown_error",
+    message,
+  });
+}
+
+function parseToolResult(content: string): unknown {
+  try {
+    return JSON.parse(content) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function groundOperationalMemory(
+  extraction: ConversationMemoryExtraction,
+  history: MemoryHistoryMessage[],
+  evidence?: OperationalMemoryEvidence,
+): ConversationMemoryExtraction {
+  if (extraction.status !== "success") return extraction;
+
+  const successfulToolEvents = history
+    .filter(
+      (message): message is MemoryHistoryMessage & { toolName: string } =>
+        message.role === "tool" && typeof message.toolName === "string",
+    )
+    .flatMap((message) =>
+      mapToolExecutionToAgentEvents({
+        toolName: message.toolName,
+        toolResult: parseToolResult(message.content),
+      }),
+    )
+    .filter((event) => event.status === AgentEventStatus.SUCCEEDED);
+  const guideToolSucceeded = successfulToolEvents.some(
+    (event) => event.type === AgentEventType.PRICING_GUIDE_SENT,
+  );
+  const bookingToolSucceeded = successfulToolEvents.some(
+    (event) => event.type === AgentEventType.CONSULTATION_BOOKED,
+  );
+  const guideDelivered = evidence?.guideDelivered ?? guideToolSucceeded;
+  const consultationBooked = evidence?.consultationBooked ?? bookingToolSucceeded;
+  const memorySet = { ...extraction.memorySet };
+
+  if (guideDelivered) {
+    memorySet.pricingShown = true;
+    memorySet.guideSent = true;
+  } else {
+    if (memorySet.pricingShown === true) delete memorySet.pricingShown;
+    if (memorySet.guideSent === true) delete memorySet.guideSent;
+  }
+
+  if (consultationBooked) {
+    memorySet.bookingConfirmed = true;
+    memorySet.booked = true;
+  } else if (memorySet.booked === true) {
+    delete memorySet.booked;
+  }
+
+  return {
+    ...extraction,
+    memorySet,
+  };
 }
 
 export async function loadConversationMemoryWithDb(args: {
@@ -89,7 +265,7 @@ export function mergeConversationMemory(
   currentMemory: ConversationMemory,
   extraction: ConversationMemoryExtraction,
 ): ConversationMemory {
-  if (extraction.confidence < 0.45) {
+  if (extraction.status !== "success" || extraction.confidence < 0.7) {
     return currentMemory;
   }
 
@@ -134,26 +310,34 @@ export async function saveConversationMemoryWithDb(args: {
 }
 
 export async function extractConversationMemory(args: {
-  history: Array<{ role: "user" | "assistant" | "tool"; content: string; toolName?: string | null }>;
+  history: MemoryHistoryMessage[];
   currentMemory: ConversationMemory;
   latestUserMessage: string;
   assistantReply: string;
+  operationalEvidence?: OperationalMemoryEvidence;
 }): Promise<ConversationMemoryExtraction> {
   if (!process.env.OPENAI_API_KEY) {
-    return { memorySet: {}, memoryClear: [], confidence: 0 };
+    return emptyMemoryExtraction("skipped_no_api_key");
   }
 
   try {
     const { output } = await generateText({
       model: openai(process.env.LEGACY_MEMORY_MODEL || "gpt-4.1-mini"),
       output: Output.object({
-        schema: memoryExtractionSchema,
+        schema: memoryExtractionOutputSchema,
       }),
       system: [
         "You silently extract CRM memory for a wedding videography Instagram sales assistant.",
         "Return structured JSON only.",
         "Extract only facts explicitly supported by the recent conversation.",
+        "Every memorySet field is required by the schema. Use null when a field should not be updated.",
+        "Normalize weddingDate to YYYY-MM-DD. Use null when the exact date is not known.",
         "Null means no update. Use memoryClear only when the user clearly says a known fact is no longer true.",
+        "Do not copy currentMemory into memorySet unless the user explicitly confirms or changes that fact.",
+        "If the user says the venue is not finalized, set venueStatus to not_finalized and include venue in memoryClear.",
+        "Set pricingShown or guideSent only when a successful pricing-guide tool result is present in recentConversation.",
+        "Set booked only when a successful consultation-booking tool result is present in recentConversation.",
+        "Assistant reply text alone is not evidence that a guide was delivered or a consultation was booked.",
         "Do not infer the sender is one of the couple if they describe the couple as they/them or say they are helping someone else.",
       ].join("\n"),
       prompt: JSON.stringify(
@@ -171,9 +355,18 @@ export async function extractConversationMemory(args: {
       timeout: 15_000,
     });
 
-    return output;
-  } catch {
-    return { memorySet: {}, memoryClear: [], confidence: 0 };
+    return groundOperationalMemory(
+      normalizeMemoryExtractionOutput(output),
+      args.history,
+      args.operationalEvidence,
+    );
+  } catch (error) {
+    const failure = classifyMemoryExtractionError(error);
+    console.warn("[conversation-memory] extractor failed", {
+      status: failure.status,
+      error: failure.error,
+    });
+    return failure;
   }
 }
 
@@ -182,6 +375,7 @@ export async function extractAndSaveConversationMemoryWithDb(args: {
   conversationId: string;
   latestUserMessage: string;
   assistantReply: string;
+  operationalEvidence?: OperationalMemoryEvidence;
 }): Promise<{
   status: "saved" | "skipped_no_delegate" | "unchanged";
   memoryBefore?: ConversationMemory;
@@ -231,6 +425,7 @@ export async function extractAndSaveConversationMemoryWithDb(args: {
     currentMemory,
     latestUserMessage: args.latestUserMessage,
     assistantReply: args.assistantReply,
+    operationalEvidence: args.operationalEvidence,
   });
   const nextMemory = mergeConversationMemory(currentMemory, extraction);
 
@@ -260,3 +455,10 @@ export async function extractAndSaveConversationMemoryWithDb(args: {
 export function isConversationMemoryEligibleChannel(channel: ChannelType) {
   return channel === ChannelType.INSTAGRAM;
 }
+
+export const conversationMemoryTestHelpers = {
+  memoryExtractionOutputSchema,
+  normalizeMemoryExtractionOutput,
+  classifyMemoryExtractionError,
+  groundOperationalMemory,
+};
