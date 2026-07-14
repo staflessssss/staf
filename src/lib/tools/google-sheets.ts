@@ -505,10 +505,29 @@ function parseSheetsCapacityAvailabilityConfig(
             },
           ],
     suggestionSearchDays:
-      typeof config?.suggestionSearchDays === "number" && config.suggestionSearchDays > 0
+      typeof config?.suggestionSearchDays === "number" && config.suggestionSearchDays >= 0
         ? Math.floor(config.suggestionSearchDays)
         : 45,
   };
+}
+
+function buildCapacityAvailabilitySummary(args: {
+  requestedDate: string;
+  region: string;
+  bookedCount: number;
+  capacity: number;
+  available: boolean;
+  suggestedDates: string[];
+}) {
+  if (args.available) {
+    return `Wedding date check: ${args.requestedDate} is available for ${args.region} (${args.bookedCount}/${args.capacity} booked).`;
+  }
+
+  if (args.suggestedDates.length > 0) {
+    return `Wedding date check: ${args.requestedDate} is unavailable for ${args.region} (${args.bookedCount}/${args.capacity} booked). Offer these nearby dates right away: ${args.suggestedDates.join(", ")}.`;
+  }
+
+  return `Wedding date check: ${args.requestedDate} is unavailable for ${args.region} (${args.bookedCount}/${args.capacity} booked).`;
 }
 
 async function createSheetsClient(credentialsEnc: string) {
@@ -1016,7 +1035,7 @@ async function runSheetsCapacityAvailability(args: SheetsExecutionArgs) {
 
     return null;
   };
-  const nearestAvailableDates = available
+  const nearestAvailableDates = available || config.suggestionSearchDays === 0
     ? null
     : {
         before: findNearestAvailableDate(-1),
@@ -1056,11 +1075,14 @@ async function runSheetsCapacityAvailability(args: SheetsExecutionArgs) {
     result: available
       ? `${requestedDateIso} is AVAILABLE in ${requestedRule.region}`
       : `${requestedDateIso} is UNAVAILABLE in ${requestedRule.region}`,
-    summary: available
-      ? `Wedding date check: ${requestedDateIso} is available for ${requestedRule.region} (${bookedCount}/${capacity} booked).`
-      : suggestedDates.length > 0
-        ? `Wedding date check: ${requestedDateIso} is unavailable for ${requestedRule.region} (${bookedCount}/${capacity} booked). Offer these nearby dates right away: ${suggestedDates.join(", ")}.`
-        : `Wedding date check: ${requestedDateIso} is unavailable for ${requestedRule.region} (${bookedCount}/${capacity} booked), and no nearby replacement dates were found automatically.`,
+    summary: buildCapacityAvailabilitySummary({
+      requestedDate: requestedDateIso,
+      region: requestedRule.region,
+      bookedCount,
+      capacity,
+      available,
+      suggestedDates,
+    }),
     params: args.params,
     request: args.request,
   };
@@ -1376,6 +1398,8 @@ export async function executeGoogleSheetsStep(args: SheetsExecutionArgs) {
 }
 
 export const googleSheetsTestHelpers = {
+  buildCapacityAvailabilitySummary,
   inferRequestedCapacityRule,
   matchesAlias,
+  parseSheetsCapacityAvailabilityConfig,
 };

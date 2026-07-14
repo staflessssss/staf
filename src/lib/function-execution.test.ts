@@ -99,6 +99,15 @@ test("getGoogleSheetsParams preserves capacity availability settings", () => {
   assert.equal(params.capacityRules[1]?.capacity, 2);
   assert.equal(params.suggestionSearchDays, 30);
 
+  const suggestionsDisabled = getGoogleSheetsParams({
+    params: {
+      operation: "capacity_availability",
+      suggestionSearchDays: 0,
+    },
+  });
+
+  assert.equal(suggestionsDisabled.suggestionSearchDays, 0);
+
   const explicitEmptyRules = getGoogleSheetsParams({
     params: {
       operation: "capacity_availability",

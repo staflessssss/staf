@@ -16,6 +16,7 @@ import {
   agentConfigInclude,
   AgentSettingsConfig,
   AgentWithConfigData,
+  ConversationPlaybookConfig,
   ControlConfig,
   hydrateFunctionBlocksForRuntime,
   FunctionBlockConfig,
@@ -23,6 +24,7 @@ import {
   getDefaultAgentSettingsConfig,
   getChannelConfigObject,
   normalizeAgentSettings,
+  normalizeConversationPlaybook,
   normalizeControlConfig,
   normalizeFunctionBlocks,
   normalizePromptingConfig,
@@ -43,6 +45,11 @@ import {
 } from "@/lib/agents/myndful/guide-config";
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
+import {
+  planSemanticTurn,
+  renderSemanticTurnPlan,
+  type SemanticTurnPlan,
+} from "@/lib/semantic-turn-planner";
 import { resolveTools } from "@/lib/tools";
 import { readMessageBehaviorConfig } from "@/lib/channels/message-behavior";
 import { findNextAgentScheduleWindowStart, isWithinAgentSchedule } from "@/lib/agent-schedule";
@@ -84,6 +91,7 @@ type RuntimeBlocks = {
   toolFeatures: Awaited<ReturnType<typeof hydrateFunctionBlocksForRuntime>>;
   agentSettings: AgentSettingsConfig;
   prompting: PromptingConfig;
+  conversationPlaybook: ConversationPlaybookConfig;
   control: ControlConfig;
 };
 
@@ -344,7 +352,8 @@ function buildConfiguredCollectionsGuideTool(args: {
             ...(pricing?.startPrice ? { startPrice: pricing.startPrice } : {}),
             ...(promotionText ? { promotionText } : {}),
             attachment,
-            summary: "The correct regional collections guide will be attached to this reply.",
+            summary:
+              "The correct regional collections guide will be attached to this reply. State the returned starting price and promotion text naturally in the customer-facing message.",
           }
         : {
             status: "not_configured",
@@ -1777,6 +1786,92 @@ function getRequiredConsultationCalendarToolKey(args: {
   );
 }
 
+function getSemanticActionToolKey(args: {
+  action: SemanticTurnPlan["action"];
+  availableTools: ToolSet;
+}) {
+  const keys = Object.keys(args.availableTools);
+
+  switch (args.action) {
+    case "check_wedding_availability":
+      return (
+        keys.find((key) => {
+          const normalized = key.toLowerCase();
+          return normalized.includes("wedding") && normalized.includes("availability");
+        }) ?? null
+      );
+    case "send_collections_guide":
+      return keys.find((key) => key === "send_collections_guide") ?? null;
+    case "check_consultation_calendar":
+      return (
+        keys.find((key) => {
+          const normalized = key.toLowerCase();
+          return (
+            normalized.includes("consultation") &&
+            normalized.includes("calendar") &&
+            !normalized.includes("book")
+          );
+        }) ?? null
+      );
+    case "book_consultation":
+      return (
+        keys.find((key) => {
+          const normalized = key.toLowerCase();
+          return normalized.includes("book") && normalized.includes("consultation");
+        }) ?? null
+      );
+    case "handoff_to_human":
+      return keys.find((key) => key.includes("owner_handoff")) ?? null;
+    default:
+      return null;
+  }
+}
+
+function toolExecutionMatchesSemanticAction(
+  action: SemanticTurnPlan["action"],
+  toolName: string,
+) {
+  const normalized = toolName.toLowerCase();
+
+  switch (action) {
+    case "check_wedding_availability":
+      return normalized.includes("wedding") && normalized.includes("availability");
+    case "send_collections_guide":
+      return normalized === "send_collections_guide";
+    case "check_consultation_calendar":
+      return (
+        normalized.includes("consultation") &&
+        normalized.includes("calendar") &&
+        !normalized.includes("book")
+      );
+    case "book_consultation":
+      return normalized.includes("book") && normalized.includes("consultation");
+    case "handoff_to_human":
+      return normalized.includes("owner_handoff");
+    default:
+      return false;
+  }
+}
+
+function getWeddingAvailabilityExecutionStatus(
+  toolExecutions: Array<{ toolName: string; toolResult: unknown }>,
+) {
+  for (const execution of toolExecutions) {
+    if (!toolExecutionMatchesSemanticAction("check_wedding_availability", execution.toolName)) {
+      continue;
+    }
+
+    const result = getStepResults(execution.toolResult).find((entry) =>
+      ["available", "unavailable"].includes(String(entry.status ?? "")),
+    );
+    if (result?.status === "available" || result?.status === "unavailable") {
+      return result.status;
+    }
+  }
+
+  return null;
+}
+
 function shouldExposeOwnerHandoffTool(input: InvokeAgentInput) {
   const channel = String(input.channel).toUpperCase();
   return channel === ChannelType.INSTAGRAM || channel === ChannelType.GMAIL;
@@ -2368,6 +2463,13 @@ async function mapAgentToRuntimeBlocks(agent: AgentWithConfigData): Promise<Runt
     toolFeatures,
     agentSettings: getRuntimeAgentSettingsConfig(agent.channelConfig),
     prompting: getRuntimePromptingConfig(agent.channelConfig),
+    conversationPlaybook: normalizeConversationPlaybook(
+      rawChannelConfig.conversationPlaybook &&
+        typeof rawChannelConfig.conversationPlaybook === "object" &&
+        !Array.isArray(rawChannelConfig.conversationPlaybook)
+        ? (rawChannelConfig.conversationPlaybook as Partial<ConversationPlaybookConfig>)
+        : undefined,
+    ),
     control: getRuntimeControlConfig(agent.channelConfig),
   };
 }
@@ -2381,6 +2483,7 @@ async function runModelInvocation(args: {
   historyText: string;
   historyMessages: RuntimeHistoryMessage[];
   prompting: PromptingConfig;
+  conversationPlaybook: ConversationPlaybookConfig;
   control: ControlConfig;
 }) {
   const toolExecutions: Array<{
@@ -2397,11 +2500,103 @@ async function runModelInvocation(args: {
     testMode: Boolean(args.input.testMode),
     runtimeType: "gpt_agent" as const,
   };
+  const potentiallyHasTools =
+    args.toolFeatures.length > 0 || shouldExposeOwnerHandoffTool(args.input);
+  const modelId = normalizeConfiguredModelId(
+    potentiallyHasTools
+      ? process.env.OPENAI_TOOL_MODEL || "gpt-5.4-mini"
+      : process.env.OPENAI_MODEL || "gpt-5.4-mini",
+  ) ?? "gpt-5.4-mini";
+
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      text: "",
+      modelId: "unavailable-no-openai-key",
+      toolExecutions,
+      unavailable: true,
+    };
+  }
+
+  const semanticTurnPlanningEnabled = args.prompting.semanticTurnPlanningEnabled === true;
+  let semanticTurnPlan: SemanticTurnPlan | null = null;
+  if (semanticTurnPlanningEnabled) {
+    try {
+      const semanticModelId =
+        normalizeConfiguredModelId(process.env.OPENAI_SEMANTIC_TURN_MODEL) ?? modelId;
+      const semanticFallbackModelId =
+        normalizeConfiguredModelId(process.env.OPENAI_SEMANTIC_TURN_FALLBACK_MODEL) ??
+        "gpt-4.1-mini";
+      const invokeSemanticPlanner = (plannerModelId: string, traceName: string) =>
+        traceLangRuntime(traceName, traceMetadata, () =>
+          planSemanticTurn({
+            modelId: plannerModelId,
+            configuredPrompt: args.promptPreview,
+            historyText: args.historyText,
+            recentCustomerMessages: args.historyMessages
+              .filter((message) => message.role === MessageRole.USER)
+              .map((message) => message.content),
+            currentMessage: args.input.message,
+          }));
+      let candidatePlan: SemanticTurnPlan;
+
+      try {
+        candidatePlan = await invokeSemanticPlanner(
+          semanticModelId,
+          "gpt_agent.semantic_turn_plan",
+        );
+      } catch (error) {
+        if (semanticFallbackModelId === semanticModelId) {
+          throw error;
+        }
+
+        console.warn(
+          `[ai-runtime] semantic planner ${semanticModelId} failed; retrying with ${semanticFallbackModelId}`,
+          { error: error instanceof Error ? error.message : "Semantic planner failed." },
+        );
+        candidatePlan = await invokeSemanticPlanner(
+          semanticFallbackModelId,
+          "gpt_agent.semantic_turn_plan.fallback",
+        );
+      }
+
+      if (candidatePlan.confidence >= 0.75) {
+        semanticTurnPlan = candidatePlan;
+        if (args.input.testMode && process.env.DEBUG_SEMANTIC_TURN_PLAN === "1") {
+          console.info("[ai-runtime] semantic turn plan", candidatePlan);
+        }
+      }
+    } catch (error) {
+      console.warn("[ai-runtime] semantic turn planner failed; using normal model choice", {
+        agentId: args.agent.id,
+        error: error instanceof Error ? error.message : "Semantic turn planner failed.",
+      });
+    }
+  }
+
+  const semanticToolContext =
+    semanticTurnPlan?.action === "check_wedding_availability"
+      ? {
+          weddingDate: semanticTurnPlan.weddingDate,
+          weddingYearEstablished:
+            semanticTurnPlan.weddingYearSource !== "not_established",
+          location: semanticTurnPlan.location,
+        }
+      : undefined;
+  const establishedGuideRegions = getConfiguredGuideRegionsFromCustomerMessages({
+    agent: args.agent,
+    customerMessages: [
+      ...args.historyMessages
+        .filter((message) => message.role === MessageRole.USER)
+        .map((message) => message.content),
+      args.input.message,
+    ],
+  });
   const tools = resolveTools({
     tenantId: args.agent.tenantId,
     toolFeatures: args.toolFeatures,
     testMode: Boolean(args.input.testMode),
     currentMessage: args.input.message,
+    semanticContext: semanticToolContext,
     traceMetadata,
     defaultEmail:
       args.input.contactEmail ??
@@ -2422,15 +2617,7 @@ async function runModelInvocation(args: {
   });
   const collectionsGuideTool = buildConfiguredCollectionsGuideTool({
     agent: args.agent,
-    establishedRegions: getConfiguredGuideRegionsFromCustomerMessages({
-      agent: args.agent,
-      customerMessages: [
-        ...args.historyMessages
-          .filter((message) => message.role === MessageRole.USER)
-          .map((message) => message.content),
-        args.input.message,
-      ],
-    }),
+    establishedRegions: establishedGuideRegions,
     onToolResult: (entry) => {
       toolExecutions.push(entry);
     },
@@ -2441,43 +2628,100 @@ async function runModelInvocation(args: {
     ...(ownerHandoffTool ? { [OWNER_HANDOFF_RUNTIME_TOOL_NAME]: ownerHandoffTool } : {}),
   };
   const hasTools = Object.keys(availableTools).length > 0;
-  const modelId = normalizeConfiguredModelId(
-    hasTools
-      ? process.env.OPENAI_TOOL_MODEL || "gpt-5.4-mini"
-      : process.env.OPENAI_MODEL || "gpt-5.4-mini",
-  ) ?? "gpt-5.4-mini";
   const fallbackModelId = getFallbackModelId({ hasTools, primaryModelId: modelId });
   let usedModelId = modelId;
 
-  if (!process.env.OPENAI_API_KEY) {
-    return {
-      text: "",
-      modelId: "unavailable-no-openai-key",
-      toolExecutions,
-      unavailable: true,
-    };
-  }
+  const schedulingNudge = semanticTurnPlanningEnabled
+    ? ""
+    : buildSchedulingNudge({
+        historyMessages: args.historyMessages,
+        currentMessage: args.input.message,
+      });
+  const requiredWeddingAvailabilityAction = semanticTurnPlanningEnabled
+    ? ""
+    : buildRequiredWeddingAvailabilityActionNudge({
+        historyMessages: args.historyMessages,
+        currentMessage: args.input.message,
+      });
+  const requiredConsultationCalendarAction = semanticTurnPlanningEnabled
+    ? ""
+    : buildRequiredConsultationCalendarActionNudge({
+        currentMessage: args.input.message,
+      });
+  const requiredToolKey = semanticTurnPlanningEnabled
+    ? null
+    : getRequiredWeddingAvailabilityToolKey({
+        requiredActionNudge: requiredWeddingAvailabilityAction,
+        availableTools,
+      });
+  const recentWeddingAvailabilityContext = semanticTurnPlanningEnabled
+    ? ""
+    : buildRecentWeddingAvailabilityContext({
+        historyMessages: args.historyMessages,
+        currentMessage: args.input.message,
+      });
+  const semanticPlanContext = semanticTurnPlan
+    ? renderSemanticTurnPlan(semanticTurnPlan)
+    : "";
+  const semanticActionToolKey = semanticTurnPlan
+    ? getSemanticActionToolKey({ action: semanticTurnPlan.action, availableTools })
+    : null;
+  const collectionsGuideToolKey = Object.keys(availableTools).find(
+    (key) => key === "send_collections_guide",
+  );
+  const sendGuideAfterAvailable =
+    semanticTurnPlan?.sendGuideAfterAvailability === true ||
+    args.conversationPlaybook.pricingBehavior === "after_availability_is_confirmed" ||
+    args.conversationPlaybook.pricingBehavior === "after_availability_or_when_asked";
+  const prepareSemanticStep = semanticTurnPlan
+    ? () => {
+        if (semanticTurnPlan.action === "model_choice") {
+          return undefined;
+        }
 
-  const schedulingNudge = buildSchedulingNudge({
-    historyMessages: args.historyMessages,
-    currentMessage: args.input.message,
-  });
-  const requiredWeddingAvailabilityAction = buildRequiredWeddingAvailabilityActionNudge({
-    historyMessages: args.historyMessages,
-    currentMessage: args.input.message,
-  });
-  const requiredConsultationCalendarAction = buildRequiredConsultationCalendarActionNudge({
-    currentMessage: args.input.message,
-  });
-  const requiredToolKey =
-    getRequiredWeddingAvailabilityToolKey({
-      requiredActionNudge: requiredWeddingAvailabilityAction,
-      availableTools,
-    });
-  const recentWeddingAvailabilityContext = buildRecentWeddingAvailabilityContext({
-    historyMessages: args.historyMessages,
-    currentMessage: args.input.message,
-  });
+        if (semanticTurnPlan.action === "respond") {
+          return { activeTools: [] };
+        }
+
+        const actionAlreadyExecuted = toolExecutions.some((execution) =>
+          toolExecutionMatchesSemanticAction(semanticTurnPlan.action, execution.toolName),
+        );
+
+        if (!actionAlreadyExecuted && semanticActionToolKey) {
+          return {
+            activeTools: [semanticActionToolKey],
+            toolChoice: {
+              type: "tool" as const,
+              toolName: semanticActionToolKey,
+            },
+          };
+        }
+
+        if (semanticTurnPlan.action === "check_wedding_availability") {
+          const availabilityStatus = getWeddingAvailabilityExecutionStatus(toolExecutions);
+          const guideAlreadyExecuted = toolExecutions.some(
+            (execution) => execution.toolName === "send_collections_guide",
+          );
+
+          if (
+            availabilityStatus === "available" &&
+            sendGuideAfterAvailable &&
+            collectionsGuideToolKey &&
+            !guideAlreadyExecuted
+          ) {
+            return {
+              activeTools: [collectionsGuideToolKey],
+              toolChoice: {
+                type: "tool" as const,
+                toolName: collectionsGuideToolKey,
+              },
+            };
+          }
+        }
+
+        return { activeTools: [] };
+      }
+    : null;
   const controlRuntimeRules = buildControlRuntimeRules(args.control);
   const runtimeContextLines = buildRuntimeContextLines({
     prompting: args.prompting,
@@ -2492,7 +2736,8 @@ Runtime application note:
 - Return only the customer-facing ${args.input.channel === ChannelType.GMAIL ? "email reply" : "Instagram DM text"}. Do not include planning notes, analysis, labels, or internal reasoning before the reply.
 - If the customer explicitly asks for a real person/human, use the ${OWNER_HANDOFF_REQUEST_TOOL_NAME} tool.
 - If the customer asks a specific Myndful business fact that is not clearly present in the prompt, knowledge, recent history, or tools, use the ${OWNER_HANDOFF_REQUEST_TOOL_NAME} tool instead of guessing or saying no.
-${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`,
+${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}
+${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semanticPlanContext}` : ""}`,
       prompt: `Conversation history:
   ${args.historyText}
 
@@ -2509,7 +2754,9 @@ ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}`
       ? {
           tools: availableTools,
           stopWhen: stepCountIs(5),
-          ...(requiredToolKey
+          ...(prepareSemanticStep
+            ? { prepareStep: prepareSemanticStep }
+            : requiredToolKey
             ? {
                 prepareStep: ({ stepNumber }: { stepNumber: number }) =>
                   stepNumber === 0
@@ -2641,6 +2888,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       historyText: renderHistory(historyMessages),
       historyMessages,
       prompting: runtimeBlocks.prompting,
+      conversationPlaybook: runtimeBlocks.conversationPlaybook,
       control: runtimeBlocks.control,
     });
     if (modelResult.unavailable) {
@@ -2768,6 +3016,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     historyText: renderHistory(historyMessages),
     historyMessages,
     prompting: runtimeBlocks.prompting,
+    conversationPlaybook: runtimeBlocks.conversationPlaybook,
     control: runtimeBlocks.control,
   });
   if (modelResult.unavailable) {
@@ -2879,6 +3128,8 @@ export const aiRuntimeTestHelpers = {
   getRequiredConsultationCalendarToolName,
   getRequiredWeddingAvailabilityToolKey,
   getRequiredConsultationCalendarToolKey,
+  getSemanticActionToolKey,
+  getWeddingAvailabilityExecutionStatus,
   isTechnicalModelFailure,
   normalizeConfiguredModelId,
   ownerHandoffCustomerReply,

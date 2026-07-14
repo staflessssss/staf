@@ -89,3 +89,62 @@ test("isInternalBusinessEmail rejects business emails as customer invite emails"
   assert.equal(toolResolutionTestHelpers.isInternalBusinessEmail("contact@myndfulfilms.com"), true);
   assert.equal(toolResolutionTestHelpers.isInternalBusinessEmail("bride@example.com"), false);
 });
+
+test("wedding availability asks for the year when month and day are known", () => {
+  assert.equal(
+    toolResolutionTestHelpers.getWeddingAvailabilityDateRequirement({
+      currentMessage:
+        "I'm getting married on November 21. The wedding will be in Port Saint Lucie, Florida.",
+      request: "Check availability for November 21 in Port Saint Lucie, Florida.",
+      weddingDate: "November 21",
+    }),
+    "needs_year",
+  );
+});
+
+test("wedding availability accepts an exact date supplied after the missing year", () => {
+  assert.equal(
+    toolResolutionTestHelpers.getWeddingAvailabilityDateRequirement({
+      currentMessage: "2026",
+      request: "Check November 21, 2026 in Port Saint Lucie, Florida.",
+      date: "2026-11-21",
+      weddingDate: "November 21, 2026",
+    }),
+    null,
+  );
+});
+
+test("semantic wedding date completes a month/day follow-up without regex inheritance", () => {
+  assert.equal(
+    toolResolutionTestHelpers.getWeddingAvailabilityDateRequirement({
+      currentMessage: "Could they do November 22 instead?",
+      request: "Check the newly proposed wedding date.",
+      semanticWeddingDate: "2026-11-22",
+      semanticWeddingYearEstablished: true,
+    }),
+    null,
+  );
+});
+
+test("semantic date cannot invent a missing wedding year", () => {
+  assert.equal(
+    toolResolutionTestHelpers.getWeddingAvailabilityDateRequirement({
+      currentMessage: "The wedding is November 21.",
+      request: "Check wedding availability.",
+      semanticWeddingDate: "2026-11-21",
+      semanticWeddingYearEstablished: false,
+    }),
+    "needs_year",
+  );
+});
+
+test("wedding availability asks for the day when only month and year are known", () => {
+  assert.equal(
+    toolResolutionTestHelpers.getWeddingAvailabilityDateRequirement({
+      currentMessage: "We're thinking November 2026 in Florida.",
+      request: "Check availability in November 2026 in Florida.",
+      weddingDate: "November 2026",
+    }),
+    "needs_exact_date",
+  );
+});

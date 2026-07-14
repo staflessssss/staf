@@ -307,7 +307,7 @@ export function getGoogleSheetsParams(step: Pick<StepLike, "params">): GoogleShe
         : defaults.bookedStatusValue,
     capacityRules: Array.isArray(params.capacityRules) ? capacityRules : defaults.capacityRules,
     suggestionSearchDays:
-      typeof params.suggestionSearchDays === "number" && params.suggestionSearchDays > 0
+      typeof params.suggestionSearchDays === "number" && params.suggestionSearchDays >= 0
         ? Math.floor(params.suggestionSearchDays)
         : defaults.suggestionSearchDays,
   };

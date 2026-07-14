@@ -59,6 +59,7 @@ export const pricingBehaviorOptions = [
   "only_when_asked",
   "after_qualification",
   "after_availability_is_confirmed",
+  "after_availability_or_when_asked",
   "immediately_if_relevant",
 ] as const;
 
@@ -66,6 +67,7 @@ export const unavailableBehaviorOptions = [
   "offer_nearest_alternatives_automatically",
   "ask_the_customer_for_other_options",
   "offer_waitlist_or_callback",
+  "state_unavailable_without_alternatives",
 ] as const;
 
 export const bookingBehaviorOptions = [
@@ -254,6 +256,7 @@ export type PromptingConfig = {
   languagePreference?: string | null;
   instruction?: string | null;
   preserveModelVoice: boolean;
+  semanticTurnPlanningEnabled?: boolean;
   showContactIdentity: boolean;
   showChannelContext: boolean;
   notes?: string | null;
@@ -837,6 +840,10 @@ export function normalizePromptingConfig(
         : null,
     preserveModelVoice:
       typeof value?.preserveModelVoice === "boolean" ? value.preserveModelVoice : false,
+    semanticTurnPlanningEnabled:
+      typeof value?.semanticTurnPlanningEnabled === "boolean"
+        ? value.semanticTurnPlanningEnabled
+        : false,
     showContactIdentity:
       typeof value?.showContactIdentity === "boolean" ? value.showContactIdentity : false,
     showChannelContext:
@@ -1196,6 +1203,7 @@ export const channelConfigSchema = z
           .optional()
           .transform((value) => (value ? value : undefined)),
         preserveModelVoice: z.boolean().default(false),
+        semanticTurnPlanningEnabled: z.boolean().default(false),
         showContactIdentity: z.boolean().default(false),
         showChannelContext: z.boolean().default(false),
         notes: z

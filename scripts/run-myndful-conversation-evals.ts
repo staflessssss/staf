@@ -43,8 +43,9 @@ const scenarios: Scenario[] = [
           "Hi! I'm helping my sister. Their wedding is October 17, 2026 in Raleigh. Are you available?",
         expect: {
           requiredTools: ["Check wedding availability"],
-          replyIncludes: ["October 16"],
           replyIncludesAny: ["unavailable", "booked", "fully booked"],
+          replyIncludes: ["Taras"],
+          replyExcludes: ["October 16", "October 18", "nearby", "closest open"],
           forbiddenTools: ["Book consultation call"],
         },
       },
@@ -60,7 +61,72 @@ const scenarios: Scenario[] = [
           requiredTools: ["Check wedding availability", "send_collections_guide"],
           minAttachments: 1,
           replyIncludesAny: ["available", "open"],
+          replyIncludes: ["Taras", "$3,600", "20%"],
           forbiddenTools: ["Book consultation call"],
+        },
+      },
+    ],
+  },
+  {
+    id: "taras_unavailable_date_close",
+    title: "Taras flow: missing year, unavailable date, and warm close",
+    turns: [
+      {
+        customer: "Good afternoon!",
+        expect: {
+          forbiddenTools: ["Check wedding availability", "Book consultation call"],
+        },
+      },
+      {
+        customer:
+          "I'm getting married on November 21. Where are you located? The wedding will be in Port Saint Lucie, Florida.",
+        expect: {
+          replyIncludes: ["year"],
+          replyIncludesAny: ["Tampa", "North Carolina", "NC and Florida", "Florida and NC"],
+          replyExcludes: [
+            "November 20",
+            "November 22",
+            "nearby",
+            "collections guide",
+            "pricing guide",
+          ],
+          forbiddenTools: ["Check wedding availability", "send_collections_guide", "Book consultation call"],
+        },
+      },
+      {
+        customer: "2026",
+        expect: {
+          requiredTools: ["Check wedding availability"],
+          replyIncludesAny: ["unavailable", "booked", "fully booked"],
+          replyExcludes: [
+            "November 20",
+            "November 22",
+            "nearby",
+            "closest open",
+            "based in Tampa",
+            "we’re based",
+            "we're based",
+            "we are based",
+            "based in",
+            "based in North Carolina",
+            "Port Saint Lucie is Florida",
+            "send over the Florida guide",
+            "collections guide",
+          ],
+          forbiddenTools: ["Book consultation call"],
+        },
+      },
+      {
+        customer: "Ohhhh okay, thank you so much.",
+        expect: {
+          forbiddenTools: ["Check wedding availability", "Book consultation call"],
+          replyExcludes: [
+            "November 20",
+            "November 22",
+            "either of those",
+            "from there",
+            "another date",
+          ],
         },
       },
     ],
@@ -172,7 +238,7 @@ const scenarios: Scenario[] = [
     history: [
       {
         role: MessageRole.ASSISTANT,
-        content: "The closest open dates are October 16 or October 18 🤍",
+        content: "Unfortunately, that wedding date is already booked on our side.",
       },
     ],
     turns: [
@@ -195,6 +261,8 @@ const scenarios: Scenario[] = [
         expect: {
           requiredTools: ["Check wedding availability"],
           replyIncludesAny: ["unavailable", "booked", "fully booked"],
+          replyIncludes: ["Taras"],
+          replyExcludes: ["October 16", "October 18", "nearby", "closest open"],
         },
       },
       {
@@ -203,6 +271,7 @@ const scenarios: Scenario[] = [
           requiredTools: ["Check wedding availability", "send_collections_guide"],
           minAttachments: 1,
           replyIncludesAny: ["available", "open"],
+          replyIncludes: ["$3,600", "20%"],
         },
       },
       {
@@ -325,6 +394,7 @@ async function runScenario(scenario: Scenario) {
       message: turn.customer,
       historyMessages: history,
       testMode: true,
+      allowDraftAgent: true,
     });
     const tools = result.usedTooling ?? [];
     const attachmentCount = result.attachments?.length ?? 0;
@@ -356,8 +426,17 @@ async function runScenario(scenario: Scenario) {
 }
 
 async function main() {
+  const selectedScenarioId = process.env.EVAL_SCENARIO_ID?.trim();
+  const selectedScenarios = selectedScenarioId
+    ? scenarios.filter((scenario) => scenario.id === selectedScenarioId)
+    : scenarios;
+
+  if (selectedScenarios.length === 0) {
+    throw new Error(`Unknown EVAL_SCENARIO_ID: ${selectedScenarioId}`);
+  }
+
   const results = [];
-  for (const scenario of scenarios) results.push(await runScenario(scenario));
+  for (const scenario of selectedScenarios) results.push(await runScenario(scenario));
 
   const passed = results.filter((result) => result.pass).length;
   console.log(JSON.stringify({

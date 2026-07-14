@@ -82,6 +82,25 @@ test("capacity availability runtime does not silently default explicit empty rul
   assert.equal((result as { status?: string }).status, "missing_capacity_rules");
 });
 
+test("capacity availability can disable nearby date suggestions", () => {
+  const config = googleSheetsTestHelpers.parseSheetsCapacityAvailabilityConfig({
+    operation: "capacity_availability",
+    suggestionSearchDays: 0,
+  });
+  const summary = googleSheetsTestHelpers.buildCapacityAvailabilitySummary({
+    requestedDate: "2026-11-21",
+    region: "FL",
+    bookedCount: 1,
+    capacity: 1,
+    available: false,
+    suggestedDates: [],
+  });
+
+  assert.equal(config.suggestionSearchDays, 0);
+  assert.equal(summary, "Wedding date check: 2026-11-21 is unavailable for FL (1/1 booked).");
+  assert.doesNotMatch(summary, /nearby|offer/i);
+});
+
 test("Google Sheets append skips writes in test mode before requiring credentials", async () => {
   const result = await executeGoogleSheetsStep({
     action: "append row to sheet",

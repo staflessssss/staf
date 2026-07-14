@@ -629,6 +629,7 @@ test("agentDraftSchema preserves prompting config in channelConfig", () => {
     languagePreference: "Russian",
     instruction: "Keep answers brief and practical.",
     preserveModelVoice: false,
+    semanticTurnPlanningEnabled: false,
     showContactIdentity: true,
     showChannelContext: false,
     notes: "Operator-only note.",
@@ -695,10 +696,46 @@ test("normalizePromptingConfig trims text and defaults visibility flags to false
     languagePreference: null,
     instruction: "Be concise.",
     preserveModelVoice: false,
+    semanticTurnPlanningEnabled: false,
     showContactIdentity: false,
     showChannelContext: false,
     notes: "Keep a premium tone.",
   });
+});
+
+test("agentDraftSchema preserves semantic turn planning as an agent-level rollout flag", () => {
+  const parsed = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      prompting: {
+        semanticTurnPlanningEnabled: true,
+      },
+    },
+  });
+
+  assert.equal(parsed.channelConfig.prompting?.semanticTurnPlanningEnabled, true);
+});
+
+test("agentDraftSchema accepts unavailable handling without adjacent date suggestions", () => {
+  const parsed = agentDraftSchema.parse({
+    name: "Studio Concierge",
+    persona: "Helpful assistant",
+    tone: "friendly",
+    channelId: "channel-1",
+    channelConfig: {
+      conversationPlaybook: {
+        unavailableBehavior: "state_unavailable_without_alternatives",
+      },
+    },
+  });
+
+  assert.equal(
+    parsed.channelConfig.conversationPlaybook?.unavailableBehavior,
+    "state_unavailable_without_alternatives",
+  );
 });
 
 test("normalizePromptingConfig preserves structured simple-runtime reply copy", () => {
@@ -742,6 +779,7 @@ test("agentDraftSchema accepts prompting nulls from editor state and normalizes 
     languagePreference: undefined,
     instruction: undefined,
     preserveModelVoice: false,
+    semanticTurnPlanningEnabled: false,
     showContactIdentity: false,
     showChannelContext: true,
     notes: undefined,

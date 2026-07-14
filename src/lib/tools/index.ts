@@ -21,6 +21,11 @@ type ResolveToolsArgs = {
   testMode?: boolean;
   defaultEmail?: string;
   currentMessage?: string;
+  semanticContext?: {
+    weddingDate?: string | null;
+    weddingYearEstablished?: boolean;
+    location?: string | null;
+  };
   traceMetadata?: LangRuntimeTraceMetadata;
   onToolResult?: (entry: ToolExecutionLog) => void;
 };
@@ -228,6 +233,52 @@ function hasExactWeddingDate(text: string) {
   return isoDate || monthDayYear.test(normalized);
 }
 
+function getWeddingAvailabilityDateRequirement(args: {
+  currentMessage?: string;
+  request: string;
+  date?: string;
+  weddingDate?: string;
+  timeText?: string;
+  semanticWeddingDate?: string | null;
+  semanticWeddingYearEstablished?: boolean;
+}) {
+  if (
+    args.currentMessage &&
+    hasMonthDayWithoutYear(args.currentMessage) &&
+    !args.semanticWeddingYearEstablished
+  ) {
+    return "needs_year" as const;
+  }
+
+  if (
+    args.semanticWeddingYearEstablished &&
+    args.semanticWeddingDate &&
+    hasExactWeddingDate(args.semanticWeddingDate)
+  ) {
+    return null;
+  }
+
+  if (args.currentMessage && hasMonthDayWithoutYear(args.currentMessage)) {
+    return "needs_year" as const;
+  }
+
+  if (args.currentMessage && hasMonthYearWithoutDay(args.currentMessage)) {
+    return "needs_exact_date" as const;
+  }
+
+  const availabilityText = [
+    args.currentMessage,
+    args.request,
+    args.date,
+    args.weddingDate,
+    args.timeText,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return hasExactWeddingDate(availabilityText) ? null : ("needs_exact_date" as const);
+}
+
 function isWeddingAvailabilityFeature(feature: RuntimeToolFeature) {
   const featureName = feature.name.toLowerCase();
 
@@ -280,6 +331,7 @@ function buildMissingWeddingYearToolResult(args: {
     feature: args.featureName,
     request: args.request,
     status: "needs_year",
+    missing: ["weddingYear"],
     ...(args.date ? { date: args.date } : {}),
     ...(args.weddingDate ? { weddingDate: args.weddingDate } : {}),
     ...(args.location ? { location: args.location } : {}),
@@ -304,6 +356,7 @@ function buildMissingWeddingDayToolResult(args: {
     feature: args.featureName,
     request: args.request,
     status: "needs_exact_date",
+    missing: ["weddingDate"],
     ...(args.date ? { date: args.date } : {}),
     ...(args.weddingDate ? { weddingDate: args.weddingDate } : {}),
     ...(args.location ? { location: args.location } : {}),
@@ -376,6 +429,7 @@ export function resolveTools({
   testMode,
   defaultEmail,
   currentMessage,
+  semanticContext,
   traceMetadata,
   onToolResult,
 }: ResolveToolsArgs) {
@@ -448,21 +502,47 @@ export function resolveTools({
         }) => {
           const startedAt = Date.now();
           const steps = [];
-          const availabilityText = [currentMessage, request, date, weddingDate]
-            .filter(Boolean)
-            .join(" ");
+          const weddingAvailabilityFeature = isWeddingAvailabilityFeature(feature);
+          const semanticWeddingDate = semanticContext?.weddingDate?.trim() || undefined;
+          const semanticLocation = semanticContext?.location?.trim() || undefined;
+          const resolvedDate =
+            weddingAvailabilityFeature && semanticWeddingDate
+              ? semanticWeddingDate
+              : date ??
+                (weddingDate && /^\d{4}-\d{2}-\d{2}$/.test(weddingDate)
+                  ? weddingDate
+                  : semanticWeddingDate);
+          const resolvedWeddingDate =
+            weddingAvailabilityFeature && semanticWeddingDate
+              ? semanticWeddingDate
+              : weddingDate ?? semanticWeddingDate;
+          const resolvedLocation =
+            weddingAvailabilityFeature && semanticLocation
+              ? semanticLocation
+              : location ?? semanticLocation;
+          const weddingDateRequirement = weddingAvailabilityFeature
+            ? getWeddingAvailabilityDateRequirement({
+                currentMessage,
+                request,
+                date: resolvedDate,
+                weddingDate: resolvedWeddingDate,
+                timeText,
+                semanticWeddingDate,
+                semanticWeddingYearEstablished: semanticContext?.weddingYearEstablished,
+              })
+            : null;
 
-          if (
-            isWeddingAvailabilityFeature(feature) &&
-            !date &&
-            !hasExactWeddingDate(availabilityText)
-          ) {
-            const output = buildMissingWeddingDayToolResult({
+          if (weddingDateRequirement) {
+            const buildResult =
+              weddingDateRequirement === "needs_year"
+                ? buildMissingWeddingYearToolResult
+                : buildMissingWeddingDayToolResult;
+            const output = buildResult({
               featureName: feature.name,
               request,
-              date,
-              weddingDate,
-              location,
+              date: resolvedDate,
+              weddingDate: resolvedWeddingDate,
+              location: resolvedLocation,
               email,
               channel,
             });
@@ -471,73 +551,9 @@ export function resolveTools({
               toolName: feature.name,
               toolInput: {
                 request,
-                ...(date ? { date } : {}),
-                ...(weddingDate ? { weddingDate } : {}),
-                ...(location ? { location } : {}),
-                ...(email ? { email } : {}),
-                ...(channel ? { channel } : {}),
-              },
-              toolResult: toJsonValue(output),
-              durationMs: Date.now() - startedAt,
-            });
-
-            return toJsonValue(output);
-          }
-
-          if (
-            isWeddingAvailabilityFeature(feature) &&
-            !date &&
-            currentMessage &&
-            hasMonthDayWithoutYear(currentMessage)
-          ) {
-            const output = buildMissingWeddingYearToolResult({
-              featureName: feature.name,
-              request,
-              date,
-              weddingDate,
-              location,
-              email,
-              channel,
-            });
-
-            onToolResult?.({
-              toolName: feature.name,
-              toolInput: {
-                request,
-                ...(date ? { date } : {}),
-                ...(weddingDate ? { weddingDate } : {}),
-                ...(location ? { location } : {}),
-                ...(email ? { email } : {}),
-                ...(channel ? { channel } : {}),
-              },
-              toolResult: toJsonValue(output),
-              durationMs: Date.now() - startedAt,
-            });
-
-            return toJsonValue(output);
-          }
-
-          if (
-            isWeddingAvailabilityFeature(feature) &&
-            hasMonthYearWithoutDay([currentMessage, request, weddingDate, timeText].filter(Boolean).join(" "))
-          ) {
-            const output = buildMissingWeddingDayToolResult({
-              featureName: feature.name,
-              request,
-              date,
-              weddingDate,
-              location,
-              email,
-              channel,
-            });
-
-            onToolResult?.({
-              toolName: feature.name,
-              toolInput: {
-                request,
-                ...(date ? { date } : {}),
-                ...(weddingDate ? { weddingDate } : {}),
-                ...(location ? { location } : {}),
+                ...(resolvedDate ? { date: resolvedDate } : {}),
+                ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
+                ...(resolvedLocation ? { location: resolvedLocation } : {}),
                 ...(email ? { email } : {}),
                 ...(channel ? { channel } : {}),
               },
@@ -555,11 +571,11 @@ export function resolveTools({
             const output = buildMissingBookingEmailToolResult({
               featureName: feature.name,
               request,
-              date,
+              date: resolvedDate,
               timeText,
               coupleName,
-              weddingDate,
-              location,
+              weddingDate: resolvedWeddingDate,
+              location: resolvedLocation,
               channel,
             });
 
@@ -567,11 +583,11 @@ export function resolveTools({
               toolName: feature.name,
               toolInput: {
                 request,
-                ...(date ? { date } : {}),
+                ...(resolvedDate ? { date: resolvedDate } : {}),
                 ...(timeText ? { timeText } : {}),
                 ...(coupleName ? { coupleName } : {}),
-                ...(weddingDate ? { weddingDate } : {}),
-                ...(location ? { location } : {}),
+                ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
+                ...(resolvedLocation ? { location: resolvedLocation } : {}),
                 ...(channel ? { channel } : {}),
               },
               toolResult: toJsonValue(output),
@@ -591,11 +607,11 @@ export function resolveTools({
             const output = buildMissingCallTimeToolResult({
               featureName: feature.name,
               request,
-              date,
+              date: resolvedDate,
               timeText,
               coupleName,
-              weddingDate,
-              location,
+              weddingDate: resolvedWeddingDate,
+              location: resolvedLocation,
               email,
               channel,
             });
@@ -604,11 +620,11 @@ export function resolveTools({
               toolName: feature.name,
               toolInput: {
                 request,
-                ...(date ? { date } : {}),
+                ...(resolvedDate ? { date: resolvedDate } : {}),
                 ...(timeText ? { timeText } : {}),
                 ...(coupleName ? { coupleName } : {}),
-                ...(weddingDate ? { weddingDate } : {}),
-                ...(location ? { location } : {}),
+                ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
+                ...(resolvedLocation ? { location: resolvedLocation } : {}),
                 ...(email ? { email } : {}),
                 ...(channel ? { channel } : {}),
               },
@@ -638,11 +654,11 @@ export function resolveTools({
                   request,
                   metadata: step.integration.metadata,
                   credentialsEnc: step.integration.credentialsEnc,
-                  date,
+                  date: resolvedDate,
                   timeText,
                   coupleName,
-                  weddingDate,
-                  location,
+                  weddingDate: resolvedWeddingDate,
+                  location: resolvedLocation,
                   email,
                   channel,
                   defaultEmail,
@@ -662,15 +678,19 @@ export function resolveTools({
           const output = {
             feature: feature.name,
             request,
-            ...(canonicalDate ? { date: canonicalDate } : date ? { date } : {}),
+            ...(canonicalDate
+              ? { date: canonicalDate }
+              : resolvedDate
+                ? { date: resolvedDate }
+                : {}),
             ...(canonicalTime
               ? { timeText: timeText ?? canonicalTime, canonicalTime }
               : timeText
                 ? { timeText }
                 : {}),
             ...(coupleName ? { coupleName } : {}),
-            ...(weddingDate ? { weddingDate } : {}),
-            ...(location ? { location } : {}),
+            ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
+            ...(resolvedLocation ? { location: resolvedLocation } : {}),
             ...(email ? { email } : {}),
             ...(channel ? { channel } : {}),
             steps,
@@ -686,15 +706,19 @@ export function resolveTools({
             toolName: feature.name,
             toolInput: {
               request,
-              ...(canonicalDate ? { date: canonicalDate } : date ? { date } : {}),
+              ...(canonicalDate
+                ? { date: canonicalDate }
+                : resolvedDate
+                  ? { date: resolvedDate }
+                  : {}),
               ...(canonicalTime
                 ? { timeText: timeText ?? canonicalTime, canonicalTime }
                 : timeText
                   ? { timeText }
                   : {}),
               ...(coupleName ? { coupleName } : {}),
-              ...(weddingDate ? { weddingDate } : {}),
-              ...(location ? { location } : {}),
+              ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
+              ...(resolvedLocation ? { location: resolvedLocation } : {}),
               ...(email ? { email } : {}),
               ...(channel ? { channel } : {}),
             },
@@ -712,6 +736,7 @@ export function resolveTools({
 
 export const toolResolutionTestHelpers = {
   extractCanonicalToolFields,
+  getWeddingAvailabilityDateRequirement,
   hasExplicitCallTime,
   hasExactWeddingDate,
   hasMonthDayWithoutYear,
