@@ -295,7 +295,7 @@ function buildConfiguredCollectionsGuideTool(args: {
 
   return tool({
     description:
-      "Send the configured regional Myndful collections guide as an attachment. Use only when the customer has stated a wedding city/state that establishes this region in the current or recent conversation, or when a successful availability result for this region is present in the current conversation. Never choose a default region or infer one solely because the customer asked for pricing. If region is not established, ask for the wedding city/state instead.",
+      "Send the configured Myndful collections guide for the established wedding location. Use the service region only to select the correct attachment and price internally; in customer-facing copy, refer to it simply as the collections or pricing guide. Use only when the customer has stated a wedding city/state that establishes this region in the current or recent conversation, or when a successful availability result for this region is present in the current conversation. Never choose a default region or infer one solely because the customer asked for pricing. If region is not established, ask for the wedding city/state instead.",
     inputSchema: z.object({
       serviceRegion: z
         .enum(["FL", "NC_SC_GA"])
@@ -310,7 +310,7 @@ function buildConfiguredCollectionsGuideTool(args: {
           serviceRegion,
           missing: ["wedding city/state or a prior availability result for this region"],
           summary:
-            "Do not attach a regional guide yet. The customer has not established this wedding region. Give the approved starting prices and ask naturally for the wedding city/state.",
+            "Do not attach a guide yet. The customer has not established the wedding location needed to select the correct attachment. Give the approved starting prices and ask naturally for the wedding city/state.",
         };
 
         args.onToolResult({
@@ -353,7 +353,7 @@ function buildConfiguredCollectionsGuideTool(args: {
             ...(promotionText ? { promotionText } : {}),
             attachment,
             summary:
-              "The correct regional collections guide will be attached to this reply. State the returned starting price and promotion text naturally in the customer-facing message.",
+              "The correct collections guide will be attached to this reply. State the returned starting price and promotion text naturally. Call the attachment simply the collections or pricing guide without appending a city, state, or internal service-region label. Do not volunteer package comparisons unless the customer asks.",
           }
         : {
             status: "not_configured",

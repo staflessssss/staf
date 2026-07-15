@@ -85,3 +85,26 @@ test("wedding year evidence must exist in the claimed customer message", () => {
     true,
   );
 });
+
+test("collections guide plan keeps internal location labels out of the guide name", () => {
+  const rendered = renderSemanticTurnPlan({
+    action: "send_collections_guide",
+    replyObjective: "Send the guide and state the applicable price and promotion.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "none",
+    alreadyAnsweredFacts: [],
+    conversationStage: "first_reply",
+    customerIsClosing: false,
+    weddingDateCompleteness: "unknown",
+    weddingYearSource: "not_established",
+    weddingYearEvidence: null,
+    weddingDate: null,
+    location: "Tampa, Florida",
+    sendGuideAfterAvailability: false,
+    confidence: 0.99,
+  });
+
+  assert.match(rendered, /call the attachment only/);
+  assert.match(rendered, /Do not append a city, state, or service-region label/);
+  assert.match(rendered, /write the reply freely/);
+});
