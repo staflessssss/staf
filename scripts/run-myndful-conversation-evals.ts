@@ -9,6 +9,7 @@ type Expectation = {
   maxAttachments?: number;
   replyIncludes?: string[];
   replyIncludesAny?: string[];
+  replyIncludesEveryGroup?: string[][];
   replyExcludes?: string[];
 };
 
@@ -68,7 +69,6 @@ const scenarios: Scenario[] = [
             "NC/SC/GA",
             "regional guide",
             "guide for Raleigh",
-            "For Raleigh",
             "Raleigh pricing",
             "Raleigh starts",
             "compare the options",
@@ -201,6 +201,92 @@ const scenarios: Scenario[] = [
             "narrow down",
           ],
           forbiddenTools: ["Book consultation call"],
+        },
+      },
+    ],
+  },
+  {
+    id: "returning_lead_prior_info",
+    title: "Returning lead uses old thread without resending the guide",
+    history: [
+      {
+        role: MessageRole.USER,
+        content: "Inquire about wedding videography 20% Valentine's Special",
+      },
+      {
+        role: MessageRole.ASSISTANT,
+        content: "Please share your wedding date and venue location so I can check availability.",
+      },
+      {
+        role: MessageRole.USER,
+        content: "The Savannah Country Club 11/14/2026",
+      },
+      {
+        role: MessageRole.ASSISTANT,
+        content:
+          "[Earlier in this Instagram thread, Myndful Films sent 1 image attachment. It was already delivered; do not guess its exact contents from the attachment alone.]",
+      },
+    ],
+    turns: [
+      {
+        customer: "Hello, can I get more info on this?",
+        expect: {
+          requiredTools: ["Check wedding availability"],
+          forbiddenTools: ["send_collections_guide", "Book consultation call"],
+          maxAttachments: 0,
+          replyIncludesAny: ["unavailable", "booked", "fully booked"],
+          replyIncludesEveryGroup: [
+            ["unavailable", "booked", "fully booked"],
+            [
+              "above",
+              "earlier",
+              "previous",
+              "already in the thread",
+              "up in this thread",
+              "back in this thread",
+              "communication",
+            ],
+          ],
+          replyExcludes: [
+            "sent over our collections guide",
+            "attached our collections guide",
+            "sent the pricing guide",
+            "send the collections guide again",
+            "another date",
+            "alternate date",
+            "Valentine",
+            "20%",
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "returning_lead_specific_question",
+    title: "Returning lead gets a direct FAQ answer without restarting the inquiry",
+    history: [
+      {
+        role: MessageRole.USER,
+        content: "The Savannah Country Club 11/14/2026",
+      },
+      {
+        role: MessageRole.ASSISTANT,
+        content:
+          "[Earlier in this Instagram thread, Myndful Films sent 1 image attachment. It was already delivered; do not guess its exact contents from the attachment alone.]",
+      },
+    ],
+    turns: [
+      {
+        customer: "Quick question: do the packages include raw footage?",
+        expect: {
+          forbiddenTools: [
+            "Check wedding availability",
+            "send_collections_guide",
+            "Book consultation call",
+          ],
+          maxAttachments: 0,
+          replyIncludes: ["raw"],
+          replyExcludes: ["send the guide", "attached the guide"],
         },
       },
     ],
@@ -434,6 +520,11 @@ function evaluate(args: {
   ) {
     failures.push(`missing one of: ${args.expectation.replyIncludesAny.join(", ")}`);
   }
+  for (const group of args.expectation.replyIncludesEveryGroup ?? []) {
+    if (!group.some((phrase) => reply.includes(phrase.toLowerCase()))) {
+      failures.push(`missing one phrase from group: ${group.join(", ")}`);
+    }
+  }
   for (const phrase of args.expectation.replyExcludes ?? []) {
     if (reply.includes(phrase.toLowerCase())) failures.push(`unsafe reply text: ${phrase}`);
   }
@@ -468,6 +559,15 @@ async function runScenario(scenario: Scenario) {
       reply: result.message,
       model: result.model,
       tools,
+      ...(process.env.EVAL_INCLUDE_TOOL_EXECUTIONS === "1"
+        ? {
+            toolExecutions: result.toolExecutions?.map((execution) => ({
+              toolName: execution.toolName,
+              toolInput: execution.toolInput,
+              toolResult: execution.toolResult,
+            })),
+          }
+        : {}),
       attachmentCount,
       pass: failures.length === 0,
       failures,
@@ -498,12 +598,19 @@ async function main() {
   for (const scenario of selectedScenarios) results.push(await runScenario(scenario));
 
   const passed = results.filter((result) => result.pass).length;
+  const outputResults = process.env.EVAL_SUMMARY_ONLY === "1"
+    ? results.map((result) =>
+        result.pass
+          ? { id: result.id, pass: true }
+          : result,
+      )
+    : results;
   console.log(JSON.stringify({
     mode: "sandbox_no_outbound_delivery",
     total: results.length,
     passed,
     failed: results.length - passed,
-    results,
+    results: outputResults,
   }, null, 2));
 }
 

@@ -266,7 +266,7 @@ function getConfiguredGuideRegionsFromCustomerMessages(args: {
   );
 }
 
-function buildConfiguredCollectionsGuideTool(args: {
+type CollectionsGuideExecutionArgs = {
   agent: AgentWithConfigData;
   establishedRegions: ReadonlySet<string>;
   onToolResult: (entry: {
@@ -275,9 +275,86 @@ function buildConfiguredCollectionsGuideTool(args: {
     toolResult: Prisma.JsonValue;
     durationMs?: number;
   }) => void;
-}) {
+};
+
+async function executeConfiguredCollectionsGuide(
+  args: CollectionsGuideExecutionArgs & { serviceRegion: MyndfulServiceRegion },
+) {
+  const startedAt = Date.now();
   const config = buildMyndfulGuideConfig(args.agent.channelConfig);
   const rawChannelConfig = getChannelConfigObject(args.agent.channelConfig as never);
+  const isEstablishedRegion = args.establishedRegions.has(args.serviceRegion);
+
+  if (!isEstablishedRegion) {
+    const output = {
+      status: "blocked_precondition",
+      serviceRegion: args.serviceRegion,
+      missing: ["wedding city/state or a prior availability result for this region"],
+      summary:
+        "Do not attach a guide yet. The customer has not established the wedding location needed to select the correct attachment. Give the approved starting prices and ask naturally for the wedding city/state.",
+    };
+
+    args.onToolResult({
+      toolName: "send_collections_guide",
+      toolInput: { serviceRegion: args.serviceRegion },
+      toolResult: output,
+      durationMs: Date.now() - startedAt,
+    });
+
+    return output;
+  }
+
+  const attachment = getMyndfulGuideAttachment({
+    channel: args.agent.channel.type,
+    message: "collections guide",
+    config,
+    allowAttachments: true,
+    region: args.serviceRegion,
+  })[0];
+  const pricing = config.pricingByRegion?.[args.serviceRegion];
+  const rawPricingByRegion =
+    rawChannelConfig.pricingByRegion &&
+    typeof rawChannelConfig.pricingByRegion === "object" &&
+    !Array.isArray(rawChannelConfig.pricingByRegion)
+      ? (rawChannelConfig.pricingByRegion as Record<string, unknown>)
+      : {};
+  const rawRegionalPricing = rawPricingByRegion[args.serviceRegion];
+  const rawPromotionText =
+    rawRegionalPricing &&
+    typeof rawRegionalPricing === "object" &&
+    !Array.isArray(rawRegionalPricing) &&
+    "promotionText" in rawRegionalPricing
+      ? (rawRegionalPricing as Record<string, unknown>).promotionText
+      : undefined;
+  const promotionText = typeof rawPromotionText === "string" ? rawPromotionText.trim() : "";
+  const output = attachment
+    ? {
+        status: "ready_to_attach",
+        serviceRegion: args.serviceRegion,
+        ...(pricing?.startPrice ? { startPrice: pricing.startPrice } : {}),
+        ...(promotionText ? { promotionText } : {}),
+        attachment,
+        summary:
+          "The correct collections guide will be attached to this reply. State the returned starting price and promotion text naturally without repeating the city, state, or internal service-region label in the pricing phrase. Call the attachment simply the collections or pricing guide. Do not volunteer package comparisons unless the customer asks.",
+      }
+    : {
+        status: "not_configured",
+        serviceRegion: args.serviceRegion,
+        summary: "No collections guide is configured for that region.",
+      };
+
+  args.onToolResult({
+    toolName: "send_collections_guide",
+    toolInput: { serviceRegion: args.serviceRegion },
+    toolResult: output,
+    durationMs: Date.now() - startedAt,
+  });
+
+  return output;
+}
+
+function buildConfiguredCollectionsGuideTool(args: CollectionsGuideExecutionArgs) {
+  const config = buildMyndfulGuideConfig(args.agent.channelConfig);
   const configuredRegions = ["FL", "NC_SC_GA"] as const;
   const hasGuide = configuredRegions.some((serviceRegion) =>
     getMyndfulGuideAttachment({
@@ -301,75 +378,8 @@ function buildConfiguredCollectionsGuideTool(args: {
         .enum(["FL", "NC_SC_GA"])
         .describe("FL for Florida, or NC_SC_GA for North Carolina, South Carolina, or Georgia."),
     }),
-    execute: async ({ serviceRegion }) => {
-      const startedAt = Date.now();
-      const isEstablishedRegion = args.establishedRegions.has(serviceRegion);
-      if (!isEstablishedRegion) {
-        const output = {
-          status: "blocked_precondition",
-          serviceRegion,
-          missing: ["wedding city/state or a prior availability result for this region"],
-          summary:
-            "Do not attach a guide yet. The customer has not established the wedding location needed to select the correct attachment. Give the approved starting prices and ask naturally for the wedding city/state.",
-        };
-
-        args.onToolResult({
-          toolName: "send_collections_guide",
-          toolInput: { serviceRegion },
-          toolResult: output,
-          durationMs: Date.now() - startedAt,
-        });
-
-        return output;
-      }
-      const attachment = getMyndfulGuideAttachment({
-        channel: args.agent.channel.type,
-        message: "collections guide",
-        config,
-        allowAttachments: true,
-        region: serviceRegion,
-      })[0];
-      const pricing = config.pricingByRegion?.[serviceRegion];
-      const rawPricingByRegion =
-        rawChannelConfig.pricingByRegion &&
-        typeof rawChannelConfig.pricingByRegion === "object" &&
-        !Array.isArray(rawChannelConfig.pricingByRegion)
-          ? (rawChannelConfig.pricingByRegion as Record<string, unknown>)
-          : {};
-      const rawRegionalPricing = rawPricingByRegion[serviceRegion];
-      const rawPromotionText =
-        rawRegionalPricing &&
-        typeof rawRegionalPricing === "object" &&
-        !Array.isArray(rawRegionalPricing) &&
-        "promotionText" in rawRegionalPricing
-          ? (rawRegionalPricing as Record<string, unknown>).promotionText
-          : undefined;
-      const promotionText = typeof rawPromotionText === "string" ? rawPromotionText.trim() : "";
-      const output = attachment
-        ? {
-            status: "ready_to_attach",
-            serviceRegion,
-            ...(pricing?.startPrice ? { startPrice: pricing.startPrice } : {}),
-            ...(promotionText ? { promotionText } : {}),
-            attachment,
-            summary:
-              "The correct collections guide will be attached to this reply. State the returned starting price and promotion text naturally without repeating the city, state, or internal service-region label in the pricing phrase. Call the attachment simply the collections or pricing guide. Do not volunteer package comparisons unless the customer asks.",
-          }
-        : {
-            status: "not_configured",
-            serviceRegion,
-            summary: "No collections guide is configured for that region.",
-          };
-
-      args.onToolResult({
-        toolName: "send_collections_guide",
-        toolInput: { serviceRegion },
-        toolResult: output,
-        durationMs: Date.now() - startedAt,
-      });
-
-      return output;
-    },
+    execute: async ({ serviceRegion }) =>
+      executeConfiguredCollectionsGuide({ ...args, serviceRegion }),
   });
 }
 
@@ -439,14 +449,23 @@ type HandleIncomingEventDeps = {
     agent: IncomingEventAgent;
     contactId: string;
     messageId?: string;
+    eventTimestamp?: Date;
   }) => Promise<InstagramConversationPreflightResult>;
 };
 
 type IncomingEventAgent = Pick<
   AgentWithConfigData,
-  "id" | "tenantId" | "channelConfig" | "channel"
+  "id" | "tenantId" | "channelConfig" | "channel" | "deployedAt"
 > & {
   features?: AgentWithConfigData["features"];
+};
+
+type InstagramImportedHistoryMessage = {
+  messageId: string;
+  role: MessageRole;
+  content: string;
+  createdAt?: Date;
+  attachmentCount: number;
 };
 
 type InstagramConversationPreflightResult =
@@ -454,6 +473,7 @@ type InstagramConversationPreflightResult =
       status: "prior_history_found";
       conversationId?: string;
       priorMessageCount: number;
+      historyMessages: InstagramImportedHistoryMessage[];
     }
   | {
       status: "no_prior_history" | "not_checked" | "error";
@@ -721,6 +741,17 @@ function getInboundConversationPolicy(args: {
   return "auto_reply" as const;
 }
 
+function isInstagramEventBeforeAgentDeployment(args: {
+  eventTimestamp?: Date;
+  deployedAt?: Date | null;
+}) {
+  if (!args.eventTimestamp || !args.deployedAt) {
+    return false;
+  }
+
+  return args.eventTimestamp.getTime() < args.deployedAt.getTime();
+}
+
 type InstagramConversationListItem = {
     id?: string;
     participants?: {
@@ -748,6 +779,9 @@ type InstagramConversationDetailPayload = {
       };
       created_time?: string;
       message?: string;
+      attachments?: {
+        data?: unknown[];
+      };
     }>;
   };
 };
@@ -769,18 +803,65 @@ async function fetchInstagramGraphJson<T>(url: URL, token: string): Promise<T> {
 
 function classifyInstagramPriorMessages(args: {
   messages: NonNullable<InstagramConversationDetailPayload["messages"]>["data"];
+  contactId: string;
   currentMessageId?: string;
+  eventTimestamp?: Date;
 }) {
   const currentMessageId = args.currentMessageId?.trim() ?? "";
-  const priorMessages = (args.messages ?? []).filter((message) => {
-    const messageId = message.id?.trim() ?? "";
+  const currentEventTime = args.eventTimestamp?.getTime();
+  const priorMessages = (args.messages ?? [])
+    .flatMap((message): InstagramImportedHistoryMessage[] => {
+      const messageId = message.id?.trim() ?? "";
 
-    if (!messageId || messageId === currentMessageId) {
-      return false;
-    }
+      if (!messageId || messageId === currentMessageId) {
+        return [];
+      }
 
-    return Boolean(message.message?.trim());
-  });
+      const createdAt = message.created_time ? new Date(message.created_time) : undefined;
+      const createdAtTime = createdAt?.getTime();
+
+      if (
+        currentEventTime !== undefined &&
+        createdAtTime !== undefined &&
+        Number.isFinite(createdAtTime) &&
+        createdAtTime >= currentEventTime
+      ) {
+        return [];
+      }
+
+      const text = message.message?.trim() ?? "";
+      const attachmentCount = Array.isArray(message.attachments?.data)
+        ? message.attachments.data.length
+        : 0;
+
+      if (!text && attachmentCount === 0) {
+        return [];
+      }
+
+      const role =
+        message.from?.id === args.contactId ? MessageRole.USER : MessageRole.ASSISTANT;
+      const attachmentContext =
+        attachmentCount > 0
+          ? role === MessageRole.ASSISTANT
+            ? `[Earlier in this Instagram thread, Myndful Films sent ${attachmentCount} image attachment${attachmentCount === 1 ? "" : "s"}. It was already delivered; do not guess its exact contents from the attachment alone.]`
+            : `[Earlier in this Instagram thread, the customer sent ${attachmentCount} image attachment${attachmentCount === 1 ? "" : "s"}.]`
+          : "";
+
+      return [
+        {
+          messageId,
+          role,
+          content: [text, attachmentContext].filter(Boolean).join("\n"),
+          createdAt:
+            createdAt && Number.isFinite(createdAt.getTime()) ? createdAt : undefined,
+          attachmentCount,
+        },
+      ];
+    })
+    .sort(
+      (left, right) =>
+        (left.createdAt?.getTime() ?? 0) - (right.createdAt?.getTime() ?? 0),
+    );
 
   return {
     priorMessages,
@@ -795,6 +876,7 @@ async function inspectInstagramConversationHistory(args: {
   agent: IncomingEventAgent;
   contactId: string;
   messageId?: string;
+  eventTimestamp?: Date;
 }): Promise<InstagramConversationPreflightResult> {
   if (!args.contactId.trim()) {
     return { status: "not_checked" };
@@ -862,7 +944,7 @@ async function inspectInstagramConversationHistory(args: {
 
     conversationUrl.searchParams.set(
       "fields",
-      "messages.limit(25){id,from,created_time,message}",
+      "messages.limit(25){id,from,created_time,message,attachments}",
     );
 
     const detail = await fetchInstagramGraphJson<InstagramConversationDetailPayload>(
@@ -871,7 +953,9 @@ async function inspectInstagramConversationHistory(args: {
     );
     const priorClassification = classifyInstagramPriorMessages({
       messages: detail.messages?.data,
+      contactId: args.contactId,
       currentMessageId: args.messageId,
+      eventTimestamp: args.eventTimestamp,
     });
 
     if (priorClassification.priorMessages.length > 0) {
@@ -879,6 +963,7 @@ async function inspectInstagramConversationHistory(args: {
         status: "prior_history_found",
         conversationId: conversation.id,
         priorMessageCount: priorClassification.priorMessages.length,
+        historyMessages: priorClassification.priorMessages,
       };
     }
 
@@ -1853,6 +1938,24 @@ function toolExecutionMatchesSemanticAction(
   }
 }
 
+function shouldSendGuideAfterAvailability(args: {
+  semanticTurnPlan: Pick<
+    SemanticTurnPlan,
+    "priorRequestedMaterialDelivered" | "sendGuideAfterAvailability"
+  > | null;
+  pricingBehavior: ConversationPlaybookConfig["pricingBehavior"];
+}) {
+  if (args.semanticTurnPlan?.priorRequestedMaterialDelivered) {
+    return false;
+  }
+
+  return (
+    args.semanticTurnPlan?.sendGuideAfterAvailability === true ||
+    args.pricingBehavior === "after_availability_is_confirmed" ||
+    args.pricingBehavior === "after_availability_or_when_asked"
+  );
+}
+
 function getWeddingAvailabilityExecutionStatus(
   toolExecutions: Array<{ toolName: string; toolResult: unknown }>,
 ) {
@@ -1866,6 +1969,31 @@ function getWeddingAvailabilityExecutionStatus(
     );
     if (result?.status === "available" || result?.status === "unavailable") {
       return result.status;
+    }
+  }
+
+  return null;
+}
+
+function getWeddingAvailabilityExecutionRegion(
+  toolExecutions: Array<{ toolName: string; toolResult: unknown }>,
+) {
+  for (const execution of toolExecutions) {
+    if (!toolExecutionMatchesSemanticAction("check_wedding_availability", execution.toolName)) {
+      continue;
+    }
+
+    for (const result of getStepResults(execution.toolResult)) {
+      if (!['available', 'unavailable'].includes(String(result.status ?? ''))) {
+        continue;
+      }
+
+      const region = normalizeMyndfulServiceRegion(
+        result.requestedRegion ?? result.region,
+      );
+      if (region) {
+        return region;
+      }
     }
   }
 
@@ -1894,7 +2022,8 @@ function buildCollectionsGuideVoiceEditorSystem() {
     "You are the final voice editor for a Myndful Films Instagram reply written by Taras.",
     'One wording requirement is non-negotiable: the attachment name and pricing phrase must stay neutral. Do not attach "for", "in", a city, a state, a market, or a service-region label to the guide name or use that label to introduce the starting price.',
     'If the draft says something like "our collections guide for Tampa" or "For Tampa, pricing starts at $2,800", keep the grounded amount but rewrite both ideas neutrally: name the attachment without a location and state that collections start at the amount. This is a transformation example, not a fixed reply template.',
-    "The draft is already grounded in successful function results. Preserve every concrete fact and action: availability, wedding date, starting price, promotion, deadline, introduction, and any direct next question. Keep the wedding location only when it is needed in an availability statement or to answer a direct location question.",
+    "The supplied collectionsGuideToolResult is ground truth for the attachment, starting price, promotion, and deadline. When its status is ready_to_attach, the final reply must naturally say that the guide is being sent and must include its startPrice and promotionText when present. Preserve every other grounded fact and action from the draft, including availability, wedding date, introduction, and any direct next question. Keep the wedding location only when it is needed in an availability statement or to answer a direct location question.",
+    "Use only customer-facing facts from collectionsGuideToolResult. Never expose its serviceRegion, source, file id, URL, status code, JSON, or internal summary.",
     'Use the supplied conversationStage. On "first_reply", the final text must naturally identify the speaker as Taras, founder of Myndful Films, even if the draft omitted it. On "ongoing", never add or repeat that introduction.',
     "Do not add facts, choices, questions, or sales steps that are absent from the draft.",
     'Refer to the attached image only as "our collections guide" or "the pricing guide". Never append a city, state, market, or service-region label to the guide name and never imply that multiple price sheets should be compared.',
@@ -1903,6 +2032,20 @@ function buildCollectionsGuideVoiceEditorSystem() {
     "Keep the original language, warm founder voice, concise Instagram paragraphs, and only the configured Myndful emojis already present in the draft.",
     "Before returning, silently verify that neither the guide name nor the starting-price phrase exposes or repeats the wedding location or internal service region, and that no package comparison was introduced.",
     "Return only the edited customer-facing reply. Do not mention editing, policy, tools, or internal routing.",
+  ].join("\n");
+}
+
+function buildReturningConversationVoiceEditorSystem() {
+  return [
+    "You are the final continuity editor for a Myndful Films Instagram reply written by Taras.",
+    "The customer has sent a fresh message that broadly reopens an older inquiry, and the requested material was already delivered in that thread.",
+    "Preserve every grounded fact from the draft and supplied context, especially the current availability result, wedding date, and venue. Never soften, reverse, or omit an unavailable result.",
+    "The final DM must communicate both of these meanings: (1) warmly acknowledge the returning request and explicitly direct the customer to the information or communication already above in this Instagram thread; (2) give the refreshed availability result. Neither meaning may be omitted, even when the date is unavailable.",
+    "Express the reference to the earlier thread in natural conversational English. Do not copy a fixed template; write it in Taras's concise founder voice and vary the wording naturally.",
+    "Do not resend, re-offer, or claim to attach the collections guide. Do not repeat the full package explanation, pricing breakdown, or an old promotion unless the customer explicitly requested a new copy or a specific current detail.",
+    "If current availability is unavailable, state that clearly once as part of the same reply. Only after both mandatory meanings are present, stop naturally without offering alternate dates, another guide, package comparison, or a new sales question unless the customer explicitly asked for one.",
+    "Do not introduce Taras again in an ongoing thread. Do not add facts, tools, promises, or internal language.",
+    "Return only the edited customer-facing DM.",
   ].join("\n");
 }
 
@@ -2295,6 +2438,108 @@ async function recordInboundMessageWithDb(
   return result.conversation;
 }
 
+async function importInstagramHistoryWithDb(
+  database: typeof db,
+  args: {
+    agentId: string;
+    contactId: string;
+    contactUsername?: string;
+    contactDisplayName?: string;
+    historyMessages: InstagramImportedHistoryMessage[];
+  },
+) {
+  const result = await database.$transaction(async (tx) => {
+    const existing = await tx.conversation.findUnique({
+      where: {
+        agentId_contactId: {
+          agentId: args.agentId,
+          contactId: args.contactId,
+        },
+      },
+    });
+    const conversation = await tx.conversation.upsert({
+      where: {
+        agentId_contactId: {
+          agentId: args.agentId,
+          contactId: args.contactId,
+        },
+      },
+      create: {
+        agentId: args.agentId,
+        contactId: args.contactId,
+        contactUsername: args.contactUsername,
+        contactDisplayName: args.contactDisplayName,
+        channel: ChannelType.INSTAGRAM,
+        status: ConversationStatus.ACTIVE,
+      },
+      update: {
+        ...(args.contactUsername ? { contactUsername: args.contactUsername } : {}),
+        ...(args.contactDisplayName ? { contactDisplayName: args.contactDisplayName } : {}),
+      },
+    });
+    let importedCount = 0;
+
+    for (const historyMessage of args.historyMessages) {
+      const alreadyImported = await tx.message.findFirst({
+        where: {
+          conversationId: conversation.id,
+          toolInput: {
+            path: ["messageId"],
+            equals: historyMessage.messageId,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (alreadyImported) {
+        continue;
+      }
+
+      await tx.message.create({
+        data: {
+          conversationId: conversation.id,
+          role: historyMessage.role,
+          content: historyMessage.content,
+          toolInput: {
+            source: "instagram_history_import",
+            messageId: historyMessage.messageId,
+            attachmentCount: historyMessage.attachmentCount,
+          },
+          ...(historyMessage.role === MessageRole.ASSISTANT
+            ? { model: "instagram_history_import" }
+            : {}),
+          ...(historyMessage.createdAt ? { createdAt: historyMessage.createdAt } : {}),
+        },
+      });
+      importedCount += 1;
+    }
+
+    return {
+      conversation,
+      importedCount,
+      isNew: !existing,
+    };
+  });
+
+  if (result.isNew) {
+    await recordAgentEventsBestEffort({
+      database,
+      agentId: args.agentId,
+      conversationId: result.conversation.id,
+      channel: ChannelType.INSTAGRAM,
+      events: [
+        {
+          type: AgentEventType.CONVERSATION_STARTED,
+          dedupeKey: `conversation-started:${result.conversation.id}`,
+          occurredAt: result.conversation.createdAt,
+        },
+      ],
+    });
+  }
+
+  return result;
+}
+
 function isPartialDeliveryResult(delivery: unknown): delivery is {
   ok: false;
   deliveredCount: number;
@@ -2593,11 +2838,12 @@ async function runModelInvocation(args: {
         );
       }
 
+      if (args.input.testMode && process.env.DEBUG_SEMANTIC_TURN_PLAN === "1") {
+        console.info("[ai-runtime] semantic turn plan candidate", candidatePlan);
+      }
+
       if (candidatePlan.confidence >= 0.75) {
         semanticTurnPlan = candidatePlan;
-        if (args.input.testMode && process.env.DEBUG_SEMANTIC_TURN_PLAN === "1") {
-          console.info("[ai-runtime] semantic turn plan", candidatePlan);
-        }
       }
     } catch (error) {
       console.warn("[ai-runtime] semantic turn planner failed; using normal model choice", {
@@ -2703,10 +2949,10 @@ async function runModelInvocation(args: {
   const collectionsGuideToolKey = Object.keys(availableTools).find(
     (key) => key === "send_collections_guide",
   );
-  const sendGuideAfterAvailable =
-    semanticTurnPlan?.sendGuideAfterAvailability === true ||
-    args.conversationPlaybook.pricingBehavior === "after_availability_is_confirmed" ||
-    args.conversationPlaybook.pricingBehavior === "after_availability_or_when_asked";
+  const sendGuideAfterAvailable = shouldSendGuideAfterAvailability({
+    semanticTurnPlan,
+    pricingBehavior: args.conversationPlaybook.pricingBehavior,
+  });
   const prepareSemanticStep = semanticTurnPlan
     ? () => {
         if (semanticTurnPlan.action === "model_choice") {
@@ -2826,9 +3072,33 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
     }
   });
 
+  const plannedGuideWasNotExecuted =
+    Boolean(collectionsGuideTool) &&
+    sendGuideAfterAvailable &&
+    getWeddingAvailabilityExecutionStatus(toolExecutions) === "available" &&
+    !toolExecutions.some((execution) => execution.toolName === "send_collections_guide");
+
+  if (plannedGuideWasNotExecuted) {
+    const serviceRegion = getWeddingAvailabilityExecutionRegion(toolExecutions);
+
+    if (serviceRegion) {
+      await executeConfiguredCollectionsGuide({
+        agent: args.agent,
+        establishedRegions: new Set([...establishedGuideRegions, serviceRegion]),
+        serviceRegion,
+        onToolResult: (entry) => {
+          toolExecutions.push(entry);
+        },
+      });
+    }
+  }
+
   let responseText = result.text;
   if (hasReadyCollectionsGuideExecution(toolExecutions)) {
     const draft = responseText.trim();
+    const guideToolResult = toolExecutions.find(
+      (execution) => execution.toolName === "send_collections_guide",
+    )?.toolResult;
     const editorFallbackModelId = getFallbackModelId({
       hasTools: false,
       primaryModelId: usedModelId,
@@ -2842,6 +3112,7 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
             {
               incomingCustomerMessage: args.input.message,
               conversationStage: semanticTurnPlan?.conversationStage ?? "unknown",
+              collectionsGuideToolResult: guideToolResult,
               groundedDraftReply: draft,
             },
             null,
@@ -2892,6 +3163,78 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
         draft,
         edited: responseText,
       });
+    }
+  }
+
+  if (
+    semanticTurnPlan?.returningConversation &&
+    semanticTurnPlan.priorRequestedMaterialDelivered &&
+    semanticTurnPlan.currentRequestScope === "reopens_prior_inquiry"
+  ) {
+    const draft = responseText.trim();
+    const availabilityStatus = getWeddingAvailabilityExecutionStatus(toolExecutions);
+    const editorFallbackModelId = getFallbackModelId({
+      hasTools: false,
+      primaryModelId: usedModelId,
+    });
+    const editDraft = (editorModelId: string, traceName: string) =>
+      traceLangRuntime(traceName, traceMetadata, async () => {
+        const edited = await generateText({
+          model: openai.chat(editorModelId),
+          system: buildReturningConversationVoiceEditorSystem(),
+          prompt: JSON.stringify(
+            {
+              incomingCustomerMessage: args.input.message,
+              currentAvailabilityStatus: availabilityStatus,
+              weddingDate: semanticTurnPlan.weddingDate,
+              weddingLocation: semanticTurnPlan.location,
+              groundedDraftReply: draft,
+            },
+            null,
+            2,
+          ),
+          maxOutputTokens: 450,
+          timeout: 15_000,
+        });
+
+        return edited.text.trim() || draft;
+      });
+
+    try {
+      responseText = await editDraft(
+        usedModelId,
+        "gpt_agent.returning_conversation_voice_edit",
+      );
+    } catch (error) {
+      if (editorFallbackModelId && isTechnicalModelFailure(error)) {
+        try {
+          responseText = await editDraft(
+            editorFallbackModelId,
+            "gpt_agent.returning_conversation_voice_edit.fallback",
+          );
+          usedModelId = editorFallbackModelId;
+        } catch (fallbackError) {
+          console.warn(
+            "[ai-runtime] returning conversation voice editor fallback failed; using grounded draft",
+            {
+              agentId: args.agent.id,
+              error:
+                fallbackError instanceof Error
+                  ? fallbackError.message
+                  : "Returning conversation editor fallback failed.",
+            },
+          );
+        }
+      } else {
+        console.warn(
+          "[ai-runtime] returning conversation voice editor failed; using grounded draft",
+          {
+            agentId: args.agent.id,
+            error:
+              error instanceof Error ? error.message : "Returning conversation editor failed.",
+          },
+        );
+      }
     }
   }
 
@@ -3217,6 +3560,7 @@ export const aiRuntimeTestHelpers = {
   extractDelayedFollowUpGuidance,
   finalizeAssistantText,
   getInboundConversationPolicy,
+  isInstagramEventBeforeAgentDeployment,
   classifyInstagramPriorMessages,
   inspectInstagramConversationHistory,
   handleIncomingEventWithDeps,
@@ -3232,9 +3576,12 @@ export const aiRuntimeTestHelpers = {
   getRequiredWeddingAvailabilityToolKey,
   getRequiredConsultationCalendarToolKey,
   getSemanticActionToolKey,
+  shouldSendGuideAfterAvailability,
   getWeddingAvailabilityExecutionStatus,
+  getWeddingAvailabilityExecutionRegion,
   hasReadyCollectionsGuideExecution,
   buildCollectionsGuideVoiceEditorSystem,
+  buildReturningConversationVoiceEditorSystem,
   isTechnicalModelFailure,
   normalizeConfiguredModelId,
   ownerHandoffCustomerReply,
@@ -3368,6 +3715,23 @@ async function handleIncomingEventWithDeps(
     },
   });
 
+  if (
+    args.channel === ChannelType.INSTAGRAM &&
+    !incoming.isBusinessManualReply &&
+    isInstagramEventBeforeAgentDeployment({
+      eventTimestamp: incoming.eventTimestamp,
+      deployedAt: agent.deployedAt,
+    })
+  ) {
+    return {
+      ok: true,
+      agentId: agent.id,
+      status: "ignored_instagram_event_before_agent_deployment",
+      eventTimestamp: incoming.eventTimestamp,
+      deployedAt: agent.deployedAt,
+    };
+  }
+
   if (args.forceManualReview && !incoming.isBusinessManualReply) {
     const conversation = await recordInboundMessageWithDb(deps.db, {
       agentId: agent.id,
@@ -3420,31 +3784,25 @@ async function handleIncomingEventWithDeps(
       agent,
       contactId: incoming.contactId,
       messageId: incoming.messageId,
+      eventTimestamp: incoming.eventTimestamp,
     });
 
     if (preflight.status === "prior_history_found") {
-      const conversation = await recordInboundMessageWithDb(deps.db, {
+      const imported = await importInstagramHistoryWithDb(deps.db, {
         agentId: agent.id,
         contactId: incoming.contactId,
         contactUsername: incoming.contactUsername,
         contactDisplayName: incoming.contactDisplayName,
-        channel: agent.channel.type,
-        message: incoming.message,
-        messageId: incoming.messageId,
-        gmailMessageId: incoming.gmailMessageId,
-        threadId: incoming.threadId,
-        subject: incoming.subject,
-        conversationStatus: ConversationStatus.ESCALATED,
+        historyMessages: preflight.historyMessages,
       });
 
-      return {
-        ok: true,
+      console.info("[instagram-preflight] imported prior conversation context", {
         agentId: agent.id,
-        conversationId: conversation.id,
-        status: "instagram_prior_history_manual_only",
+        conversationId: imported.conversation.id,
         priorMessageCount: preflight.priorMessageCount,
+        importedMessageCount: imported.importedCount,
         instagramConversationId: preflight.conversationId,
-      };
+      });
     }
   }
 

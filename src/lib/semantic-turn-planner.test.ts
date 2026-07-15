@@ -16,6 +16,10 @@ test("incomplete wedding date cannot request availability execution", () => {
     alreadyAnsweredFacts: [],
     conversationStage: "ongoing",
     customerIsClosing: false,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "specific_question",
+    refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "missing_year",
     weddingYearSource: "not_established",
     weddingYearEvidence: null,
@@ -39,6 +43,10 @@ test("customer close disables tools and renders no-CTA guidance", () => {
     alreadyAnsweredFacts: ["Myndful operates in Florida and North Carolina"],
     conversationStage: "ongoing",
     customerIsClosing: true,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "close",
+    refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "complete",
     weddingYearSource: "recent_customer_message",
     weddingYearEvidence: "2026",
@@ -61,6 +69,10 @@ test("wedding year evidence must exist in the claimed customer message", () => {
     alreadyAnsweredFacts: [],
     conversationStage: "ongoing" as const,
     customerIsClosing: false,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "new_inquiry" as const,
+    refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "complete" as const,
     weddingYearSource: "current_message" as const,
     weddingYearEvidence: "2026",
@@ -95,6 +107,10 @@ test("collections guide plan keeps internal location labels out of the guide nam
     alreadyAnsweredFacts: [],
     conversationStage: "first_reply",
     customerIsClosing: false,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "new_inquiry",
+    refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "unknown",
     weddingYearSource: "not_established",
     weddingYearEvidence: null,
@@ -108,4 +124,32 @@ test("collections guide plan keeps internal location labels out of the guide nam
   assert.match(rendered, /Do not append a city, state, or service-region label/);
   assert.match(rendered, /repeat that location to introduce the starting price/);
   assert.match(rendered, /write the reply freely/);
+});
+
+test("returning lead refreshes availability without resending prior material", () => {
+  const plan = normalizeSemanticTurnPlan({
+    action: "respond",
+    replyObjective: "Refer to the earlier information and refresh current availability.",
+    directCustomerQuestion: "Can I get more info on this?",
+    nextInformationNeeded: "none",
+    alreadyAnsweredFacts: ["The collections guide was already sent"],
+    conversationStage: "ongoing",
+    customerIsClosing: false,
+    returningConversation: true,
+    priorRequestedMaterialDelivered: true,
+    currentRequestScope: "reopens_prior_inquiry",
+    refreshAvailabilityBeforeReply: true,
+    weddingDateCompleteness: "complete",
+    weddingYearSource: "recent_customer_message",
+    weddingYearEvidence: "2026",
+    weddingDate: "2026-11-14",
+    location: "The Savannah Country Club",
+    sendGuideAfterAvailability: true,
+    confidence: 0.95,
+  });
+
+  assert.equal(plan.action, "check_wedding_availability");
+  assert.equal(plan.sendGuideAfterAvailability, false);
+  assert.match(renderSemanticTurnPlan(plan), /already delivered earlier/);
+  assert.match(renderSemanticTurnPlan(plan), /Refresh current wedding availability/);
 });

@@ -77,11 +77,67 @@ test("guide voice editor runs only after a ready attachment result", () => {
 test("guide voice editor keeps location separate from the customer-facing guide name", () => {
   const system = aiRuntimeTestHelpers.buildCollectionsGuideVoiceEditorSystem();
 
-  assert.match(system, /Preserve every concrete fact and action/);
+  assert.match(system, /collectionsGuideToolResult is ground truth/);
+  assert.match(system, /must include its startPrice and promotionText when present/);
+  assert.match(system, /Never expose its serviceRegion/);
   assert.match(system, /attachment name and pricing phrase must stay neutral/);
   assert.match(system, /do not repeat it in the guide or pricing clause/);
   assert.match(system, /On "first_reply"/);
   assert.match(system, /On "ongoing"/);
   assert.match(system, /Remove unsolicited offers to compare packages/);
   assert.match(system, /Return only the edited customer-facing reply/);
+});
+
+test("availability execution exposes the grounded guide region", () => {
+  assert.equal(
+    aiRuntimeTestHelpers.getWeddingAvailabilityExecutionRegion([
+      {
+        toolName: "Check wedding availability",
+        toolResult: {
+          steps: [
+            {
+              result: {
+                status: "available",
+                requestedRegion: "NC/SC/GA",
+              },
+            },
+          ],
+        },
+      },
+    ]),
+    "NC_SC_GA",
+  );
+});
+
+test("guide policy sends after new availability but not after prior delivery", () => {
+  assert.equal(
+    aiRuntimeTestHelpers.shouldSendGuideAfterAvailability({
+      semanticTurnPlan: null,
+      pricingBehavior: "after_availability_or_when_asked",
+    }),
+    true,
+  );
+
+  assert.equal(
+    aiRuntimeTestHelpers.shouldSendGuideAfterAvailability({
+      semanticTurnPlan: {
+        priorRequestedMaterialDelivered: true,
+        sendGuideAfterAvailability: true,
+      },
+      pricingBehavior: "after_availability_or_when_asked",
+    }),
+    false,
+  );
+});
+
+test("returning conversation editor preserves status without resending prior material", () => {
+  const system = aiRuntimeTestHelpers.buildReturningConversationVoiceEditorSystem();
+
+  assert.match(system, /requested material was already delivered/);
+  assert.match(system, /Never soften, reverse, or omit an unavailable result/);
+  assert.match(system, /explicitly direct the customer to the information or communication already above/);
+  assert.match(system, /Neither meaning may be omitted/);
+  assert.match(system, /Do not resend, re-offer, or claim to attach/);
+  assert.match(system, /without offering alternate dates/);
+  assert.match(system, /Return only the edited customer-facing DM/);
 });
