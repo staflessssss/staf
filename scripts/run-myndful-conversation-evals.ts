@@ -242,6 +242,7 @@ const scenarios: Scenario[] = [
               "earlier",
               "previous",
               "already in the thread",
+              "in our thread",
               "up in this thread",
               "back in this thread",
               "communication",
@@ -378,6 +379,50 @@ const scenarios: Scenario[] = [
         expect: {
           forbiddenTools: ["tool_4_owner_handoff_request", "Book consultation call"],
           replyExcludes: ["handoff", "fallback"],
+        },
+      },
+    ],
+  },
+  {
+    id: "positive_creative_fit_to_consultation",
+    title: "Positive creative fit advances naturally to a consultation",
+    history: [
+      {
+        role: MessageRole.USER,
+        content:
+          "We're Angelica and Nick. Our wedding is October 2, 2026 at Longboat Key Club in Sarasota, Florida.",
+      },
+      {
+        role: MessageRole.ASSISTANT,
+        content:
+          "Your date is available, and I've sent the pricing guide. Tell me what style and vibe you want for your wedding films.",
+      },
+      {
+        role: MessageRole.USER,
+        content: "The video inspiration I sent is definitely the style and vibe I like.",
+      },
+      {
+        role: MessageRole.USER,
+        content: "Do you think you would be able to create something like that?",
+      },
+      {
+        role: MessageRole.ASSISTANT,
+        content:
+          "Yes - that creative direction is something we can aim for while keeping the film true to the real moments from your day.",
+      },
+    ],
+    turns: [
+      {
+        customer: "Amazing!",
+        expect: {
+          forbiddenTools: [
+            "Check consultation calendar",
+            "Book consultation call",
+            "send_collections_guide",
+          ],
+          replyIncludes: ["?"],
+          replyIncludesAny: ["call", "chat", "talk", "consultation"],
+          replyExcludes: ["take your time", "i'd be open", "i’d be open"],
         },
       },
     ],

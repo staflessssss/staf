@@ -2049,6 +2049,18 @@ function buildReturningConversationVoiceEditorSystem() {
   ].join("\n");
 }
 
+function buildRequiredQuestionVoiceEditorSystem() {
+  return [
+    "You are the final voice-preserving editor for a customer-facing Instagram DM.",
+    "The semantic plan requires the reply to end with one genuine direct question to the customer, but the draft ended as a statement.",
+    "Make the smallest natural rewrite needed to turn the intended next-step invitation into a direct customer question.",
+    "Preserve the draft's grounded facts, meaning, language, warmth, paragraph rhythm, and speaker voice. Do not add a new business fact, promise, tool action, booking claim, availability claim, or extra sales step.",
+    "Do not use a fixed template. Keep the wording natural and specific to the supplied reply objective and conversation.",
+    "The final sentence must be the question, and the final non-whitespace character must be a question mark. Place any emoji before the question mark or earlier in the reply.",
+    "Return only the edited customer-facing reply. Do not mention the plan, editing, validation, or internal instructions.",
+  ].join("\n");
+}
+
 function shouldExposeOwnerHandoffTool(input: InvokeAgentInput) {
   const channel = String(input.channel).toUpperCase();
   return channel === ChannelType.INSTAGRAM || channel === ChannelType.GMAIL;
@@ -2842,9 +2854,7 @@ async function runModelInvocation(args: {
         console.info("[ai-runtime] semantic turn plan candidate", candidatePlan);
       }
 
-      if (candidatePlan.confidence >= 0.75) {
-        semanticTurnPlan = candidatePlan;
-      }
+      semanticTurnPlan = candidatePlan;
     } catch (error) {
       console.warn("[ai-runtime] semantic turn planner failed; using normal model choice", {
         agentId: args.agent.id,
@@ -3238,6 +3248,70 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
     }
   }
 
+  if (
+    semanticTurnPlan?.replyMustEndWithQuestion &&
+    !responseText.trimEnd().endsWith("?")
+  ) {
+    const draft = responseText.trim();
+    const editorFallbackModelId = getFallbackModelId({
+      hasTools: false,
+      primaryModelId: usedModelId,
+    });
+    const editDraft = (editorModelId: string, traceName: string) =>
+      traceLangRuntime(traceName, traceMetadata, async () => {
+        const edited = await generateText({
+          model: openai.chat(editorModelId),
+          system: buildRequiredQuestionVoiceEditorSystem(),
+          prompt: JSON.stringify(
+            {
+              incomingCustomerMessage: args.input.message,
+              replyObjective: semanticTurnPlan.replyObjective,
+              groundedDraftReply: draft,
+            },
+            null,
+            2,
+          ),
+          maxOutputTokens: 450,
+          timeout: 15_000,
+        });
+
+        return edited.text.trim() || draft;
+      });
+
+    try {
+      responseText = await editDraft(
+        usedModelId,
+        "gpt_agent.required_question_voice_edit",
+      );
+    } catch (error) {
+      if (editorFallbackModelId && isTechnicalModelFailure(error)) {
+        try {
+          responseText = await editDraft(
+            editorFallbackModelId,
+            "gpt_agent.required_question_voice_edit.fallback",
+          );
+          usedModelId = editorFallbackModelId;
+        } catch (fallbackError) {
+          console.warn(
+            "[ai-runtime] required question voice editor fallback failed; using grounded draft",
+            {
+              agentId: args.agent.id,
+              error:
+                fallbackError instanceof Error
+                  ? fallbackError.message
+                  : "Required question editor fallback failed.",
+            },
+          );
+        }
+      } else {
+        console.warn("[ai-runtime] required question voice editor failed; using grounded draft", {
+          agentId: args.agent.id,
+          error: error instanceof Error ? error.message : "Required question editor failed.",
+        });
+      }
+    }
+  }
+
   return {
     text: responseText,
     modelId: usedModelId,
@@ -3582,6 +3656,7 @@ export const aiRuntimeTestHelpers = {
   hasReadyCollectionsGuideExecution,
   buildCollectionsGuideVoiceEditorSystem,
   buildReturningConversationVoiceEditorSystem,
+  buildRequiredQuestionVoiceEditorSystem,
   isTechnicalModelFailure,
   normalizeConfiguredModelId,
   ownerHandoffCustomerReply,

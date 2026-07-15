@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   normalizeSemanticTurnPlan,
+  hasGroundedBookingAuthorization,
   hasGroundedWeddingYear,
   renderSemanticTurnPlan,
 } from "@/lib/semantic-turn-planner";
@@ -16,6 +17,9 @@ test("incomplete wedding date cannot request availability execution", () => {
     alreadyAnsweredFacts: [],
     conversationStage: "ongoing",
     customerIsClosing: false,
+    replyMustEndWithQuestion: true,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
     returningConversation: false,
     priorRequestedMaterialDelivered: false,
     currentRequestScope: "specific_question",
@@ -43,6 +47,9 @@ test("customer close disables tools and renders no-CTA guidance", () => {
     alreadyAnsweredFacts: ["Myndful operates in Florida and North Carolina"],
     conversationStage: "ongoing",
     customerIsClosing: true,
+    replyMustEndWithQuestion: true,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
     returningConversation: false,
     priorRequestedMaterialDelivered: false,
     currentRequestScope: "close",
@@ -69,6 +76,9 @@ test("wedding year evidence must exist in the claimed customer message", () => {
     alreadyAnsweredFacts: [],
     conversationStage: "ongoing" as const,
     customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
     returningConversation: false,
     priorRequestedMaterialDelivered: false,
     currentRequestScope: "new_inquiry" as const,
@@ -107,6 +117,9 @@ test("collections guide plan keeps internal location labels out of the guide nam
     alreadyAnsweredFacts: [],
     conversationStage: "first_reply",
     customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
     returningConversation: false,
     priorRequestedMaterialDelivered: false,
     currentRequestScope: "new_inquiry",
@@ -135,6 +148,9 @@ test("returning lead refreshes availability without resending prior material", (
     alreadyAnsweredFacts: ["The collections guide was already sent"],
     conversationStage: "ongoing",
     customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
     returningConversation: true,
     priorRequestedMaterialDelivered: true,
     currentRequestScope: "reopens_prior_inquiry",
@@ -152,4 +168,80 @@ test("returning lead refreshes availability without resending prior material", (
   assert.equal(plan.sendGuideAfterAvailability, false);
   assert.match(renderSemanticTurnPlan(plan), /already delivered earlier/);
   assert.match(renderSemanticTurnPlan(plan), /Refresh current wedding availability/);
+});
+
+test("open next-step objectives preserve a direct customer question", () => {
+  const rendered = renderSemanticTurnPlan({
+    action: "respond",
+    replyObjective: "Invite the customer to a quick consultation about their creative direction.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "none",
+    alreadyAnsweredFacts: [],
+    conversationStage: "ongoing",
+    customerIsClosing: false,
+    replyMustEndWithQuestion: true,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "specific_question",
+    refreshAvailabilityBeforeReply: false,
+    weddingDateCompleteness: "complete",
+    weddingYearSource: "recent_customer_message",
+    weddingYearEvidence: "2026",
+    weddingDate: "2026-10-02",
+    location: "Sarasota, Florida",
+    sendGuideAfterAvailability: false,
+    confidence: 0.98,
+  });
+
+  assert.match(rendered, /final sentence must be one genuine direct question/);
+  assert.match(rendered, /final non-whitespace character must be a question mark/);
+  assert.match(rendered, /Do not replace the question with a statement/);
+});
+
+test("booking requires grounded explicit customer authorization", () => {
+  const plan = {
+    action: "book_consultation" as const,
+    replyObjective: "Book the agreed consultation.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "none" as const,
+    alreadyAnsweredFacts: [],
+    conversationStage: "ongoing" as const,
+    customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: true,
+    bookingAuthorizationEvidence: "Yes, please book Tuesday at 11am",
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "specific_question" as const,
+    refreshAvailabilityBeforeReply: false,
+    weddingDateCompleteness: "complete" as const,
+    weddingYearSource: "recent_customer_message" as const,
+    weddingYearEvidence: "2026",
+    weddingDate: "2026-10-16",
+    location: "Raleigh",
+    sendGuideAfterAvailability: false,
+    confidence: 0.98,
+  };
+  const context = {
+    currentMessage: "Yes, please book Tuesday at 11am",
+    recentCustomerMessages: ["Our wedding is October 16, 2026 in Raleigh."],
+  };
+
+  assert.equal(hasGroundedBookingAuthorization(plan, context), true);
+  assert.equal(
+    normalizeSemanticTurnPlan(plan, {
+      weddingYearGrounded: true,
+      bookingAuthorizationGrounded: true,
+    }).action,
+    "book_consultation",
+  );
+  assert.equal(
+    normalizeSemanticTurnPlan(
+      { ...plan, bookingAuthorizationEvidence: "assistant offered a call" },
+      { weddingYearGrounded: true, bookingAuthorizationGrounded: false },
+    ).action,
+    "respond",
+  );
 });

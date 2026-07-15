@@ -141,3 +141,12 @@ test("returning conversation editor preserves status without resending prior mat
   assert.match(system, /without offering alternate dates/);
   assert.match(system, /Return only the edited customer-facing DM/);
 });
+
+test("required question editor preserves voice without supplying a fixed reply", () => {
+  const system = aiRuntimeTestHelpers.buildRequiredQuestionVoiceEditorSystem();
+
+  assert.match(system, /smallest natural rewrite/);
+  assert.match(system, /Do not use a fixed template/);
+  assert.match(system, /final non-whitespace character must be a question mark/);
+  assert.match(system, /Do not add a new business fact/);
+});

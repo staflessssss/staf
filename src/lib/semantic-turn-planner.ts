@@ -26,6 +26,9 @@ export const semanticTurnPlanSchema = z.object({
   alreadyAnsweredFacts: z.array(z.string().trim().min(1).max(160)).max(8),
   conversationStage: z.enum(["first_reply", "ongoing"]),
   customerIsClosing: z.boolean(),
+  replyMustEndWithQuestion: z.boolean(),
+  bookingAuthorized: z.boolean(),
+  bookingAuthorizationEvidence: z.string().trim().min(1).nullable(),
   returningConversation: z.boolean(),
   priorRequestedMaterialDelivered: z.boolean(),
   currentRequestScope: z.enum([
@@ -46,6 +49,22 @@ export const semanticTurnPlanSchema = z.object({
 });
 
 export type SemanticTurnPlan = z.infer<typeof semanticTurnPlanSchema>;
+
+export function hasGroundedBookingAuthorization(
+  plan: SemanticTurnPlan,
+  args: {
+    currentMessage: string;
+    recentCustomerMessages: string[];
+  },
+) {
+  if (!plan.bookingAuthorized || !plan.bookingAuthorizationEvidence) {
+    return false;
+  }
+
+  return [args.currentMessage, ...args.recentCustomerMessages].some((message) =>
+    message.includes(plan.bookingAuthorizationEvidence ?? ""),
+  );
+}
 
 export function hasGroundedWeddingYear(
   plan: SemanticTurnPlan,
@@ -76,7 +95,10 @@ export function hasGroundedWeddingYear(
 
 export function normalizeSemanticTurnPlan(
   plan: SemanticTurnPlan,
-  options?: { weddingYearGrounded?: boolean },
+  options?: {
+    weddingYearGrounded?: boolean;
+    bookingAuthorizationGrounded?: boolean;
+  },
 ): SemanticTurnPlan {
   const hasGroundedCompleteWeddingDate =
     plan.weddingDateCompleteness === "complete" &&
@@ -91,7 +113,9 @@ export function normalizeSemanticTurnPlan(
     !plan.customerIsClosing;
   const shouldRespondWithoutTool =
     plan.customerIsClosing ||
-    (plan.action === "check_wedding_availability" && !hasGroundedCompleteWeddingDate);
+    (plan.action === "check_wedding_availability" && !hasGroundedCompleteWeddingDate) ||
+    (plan.action === "book_consultation" &&
+      options?.bookingAuthorizationGrounded !== true);
 
   return {
     ...plan,
@@ -101,6 +125,14 @@ export function normalizeSemanticTurnPlan(
       : shouldRefreshAvailability
         ? "check_wedding_availability"
         : plan.action,
+    replyMustEndWithQuestion: plan.customerIsClosing
+      ? false
+      : plan.replyMustEndWithQuestion,
+    bookingAuthorized: options?.bookingAuthorizationGrounded === true,
+    bookingAuthorizationEvidence:
+      options?.bookingAuthorizationGrounded === true
+        ? plan.bookingAuthorizationEvidence
+        : null,
     weddingDate: hasGroundedCompleteWeddingDate ? plan.weddingDate : null,
     sendGuideAfterAvailability:
       hasGroundedCompleteWeddingDate &&
@@ -130,10 +162,14 @@ export async function planSemanticTurn(args: {
     "Set returningConversation true when the fresh inbound continues an older thread rather than starting a new conversation.",
     "Set priorRequestedMaterialDelivered true only when recentConversation shows that the information, pricing material, or attachment now being referenced was already sent by the business.",
     "Set currentRequestScope to reopens_prior_inquiry when a returning customer makes a broad request to revisit or get more information about the earlier inquiry. Use specific_question for a narrow factual question that can be answered directly without reopening the sales status.",
+    "For a returning customer's specific_question, choose respond and keep refreshAvailabilityBeforeReply false when the question can be answered from business knowledge without a fresh availability result. Do not volunteer a date-status refresh merely because an older wedding date and location exist in the thread. Choose check_wedding_availability only when the current question itself asks about availability or the customer broadly reopens the prior inquiry under the configured policy.",
     "Set refreshAvailabilityBeforeReply true when a returning conversation has a complete customer-provided wedding date and established location and the configured prompt requires current availability to be refreshed before replying.",
     "Choose a concrete function action only when that function should run now. Use model_choice only when more than one action is genuinely plausible.",
+    "Choose book_consultation only after the customer has explicitly agreed to book a concrete consultation time and the booking action is appropriate now. A name, email, positive reaction, or general interest by itself is not booking authorization. When the next step is to invite the customer to a consultation, choose respond, make the invitation the reply objective, and set replyMustEndWithQuestion true; do not call the booking tool just to discover a missing field.",
+    "Set bookingAuthorized true only when the current or recent customer-authored message explicitly agrees to book a concrete consultation time. Set bookingAuthorizationEvidence to the exact minimal customer quote proving that agreement. Otherwise set bookingAuthorized false and bookingAuthorizationEvidence null. Never use an assistant message, a supplied name/email, or a general positive reaction as authorization.",
     "When the configured prompt says a returning inquiry with an established complete wedding date and location must refresh availability, choose check_wedding_availability. Do not choose respond merely to tell the customer that availability should be checked first.",
     "Resolve short follow-ups from context. A year-only reply can complete a prior wedding month/day, and a new month/day can inherit an established year and location when the customer has not changed them.",
+    "When the latest customer message proposes an alternative wedding date, that newly proposed month/day supersedes the prior date. Preserve the established year and location when appropriate, but normalize weddingDate from the latest proposal rather than carrying forward the old day.",
     "Never infer a missing wedding year from today's date, the current calendar year, or an assistant message. Month/day with no customer-provided year is missing_year and weddingDate must be null.",
     "When the wedding year is missing, action must be respond, nextInformationNeeded must be wedding_year, and replyObjective must answer any direct question first and then ask only for that year.",
     "weddingYearSource is current_message when the customer supplies the year now, recent_customer_message when the customer supplied it earlier, and not_established when the customer has not supplied it.",
@@ -144,29 +180,37 @@ export async function planSemanticTurn(args: {
     "Set location to the established wedding location, not the business office location.",
     "When planning send_collections_guide, use the wedding location only to select the correct tool input and price. The reply objective must preserve neutral customer-facing guide and price wording: do not append a city, state, or service-region label to the guide name, do not repeat the location as a qualifier for the price, do not imply multiple price sheets, and do not volunteer package comparisons.",
     "conversationStage is first_reply only when no assistant reply exists in recentConversation. Otherwise it is ongoing.",
-    "customerIsClosing is true when the latest message is a thank-you, decline, or natural close that does not ask a new question. The reply objective should then be a warm close without reopening sales steps.",
+    "Set customerIsClosing true only when the latest message is genuinely closing the exchange under the configured agent prompt. Distinguish a polite close or request for time from clear positive interest after a substantive answer. When the configured prompt says that positive interest should advance naturally to a consultation, set customerIsClosing false and make one direct customer-facing question inviting that consultation the reply objective, even if the customer did not ask a new question.",
+    "Set replyMustEndWithQuestion true only when the reply objective requires the agent to ask the customer a direct next question. This includes a natural consultation invitation after clear positive interest. Set it false for acknowledgements, factual answers with no next question, and closing replies.",
     "Set sendGuideAfterAvailability only when the configured prompt explicitly requires the guide after a successful available result.",
     "The configured prompt is authoritative for business policy and conversation style.",
   ].join("\n");
-  const buildPrompt = (validationFeedback?: string) =>
+  const buildPrompt = (
+    validationFeedback?: string,
+    previousPlan?: SemanticTurnPlan,
+  ) =>
     JSON.stringify(
       {
         configuredAgentPrompt: args.configuredPrompt,
         recentConversation: args.historyText,
         incomingCustomerMessage: args.currentMessage,
+        ...(previousPlan ? { previousPlanToReview: previousPlan } : {}),
         ...(validationFeedback ? { validationFeedback } : {}),
       },
       null,
       2,
     );
-  const generatePlan = async (validationFeedback?: string) => {
+  const generatePlan = async (
+    validationFeedback?: string,
+    previousPlan?: SemanticTurnPlan,
+  ) => {
     const { output } = await generateText({
       model: openai(args.modelId),
       output: Output.object({
         schema: semanticTurnPlanSchema,
       }),
       system,
-      prompt: buildPrompt(validationFeedback),
+      prompt: buildPrompt(validationFeedback, previousPlan),
       maxOutputTokens: 700,
       timeout: 15_000,
     });
@@ -194,7 +238,41 @@ export async function planSemanticTurn(args: {
     weddingYearGrounded = hasGroundedWeddingYear(output, args);
   }
 
-  return normalizeSemanticTurnPlan(output, { weddingYearGrounded });
+  if (
+    output.action === "check_wedding_availability" &&
+    output.weddingDateCompleteness === "complete"
+  ) {
+    const planToReview = output;
+    output = await generatePlan(
+      "Review the previous plan before availability is checked. First verify that the current customer request actually requires a current availability result: a narrow FAQ that can be answered from business knowledge must use respond without volunteering an availability refresh, while an availability question or a broad reopening may require the tool under the configured policy. If a check is required, verify that weddingDate is the exact date the customer is asking about now. If the latest message proposes a different month/day, use that latest proposal and inherit only the established year and location. Return the corrected final plan; do not keep an older date merely because it appears earlier in the thread.",
+      planToReview,
+    );
+    weddingYearGrounded = hasGroundedWeddingYear(output, args);
+
+    if (output.weddingDateCompleteness === "complete" && !weddingYearGrounded) {
+      output = await generatePlan(
+        "The reviewed availability plan still lacks a complete wedding date grounded in the customer-authored conversation. Re-read the latest requested date, preserve only context the customer already established, and return a safe final plan without inventing a year.",
+        output,
+      );
+      weddingYearGrounded = hasGroundedWeddingYear(output, args);
+    }
+  }
+
+  if (output.action === "book_consultation") {
+    const planToReview = output;
+    output = await generatePlan(
+      "Review the previous booking plan before any booking tool runs. Confirm from the customer-authored conversation that the customer explicitly agreed to book a concrete consultation time. Names, an email address, positive interest, or an invitation that has not yet been accepted are not booking authorization. If explicit agreement to a concrete time is absent, choose respond and write a natural next-step objective instead of using book_consultation to discover missing fields.",
+      planToReview,
+    );
+    weddingYearGrounded = hasGroundedWeddingYear(output, args);
+  }
+
+  const bookingAuthorizationGrounded = hasGroundedBookingAuthorization(output, args);
+
+  return normalizeSemanticTurnPlan(output, {
+    weddingYearGrounded,
+    bookingAuthorizationGrounded,
+  });
 }
 
 export function renderSemanticTurnPlan(plan: SemanticTurnPlan) {
@@ -235,6 +313,12 @@ export function renderSemanticTurnPlan(plan: SemanticTurnPlan) {
       : "",
     plan.customerIsClosing
       ? "- The customer is closing this exchange. Reply warmly without a new CTA, question, alternative, or sales step."
+      : "",
+    plan.bookingAuthorized
+      ? `- The customer explicitly authorized booking in this quote: ${plan.bookingAuthorizationEvidence}`
+      : "- No explicit booking authorization is established for this turn. Do not claim or imply that a consultation was booked.",
+    plan.replyMustEndWithQuestion
+      ? "- Preserve the response form required by the customer-facing objective. If the objective invites the customer to a call, consultation, or another next step, the final sentence must be one genuine direct question to the customer and the final non-whitespace character must be a question mark. Do not replace the question with a statement about your own willingness."
       : "",
     `- Wedding date completeness: ${plan.weddingDateCompleteness}.`,
     plan.weddingDateCompleteness !== "complete"
