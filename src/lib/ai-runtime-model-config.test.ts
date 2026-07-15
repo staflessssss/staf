@@ -52,3 +52,36 @@ test("requires a calendar check for a relative consultation time", () => {
 
   assert.match(nudge, /Call the consultation calendar tool/);
 });
+
+test("guide voice editor runs only after a ready attachment result", () => {
+  assert.equal(
+    aiRuntimeTestHelpers.hasReadyCollectionsGuideExecution([
+      {
+        toolName: "send_collections_guide",
+        toolResult: { status: "ready_to_attach" },
+      },
+    ]),
+    true,
+  );
+  assert.equal(
+    aiRuntimeTestHelpers.hasReadyCollectionsGuideExecution([
+      {
+        toolName: "send_collections_guide",
+        toolResult: { status: "blocked_precondition" },
+      },
+    ]),
+    false,
+  );
+});
+
+test("guide voice editor keeps location separate from the customer-facing guide name", () => {
+  const system = aiRuntimeTestHelpers.buildCollectionsGuideVoiceEditorSystem();
+
+  assert.match(system, /Preserve every concrete fact and action/);
+  assert.match(system, /attachment name and pricing phrase must stay neutral/);
+  assert.match(system, /do not repeat it in the guide or pricing clause/);
+  assert.match(system, /On "first_reply"/);
+  assert.match(system, /On "ongoing"/);
+  assert.match(system, /Remove unsolicited offers to compare packages/);
+  assert.match(system, /Return only the edited customer-facing reply/);
+});

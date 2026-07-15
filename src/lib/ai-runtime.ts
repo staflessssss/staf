@@ -353,7 +353,7 @@ function buildConfiguredCollectionsGuideTool(args: {
             ...(promotionText ? { promotionText } : {}),
             attachment,
             summary:
-              "The correct collections guide will be attached to this reply. State the returned starting price and promotion text naturally. Call the attachment simply the collections or pricing guide without appending a city, state, or internal service-region label. Do not volunteer package comparisons unless the customer asks.",
+              "The correct collections guide will be attached to this reply. State the returned starting price and promotion text naturally without repeating the city, state, or internal service-region label in the pricing phrase. Call the attachment simply the collections or pricing guide. Do not volunteer package comparisons unless the customer asks.",
           }
         : {
             status: "not_configured",
@@ -1872,6 +1872,40 @@ function getWeddingAvailabilityExecutionStatus(
   return null;
 }
 
+function hasReadyCollectionsGuideExecution(
+  toolExecutions: Array<{ toolName: string; toolResult: unknown }>,
+) {
+  return toolExecutions.some((execution) => {
+    if (
+      execution.toolName !== "send_collections_guide" ||
+      !execution.toolResult ||
+      typeof execution.toolResult !== "object" ||
+      Array.isArray(execution.toolResult)
+    ) {
+      return false;
+    }
+
+    return (execution.toolResult as Record<string, unknown>).status === "ready_to_attach";
+  });
+}
+
+function buildCollectionsGuideVoiceEditorSystem() {
+  return [
+    "You are the final voice editor for a Myndful Films Instagram reply written by Taras.",
+    'One wording requirement is non-negotiable: the attachment name and pricing phrase must stay neutral. Do not attach "for", "in", a city, a state, a market, or a service-region label to the guide name or use that label to introduce the starting price.',
+    'If the draft says something like "our collections guide for Tampa" or "For Tampa, pricing starts at $2,800", keep the grounded amount but rewrite both ideas neutrally: name the attachment without a location and state that collections start at the amount. This is a transformation example, not a fixed reply template.',
+    "The draft is already grounded in successful function results. Preserve every concrete fact and action: availability, wedding date, starting price, promotion, deadline, introduction, and any direct next question. Keep the wedding location only when it is needed in an availability statement or to answer a direct location question.",
+    'Use the supplied conversationStage. On "first_reply", the final text must naturally identify the speaker as Taras, founder of Myndful Films, even if the draft omitted it. On "ongoing", never add or repeat that introduction.',
+    "Do not add facts, choices, questions, or sales steps that are absent from the draft.",
+    'Refer to the attached image only as "our collections guide" or "the pricing guide". Never append a city, state, market, or service-region label to the guide name and never imply that multiple price sheets should be compared.',
+    "Once the location has selected the correct guide and price internally, do not repeat it in the guide or pricing clause.",
+    "Remove unsolicited offers to compare packages, narrow down collections, or help choose an option unless the customer explicitly requested that comparison.",
+    "Keep the original language, warm founder voice, concise Instagram paragraphs, and only the configured Myndful emojis already present in the draft.",
+    "Before returning, silently verify that neither the guide name nor the starting-price phrase exposes or repeats the wedding location or internal service region, and that no package comparison was introduced.",
+    "Return only the edited customer-facing reply. Do not mention editing, policy, tools, or internal routing.",
+  ].join("\n");
+}
+
 function shouldExposeOwnerHandoffTool(input: InvokeAgentInput) {
   const channel = String(input.channel).toUpperCase();
   return channel === ChannelType.INSTAGRAM || channel === ChannelType.GMAIL;
@@ -2792,8 +2826,77 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
     }
   });
 
+  let responseText = result.text;
+  if (hasReadyCollectionsGuideExecution(toolExecutions)) {
+    const draft = responseText.trim();
+    const editorFallbackModelId = getFallbackModelId({
+      hasTools: false,
+      primaryModelId: usedModelId,
+    });
+    const editDraft = (editorModelId: string, traceName: string) =>
+      traceLangRuntime(traceName, traceMetadata, async () => {
+        const edited = await generateText({
+          model: openai.chat(editorModelId),
+          system: buildCollectionsGuideVoiceEditorSystem(),
+          prompt: JSON.stringify(
+            {
+              incomingCustomerMessage: args.input.message,
+              conversationStage: semanticTurnPlan?.conversationStage ?? "unknown",
+              groundedDraftReply: draft,
+            },
+            null,
+            2,
+          ),
+          maxOutputTokens: 600,
+          timeout: 15_000,
+        });
+
+        return edited.text.trim() || draft;
+      });
+
+    try {
+      responseText = await editDraft(
+        usedModelId,
+        "gpt_agent.collections_guide_voice_edit",
+      );
+    } catch (error) {
+      if (editorFallbackModelId && isTechnicalModelFailure(error)) {
+        try {
+          responseText = await editDraft(
+            editorFallbackModelId,
+            "gpt_agent.collections_guide_voice_edit.fallback",
+          );
+          usedModelId = editorFallbackModelId;
+        } catch (fallbackError) {
+          console.warn(
+            "[ai-runtime] collections guide voice editor fallback failed; using grounded draft",
+            {
+              agentId: args.agent.id,
+              error:
+                fallbackError instanceof Error
+                  ? fallbackError.message
+                  : "Voice editor fallback failed.",
+            },
+          );
+        }
+      } else {
+        console.warn("[ai-runtime] collections guide voice editor failed; using grounded draft", {
+          agentId: args.agent.id,
+          error: error instanceof Error ? error.message : "Voice editor failed.",
+        });
+      }
+    }
+
+    if (args.input.testMode && process.env.DEBUG_COLLECTIONS_GUIDE_VOICE_EDIT === "1") {
+      console.info("[ai-runtime] collections guide voice edit", {
+        draft,
+        edited: responseText,
+      });
+    }
+  }
+
   return {
-    text: result.text,
+    text: responseText,
     modelId: usedModelId,
     toolExecutions,
   };
@@ -3130,6 +3233,8 @@ export const aiRuntimeTestHelpers = {
   getRequiredConsultationCalendarToolKey,
   getSemanticActionToolKey,
   getWeddingAvailabilityExecutionStatus,
+  hasReadyCollectionsGuideExecution,
+  buildCollectionsGuideVoiceEditorSystem,
   isTechnicalModelFailure,
   normalizeConfiguredModelId,
   ownerHandoffCustomerReply,

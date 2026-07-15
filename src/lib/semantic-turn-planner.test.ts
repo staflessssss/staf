@@ -106,5 +106,6 @@ test("collections guide plan keeps internal location labels out of the guide nam
 
   assert.match(rendered, /call the attachment only/);
   assert.match(rendered, /Do not append a city, state, or service-region label/);
+  assert.match(rendered, /repeat that location to introduce the starting price/);
   assert.match(rendered, /write the reply freely/);
 });

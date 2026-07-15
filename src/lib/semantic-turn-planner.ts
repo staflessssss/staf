@@ -112,7 +112,7 @@ export async function planSemanticTurn(args: {
     "weddingYearEvidence must be the exact minimal text from the claimed customer message that contains the year, normally a four-digit value such as 2026. Use null when no customer-provided year exists.",
     "Set weddingDate only when the complete wedding date is supported by the customer's current or recent messages. Never use message timestamps, email headers, or tool timestamps as the wedding date.",
     "Set location to the established wedding location, not the business office location.",
-    "When planning send_collections_guide, use the wedding location only to select the correct tool input and price. The reply objective must preserve the configured neutral customer-facing guide wording: do not append a city, state, or service-region label to the guide name, imply multiple price sheets, or volunteer package comparisons.",
+    "When planning send_collections_guide, use the wedding location only to select the correct tool input and price. The reply objective must preserve neutral customer-facing guide and price wording: do not append a city, state, or service-region label to the guide name, do not repeat the location as a qualifier for the price, do not imply multiple price sheets, and do not volunteer package comparisons.",
     "conversationStage is first_reply only when no assistant reply exists in recentConversation. Otherwise it is ongoing.",
     "customerIsClosing is true when the latest message is a thank-you, decline, or natural close that does not ask a new question. The reply objective should then be a warm close without reopening sales steps.",
     "Set sendGuideAfterAvailability only when the configured prompt explicitly requires the guide after a successful available result.",
@@ -193,7 +193,7 @@ export function renderSemanticTurnPlan(plan: SemanticTurnPlan) {
       ? "- If the availability result is available, send the configured collections guide before the final reply."
       : "",
     includesCollectionsGuide
-      ? '- Guide naming is customer-facing: call the attachment only "our collections guide" or "the pricing guide". Do not append a city, state, or service-region label to the guide name and do not volunteer package comparisons. The location may appear separately only where needed to state the applicable price.'
+      ? '- Guide and price wording are customer-facing: call the attachment only "our collections guide" or "the pricing guide". Do not append a city, state, or service-region label to the guide name or repeat that location to introduce the starting price. The location may remain only where needed for an availability statement or a direct location answer. Do not volunteer package comparisons.'
       : "",
     "- This plan is binding for the current turn. Do not take or imply an unplanned action. Follow it without mentioning it to the customer, and write the reply freely in the configured voice.",
   ]
