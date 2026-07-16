@@ -32,6 +32,14 @@ import {
   type RuntimeToolFeature,
 } from "@/lib/agent-config";
 import { loadConversationHistory, saveMessages } from "@/lib/agent-memory";
+import {
+  renderConversationHistory,
+  renderConversationMemoryContext,
+} from "@/lib/conversation-context";
+import {
+  loadConversationMemoryWithDb,
+  type ConversationMemory,
+} from "@/lib/conversation-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { parseInstagramCredentials } from "@/lib/channels/instagram";
 import { decrypt } from "@/lib/crypto";
@@ -61,7 +69,6 @@ import {
 import {
   BUSINESS_MANUAL_MESSAGE_TOOL_NAME,
   getLatestCustomerReplyContext,
-  isBusinessManualMessage,
   pauseConversationForBusinessHandoffWithDb,
   shouldPauseAfterBusinessManualMessage,
 } from "@/lib/business-handoff";
@@ -487,6 +494,7 @@ const FALSE_CONFIRMATION_PATTERNS = [
   /\bbooking is confirmed\b/i,
   /\b(?:call|consultation|meeting|appointment|slot|calendar|invite)\s+(?:is\s+)?booked\b/i,
   /\b(?:call|consultation|meeting|appointment|slot|calendar|invite)\s+(?:is\s+)?confirmed\b/i,
+  /\b(?:i['’]?m|we['’]?re|i am|we are)\s+(?:locking|booking|scheduling)\b/i,
 ] as const;
 
 function splitSignature(text: string) {
@@ -582,6 +590,32 @@ function hasAvailableCalendarCheckTurn(
     }
 
     return getStepResults(execution.toolResult).some((result) => result.status === "available");
+  });
+}
+
+function historyHasAvailableConsultationSlot(history: RuntimeHistoryMessage[]) {
+  return history.some((message) => {
+    if (
+      message.role !== MessageRole.TOOL ||
+      !message.toolName?.toLowerCase().includes("consultation") ||
+      !message.toolName.toLowerCase().includes("calendar")
+    ) {
+      return false;
+    }
+
+    if (
+      message.toolResult &&
+      typeof message.toolResult === "object" &&
+      !Array.isArray(message.toolResult) &&
+      "status" in message.toolResult &&
+      message.toolResult.status === "available"
+    ) {
+      return true;
+    }
+
+    return getStepResults(message.toolResult).some(
+      (result) => result.status === "available",
+    );
   });
 }
 
@@ -1283,27 +1317,6 @@ function buildFallbackResponse(args: {
   ]
     .filter(Boolean)
     .join(" ");
-}
-
-function renderHistory(messages: RuntimeHistoryMessage[]) {
-  if (messages.length === 0) {
-    return "No prior conversation history.";
-  }
-
-  return messages
-    .slice(-12)
-    .map((message) => {
-      if (isBusinessManualMessage(message)) {
-        return `business: ${message.content}`;
-      }
-
-      if (message.role === MessageRole.TOOL) {
-        return `tool ${message.toolName ?? "tool"}: ${message.content}`;
-      }
-
-      return `${message.role.toLowerCase()}: ${message.content}`;
-    })
-      .join("\n");
 }
 
 function isGmailClientClassifierEnabled(channelConfig: unknown) {
@@ -2776,6 +2789,7 @@ async function runModelInvocation(args: {
   prompting: PromptingConfig;
   conversationPlaybook: ConversationPlaybookConfig;
   control: ControlConfig;
+  conversationMemory: ConversationMemory;
 }) {
   const toolExecutions: Array<{
     toolName: string;
@@ -2827,6 +2841,10 @@ async function runModelInvocation(args: {
               .filter((message) => message.role === MessageRole.USER)
               .map((message) => message.content),
             currentMessage: args.input.message,
+            persistedMemory: args.conversationMemory,
+            recentAvailableConsultationSlot: historyHasAvailableConsultationSlot(
+              args.historyMessages,
+            ),
           }));
       let candidatePlan: SemanticTurnPlan;
 
@@ -2953,6 +2971,9 @@ async function runModelInvocation(args: {
   const semanticPlanContext = semanticTurnPlan
     ? renderSemanticTurnPlan(semanticTurnPlan)
     : "";
+  const conversationMemoryContext = renderConversationMemoryContext(
+    args.conversationMemory,
+  );
   const semanticActionToolKey = semanticTurnPlan
     ? getSemanticActionToolKey({ action: semanticTurnPlan.action, availableTools })
     : null;
@@ -3027,6 +3048,7 @@ Runtime application note:
 - If the customer explicitly asks for a real person/human, use the ${OWNER_HANDOFF_REQUEST_TOOL_NAME} tool.
 - If the customer asks a specific Myndful business fact that is not clearly present in the prompt, knowledge, recent history, or tools, use the ${OWNER_HANDOFF_REQUEST_TOOL_NAME} tool instead of guessing or saying no.
 ${controlRuntimeRules ? `\n- ${controlRuntimeRules.replace(/\n/g, "\n")}` : ""}
+\n\n${conversationMemoryContext}
 ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semanticPlanContext}` : ""}`,
       prompt: `Conversation history:
   ${args.historyText}
@@ -3405,11 +3427,18 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       toolFeatures: runtimeBlocks.toolFeatures,
       input,
       promptPreview: runtimeBlocks.promptPreview,
-      historyText: renderHistory(historyMessages),
+      historyText: renderConversationHistory(historyMessages),
       historyMessages,
       prompting: runtimeBlocks.prompting,
       conversationPlaybook: runtimeBlocks.conversationPlaybook,
       control: runtimeBlocks.control,
+      conversationMemory:
+        input.conversationId
+          ? await loadConversationMemoryWithDb({
+              database: db,
+              conversationId: input.conversationId,
+            })
+          : {},
     });
     if (modelResult.unavailable) {
       return {
@@ -3533,11 +3562,15 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     input,
     conversationId: conversation.id,
     promptPreview: runtimeBlocks.promptPreview,
-    historyText: renderHistory(historyMessages),
+    historyText: renderConversationHistory(historyMessages),
     historyMessages,
     prompting: runtimeBlocks.prompting,
     conversationPlaybook: runtimeBlocks.conversationPlaybook,
     control: runtimeBlocks.control,
+    conversationMemory: await loadConversationMemoryWithDb({
+      database: db,
+      conversationId: conversation.id,
+    }),
   });
   if (modelResult.unavailable) {
     return {
@@ -3653,6 +3686,7 @@ export const aiRuntimeTestHelpers = {
   shouldSendGuideAfterAvailability,
   getWeddingAvailabilityExecutionStatus,
   getWeddingAvailabilityExecutionRegion,
+  historyHasAvailableConsultationSlot,
   hasReadyCollectionsGuideExecution,
   buildCollectionsGuideVoiceEditorSystem,
   buildReturningConversationVoiceEditorSystem,

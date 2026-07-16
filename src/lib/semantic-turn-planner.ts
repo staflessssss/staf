@@ -48,6 +48,11 @@ export const semanticTurnPlanSchema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+const bookingAuthorizationDecisionSchema = z.object({
+  authorized: z.boolean(),
+  evidence: z.string().trim().min(1).nullable(),
+});
+
 export type SemanticTurnPlan = z.infer<typeof semanticTurnPlanSchema>;
 
 export function hasGroundedBookingAuthorization(
@@ -84,7 +89,13 @@ export function hasGroundedWeddingYear(
 
   const expectedYear = plan.weddingDate.slice(0, 4);
   const evidence = plan.weddingYearEvidence;
-  if (!evidence.includes(expectedYear)) {
+  const twoDigitExpectedYear = expectedYear.slice(-2);
+  const evidenceHasExpectedYear =
+    evidence.includes(expectedYear) ||
+    evidence
+      .match(/\b\d{2}\b/g)
+      ?.some((candidate) => candidate === twoDigitExpectedYear) === true;
+  if (!evidenceHasExpectedYear) {
     return false;
   }
 
@@ -149,6 +160,8 @@ export async function planSemanticTurn(args: {
   historyText: string;
   recentCustomerMessages: string[];
   currentMessage: string;
+  persistedMemory?: Record<string, unknown>;
+  recentAvailableConsultationSlot?: boolean;
 }): Promise<SemanticTurnPlan> {
   const system = [
     "You are the semantic turn planner for a customer-facing AI agent.",
@@ -158,6 +171,8 @@ export async function planSemanticTurn(args: {
     "Use respond when the agent should answer, ask for missing information, acknowledge, or close without running a function.",
     "Capture any direct customer question in directCustomerQuestion. The main reply must answer it before asking for missing information.",
     "Use nextInformationNeeded to identify the one customer fact needed for the immediate next step. Do not request facts that are already established.",
+    "Treat persistedConversationMemory as trusted context for stable customer-provided facts such as names, wedding date, location, venue, email, and proposed call time. Do not ask for those facts again when they are present there.",
+    "Persisted memory does not replace a current tool result for volatile facts such as wedding availability or calendar availability.",
     "List concise business facts already answered by the assistant in alreadyAnsweredFacts when repeating them would sound robotic. Do not include facts that must be repeated to disambiguate the current action.",
     "Set returningConversation true when the fresh inbound continues an older thread rather than starting a new conversation.",
     "Set priorRequestedMaterialDelivered true only when recentConversation shows that the information, pricing material, or attachment now being referenced was already sent by the business.",
@@ -174,10 +189,11 @@ export async function planSemanticTurn(args: {
     "When the wedding year is missing, action must be respond, nextInformationNeeded must be wedding_year, and replyObjective must answer any direct question first and then ask only for that year.",
     "weddingYearSource is current_message when the customer supplies the year now, recent_customer_message when the customer supplied it earlier, and not_established when the customer has not supplied it.",
     "Never label weddingYearSource as current_message when weddingYearEvidence appears only in recentConversation. Use recent_customer_message in that case.",
-    "weddingYearEvidence must be the exact minimal text from the claimed customer message that contains the year, normally a four-digit value such as 2026. Use null when no customer-provided year exists.",
+    "weddingYearEvidence must be exact text from the claimed customer message that contains the year. Preserve a complete compact date such as 3.27.27 when the customer used a two-digit year; do not replace their evidence with an invented four-digit quote. Use null when no customer-provided year exists.",
     "Set weddingDate only when the complete wedding date is supported by the customer's current or recent messages. Never use message timestamps, email headers, or tool timestamps as the wedding date.",
     "When weddingDateCompleteness is complete, weddingDate must contain the supported date normalized as YYYY-MM-DD. Do not mark the date complete while leaving weddingDate null.",
     "Set location to the established wedding location, not the business office location.",
+    "When persistedConversationMemory already contains booking details and the customer supplies the final missing detail, continue the same scheduling flow. Do not restart by asking for wedding facts that memory already contains.",
     "When planning send_collections_guide, use the wedding location only to select the correct tool input and price. The reply objective must preserve neutral customer-facing guide and price wording: do not append a city, state, or service-region label to the guide name, do not repeat the location as a qualifier for the price, do not imply multiple price sheets, and do not volunteer package comparisons.",
     "conversationStage is first_reply only when no assistant reply exists in recentConversation. Otherwise it is ongoing.",
     "Set customerIsClosing true only when the latest message is genuinely closing the exchange under the configured agent prompt. Distinguish a polite close or request for time from clear positive interest after a substantive answer. When the configured prompt says that positive interest should advance naturally to a consultation, set customerIsClosing false and make one direct customer-facing question inviting that consultation the reply objective, even if the customer did not ask a new question.",
@@ -193,6 +209,7 @@ export async function planSemanticTurn(args: {
       {
         configuredAgentPrompt: args.configuredPrompt,
         recentConversation: args.historyText,
+        persistedConversationMemory: args.persistedMemory ?? {},
         incomingCustomerMessage: args.currentMessage,
         ...(previousPlan ? { previousPlanToReview: previousPlan } : {}),
         ...(validationFeedback ? { validationFeedback } : {}),
@@ -217,8 +234,59 @@ export async function planSemanticTurn(args: {
 
     return output;
   };
+  const verifyBookingAuthorization = async () => {
+    const { output } = await generateText({
+      model: openai(args.modelId),
+      output: Output.object({ schema: bookingAuthorizationDecisionSchema }),
+      system: [
+        "You verify authorization for a real consultation booking action.",
+        "The recent conversation already contains a successful calendar availability result for a concrete consultation slot.",
+        "Set authorized true only when a customer-authored message explicitly accepts, confirms, or asks to lock or book that concrete slot.",
+        "A direct yes to the assistant's immediately preceding question asking whether to lock the concrete slot counts as authorization.",
+        "Names, email, a question asking whether a time works, general interest, or an assistant statement do not count by themselves.",
+        "When authorized is true, evidence must be an exact minimal quote from a customer-authored message. Otherwise evidence must be null.",
+      ].join("\n"),
+      prompt: JSON.stringify(
+        {
+          recentConversation: args.historyText,
+          incomingCustomerMessage: args.currentMessage,
+        },
+        null,
+        2,
+      ),
+      maxOutputTokens: 180,
+      timeout: 15_000,
+    });
+
+    return output;
+  };
   let output = await generatePlan();
   let weddingYearGrounded = hasGroundedWeddingYear(output, args);
+  let bookingAuthorizationVerified = false;
+
+  if (args.recentAvailableConsultationSlot === true) {
+    const authorization = await verifyBookingAuthorization();
+    const evidenceGrounded =
+      authorization.authorized &&
+      authorization.evidence &&
+      [args.currentMessage, ...args.recentCustomerMessages].some((message) =>
+        message.includes(authorization.evidence ?? ""),
+      );
+
+    if (evidenceGrounded) {
+      output = {
+        ...output,
+        action: "book_consultation",
+        replyObjective:
+          "Execute the authorized consultation booking, then confirm the successful result naturally.",
+        customerIsClosing: false,
+        bookingAuthorized: true,
+        bookingAuthorizationEvidence: authorization.evidence,
+        replyMustEndWithQuestion: false,
+      };
+      bookingAuthorizationVerified = true;
+    }
+  }
 
   if (
     output.returningConversation &&
@@ -258,7 +326,7 @@ export async function planSemanticTurn(args: {
     }
   }
 
-  if (output.action === "book_consultation") {
+  if (output.action === "book_consultation" && !bookingAuthorizationVerified) {
     const planToReview = output;
     output = await generatePlan(
       "Review the previous booking plan before any booking tool runs. Confirm from the customer-authored conversation that the customer explicitly agreed to book a concrete consultation time. Names, an email address, positive interest, or an invitation that has not yet been accepted are not booking authorization. If explicit agreement to a concrete time is absent, choose respond and write a natural next-step objective instead of using book_consultation to discover missing fields.",

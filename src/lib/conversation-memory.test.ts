@@ -145,6 +145,7 @@ test("assistant promises cannot mark guide delivery or booking as successful", (
     memorySet: {
       pricingShown: true,
       guideSent: true,
+      bookingConfirmed: true,
       booked: true,
     },
     memoryClear: [],
@@ -156,6 +157,59 @@ test("assistant promises cannot mark guide delivery or booking as successful", (
   ]);
 
   assert.deepEqual(grounded.memorySet, {});
+});
+
+test("calendar availability cannot become confirmed booking memory", () => {
+  const extraction: ConversationMemoryExtraction = {
+    status: "success",
+    memorySet: {
+      bookingConfirmed: true,
+      proposedCallTime: "2026-07-17T10:00:00-04:00",
+    },
+    memoryClear: [],
+    confidence: 0.95,
+  };
+
+  const grounded = conversationMemoryTestHelpers.groundOperationalMemory(
+    extraction,
+    [
+      {
+        role: "tool",
+        toolName: "Check consultation calendar",
+        content: JSON.stringify({ status: "available" }),
+      },
+    ],
+    { consultationBooked: false },
+  );
+
+  assert.deepEqual(grounded.memorySet, {
+    proposedCallTime: "2026-07-17T10:00:00-04:00",
+  });
+});
+
+test("stale unbooked confirmation is cleared without erasing a completed booking", () => {
+  const extraction: ConversationMemoryExtraction = {
+    status: "success",
+    memorySet: {},
+    memoryClear: [],
+    confidence: 0.95,
+  };
+
+  const stale = conversationMemoryTestHelpers.groundOperationalMemory(
+    extraction,
+    [],
+    { consultationBooked: false },
+    { bookingConfirmed: true },
+  );
+  const completed = conversationMemoryTestHelpers.groundOperationalMemory(
+    extraction,
+    [],
+    { consultationBooked: false },
+    { bookingConfirmed: true, booked: true },
+  );
+
+  assert.deepEqual(stale.memoryClear, ["bookingConfirmed"]);
+  assert.deepEqual(completed.memoryClear, []);
 });
 
 test("successful tool results authoritatively update operational memory", () => {

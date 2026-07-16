@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { MessageRole } from "@prisma/client";
+
 import { aiRuntimeTestHelpers } from "@/lib/ai-runtime";
 
 test("normalizes accidental line-ending escapes in configured model ids", () => {
@@ -19,7 +21,7 @@ test("requires a new availability check when the customer selects an offered alt
     currentMessage: "Could they do October 16 instead?",
     historyMessages: [
       {
-        role: "TOOL",
+        role: MessageRole.TOOL,
         toolName: "Check wedding availability",
         content: "availability result",
         toolResult: {
@@ -51,6 +53,45 @@ test("requires a calendar check for a relative consultation time", () => {
   });
 
   assert.match(nudge, /Call the consultation calendar tool/);
+});
+
+test("successful structured calendar history enables booking authorization review", () => {
+  assert.equal(
+    aiRuntimeTestHelpers.historyHasAvailableConsultationSlot([
+      {
+        role: MessageRole.TOOL,
+        toolName: "Check consultation calendar",
+        content: "calendar result",
+        toolResult: {
+          steps: [{ result: { status: "available" } }],
+        },
+      },
+    ]),
+    true,
+  );
+  assert.equal(
+    aiRuntimeTestHelpers.historyHasAvailableConsultationSlot([
+      {
+        role: "TOOL",
+        toolName: "Check consultation calendar",
+        content: "calendar result",
+        toolResult: {
+          steps: [{ result: { status: "busy" } }],
+        },
+      },
+    ]),
+    false,
+  );
+});
+
+test("unexecuted in-progress booking language is blocked by final safety", () => {
+  const guarded = aiRuntimeTestHelpers.softenFalseBookingConfirmation({
+    text: "Perfect — I'm locking in tomorrow at 10am Eastern now.",
+    toolExecutions: [],
+  });
+
+  assert.doesNotMatch(guarded, /I'm locking/i);
+  assert.match(guarded, /not want to call that booked or confirmed/i);
 });
 
 test("guide voice editor runs only after a ready attachment result", () => {

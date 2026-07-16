@@ -108,6 +108,40 @@ test("wedding year evidence must exist in the claimed customer message", () => {
   );
 });
 
+test("two-digit year in a complete customer date grounds the normalized wedding year", () => {
+  const plan = {
+    action: "check_wedding_availability" as const,
+    replyObjective: "Check availability.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "none" as const,
+    alreadyAnsweredFacts: [],
+    conversationStage: "ongoing" as const,
+    customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "new_inquiry" as const,
+    refreshAvailabilityBeforeReply: false,
+    weddingDateCompleteness: "complete" as const,
+    weddingYearSource: "current_message" as const,
+    weddingYearEvidence: "3.27.27",
+    weddingDate: "2027-03-27",
+    location: "Miami, Florida",
+    sendGuideAfterAvailability: true,
+    confidence: 0.99,
+  };
+
+  assert.equal(
+    hasGroundedWeddingYear(plan, {
+      currentMessage: "3.27.27",
+      recentCustomerMessages: [],
+    }),
+    true,
+  );
+});
+
 test("collections guide plan keeps internal location labels out of the guide name", () => {
   const rendered = renderSemanticTurnPlan({
     action: "send_collections_guide",

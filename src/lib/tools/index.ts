@@ -30,6 +30,10 @@ type ResolveToolsArgs = {
   onToolResult?: (entry: ToolExecutionLog) => void;
 };
 
+function resolveToolLocation(location?: string, semanticLocation?: string) {
+  return location?.trim() || semanticLocation?.trim() || undefined;
+}
+
 function toJsonValue(value: unknown): Prisma.JsonValue {
   if (
     value === null ||
@@ -516,10 +520,7 @@ export function resolveTools({
             weddingAvailabilityFeature && semanticWeddingDate
               ? semanticWeddingDate
               : weddingDate ?? semanticWeddingDate;
-          const resolvedLocation =
-            weddingAvailabilityFeature && semanticLocation
-              ? semanticLocation
-              : location ?? semanticLocation;
+          const resolvedLocation = resolveToolLocation(location, semanticLocation);
           const weddingDateRequirement = weddingAvailabilityFeature
             ? getWeddingAvailabilityDateRequirement({
                 currentMessage,
@@ -745,4 +746,5 @@ export const toolResolutionTestHelpers = {
   isBookConsultationFeature,
   isConsultationCalendarFeature,
   isWeddingAvailabilityFeature,
+  resolveToolLocation,
 };

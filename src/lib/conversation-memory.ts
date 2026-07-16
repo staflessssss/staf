@@ -197,6 +197,7 @@ function groundOperationalMemory(
   extraction: ConversationMemoryExtraction,
   history: MemoryHistoryMessage[],
   evidence?: OperationalMemoryEvidence,
+  currentMemory: ConversationMemory = {},
 ): ConversationMemoryExtraction {
   if (extraction.status !== "success") return extraction;
 
@@ -233,13 +234,27 @@ function groundOperationalMemory(
   if (consultationBooked) {
     memorySet.bookingConfirmed = true;
     memorySet.booked = true;
-  } else if (memorySet.booked === true) {
-    delete memorySet.booked;
+  } else {
+    // Calendar availability and a customer's interest are not completed bookings.
+    // Operational booking state is grounded only by a successful booking tool result.
+    if (memorySet.bookingConfirmed === true) delete memorySet.bookingConfirmed;
+    if (memorySet.booked === true) delete memorySet.booked;
+  }
+
+  const memoryClear = [...extraction.memoryClear];
+  if (
+    !consultationBooked &&
+    currentMemory.bookingConfirmed === true &&
+    currentMemory.booked !== true &&
+    !memoryClear.includes("bookingConfirmed")
+  ) {
+    memoryClear.push("bookingConfirmed");
   }
 
   return {
     ...extraction,
     memorySet,
+    memoryClear,
   };
 }
 
@@ -336,7 +351,8 @@ export async function extractConversationMemory(args: {
         "Do not copy currentMemory into memorySet unless the user explicitly confirms or changes that fact.",
         "If the user says the venue is not finalized, set venueStatus to not_finalized and include venue in memoryClear.",
         "Set pricingShown or guideSent only when a successful pricing-guide tool result is present in recentConversation.",
-        "Set booked only when a successful consultation-booking tool result is present in recentConversation.",
+        "Set bookingConfirmed or booked only when a successful consultation-booking tool result is present in recentConversation.",
+        "A question about whether a time works, a successful calendar availability check, or general scheduling interest is not a completed booking.",
         "Assistant reply text alone is not evidence that a guide was delivered or a consultation was booked.",
         "Do not infer the sender is one of the couple if they describe the couple as they/them or say they are helping someone else.",
       ].join("\n"),
@@ -359,6 +375,7 @@ export async function extractConversationMemory(args: {
       normalizeMemoryExtractionOutput(output),
       args.history,
       args.operationalEvidence,
+      args.currentMemory,
     );
   } catch (error) {
     const failure = classifyMemoryExtractionError(error);

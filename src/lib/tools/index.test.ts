@@ -138,6 +138,16 @@ test("semantic date cannot invent a missing wedding year", () => {
   );
 });
 
+test("an explicit current tool location overrides stale semantic location", () => {
+  assert.equal(
+    toolResolutionTestHelpers.resolveToolLocation(
+      "Homestead, Florida",
+      "Gran Paraiso Gardens",
+    ),
+    "Homestead, Florida",
+  );
+});
+
 test("wedding availability asks for the day when only month and year are known", () => {
   assert.equal(
     toolResolutionTestHelpers.getWeddingAvailabilityDateRequirement({
