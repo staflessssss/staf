@@ -160,6 +160,33 @@ const scenarios: Scenario[] = [
     ],
   },
   {
+    id: "generic_new_wedding_inquiry",
+    title: "Generic ad-style inquiry starts wedding qualification",
+    turns: [
+      {
+        customer: "Hello, can I get more info on this?",
+        expect: {
+          forbiddenTools: [
+            "Check wedding availability",
+            "send_collections_guide",
+            "Check consultation calendar",
+            "Book consultation call",
+          ],
+          maxAttachments: 0,
+          replyIncludesEveryGroup: [
+            ["date", "day"],
+            ["venue", "city", "location"],
+          ],
+          replyExcludes: [
+            "what part do you want",
+            "what would you like to know",
+            "pricing, availability",
+          ],
+        },
+      },
+    ],
+  },
+  {
     id: "pricing_region_unknown",
     title: "Pricing request without a region",
     turns: [

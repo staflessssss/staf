@@ -84,6 +84,121 @@ test("successful structured calendar history enables booking authorization revie
   );
 });
 
+test("pending authorized booking resumes when the customer supplies the missing email", () => {
+  const history = [
+    {
+      role: MessageRole.TOOL,
+      toolName: "Check consultation calendar",
+      content: "calendar result",
+      toolResult: { steps: [{ result: { status: "available" } }] },
+    },
+    { role: MessageRole.ASSISTANT, content: "Would you like me to lock in Wednesday at 10am?" },
+    { role: MessageRole.USER, content: "Yes, sounds great!" },
+    {
+      role: MessageRole.TOOL,
+      toolName: "Book consultation call",
+      content: "booking precondition",
+      toolResult: { status: "needs_email", missing_fields: ["email"], steps: [] },
+    },
+    { role: MessageRole.ASSISTANT, content: "What is the best email for the invite?" },
+  ];
+  const basePlan = {
+    action: "respond" as const,
+    replyObjective: "Acknowledge the email.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "none" as const,
+    alreadyAnsweredFacts: [],
+    conversationStage: "ongoing" as const,
+    customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
+    returningConversation: true,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "specific_question" as const,
+    refreshAvailabilityBeforeReply: false,
+    weddingDateCompleteness: "complete" as const,
+    weddingYearSource: "recent_customer_message" as const,
+    weddingYearEvidence: "2027",
+    weddingDate: "2027-10-17",
+    location: "Raleigh",
+    sendGuideAfterAvailability: false,
+    confidence: 0.98,
+  };
+
+  assert.deepEqual(aiRuntimeTestHelpers.getPendingAuthorizedBooking(history), {
+    authorizationEvidence: "Yes, sounds great!",
+    missingFields: ["email"],
+  });
+  const resumed = aiRuntimeTestHelpers.continuePendingBookingAfterEmail({
+    plan: basePlan,
+    historyMessages: history,
+    currentMessage: "abby@example.com",
+  });
+  assert.equal(resumed.action, "book_consultation");
+  assert.equal(resumed.bookingAuthorized, true);
+  assert.equal(resumed.bookingAuthorizationEvidence, "Yes, sounds great!");
+});
+
+test("pending booking does not resume from unrelated text or after a successful booking", () => {
+  const pendingHistory = [
+    { role: MessageRole.USER, content: "Yes, book it." },
+    {
+      role: MessageRole.TOOL,
+      toolName: "Book consultation call",
+      content: "booking precondition",
+      toolResult: { status: "needs_email", missing_fields: ["email"], steps: [] },
+    },
+  ];
+  const bookedHistory = [
+    ...pendingHistory,
+    {
+      role: MessageRole.TOOL,
+      toolName: "Book consultation call",
+      content: "booked",
+      toolResult: { steps: [{ result: { status: "booked" } }] },
+    },
+  ];
+
+  assert.equal(aiRuntimeTestHelpers.getPendingAuthorizedBooking(bookedHistory), null);
+  assert.equal(
+    aiRuntimeTestHelpers.getPendingAuthorizedBooking([
+      ...pendingHistory,
+      { role: MessageRole.ASSISTANT, content: "What email should I use?" },
+      { role: MessageRole.USER, content: "Actually, I need to think about it." },
+    ]),
+    null,
+  );
+  const unchanged = aiRuntimeTestHelpers.continuePendingBookingAfterEmail({
+    plan: {
+      action: "respond",
+      replyObjective: "Respond naturally.",
+      directCustomerQuestion: null,
+      nextInformationNeeded: "none",
+      alreadyAnsweredFacts: [],
+      conversationStage: "ongoing",
+      customerIsClosing: false,
+      replyMustEndWithQuestion: false,
+      bookingAuthorized: false,
+      bookingAuthorizationEvidence: null,
+      returningConversation: false,
+      priorRequestedMaterialDelivered: false,
+      currentRequestScope: "specific_question",
+      refreshAvailabilityBeforeReply: false,
+      weddingDateCompleteness: "unknown",
+      weddingYearSource: "not_established",
+      weddingYearEvidence: null,
+      weddingDate: null,
+      location: null,
+      sendGuideAfterAvailability: false,
+      confidence: 0.9,
+    },
+    historyMessages: pendingHistory,
+    currentMessage: "Actually, let me think about it.",
+  });
+  assert.equal(unchanged.action, "respond");
+});
+
 test("unexecuted in-progress booking language is blocked by final safety", () => {
   const guarded = aiRuntimeTestHelpers.softenFalseBookingConfirmation({
     text: "Perfect — I'm locking in tomorrow at 10am Eastern now.",

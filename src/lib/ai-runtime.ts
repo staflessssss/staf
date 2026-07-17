@@ -619,6 +619,95 @@ function historyHasAvailableConsultationSlot(history: RuntimeHistoryMessage[]) {
   });
 }
 
+type PendingAuthorizedBooking = {
+  authorizationEvidence: string;
+  missingFields: string[];
+};
+
+function getPendingAuthorizedBooking(
+  history: RuntimeHistoryMessage[],
+): PendingAuthorizedBooking | null {
+  let pending: PendingAuthorizedBooking | null = null;
+
+  for (const [index, message] of history.entries()) {
+    if (message.role === MessageRole.USER && pending) {
+      pending = null;
+    }
+
+    if (
+      message.role !== MessageRole.TOOL ||
+      !message.toolName?.toLowerCase().includes("book") ||
+      !message.toolName.toLowerCase().includes("consultation")
+    ) {
+      continue;
+    }
+
+    if (getStepResults(message.toolResult).some((result) => result.status === "booked")) {
+      pending = null;
+      continue;
+    }
+
+    const result =
+      message.toolResult &&
+      typeof message.toolResult === "object" &&
+      !Array.isArray(message.toolResult)
+        ? (message.toolResult as Record<string, unknown>)
+        : null;
+    const missingFields = result && Array.isArray(result.missing_fields)
+      ? result.missing_fields.filter((field): field is string => typeof field === "string")
+      : [];
+
+    if (!result || result.status !== "needs_email" || missingFields.length === 0) {
+      pending = null;
+      continue;
+    }
+
+    const authorizationMessage = history
+      .slice(0, index)
+      .reverse()
+      .find((candidate) => candidate.role === MessageRole.USER);
+
+    pending = authorizationMessage?.content.trim()
+      ? {
+          authorizationEvidence: authorizationMessage.content.trim(),
+          missingFields,
+        }
+      : null;
+  }
+
+  return pending;
+}
+
+function continuePendingBookingAfterEmail(args: {
+  plan: SemanticTurnPlan;
+  historyMessages: RuntimeHistoryMessage[];
+  currentMessage: string;
+}) {
+  const pending = getPendingAuthorizedBooking(args.historyMessages);
+  const customerEmail = z.string().trim().email().safeParse(args.currentMessage);
+
+  if (
+    !pending ||
+    !customerEmail.success ||
+    !pending.missingFields.every((field) => field === "email" || field === "customerEmail")
+  ) {
+    return args.plan;
+  }
+
+  return {
+    ...args.plan,
+    action: "book_consultation" as const,
+    replyObjective:
+      "Continue the previously authorized consultation booking with the supplied email, then confirm only the successful tool result naturally.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "none" as const,
+    customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: true,
+    bookingAuthorizationEvidence: pending.authorizationEvidence,
+  };
+}
+
 function hasUnavailableWeddingAvailabilityTurn(
   toolExecutions: Array<{
     toolName: string;
@@ -2868,6 +2957,12 @@ async function runModelInvocation(args: {
         );
       }
 
+      candidatePlan = continuePendingBookingAfterEmail({
+        plan: candidatePlan,
+        historyMessages: args.historyMessages,
+        currentMessage: args.input.message,
+      });
+
       if (args.input.testMode && process.env.DEBUG_SEMANTIC_TURN_PLAN === "1") {
         console.info("[ai-runtime] semantic turn plan candidate", candidatePlan);
       }
@@ -2899,6 +2994,7 @@ async function runModelInvocation(args: {
       args.input.message,
     ],
   });
+  const currentMessageEmail = z.string().trim().email().safeParse(args.input.message);
   const tools = resolveTools({
     tenantId: args.agent.tenantId,
     toolFeatures: args.toolFeatures,
@@ -2908,6 +3004,7 @@ async function runModelInvocation(args: {
     traceMetadata,
     defaultEmail:
       args.input.contactEmail ??
+      (currentMessageEmail.success ? currentMessageEmail.data : undefined) ??
       (String(args.input.channel).toUpperCase() === "GMAIL" && args.input.contactId.includes("@")
         ? args.input.contactId
         : undefined),
@@ -3687,6 +3784,8 @@ export const aiRuntimeTestHelpers = {
   getWeddingAvailabilityExecutionStatus,
   getWeddingAvailabilityExecutionRegion,
   historyHasAvailableConsultationSlot,
+  getPendingAuthorizedBooking,
+  continuePendingBookingAfterEmail,
   hasReadyCollectionsGuideExecution,
   buildCollectionsGuideVoiceEditorSystem,
   buildReturningConversationVoiceEditorSystem,

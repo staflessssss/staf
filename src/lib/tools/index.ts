@@ -521,6 +521,13 @@ export function resolveTools({
               ? semanticWeddingDate
               : weddingDate ?? semanticWeddingDate;
           const resolvedLocation = resolveToolLocation(location, semanticLocation);
+          const resolvedEmail =
+            isBookConsultationFeature(feature) &&
+            !email &&
+            defaultEmail &&
+            !isInternalBusinessEmail(defaultEmail)
+              ? defaultEmail
+              : email;
           const weddingDateRequirement = weddingAvailabilityFeature
             ? getWeddingAvailabilityDateRequirement({
                 currentMessage,
@@ -544,7 +551,7 @@ export function resolveTools({
               date: resolvedDate,
               weddingDate: resolvedWeddingDate,
               location: resolvedLocation,
-              email,
+              email: resolvedEmail,
               channel,
             });
 
@@ -555,7 +562,7 @@ export function resolveTools({
                 ...(resolvedDate ? { date: resolvedDate } : {}),
                 ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
                 ...(resolvedLocation ? { location: resolvedLocation } : {}),
-                ...(email ? { email } : {}),
+                ...(resolvedEmail ? { email: resolvedEmail } : {}),
                 ...(channel ? { channel } : {}),
               },
               toolResult: toJsonValue(output),
@@ -567,7 +574,7 @@ export function resolveTools({
 
           if (
             isBookConsultationFeature(feature) &&
-            (!email || isInternalBusinessEmail(email))
+            (!resolvedEmail || isInternalBusinessEmail(resolvedEmail))
           ) {
             const output = buildMissingBookingEmailToolResult({
               featureName: feature.name,
@@ -613,7 +620,7 @@ export function resolveTools({
               coupleName,
               weddingDate: resolvedWeddingDate,
               location: resolvedLocation,
-              email,
+              email: resolvedEmail,
               channel,
             });
 
@@ -626,7 +633,7 @@ export function resolveTools({
                 ...(coupleName ? { coupleName } : {}),
                 ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
                 ...(resolvedLocation ? { location: resolvedLocation } : {}),
-                ...(email ? { email } : {}),
+                ...(resolvedEmail ? { email: resolvedEmail } : {}),
                 ...(channel ? { channel } : {}),
               },
               toolResult: toJsonValue(output),
@@ -660,7 +667,7 @@ export function resolveTools({
                   coupleName,
                   weddingDate: resolvedWeddingDate,
                   location: resolvedLocation,
-                  email,
+                  email: resolvedEmail,
                   channel,
                   defaultEmail,
                   testMode,
@@ -692,7 +699,7 @@ export function resolveTools({
             ...(coupleName ? { coupleName } : {}),
             ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
             ...(resolvedLocation ? { location: resolvedLocation } : {}),
-            ...(email ? { email } : {}),
+            ...(resolvedEmail ? { email: resolvedEmail } : {}),
             ...(channel ? { channel } : {}),
             steps,
             summary: steps
@@ -720,7 +727,7 @@ export function resolveTools({
               ...(coupleName ? { coupleName } : {}),
               ...(resolvedWeddingDate ? { weddingDate: resolvedWeddingDate } : {}),
               ...(resolvedLocation ? { location: resolvedLocation } : {}),
-              ...(email ? { email } : {}),
+              ...(resolvedEmail ? { email: resolvedEmail } : {}),
               ...(channel ? { channel } : {}),
             },
             toolResult: toJsonValue(output),
