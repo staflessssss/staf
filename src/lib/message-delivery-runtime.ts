@@ -791,6 +791,9 @@ async function processBufferedReply(args: {
     toolExecutions: result.toolExecutions,
     attachments: result.attachments,
     delivery: channelDelivery,
+    referenceTimeZone: getRuntimeAgentSettingsConfig(
+      args.delivery.agent.channelConfig,
+    ).timezone,
   });
 
   const agentActiveAfterDelivery = await args.deps.db.agent.findFirst({

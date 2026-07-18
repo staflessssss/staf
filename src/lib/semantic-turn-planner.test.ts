@@ -26,6 +26,7 @@ test("incomplete wedding date cannot request availability execution", () => {
     refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "missing_year",
     weddingYearSource: "not_established",
+    weddingYearBasis: "not_established",
     weddingYearEvidence: null,
     weddingDate: "2026-11-21",
     location: "Port Saint Lucie, Florida",
@@ -56,6 +57,7 @@ test("customer close disables tools and renders no-CTA guidance", () => {
     refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "complete",
     weddingYearSource: "recent_customer_message",
+    weddingYearBasis: "explicit_calendar_year",
     weddingYearEvidence: "2026",
     weddingDate: "2026-11-21",
     location: "Port Saint Lucie, Florida",
@@ -85,6 +87,7 @@ test("wedding year evidence must exist in the claimed customer message", () => {
     refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "complete" as const,
     weddingYearSource: "current_message" as const,
+    weddingYearBasis: "explicit_calendar_year" as const,
     weddingYearEvidence: "2026",
     weddingDate: "2026-11-21",
     location: "Port Saint Lucie, Florida",
@@ -126,6 +129,7 @@ test("two-digit year in a complete customer date grounds the normalized wedding 
     refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "complete" as const,
     weddingYearSource: "current_message" as const,
+    weddingYearBasis: "explicit_calendar_year" as const,
     weddingYearEvidence: "3.27.27",
     weddingDate: "2027-03-27",
     location: "Miami, Florida",
@@ -139,6 +143,53 @@ test("two-digit year in a complete customer date grounds the normalized wedding 
       recentCustomerMessages: [],
     }),
     true,
+  );
+});
+
+test("customer-relative current year grounds against the supplied local date", () => {
+  const plan = {
+    action: "check_wedding_availability" as const,
+    replyObjective: "Check availability and send the guide if available.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "none" as const,
+    alreadyAnsweredFacts: [],
+    conversationStage: "ongoing" as const,
+    customerIsClosing: false,
+    replyMustEndWithQuestion: false,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "new_inquiry" as const,
+    refreshAvailabilityBeforeReply: false,
+    weddingDateCompleteness: "complete" as const,
+    weddingYearSource: "current_message" as const,
+    weddingYearBasis: "relative_current_year" as const,
+    weddingYearEvidence: "this year",
+    weddingDate: "2026-11-22",
+    location: "Auburndale, FL",
+    sendGuideAfterAvailability: true,
+    confidence: 0.99,
+  };
+
+  assert.equal(
+    hasGroundedWeddingYear(plan, {
+      currentMessage: "Auburndale fl, 22 November this year",
+      recentCustomerMessages: [],
+      referenceDate: "2026-07-18",
+    }),
+    true,
+  );
+  assert.equal(
+    hasGroundedWeddingYear(
+      { ...plan, weddingDate: "2023-11-22" },
+      {
+        currentMessage: "Auburndale fl, 22 November this year",
+        recentCustomerMessages: [],
+        referenceDate: "2026-07-18",
+      },
+    ),
+    false,
   );
 });
 
@@ -160,6 +211,7 @@ test("collections guide plan keeps internal location labels out of the guide nam
     refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "unknown",
     weddingYearSource: "not_established",
+    weddingYearBasis: "not_established",
     weddingYearEvidence: null,
     weddingDate: null,
     location: "Tampa, Florida",
@@ -191,6 +243,7 @@ test("returning lead refreshes availability without resending prior material", (
     refreshAvailabilityBeforeReply: true,
     weddingDateCompleteness: "complete",
     weddingYearSource: "recent_customer_message",
+    weddingYearBasis: "explicit_calendar_year",
     weddingYearEvidence: "2026",
     weddingDate: "2026-11-14",
     location: "The Savannah Country Club",
@@ -222,6 +275,7 @@ test("open next-step objectives preserve a direct customer question", () => {
     refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "complete",
     weddingYearSource: "recent_customer_message",
+    weddingYearBasis: "explicit_calendar_year",
     weddingYearEvidence: "2026",
     weddingDate: "2026-10-02",
     location: "Sarasota, Florida",
@@ -252,6 +306,7 @@ test("booking requires grounded explicit customer authorization", () => {
     refreshAvailabilityBeforeReply: false,
     weddingDateCompleteness: "complete" as const,
     weddingYearSource: "recent_customer_message" as const,
+    weddingYearBasis: "explicit_calendar_year" as const,
     weddingYearEvidence: "2026",
     weddingDate: "2026-10-16",
     location: "Raleigh",

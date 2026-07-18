@@ -1160,6 +1160,8 @@ function buildControlRuntimeRules(control: ControlConfig) {
 function buildRuntimeContextLines(args: {
   prompting: PromptingConfig;
   input: Pick<InvokeAgentInput, "channel" | "contactId" | "contactEmail">;
+  referenceDate?: string;
+  referenceTimeZone?: string;
 }) {
   const lines: string[] = [];
 
@@ -1179,7 +1181,25 @@ function buildRuntimeContextLines(args: {
     lines.push(`Current channel: ${String(args.input.channel).toLowerCase()}.`);
   }
 
+  if (args.referenceDate && args.referenceTimeZone) {
+    lines.push(
+      `Current local date for resolving customer-relative dates is ${args.referenceDate} (${args.referenceTimeZone}).`,
+    );
+  }
+
   return lines.join("\n");
+}
+
+function getLocalIsoDate(now: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 type AntiSpamIntercept =
@@ -2876,6 +2896,7 @@ async function runModelInvocation(args: {
   historyText: string;
   historyMessages: RuntimeHistoryMessage[];
   prompting: PromptingConfig;
+  agentSettings: AgentSettingsConfig;
   conversationPlaybook: ConversationPlaybookConfig;
   control: ControlConfig;
   conversationMemory: ConversationMemory;
@@ -2912,6 +2933,8 @@ async function runModelInvocation(args: {
   }
 
   const semanticTurnPlanningEnabled = args.prompting.semanticTurnPlanningEnabled === true;
+  const referenceTimeZone = args.agentSettings.timezone;
+  const referenceDate = getLocalIsoDate(new Date(), referenceTimeZone);
   let semanticTurnPlan: SemanticTurnPlan | null = null;
   if (semanticTurnPlanningEnabled) {
     try {
@@ -2930,6 +2953,8 @@ async function runModelInvocation(args: {
               .filter((message) => message.role === MessageRole.USER)
               .map((message) => message.content),
             currentMessage: args.input.message,
+            referenceDate,
+            referenceTimeZone,
             persistedMemory: args.conversationMemory,
             recentAvailableConsultationSlot: historyHasAvailableConsultationSlot(
               args.historyMessages,
@@ -3134,6 +3159,8 @@ async function runModelInvocation(args: {
   const runtimeContextLines = buildRuntimeContextLines({
     prompting: args.prompting,
     input: args.input,
+    referenceDate,
+    referenceTimeZone,
   });
 
   const modelRequest = {
@@ -3527,6 +3554,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
       historyText: renderConversationHistory(historyMessages),
       historyMessages,
       prompting: runtimeBlocks.prompting,
+      agentSettings: runtimeBlocks.agentSettings,
       conversationPlaybook: runtimeBlocks.conversationPlaybook,
       control: runtimeBlocks.control,
       conversationMemory:
@@ -3662,6 +3690,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
     historyText: renderConversationHistory(historyMessages),
     historyMessages,
     prompting: runtimeBlocks.prompting,
+    agentSettings: runtimeBlocks.agentSettings,
     conversationPlaybook: runtimeBlocks.conversationPlaybook,
     control: runtimeBlocks.control,
     conversationMemory: await loadConversationMemoryWithDb({
@@ -4455,6 +4484,7 @@ async function handleIncomingEventWithDeps(
       toolExecutions: result.toolExecutions,
       attachments: result.attachments,
       delivery,
+      referenceTimeZone: agentSettings.timezone,
     });
   }
 

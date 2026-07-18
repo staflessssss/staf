@@ -112,6 +112,18 @@ type DbWithOptionalMemory = PrismaClient & {
   conversationMemory?: PrismaClient["conversationMemory"];
 };
 
+function getLocalIsoDate(now: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function parseMemory(value: unknown): ConversationMemory {
   const parsed = conversationMemorySchema.safeParse(value);
   return parsed.success ? parsed.data : {};
@@ -193,6 +205,74 @@ function parseToolResult(content: string): unknown {
   }
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function collectToolResultRecords(value: unknown) {
+  const root = asRecord(value);
+  if (!root) return [];
+
+  return [
+    root,
+    ...(Array.isArray(root.steps)
+      ? root.steps.flatMap((step) => {
+          const result = asRecord(asRecord(step)?.result);
+          return result ? [result] : [];
+        })
+      : []),
+  ];
+}
+
+function firstStringField(records: Record<string, unknown>[], fields: string[]) {
+  for (const record of records) {
+    for (const field of fields) {
+      const value = record[field];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function getAvailabilityMemory(history: MemoryHistoryMessage[]) {
+  for (const message of history) {
+    if (message.role !== "tool" || !message.toolName) continue;
+    const toolResult = parseToolResult(message.content);
+    const succeeded = mapToolExecutionToAgentEvents({
+      toolName: message.toolName,
+      toolResult,
+    }).some(
+      (event) =>
+        event.type === AgentEventType.AVAILABILITY_CHECKED &&
+        event.status === AgentEventStatus.SUCCEEDED,
+    );
+    if (!succeeded) continue;
+
+    const records = collectToolResultRecords(toolResult);
+    const weddingDate = firstStringField(records, ["requestedDate", "date", "weddingDate"]);
+    const location = firstStringField(records, ["location"]);
+    const rawRegion = firstStringField(records, ["requestedRegion", "region"]);
+    const normalizedRegion = rawRegion?.toUpperCase().replace(/[^A-Z]/g, "_");
+    const serviceRegion =
+      normalizedRegion === "FL"
+        ? ("FL" as const)
+        : normalizedRegion === "NC_SC_GA"
+          ? ("NC_SC_GA" as const)
+          : null;
+
+    return {
+      ...(weddingDate && /^\d{4}-\d{2}-\d{2}$/.test(weddingDate) ? { weddingDate } : {}),
+      ...(location ? { location } : {}),
+      ...(serviceRegion ? { serviceRegion } : {}),
+    };
+  }
+
+  return {};
+}
+
 function groundOperationalMemory(
   extraction: ConversationMemoryExtraction,
   history: MemoryHistoryMessage[],
@@ -221,7 +301,10 @@ function groundOperationalMemory(
   );
   const guideDelivered = evidence?.guideDelivered ?? guideToolSucceeded;
   const consultationBooked = evidence?.consultationBooked ?? bookingToolSucceeded;
-  const memorySet = { ...extraction.memorySet };
+  const memorySet = {
+    ...extraction.memorySet,
+    ...getAvailabilityMemory(history),
+  };
 
   if (guideDelivered) {
     memorySet.pricingShown = true;
@@ -330,12 +413,16 @@ export async function extractConversationMemory(args: {
   latestUserMessage: string;
   assistantReply: string;
   operationalEvidence?: OperationalMemoryEvidence;
+  referenceDate?: Date;
+  referenceTimeZone?: string;
 }): Promise<ConversationMemoryExtraction> {
   if (!process.env.OPENAI_API_KEY) {
     return emptyMemoryExtraction("skipped_no_api_key");
   }
 
   try {
+    const referenceTimeZone = args.referenceTimeZone ?? "UTC";
+    const referenceDate = getLocalIsoDate(args.referenceDate ?? new Date(), referenceTimeZone);
     const { output } = await generateText({
       model: openai(process.env.LEGACY_MEMORY_MODEL || "gpt-4.1-mini"),
       output: Output.object({
@@ -347,6 +434,7 @@ export async function extractConversationMemory(args: {
         "Extract only facts explicitly supported by the recent conversation.",
         "Every memorySet field is required by the schema. Use null when a field should not be updated.",
         "Normalize weddingDate to YYYY-MM-DD. Use null when the exact date is not known.",
+        "Resolve an explicit customer-relative date expression only against referenceContext.localDate in referenceContext.timeZone. For example, a customer saying this year has supplied the year; do not substitute a model-training year.",
         "Null means no update. Use memoryClear only when the user clearly says a known fact is no longer true.",
         "Do not copy currentMemory into memorySet unless the user explicitly confirms or changes that fact.",
         "If the user says the venue is not finalized, set venueStatus to not_finalized and include venue in memoryClear.",
@@ -359,6 +447,10 @@ export async function extractConversationMemory(args: {
       prompt: JSON.stringify(
         {
           recentConversation: args.history.slice(-12),
+          referenceContext: {
+            localDate: referenceDate,
+            timeZone: referenceTimeZone,
+          },
           latestUserMessage: args.latestUserMessage,
           assistantReply: args.assistantReply,
           currentMemory: args.currentMemory,
@@ -393,6 +485,7 @@ export async function extractAndSaveConversationMemoryWithDb(args: {
   latestUserMessage: string;
   assistantReply: string;
   operationalEvidence?: OperationalMemoryEvidence;
+  referenceTimeZone?: string;
 }): Promise<{
   status: "saved" | "skipped_no_delegate" | "unchanged";
   memoryBefore?: ConversationMemory;
@@ -422,8 +515,12 @@ export async function extractAndSaveConversationMemoryWithDb(args: {
       role: true,
       content: true,
       toolName: true,
+      createdAt: true,
     },
   });
+  const latestCustomerMessage = recentMessages.find(
+    (message) => message.role === MessageRole.USER,
+  );
   const history = recentMessages
     .reverse()
     .map((message) => ({
@@ -443,6 +540,8 @@ export async function extractAndSaveConversationMemoryWithDb(args: {
     latestUserMessage: args.latestUserMessage,
     assistantReply: args.assistantReply,
     operationalEvidence: args.operationalEvidence,
+    referenceDate: latestCustomerMessage?.createdAt,
+    referenceTimeZone: args.referenceTimeZone,
   });
   const nextMemory = mergeConversationMemory(currentMemory, extraction);
 

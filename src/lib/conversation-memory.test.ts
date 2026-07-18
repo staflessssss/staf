@@ -240,6 +240,44 @@ test("successful tool results authoritatively update operational memory", () => 
   });
 });
 
+test("successful availability result overrides an incorrect extracted relative date", () => {
+  const extraction: ConversationMemoryExtraction = {
+    status: "success",
+    memorySet: {
+      weddingDate: "2023-11-22",
+      location: "Auburndale, FL",
+      serviceRegion: "FL",
+    },
+    memoryClear: [],
+    confidence: 0.95,
+  };
+  const grounded = conversationMemoryTestHelpers.groundOperationalMemory(extraction, [
+    {
+      role: "tool",
+      toolName: "Check wedding availability",
+      content: JSON.stringify({
+        weddingDate: "2026-11-22",
+        location: "Auburndale, FL",
+        steps: [
+          {
+            result: {
+              status: "available",
+              requestedDate: "2026-11-22",
+              requestedRegion: "FL",
+            },
+          },
+        ],
+      }),
+    },
+  ]);
+
+  assert.deepEqual(grounded.memorySet, {
+    weddingDate: "2026-11-22",
+    location: "Auburndale, FL",
+    serviceRegion: "FL",
+  });
+});
+
 test("blocked tools cannot update operational memory", () => {
   const extraction: ConversationMemoryExtraction = {
     status: "success",

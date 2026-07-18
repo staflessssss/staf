@@ -66,6 +66,7 @@ export async function recordSuccessfulRuntimeTurnWithDb(args: {
   attachments?: unknown[];
   delivery?: unknown;
   updateMemory?: boolean;
+  referenceTimeZone?: string;
 }) {
   const mappedToolEvents = (args.toolExecutions ?? []).flatMap(mapToolExecutionToAgentEvents);
   const toolEvents = mappedToolEvents.filter(
@@ -106,6 +107,7 @@ export async function recordSuccessfulRuntimeTurnWithDb(args: {
             !isPartialDelivery(args.delivery),
           consultationBooked: consultationBookingSucceeded,
         },
+        referenceTimeZone: args.referenceTimeZone,
       });
     } catch (error) {
       memoryUpdate = {

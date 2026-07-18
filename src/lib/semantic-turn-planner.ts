@@ -41,6 +41,13 @@ export const semanticTurnPlanSchema = z.object({
   refreshAvailabilityBeforeReply: z.boolean(),
   weddingDateCompleteness: z.enum(["unknown", "missing_year", "missing_day", "complete"]),
   weddingYearSource: z.enum(["current_message", "recent_customer_message", "not_established"]),
+  weddingYearBasis: z.enum([
+    "explicit_calendar_year",
+    "relative_current_year",
+    "relative_next_year",
+    "relative_previous_year",
+    "not_established",
+  ]),
   weddingYearEvidence: z.string().trim().min(1).nullable(),
   weddingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   location: z.string().trim().min(1).nullable(),
@@ -76,6 +83,7 @@ export function hasGroundedWeddingYear(
   args: {
     currentMessage: string;
     recentCustomerMessages: string[];
+    referenceDate?: string;
   },
 ) {
   if (
@@ -89,6 +97,30 @@ export function hasGroundedWeddingYear(
 
   const expectedYear = plan.weddingDate.slice(0, 4);
   const evidence = plan.weddingYearEvidence;
+  const evidenceIsGrounded =
+    plan.weddingYearSource === "current_message"
+      ? args.currentMessage.includes(evidence)
+      : args.recentCustomerMessages.some((message) => message.includes(evidence));
+
+  if (!evidenceIsGrounded) {
+    return false;
+  }
+
+  if (plan.weddingYearBasis !== "explicit_calendar_year") {
+    const referenceYear = args.referenceDate?.match(/^(\d{4})-/)?.[1];
+    if (!referenceYear || plan.weddingYearBasis === "not_established") {
+      return false;
+    }
+
+    const referenceOffset = {
+      relative_previous_year: -1,
+      relative_current_year: 0,
+      relative_next_year: 1,
+    }[plan.weddingYearBasis];
+
+    return Number(expectedYear) === Number(referenceYear) + referenceOffset;
+  }
+
   const twoDigitExpectedYear = expectedYear.slice(-2);
   const evidenceHasExpectedYear =
     evidence.includes(expectedYear) ||
@@ -99,9 +131,7 @@ export function hasGroundedWeddingYear(
     return false;
   }
 
-  return plan.weddingYearSource === "current_message"
-    ? args.currentMessage.includes(evidence)
-    : args.recentCustomerMessages.some((message) => message.includes(evidence));
+  return true;
 }
 
 export function normalizeSemanticTurnPlan(
@@ -160,6 +190,8 @@ export async function planSemanticTurn(args: {
   historyText: string;
   recentCustomerMessages: string[];
   currentMessage: string;
+  referenceDate: string;
+  referenceTimeZone: string;
   persistedMemory?: Record<string, unknown>;
   recentAvailableConsultationSlot?: boolean;
 }): Promise<SemanticTurnPlan> {
@@ -185,9 +217,11 @@ export async function planSemanticTurn(args: {
     "When the configured prompt says a returning inquiry with an established complete wedding date and location must refresh availability, choose check_wedding_availability. Do not choose respond merely to tell the customer that availability should be checked first.",
     "Resolve short follow-ups from context. A year-only reply can complete a prior wedding month/day, and a new month/day can inherit an established year and location when the customer has not changed them.",
     "When the latest customer message proposes an alternative wedding date, that newly proposed month/day supersedes the prior date. Preserve the established year and location when appropriate, but normalize weddingDate from the latest proposal rather than carrying forward the old day.",
-    "Never infer a missing wedding year from today's date, the current calendar year, or an assistant message. Month/day with no customer-provided year is missing_year and weddingDate must be null.",
+    "Never infer a missing wedding year merely from today's date or an assistant message. Month/day with no customer-provided year expression is missing_year and weddingDate must be null.",
+    "An explicit customer-relative year expression such as this year, next year, or its equivalent in another language is customer-provided year evidence. Resolve it only against referenceContext.localDate and set the matching relative weddingYearBasis.",
     "When the wedding year is missing, action must be respond, nextInformationNeeded must be wedding_year, and replyObjective must answer any direct question first and then ask only for that year.",
     "weddingYearSource is current_message when the customer supplies the year now, recent_customer_message when the customer supplied it earlier, and not_established when the customer has not supplied it.",
+    "weddingYearBasis is explicit_calendar_year for a numeric year, relative_current_year/relative_next_year/relative_previous_year for an explicit relative expression, and not_established when no customer year expression exists.",
     "Never label weddingYearSource as current_message when weddingYearEvidence appears only in recentConversation. Use recent_customer_message in that case.",
     "weddingYearEvidence must be exact text from the claimed customer message that contains the year. Preserve a complete compact date such as 3.27.27 when the customer used a two-digit year; do not replace their evidence with an invented four-digit quote. Use null when no customer-provided year exists.",
     "Set weddingDate only when the complete wedding date is supported by the customer's current or recent messages. Never use message timestamps, email headers, or tool timestamps as the wedding date.",
@@ -208,6 +242,10 @@ export async function planSemanticTurn(args: {
     JSON.stringify(
       {
         configuredAgentPrompt: args.configuredPrompt,
+        referenceContext: {
+          localDate: args.referenceDate,
+          timeZone: args.referenceTimeZone,
+        },
         recentConversation: args.historyText,
         persistedConversationMemory: args.persistedMemory ?? {},
         incomingCustomerMessage: args.currentMessage,
@@ -301,7 +339,7 @@ export async function planSemanticTurn(args: {
 
   if (output.weddingDateCompleteness === "complete" && !weddingYearGrounded) {
     output = await generatePlan(
-      "The previous plan marked the wedding date complete but did not provide a normalized date grounded in the claimed current or recent customer message. Re-plan from the actual customer text, correct weddingYearSource, weddingYearEvidence, and weddingDate, and then choose the action required by the configured returning-conversation policy. Do not infer the current year.",
+      "The previous plan marked the wedding date complete but did not provide a normalized date grounded in the claimed current or recent customer message. Re-plan from the actual customer text and referenceContext, correct weddingYearSource, weddingYearBasis, weddingYearEvidence, and weddingDate, and then choose the required action. Do not infer a year when the customer supplied no numeric or relative year expression.",
     );
     weddingYearGrounded = hasGroundedWeddingYear(output, args);
   }
