@@ -396,7 +396,7 @@ function buildMissingCallTimeToolResult(args: {
     ...(args.channel ? { channel: args.channel } : {}),
     steps: [],
     summary:
-      "The customer has not provided a proposed consultation time. Ask what time works Monday-Friday, 9am-2pm Eastern before checking or booking the calendar.",
+      "The customer has not provided a proposed consultation time. Ask for a specific day/date and time within the configured consultation window before checking or booking the calendar.",
   };
 }
 
