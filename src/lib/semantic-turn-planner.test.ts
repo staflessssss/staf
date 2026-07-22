@@ -2,11 +2,91 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildPostToolContinuationPlannerSystem,
   normalizeSemanticTurnPlan,
   hasGroundedBookingAuthorization,
   hasGroundedWeddingYear,
+  planSemanticTurn,
   renderSemanticTurnPlan,
+  shouldReviewPostToolContinuationPlan,
 } from "@/lib/semantic-turn-planner";
+
+test("post-tool continuation planning follows playbook without fixed copy", () => {
+  const system = buildPostToolContinuationPlannerSystem();
+
+  assert.match(system, /configuredConversationPolicy and conversationPlaybook/);
+  assert.match(system, /first genuinely useful missing step/);
+  assert.match(system, /successful availability check and delivered pricing guide/);
+  assert.match(system, /without supplying fixed customer-facing wording/);
+  assert.match(system, /availability is unavailable/);
+  assert.match(system, /Never authorize or claim a consultation booking/);
+});
+
+test("available lead with a delivered guide rechecks an empty continuation plan", () => {
+  const plan = {
+    shouldAskNextQuestion: false,
+    replyObjective: "Close without another question.",
+    nextInformationNeeded: null,
+    reason: "No next step selected.",
+  };
+
+  assert.equal(
+    shouldReviewPostToolContinuationPlan({
+      plan,
+      currentAvailabilityStatus: "available",
+      completedTools: [{ toolName: "send_collections_guide", toolResult: {} }],
+      priorPlan: null,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldReviewPostToolContinuationPlan({
+      plan,
+      currentAvailabilityStatus: "unavailable",
+      completedTools: [{ toolName: "send_collections_guide", toolResult: {} }],
+      priorPlan: null,
+    }),
+    false,
+  );
+});
+
+test("semantic planner requires a fresh check for an alternative wedding date", () => {
+  const source = planSemanticTurn.toString();
+
+  assert.match(source, /proposes an alternative wedding date/);
+  assert.match(source, /choose check_wedding_availability before the reply/);
+  assert.match(source, /prior result for a different date never grounds the new date/i);
+});
+
+test("semantic planner exposes the consultation progression fields", () => {
+  const rendered = renderSemanticTurnPlan({
+    action: "respond",
+    replyObjective: "Invite the customer to a consultation naturally.",
+    directCustomerQuestion: null,
+    nextInformationNeeded: "consultation_interest",
+    alreadyAnsweredFacts: [],
+    conversationStage: "ongoing",
+    customerIsClosing: false,
+    replyMustEndWithQuestion: true,
+    bookingAuthorized: false,
+    bookingAuthorizationEvidence: null,
+    returningConversation: false,
+    priorRequestedMaterialDelivered: false,
+    currentRequestScope: "specific_question",
+    refreshAvailabilityBeforeReply: false,
+    weddingDateCompleteness: "complete",
+    weddingYearSource: "recent_customer_message",
+    weddingYearBasis: "explicit_calendar_year",
+    weddingYearEvidence: "2027",
+    weddingDate: "2027-07-10",
+    location: "Charleston, SC",
+    sendGuideAfterAvailability: false,
+    confidence: 0.95,
+  });
+
+  assert.match(rendered, /consultation_interest/);
+  assert.match(rendered, /final sentence must be one genuine direct question/);
+});
 
 test("incomplete wedding date cannot request availability execution", () => {
   const plan = normalizeSemanticTurnPlan({

@@ -242,6 +242,12 @@ test("guide voice editor keeps location separate from the customer-facing guide 
   assert.match(system, /do not repeat it in the guide or pricing clause/);
   assert.match(system, /On "first_reply"/);
   assert.match(system, /On "ongoing"/);
+  assert.match(system, /post-tool conversation continuity/);
+  assert.match(system, /postToolContinuation\.shouldAskNextQuestion/);
+  assert.match(system, /exactly one natural direct question/);
+  assert.match(system, /do not use a fixed phrase/i);
+  assert.match(system, /do not ask for information already known/);
+  assert.match(system, /wedding date is unavailable/);
   assert.match(system, /Remove unsolicited offers to compare packages/);
   assert.match(system, /Return only the edited customer-facing reply/);
 });

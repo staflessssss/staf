@@ -54,8 +54,10 @@ import {
 import { traceLangRuntime } from "@/lib/lang/langsmith";
 import { buildSystemPrompt } from "@/lib/prompt-composer";
 import {
+  planPostToolContinuation,
   planSemanticTurn,
   renderSemanticTurnPlan,
+  type PostToolContinuationPlan,
   type SemanticTurnPlan,
 } from "@/lib/semantic-turn-planner";
 import { resolveTools } from "@/lib/tools";
@@ -2147,7 +2149,13 @@ function buildCollectionsGuideVoiceEditorSystem() {
     "The supplied collectionsGuideToolResult is ground truth for the attachment, starting price, promotion, and deadline. When its status is ready_to_attach, the final reply must naturally say that the guide is being sent and must include its startPrice and promotionText when present. Preserve every other grounded fact and action from the draft, including availability, wedding date, introduction, and any direct next question. Keep the wedding location only when it is needed in an availability statement or to answer a direct location question.",
     "Use only customer-facing facts from collectionsGuideToolResult. Never expose its serviceRegion, source, file id, URL, status code, JSON, or internal summary.",
     'Use the supplied conversationStage. On "first_reply", the final text must naturally identify the speaker as Taras, founder of Myndful Films, even if the draft omitted it. On "ongoing", never add or repeat that introduction.',
-    "Do not add facts, choices, questions, or sales steps that are absent from the draft.",
+    "You also own post-tool conversation continuity. Read postToolContinuation before finalizing the reply.",
+    "When postToolContinuation.shouldAskNextQuestion is true, the final reply must end with exactly one natural direct question that fulfills its replyObjective. Do not use a fixed phrase, do not ask for information already known, and do not turn the reply into a form.",
+    "Express planning concepts in normal spoken English from Taras. Never expose CRM-style labels such as customer_name or partner_name, and never turn a field label into awkward wording such as 'the couple names'. When asking for names, use ordinary possessive grammar appropriate to the known contact role.",
+    "Preserve the sender's role from the conversation. If the sender is helping or speaking for another couple, use natural third-person wording and never call the sender or their partner the couple.",
+    "When postToolContinuation.shouldAskNextQuestion is false, do not add a question merely to keep the conversation going.",
+    "If the wedding date is unavailable, the customer is closing the conversation, or the configured playbook does not require a reply from the customer yet, do not manufacture a question or sales CTA. Never claim a consultation was checked or booked unless the matching tool result is present.",
+    "Do not add ungrounded facts, package choices, or unsolicited package comparisons that are absent from the draft and tool result.",
     'Refer to the attached image only as "our collections guide" or "the pricing guide". Never append a city, state, market, or service-region label to the guide name and never imply that multiple price sheets should be compared.',
     "Once the location has selected the correct guide and price internally, do not repeat it in the guide or pricing clause.",
     "Remove unsolicited offers to compare packages, narrow down collections, or help choose an option unless the customer explicitly requested that comparison.",
@@ -3250,6 +3258,7 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
   }
 
   let responseText = result.text;
+  let postToolContinuation: PostToolContinuationPlan | null = null;
   if (hasReadyCollectionsGuideExecution(toolExecutions)) {
     const draft = responseText.trim();
     const guideToolResult = toolExecutions.find(
@@ -3259,6 +3268,39 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
       hasTools: false,
       primaryModelId: usedModelId,
     });
+
+    try {
+      postToolContinuation = await traceLangRuntime(
+        "gpt_agent.post_tool_continuation_plan",
+        traceMetadata,
+        () =>
+          planPostToolContinuation({
+            modelId: usedModelId,
+            recentConversation: args.historyText,
+            currentMessage: args.input.message,
+            persistedMemory: args.conversationMemory,
+            configuredConversationPolicy: args.prompting.instruction ?? "",
+            conversationPlaybook: args.conversationPlaybook,
+            currentAvailabilityStatus:
+              getWeddingAvailabilityExecutionStatus(toolExecutions),
+            completedTools: toolExecutions.map((execution) => ({
+              toolName: execution.toolName,
+              toolResult: execution.toolResult,
+            })),
+            groundedDraftReply: draft,
+            priorPlan: semanticTurnPlan,
+          }),
+      );
+    } catch (error) {
+      console.warn("[ai-runtime] post-tool continuation planner failed", {
+        agentId: args.agent.id,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Post-tool continuation planner failed.",
+      });
+    }
+
     const editDraft = (editorModelId: string, traceName: string) =>
       traceLangRuntime(traceName, traceMetadata, async () => {
         const edited = await generateText({
@@ -3268,6 +3310,7 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
             {
               incomingCustomerMessage: args.input.message,
               conversationStage: semanticTurnPlan?.conversationStage ?? "unknown",
+              postToolContinuation,
               collectionsGuideToolResult: guideToolResult,
               groundedDraftReply: draft,
             },
@@ -3394,10 +3437,13 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
     }
   }
 
-  if (
-    semanticTurnPlan?.replyMustEndWithQuestion &&
-    !responseText.trimEnd().endsWith("?")
-  ) {
+  const requiredQuestionObjective = postToolContinuation?.shouldAskNextQuestion
+    ? postToolContinuation.replyObjective
+    : semanticTurnPlan?.replyMustEndWithQuestion
+      ? semanticTurnPlan.replyObjective
+      : null;
+
+  if (requiredQuestionObjective && !responseText.trimEnd().endsWith("?")) {
     const draft = responseText.trim();
     const editorFallbackModelId = getFallbackModelId({
       hasTools: false,
@@ -3411,7 +3457,7 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
           prompt: JSON.stringify(
             {
               incomingCustomerMessage: args.input.message,
-              replyObjective: semanticTurnPlan.replyObjective,
+              replyObjective: requiredQuestionObjective,
               groundedDraftReply: draft,
             },
             null,

@@ -75,6 +75,8 @@ const scenarios: Scenario[] = [
             "compare packages",
             "which collection fits",
             "narrow down",
+            "you and your fiancé",
+            "you and your fiance",
           ],
           forbiddenTools: ["Book consultation call"],
         },
@@ -182,6 +184,55 @@ const scenarios: Scenario[] = [
             "what would you like to know",
             "pricing, availability",
           ],
+        },
+      },
+    ],
+  },
+  {
+    id: "maggie_available_lead_progression",
+    title: "Maggie flow: available date, guide, names, and consultation invitation",
+    turns: [
+      {
+        customer: "Hello, can I get more info on this?",
+        expect: {
+          forbiddenTools: [
+            "Check wedding availability",
+            "send_collections_guide",
+            "Check consultation calendar",
+            "Book consultation call",
+          ],
+          maxAttachments: 0,
+          replyIncludes: ["Taras"],
+          replyIncludesEveryGroup: [
+            ["date", "day"],
+            ["venue", "city", "location"],
+          ],
+        },
+      },
+      {
+        customer: "July 10th 2027 in Charleston SC at The Admirals House",
+        expect: {
+          requiredTools: ["Check wedding availability", "send_collections_guide"],
+          forbiddenTools: ["Check consultation calendar", "Book consultation call"],
+          minAttachments: 1,
+          replyIncludesAny: ["available", "open", "free"],
+          replyIncludesEveryGroup: [["name", "names"], ["?"]],
+          replyIncludes: ["$3,600", "20%"],
+          replyExcludes: ["what's your email", "what is your email", "best email"],
+        },
+      },
+      {
+        customer: "Maggie and Tyler",
+        expect: {
+          forbiddenTools: [
+            "Check wedding availability",
+            "send_collections_guide",
+            "Check consultation calendar",
+            "Book consultation call",
+          ],
+          replyIncludesAny: ["call", "chat", "talk", "consultation"],
+          replyIncludes: ["?"],
+          replyExcludes: ["what's your email", "what is your email", "best email"],
         },
       },
     ],
@@ -488,12 +539,17 @@ const scenarios: Scenario[] = [
             "compare packages",
             "which collection fits",
             "narrow down",
+            "you and your fiancé",
+            "you and your fiance",
           ],
         },
       },
       {
         customer: "Their names are Analeigh Brooks and Jackson Ellerbee.",
-        expect: { replyExcludes: ["nice to meet you both"] },
+        expect: {
+          replyIncludesAny: ["call", "chat", "talk", "consultation"],
+          replyExcludes: ["nice to meet you both", "would you two", "you and your fiancé"],
+        },
       },
       {
         customer: "Does the package include all raw footage and can they pick the music?",

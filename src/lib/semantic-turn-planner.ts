@@ -21,6 +21,12 @@ export const semanticTurnPlanSchema = z.object({
     "wedding_year",
     "wedding_day",
     "wedding_location",
+    "customer_name",
+    "partner_name",
+    "consultation_interest",
+    "consultation_time",
+    "customer_email",
+    "service_needed",
     "other",
   ]),
   alreadyAnsweredFacts: z.array(z.string().trim().min(1).max(160)).max(8),
@@ -61,6 +67,104 @@ const bookingAuthorizationDecisionSchema = z.object({
 });
 
 export type SemanticTurnPlan = z.infer<typeof semanticTurnPlanSchema>;
+
+const postToolContinuationSchema = z.object({
+  shouldAskNextQuestion: z.boolean(),
+  replyObjective: z.string().trim().min(1).max(500),
+  nextInformationNeeded: z.string().trim().min(1).max(160).nullable(),
+  reason: z.string().trim().min(1).max(500),
+});
+
+export type PostToolContinuationPlan = z.infer<typeof postToolContinuationSchema>;
+
+export function shouldReviewPostToolContinuationPlan(args: {
+  plan: PostToolContinuationPlan;
+  currentAvailabilityStatus: "available" | "unavailable" | null;
+  completedTools: Array<{ toolName: string; toolResult: unknown }>;
+  priorPlan?: SemanticTurnPlan | null;
+}) {
+  return (
+    !args.plan.shouldAskNextQuestion &&
+    args.currentAvailabilityStatus === "available" &&
+    args.priorPlan?.customerIsClosing !== true &&
+    args.completedTools.some((tool) => tool.toolName === "send_collections_guide")
+  );
+}
+
+export function buildPostToolContinuationPlannerSystem() {
+  return [
+    "You plan conversational continuity after customer-facing business tools have already completed.",
+    "Do not write the customer reply. Decide only whether the current reply should end with one direct next question.",
+    "Treat configuredConversationPolicy and conversationPlaybook as the source of truth for the business goal, required lead details, and discovery order.",
+    "Use recentConversation and persistedConversationMemory to skip facts that are already known. Select at most the first genuinely useful missing step; never turn the conversation into a form or jump across several stages.",
+    "Preserve the contact role established in the conversation. If the sender is helping or speaking for another couple, plan the question about them with third-person meaning; never treat the sender as one of the partners.",
+    "A successful availability check and delivered pricing guide do not finish an active lead by themselves. When the playbook still has a useful missing discovery step, set shouldAskNextQuestion true and describe that next objective without supplying fixed customer-facing wording.",
+    "Set shouldAskNextQuestion false when availability is unavailable, the customer is declining or closing, the customer asked for time to review, an unresolved concern should be answered first, or the configured playbook has no useful next step yet.",
+    "Never authorize or claim a consultation booking. This plan may invite or qualify naturally, but real calendar and booking actions remain tool-controlled.",
+  ].join("\n");
+}
+
+export async function planPostToolContinuation(args: {
+  modelId: string;
+  recentConversation: string;
+  currentMessage: string;
+  persistedMemory?: Record<string, unknown>;
+  configuredConversationPolicy: string;
+  conversationPlaybook: unknown;
+  currentAvailabilityStatus: "available" | "unavailable" | null;
+  completedTools: Array<{ toolName: string; toolResult: unknown }>;
+  groundedDraftReply: string;
+  priorPlan?: SemanticTurnPlan | null;
+}) {
+  const generatePlan = async (
+    validationFeedback?: string,
+    previousPlan?: PostToolContinuationPlan,
+  ) => {
+    const { output } = await generateText({
+      model: openai(args.modelId),
+      output: Output.object({ schema: postToolContinuationSchema }),
+      system: buildPostToolContinuationPlannerSystem(),
+      prompt: JSON.stringify(
+        {
+          recentConversation: args.recentConversation,
+          incomingCustomerMessage: args.currentMessage,
+          persistedConversationMemory: args.persistedMemory ?? {},
+          configuredConversationPolicy: args.configuredConversationPolicy,
+          conversationPlaybook: args.conversationPlaybook,
+          currentAvailabilityStatus: args.currentAvailabilityStatus,
+          completedTools: args.completedTools,
+          groundedDraftReply: args.groundedDraftReply,
+          priorSemanticPlan: args.priorPlan ?? null,
+          ...(previousPlan ? { previousPlanToReview: previousPlan } : {}),
+          ...(validationFeedback ? { validationFeedback } : {}),
+        },
+        null,
+        2,
+      ),
+      maxOutputTokens: 350,
+      timeout: 15_000,
+    });
+
+    return output;
+  };
+
+  let output = await generatePlan();
+  if (
+    shouldReviewPostToolContinuationPlan({
+      plan: output,
+      currentAvailabilityStatus: args.currentAvailabilityStatus,
+      completedTools: args.completedTools,
+      priorPlan: args.priorPlan,
+    })
+  ) {
+    output = await generatePlan(
+      "Re-review the previous plan against the configured playbook. The current wedding date was successfully confirmed available, the pricing guide was delivered, and the customer is not closing the conversation. A false decision is valid only when a specific exception from the system guidance applies. Otherwise identify the first genuinely useful missing business step and require one natural direct question. Do not write the customer-facing wording.",
+      output,
+    );
+  }
+
+  return output;
+}
 
 export function hasGroundedBookingAuthorization(
   plan: SemanticTurnPlan,
@@ -203,7 +307,9 @@ export async function planSemanticTurn(args: {
     "Use respond when the agent should answer, ask for missing information, acknowledge, or close without running a function.",
     "Capture any direct customer question in directCustomerQuestion. The main reply must answer it before asking for missing information.",
     "Use nextInformationNeeded to identify the one customer fact needed for the immediate next step. Do not request facts that are already established.",
+    "Use the specific nextInformationNeeded values for names, consultation interest, consultation time, email, and service instead of collapsing a clear sales step into other or none.",
     "Treat persistedConversationMemory as trusted context for stable customer-provided facts such as names, wedding date, location, venue, email, and proposed call time. Do not ask for those facts again when they are present there.",
+    "Preserve the established contact role and pronouns. When the sender is helping or speaking for another couple, keep the reply objective in third-person terms and do not address the sender as one of the partners.",
     "Persisted memory does not replace a current tool result for volatile facts such as wedding availability or calendar availability.",
     "List concise business facts already answered by the assistant in alreadyAnsweredFacts when repeating them would sound robotic. Do not include facts that must be repeated to disambiguate the current action.",
     "Set returningConversation true when the fresh inbound continues an older thread rather than starting a new conversation.",
@@ -213,10 +319,12 @@ export async function planSemanticTurn(args: {
     "Set refreshAvailabilityBeforeReply true when a returning conversation has a complete customer-provided wedding date and established location and the configured prompt requires current availability to be refreshed before replying.",
     "Choose a concrete function action only when that function should run now. Use model_choice only when more than one action is genuinely plausible.",
     "Choose book_consultation only after the customer has explicitly agreed to book a concrete consultation time and the booking action is appropriate now. A name, email, positive reaction, or general interest by itself is not booking authorization. When the next step is to invite the customer to a consultation, choose respond, make the invitation the reply objective, and set replyMustEndWithQuestion true; do not call the booking tool just to discover a missing field.",
+    "Treat customer email as a booking-stage detail, not an early discovery field. Do not ask for email merely because a future booking will require it. First invite the consultation, obtain a specific proposed day/date and time, check the calendar, and obtain the customer's clear confirmation of that slot. Ask for email only when it is the remaining detail needed to complete that authorized booking.",
+    "When the customer supplies the requested names after wedding date, location, successful availability, and pricing context are established, follow the configured playbook toward its success action. When that success action is consultation or booking progression, respond with a natural consultation invitation, set nextInformationNeeded to consultation_interest, and require one direct question instead of collecting email prematurely.",
     "Set bookingAuthorized true only when the current or recent customer-authored message explicitly agrees to book a concrete consultation time. Set bookingAuthorizationEvidence to the exact minimal customer quote proving that agreement. Otherwise set bookingAuthorized false and bookingAuthorizationEvidence null. Never use an assistant message, a supplied name/email, or a general positive reaction as authorization.",
     "When the configured prompt says a returning inquiry with an established complete wedding date and location must refresh availability, choose check_wedding_availability. Do not choose respond merely to tell the customer that availability should be checked first.",
     "Resolve short follow-ups from context. A year-only reply can complete a prior wedding month/day, and a new month/day can inherit an established year and location when the customer has not changed them.",
-    "When the latest customer message proposes an alternative wedding date, that newly proposed month/day supersedes the prior date. Preserve the established year and location when appropriate, but normalize weddingDate from the latest proposal rather than carrying forward the old day.",
+    "When the latest customer message proposes an alternative wedding date, that newly proposed month/day supersedes the prior date. Preserve the established year and location when appropriate, normalize weddingDate from the latest proposal rather than carrying forward the old day, and choose check_wedding_availability before the reply. A prior result for a different date never grounds the new date.",
     "Never infer a missing wedding year merely from today's date or an assistant message. Month/day with no customer-provided year expression is missing_year and weddingDate must be null.",
     "An explicit customer-relative year expression such as this year, next year, or its equivalent in another language is customer-provided year evidence. Resolve it only against referenceContext.localDate and set the matching relative weddingYearBasis.",
     "When the wedding year is missing, action must be respond, nextInformationNeeded must be wedding_year, and replyObjective must answer any direct question first and then ask only for that year.",
