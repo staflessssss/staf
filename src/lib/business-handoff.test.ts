@@ -6,6 +6,7 @@ import {
   containsBusinessExceptionPhrase,
   getAutoResumeDueAt,
   getLatestCustomerReplyContext,
+  pauseConversationForBusinessHandoffWithDb,
   shouldPauseAfterBusinessManualMessage,
 } from "@/lib/business-handoff";
 
@@ -103,4 +104,32 @@ test("business reply context uses the latest customer message metadata", () => {
       subject: "Latest subject",
     },
   );
+});
+
+test("manual-only conversations never schedule business auto-resume", async () => {
+  let createdDeliveries = 0;
+  const database = {
+    conversation: {
+      update: async () => ({ manualOnly: true }),
+    },
+    delayedDelivery: {
+      updateMany: async () => ({ count: 0 }),
+      create: async () => {
+        createdDeliveries += 1;
+        return { id: "unexpected" };
+      },
+    },
+  };
+
+  await pauseConversationForBusinessHandoffWithDb({
+    database: database as never,
+    conversationId: "conversation-1",
+    agentId: "agent-1",
+    control: {
+      ...getDefaultControlConfig(),
+      autoResumeEnabled: true,
+    },
+  });
+
+  assert.equal(createdDeliveries, 0);
 });

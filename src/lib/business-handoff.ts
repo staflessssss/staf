@@ -1,6 +1,7 @@
 import { ConversationStatus, DelayedDeliveryKind, DelayedDeliveryStatus, MessageRole } from "@prisma/client";
 
 import { ControlConfig } from "@/lib/agent-config";
+import { isConversationManualOnly } from "@/lib/conversation-control";
 import { db } from "@/lib/db";
 
 export const BUSINESS_MANUAL_MESSAGE_TOOL_NAME = "business_manual_message";
@@ -172,10 +173,13 @@ export async function pauseConversationForBusinessHandoffWithDb(args: {
   replyContext?: BusinessReplyContext;
   now?: Date;
 }) {
-  await args.database.conversation.update({
+  const conversation = await args.database.conversation.update({
     where: { id: args.conversationId },
     data: {
       status: ConversationStatus.ESCALATED,
+    },
+    select: {
+      manualOnly: true,
     },
   });
 
@@ -196,12 +200,14 @@ export async function pauseConversationForBusinessHandoffWithDb(args: {
     },
   });
 
-  await scheduleBusinessAutoResumeWithDb({
-    database: args.database,
-    agentId: args.agentId,
-    conversationId: args.conversationId,
-    control: args.control,
-    replyContext: args.replyContext,
-    now: args.now,
-  });
+  if (!isConversationManualOnly(conversation)) {
+    await scheduleBusinessAutoResumeWithDb({
+      database: args.database,
+      agentId: args.agentId,
+      conversationId: args.conversationId,
+      control: args.control,
+      replyContext: args.replyContext,
+      now: args.now,
+    });
+  }
 }

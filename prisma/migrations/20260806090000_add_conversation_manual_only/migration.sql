@@ -1,0 +1,2 @@
+ALTER TABLE "Conversation"
+ADD COLUMN IF NOT EXISTS "manualOnly" BOOLEAN NOT NULL DEFAULT false;

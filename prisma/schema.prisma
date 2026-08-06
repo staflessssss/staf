@@ -177,6 +177,7 @@ model Conversation {
   contactDisplayName String?
   channel            ChannelType
   status             ConversationStatus @default(ACTIVE)
+  manualOnly         Boolean            @default(false)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   agent              Agent              @relation(fields: [agentId], references: [id])

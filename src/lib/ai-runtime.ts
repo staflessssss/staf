@@ -41,6 +41,7 @@ import {
   type ConversationMemory,
 } from "@/lib/conversation-memory";
 import { getChannelAdapter } from "@/lib/channels";
+import { isConversationManualOnly } from "@/lib/conversation-control";
 import { parseInstagramCredentials } from "@/lib/channels/instagram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
@@ -843,8 +844,13 @@ function getRuntimePromptingConfig(channelConfig: unknown): PromptingConfig {
 function getInboundConversationPolicy(args: {
   agentSettings: AgentSettingsConfig;
   existingConversationStatus?: ConversationStatus | null;
+  manualOnly?: boolean;
   now?: Date;
 }) {
+  if (isConversationManualOnly(args)) {
+    return "waiting_for_manual_dialog_activation" as const;
+  }
+
   if (args.existingConversationStatus === ConversationStatus.CLOSED) {
     return "closed_conversation" as const;
   }
@@ -3995,6 +4001,7 @@ async function handleIncomingEventWithDeps(
     select: {
       id: true,
       status: true,
+      manualOnly: true,
     },
   });
 
@@ -4197,6 +4204,7 @@ async function handleIncomingEventWithDeps(
   const inboundPolicy = getInboundConversationPolicy({
     agentSettings,
     existingConversationStatus: existingConversation?.status,
+    manualOnly: existingConversation?.manualOnly,
     now: incoming.eventTimestamp,
   });
 

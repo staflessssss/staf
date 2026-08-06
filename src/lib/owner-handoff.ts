@@ -16,6 +16,7 @@ import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
 import { recordAgentEventsBestEffort } from "@/lib/agent-events";
 import { BUSINESS_MANUAL_MESSAGE_TOOL_NAME } from "@/lib/business-handoff";
+import { isConversationManualOnly } from "@/lib/conversation-control";
 import { recordInstagramOutboundDeliveries } from "@/lib/instagram-outbound";
 import {
   recordConversationHandoffPause,
@@ -952,6 +953,12 @@ export async function handleOwnerTelegramCommand(args: {
       throw new Error("Conversation does not belong to this tenant.");
     }
 
+    if (isConversationManualOnly(conversation)) {
+      return {
+        message: `Conversation ${conversation.id} is locked to manual-only mode.`,
+      };
+    }
+
     await db.conversation.update({
       where: { id: conversation.id },
       data: { status: ConversationStatus.ACTIVE },
@@ -1023,6 +1030,12 @@ export async function handleOwnerTelegramCallback(args: {
     return {
       message: `Manual takeover is active for conversation ${conversation.id}.`,
       replyMarkup: buildOwnerResumeReplyMarkup(conversation.id),
+    };
+  }
+
+  if (isConversationManualOnly(conversation)) {
+    return {
+      message: `Conversation ${conversation.id} is locked to manual-only mode.`,
     };
   }
 

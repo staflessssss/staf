@@ -20,6 +20,7 @@ import {
   readMessageBehaviorConfig,
 } from "@/lib/channels/message-behavior";
 import { getChannelAdapter } from "@/lib/channels";
+import { isConversationManualOnly } from "@/lib/conversation-control";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { saveMessages } from "@/lib/agent-memory";
@@ -631,7 +632,8 @@ async function processBufferedReply(args: {
 
   if (
     args.delivery.agent.status !== AgentStatus.ACTIVE ||
-    args.delivery.conversation.status !== ConversationStatus.ACTIVE
+    args.delivery.conversation.status !== ConversationStatus.ACTIVE ||
+    isConversationManualOnly(args.delivery.conversation)
   ) {
     await markDeliveryStatus({
       database: args.deps.db,
@@ -852,6 +854,19 @@ async function processFollowUp(args: {
   if (autoResumePayload) {
     let resumeMessageDeliveryFailed = false;
 
+    if (isConversationManualOnly(args.delivery.conversation)) {
+      await markDeliveryStatus({
+        database: args.deps.db,
+        deliveryId: args.deliveryId,
+        status: DelayedDeliveryStatus.CANCELED,
+        error: "business_auto_resume_suppressed_manual_only",
+      });
+      return {
+        ok: true,
+        status: "business_auto_resume_suppressed_manual_only" as const,
+      };
+    }
+
     const activeAgent = await args.deps.db.agent.findFirst({
       where: {
         id: args.delivery.agentId,
@@ -977,7 +992,8 @@ async function processFollowUp(args: {
 
   if (
     args.delivery.agent.status !== AgentStatus.ACTIVE ||
-    args.delivery.conversation.status !== ConversationStatus.ACTIVE
+    args.delivery.conversation.status !== ConversationStatus.ACTIVE ||
+    isConversationManualOnly(args.delivery.conversation)
   ) {
     await markDeliveryStatus({
       database: args.deps.db,
