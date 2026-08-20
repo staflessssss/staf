@@ -34,6 +34,35 @@ test("derives conversation stage from persisted assistant history", () => {
   );
 });
 
+test("deduplicates a repeated Instagram history page before new-lead classification", () => {
+  const messages: Array<{ id?: string; created_time?: string }> = [];
+  const seenMessageIds = new Set<string>();
+  const currentMessage = {
+    id: "instagram-message-1",
+    created_time: "2026-08-20T10:59:51.000Z",
+  };
+
+  aiRuntimeTestHelpers.appendUniqueInstagramMessages({
+    messages,
+    seenMessageIds,
+    additions: [currentMessage],
+  });
+  aiRuntimeTestHelpers.appendUniqueInstagramMessages({
+    messages,
+    seenMessageIds,
+    additions: [currentMessage],
+  });
+
+  assert.equal(messages.length, 1);
+  const classification = aiRuntimeTestHelpers.classifyInstagramPriorMessages({
+    messages,
+    contactId: "contact-1",
+    currentMessageId: "instagram-message-1",
+    eventTimestamp: new Date("2026-08-20T11:00:04.000Z"),
+  });
+  assert.equal(classification.priorMessages.length, 0);
+});
+
 test("requires a new availability check when the customer selects an offered alternative date", () => {
   const nudge = aiRuntimeTestHelpers.buildRequiredWeddingAvailabilityActionNudge({
     currentMessage: "Could they do October 16 instead?",

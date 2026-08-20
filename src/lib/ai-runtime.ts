@@ -915,21 +915,27 @@ type InstagramConversationListPayload = {
 
 type InstagramConversationDetailPayload = {
   messages?: {
-    data?: Array<{
-      id?: string;
-      from?: {
-        id?: string;
-        username?: string;
-      };
-      created_time?: string;
-      message?: string;
-      attachments?: {
-        data?: unknown[];
-      };
-    }>;
+    data?: InstagramConversationMessage[];
     paging?: {
       next?: string;
     };
+  };
+  data?: InstagramConversationMessage[];
+  paging?: {
+    next?: string;
+  };
+};
+
+type InstagramConversationMessage = {
+  id?: string;
+  from?: {
+    id?: string;
+    username?: string;
+  };
+  created_time?: string;
+  message?: string;
+  attachments?: {
+    data?: unknown[];
   };
 };
 
@@ -946,6 +952,33 @@ async function fetchInstagramGraphJson<T>(url: URL, token: string): Promise<T> {
   }
 
   return payload;
+}
+
+function getInstagramMessagePage(payload: InstagramConversationDetailPayload) {
+  return {
+    messages: payload.messages?.data ?? payload.data ?? [],
+    next: payload.messages?.paging?.next ?? payload.paging?.next,
+  };
+}
+
+function appendUniqueInstagramMessages(args: {
+  messages: InstagramConversationMessage[];
+  seenMessageIds: Set<string>;
+  additions: InstagramConversationMessage[];
+}) {
+  for (const message of args.additions) {
+    const messageId = message.id?.trim();
+
+    if (messageId) {
+      if (args.seenMessageIds.has(messageId)) {
+        continue;
+      }
+
+      args.seenMessageIds.add(messageId);
+    }
+
+    args.messages.push(message);
+  }
 }
 
 function classifyInstagramPriorMessages(args: {
@@ -1095,27 +1128,59 @@ async function inspectInstagramConversationHistory(args: {
 
     conversationUrl.searchParams.set(
       "fields",
-      "messages.limit(25){id,from,created_time,message,attachments}",
+      "messages.limit(100){id,from,created_time,message,attachments}",
     );
 
-    const detail = await fetchInstagramGraphJson<InstagramConversationDetailPayload>(
-      conversationUrl,
-      credentials.pageAccessToken,
-    );
-    if (detail.messages?.paging?.next) {
+    // Meta can return a second, duplicate page even for a thread with one message.
+    // Follow pagination and deduplicate message IDs before classifying its history.
+    const historyMessages: InstagramConversationMessage[] = [];
+    const seenMessageIds = new Set<string>();
+    const seenMessagePageUrls = new Set<string>();
+    let nextMessagePageUrl: URL | null = conversationUrl;
+    let messagePageCount = 0;
+    const maxMessagePages = 20;
+
+    while (nextMessagePageUrl && messagePageCount < maxMessagePages) {
+      const pageUrl = nextMessagePageUrl.toString();
+      if (seenMessagePageUrls.has(pageUrl)) {
+        return {
+          status: "error",
+          error: "Instagram message history pagination loop detected.",
+        };
+      }
+
+      seenMessagePageUrls.add(pageUrl);
+      messagePageCount += 1;
+
+      const detail = await fetchInstagramGraphJson<InstagramConversationDetailPayload>(
+        nextMessagePageUrl,
+        credentials.pageAccessToken,
+      );
+      const page = getInstagramMessagePage(detail);
+      appendUniqueInstagramMessages({
+        messages: historyMessages,
+        seenMessageIds,
+        additions: page.messages,
+      });
+      nextMessagePageUrl = page.next ? new URL(page.next) : null;
+    }
+
+    if (nextMessagePageUrl) {
       console.warn("[instagram-preflight] message history page limit reached", {
         agentId: args.agent.id,
         tenantId: args.agent.tenantId,
         contactId: args.contactId,
         instagramConversationId: conversation.id,
+        pagesChecked: messagePageCount,
       });
       return {
         status: "error",
         error: "Instagram message history could not be fully verified.",
       };
     }
+
     const priorClassification = classifyInstagramPriorMessages({
-      messages: detail.messages?.data,
+      messages: historyMessages,
       contactId: args.contactId,
       currentMessageId: args.messageId,
       eventTimestamp: args.eventTimestamp,
@@ -3909,6 +3974,7 @@ export const aiRuntimeTestHelpers = {
   getInboundConversationPolicy,
   isInstagramEventBeforeAgentDeployment,
   classifyInstagramPriorMessages,
+  appendUniqueInstagramMessages,
   inspectInstagramConversationHistory,
   handleIncomingEventWithDeps,
   isWithinAgentSchedule,
