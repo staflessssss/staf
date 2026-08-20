@@ -988,6 +988,10 @@ export const channelConfigSchema = z
     gmailInboundPolicy: z
       .enum(["new_threads_only"])
       .optional(),
+    instagramInboundPolicy: z
+      .enum(["new_leads_only"])
+      .optional(),
+    instagramNewLeadCutoverAt: z.string().trim().datetime({ offset: true }).optional(),
     enableInstagramSemanticDeliveryPlan: z.boolean().optional().default(false),
     priceAttachmentFileId: z
       .string()
@@ -1290,6 +1294,8 @@ export const channelConfigSchema = z
   .default({
     runtimeType: "gpt_agent",
     gmailInboundPolicy: undefined,
+    instagramInboundPolicy: undefined,
+    instagramNewLeadCutoverAt: undefined,
     enableInstagramSemanticDeliveryPlan: false,
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,
@@ -1309,6 +1315,8 @@ export const channelConfigSchema = z
 const agentManagedChannelConfigKeys = [
   "runtimeType",
   "gmailInboundPolicy",
+  "instagramInboundPolicy",
+  "instagramNewLeadCutoverAt",
   "enableInstagramSemanticDeliveryPlan",
   "priceAttachmentFileId",
   "priceAttachmentFileName",
@@ -1341,6 +1349,8 @@ export const agentDraftSchema = z.object({
   channelConfig: channelConfigSchema.optional().default({
     runtimeType: "gpt_agent",
     gmailInboundPolicy: undefined,
+    instagramInboundPolicy: undefined,
+    instagramNewLeadCutoverAt: undefined,
     enableInstagramSemanticDeliveryPlan: false,
     priceAttachmentFileId: undefined,
     priceAttachmentFileName: undefined,

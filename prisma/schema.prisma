@@ -178,6 +178,7 @@ model Conversation {
   channel            ChannelType
   status             ConversationStatus @default(ACTIVE)
   manualOnly         Boolean            @default(false)
+  automationScope    String             @default("UNCLASSIFIED")
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   agent              Agent              @relation(fields: [agentId], references: [id])
@@ -189,6 +190,7 @@ model Conversation {
   events             AgentEvent[]
 
   @@unique([agentId, contactId])
+  @@index([agentId, automationScope])
 }
 
 model AgentMonitorThread {

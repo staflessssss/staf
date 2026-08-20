@@ -21,6 +21,7 @@ import {
 } from "@/lib/channels/message-behavior";
 import { getChannelAdapter } from "@/lib/channels";
 import { isConversationManualOnly } from "@/lib/conversation-control";
+import { isConversationEligibleForAutomation } from "@/lib/instagram-new-lead-policy";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { saveMessages } from "@/lib/agent-memory";
@@ -630,6 +631,20 @@ async function processBufferedReply(args: {
     return { ok: false, status: "buffered_delivery_missing_reply_context" as const };
   }
 
+  if (!isConversationEligibleForAutomation({
+    channel: args.delivery.agent.channel.type,
+    channelConfig: args.delivery.agent.channelConfig,
+    automationScope: args.delivery.conversation.automationScope,
+  })) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "buffered_delivery_conversation_not_eligible_for_automation",
+    });
+    return { ok: true, status: "buffered_delivery_canceled" as const };
+  }
+
   if (
     args.delivery.agent.status !== AgentStatus.ACTIVE ||
     args.delivery.conversation.status !== ConversationStatus.ACTIVE ||
@@ -848,6 +863,20 @@ async function processFollowUp(args: {
       error: "follow_up_missing_agent_or_conversation",
     });
     return { ok: false, status: "follow_up_missing_context" as const };
+  }
+
+  if (!isConversationEligibleForAutomation({
+    channel: args.delivery.agent.channel.type,
+    channelConfig: args.delivery.agent.channelConfig,
+    automationScope: args.delivery.conversation.automationScope,
+  })) {
+    await markDeliveryStatus({
+      database: args.deps.db,
+      deliveryId: args.deliveryId,
+      status: DelayedDeliveryStatus.CANCELED,
+      error: "follow_up_conversation_not_eligible_for_automation",
+    });
+    return { ok: true, status: "follow_up_canceled" as const };
   }
 
   const autoResumePayload = getBusinessAutoResumePayload(args.delivery.payload);

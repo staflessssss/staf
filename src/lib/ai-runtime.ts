@@ -42,6 +42,12 @@ import {
 } from "@/lib/conversation-memory";
 import { getChannelAdapter } from "@/lib/channels";
 import { isConversationManualOnly } from "@/lib/conversation-control";
+import {
+  conversationAutomationScopes,
+  decideInstagramNewLeadEligibility,
+  getInstagramNewLeadPolicy,
+  type ConversationAutomationScope,
+} from "@/lib/instagram-new-lead-policy";
 import { parseInstagramCredentials } from "@/lib/channels/instagram";
 import { decrypt } from "@/lib/crypto";
 import { db } from "@/lib/db";
@@ -112,6 +118,7 @@ type InvokeAgentInput = {
   testMode?: boolean;
   skipInboundPersistence?: boolean;
   conversationId?: string;
+  conversationAutomationScope?: ConversationAutomationScope;
   channel: ChannelType | string;
   contactId: string;
   message: string;
@@ -2515,6 +2522,8 @@ async function recordInboundMessageWithDb(
     threadId?: string;
     subject?: string;
     conversationStatus?: ConversationStatus;
+    manualOnly?: boolean;
+    automationScope?: ConversationAutomationScope;
   },
 ) {
   const result = await database.$transaction(async (tx) => {
@@ -2531,13 +2540,27 @@ async function recordInboundMessageWithDb(
           contactDisplayName: args.contactDisplayName,
           channel: args.channel,
           status: args.conversationStatus ?? ConversationStatus.ACTIVE,
+          manualOnly: args.manualOnly ?? false,
+          automationScope: args.automationScope ?? conversationAutomationScopes.UNCLASSIFIED,
         },
       }));
 
-    if (existing && args.conversationStatus && existing.status !== args.conversationStatus) {
+    const updateData: Prisma.ConversationUpdateInput = {
+      ...(args.conversationStatus && existing?.status !== args.conversationStatus
+        ? { status: args.conversationStatus }
+        : {}),
+      ...(typeof args.manualOnly === "boolean" && existing?.manualOnly !== args.manualOnly
+        ? { manualOnly: args.manualOnly }
+        : {}),
+      ...(args.automationScope && existing?.automationScope !== args.automationScope
+        ? { automationScope: args.automationScope }
+        : {}),
+    };
+
+    if (existing && Object.keys(updateData).length > 0) {
       await tx.conversation.update({
         where: { id: existing.id },
-        data: { status: args.conversationStatus },
+        data: updateData,
       });
     }
 
@@ -2600,6 +2623,9 @@ async function importInstagramHistoryWithDb(
     contactUsername?: string;
     contactDisplayName?: string;
     historyMessages: InstagramImportedHistoryMessage[];
+    conversationStatus?: ConversationStatus;
+    manualOnly?: boolean;
+    automationScope?: ConversationAutomationScope;
   },
 ) {
   const result = await database.$transaction(async (tx) => {
@@ -2624,11 +2650,16 @@ async function importInstagramHistoryWithDb(
         contactUsername: args.contactUsername,
         contactDisplayName: args.contactDisplayName,
         channel: ChannelType.INSTAGRAM,
-        status: ConversationStatus.ACTIVE,
+        status: args.conversationStatus ?? ConversationStatus.ACTIVE,
+        manualOnly: args.manualOnly ?? false,
+        automationScope: args.automationScope ?? conversationAutomationScopes.UNCLASSIFIED,
       },
       update: {
         ...(args.contactUsername ? { contactUsername: args.contactUsername } : {}),
         ...(args.contactDisplayName ? { contactDisplayName: args.contactDisplayName } : {}),
+        ...(args.conversationStatus ? { status: args.conversationStatus } : {}),
+        ...(typeof args.manualOnly === "boolean" ? { manualOnly: args.manualOnly } : {}),
+        ...(args.automationScope ? { automationScope: args.automationScope } : {}),
       },
     });
     let importedCount = 0;
@@ -2767,9 +2798,11 @@ async function recordInboundMessage(args: {
   messageId?: string;
   gmailMessageId?: string;
   threadId?: string;
-  subject?: string;
-  conversationStatus?: ConversationStatus;
-}) {
+    subject?: string;
+    conversationStatus?: ConversationStatus;
+    manualOnly?: boolean;
+    automationScope?: ConversationAutomationScope;
+  }) {
   return recordInboundMessageWithDb(db, args);
 }
 
@@ -3699,6 +3732,7 @@ export async function invokeAgent(input: InvokeAgentInput): Promise<InvokeAgentR
           gmailMessageId: input.gmailMessageId,
           threadId: input.threadId,
           subject: input.subject,
+          automationScope: input.conversationAutomationScope,
         });
 
   const antiSpamIntercept = getAntiSpamIntercept({
@@ -4001,7 +4035,7 @@ async function handleIncomingEventWithDeps(
     }
   }
 
-  const existingConversation = await deps.db.conversation.findUnique({
+  let existingConversation = await deps.db.conversation.findUnique({
     where: {
       agentId_contactId: {
         agentId: agent.id,
@@ -4012,6 +4046,7 @@ async function handleIncomingEventWithDeps(
       id: true,
       status: true,
       manualOnly: true,
+      automationScope: true,
     },
   });
 
@@ -4074,20 +4109,28 @@ async function handleIncomingEventWithDeps(
     };
   }
 
-  if (
-    args.channel === ChannelType.INSTAGRAM &&
-    !incoming.isBusinessManualReply &&
-    !existingConversation &&
-    deps.inspectInstagramConversationHistory
-  ) {
-    const preflight = await deps.inspectInstagramConversationHistory({
-      agent,
-      contactId: incoming.contactId,
-      messageId: incoming.messageId,
-      eventTimestamp: incoming.eventTimestamp,
+  const instagramNewLeadPolicy = getInstagramNewLeadPolicy(agent.channelConfig);
+  let incomingAutomationScope: ConversationAutomationScope | undefined;
+
+  if (args.channel === ChannelType.INSTAGRAM && !incoming.isBusinessManualReply) {
+    let preflight: InstagramConversationPreflightResult | undefined;
+
+    if (!existingConversation && deps.inspectInstagramConversationHistory) {
+      preflight = await deps.inspectInstagramConversationHistory({
+        agent,
+        contactId: incoming.contactId,
+        messageId: incoming.messageId,
+        eventTimestamp: incoming.eventTimestamp,
+      });
+    }
+
+    const newLeadDecision = decideInstagramNewLeadEligibility({
+      policy: instagramNewLeadPolicy,
+      existingConversationScope: existingConversation?.automationScope,
+      preflight,
     });
 
-    if (preflight.status === "prior_history_found") {
+    if (!instagramNewLeadPolicy.enabled && preflight?.status === "prior_history_found") {
       const imported = await importInstagramHistoryWithDb(deps.db, {
         agentId: agent.id,
         contactId: incoming.contactId,
@@ -4096,6 +4139,7 @@ async function handleIncomingEventWithDeps(
         historyMessages: preflight.historyMessages,
       });
 
+      existingConversation = imported.conversation;
       console.info("[instagram-preflight] imported prior conversation context", {
         agentId: agent.id,
         conversationId: imported.conversation.id,
@@ -4103,6 +4147,66 @@ async function handleIncomingEventWithDeps(
         importedMessageCount: imported.importedCount,
         instagramConversationId: preflight.conversationId,
       });
+    }
+
+    if (instagramNewLeadPolicy.enabled && !newLeadDecision.allowAutomation) {
+      if (preflight?.status === "prior_history_found") {
+        const imported = await importInstagramHistoryWithDb(deps.db, {
+          agentId: agent.id,
+          contactId: incoming.contactId,
+          contactUsername: incoming.contactUsername,
+          contactDisplayName: incoming.contactDisplayName,
+          historyMessages: preflight.historyMessages,
+          manualOnly: true,
+          automationScope: newLeadDecision.scope,
+        });
+        existingConversation = imported.conversation;
+      }
+
+      const conversation = await recordInboundMessageWithDb(deps.db, {
+        agentId: agent.id,
+        contactId: incoming.contactId,
+        contactUsername: incoming.contactUsername,
+        contactDisplayName: incoming.contactDisplayName,
+        channel: agent.channel.type,
+        message: incoming.message,
+        messageId: incoming.messageId,
+        gmailMessageId: incoming.gmailMessageId,
+        threadId: incoming.threadId,
+        subject: incoming.subject,
+        conversationStatus: existingConversation?.status,
+        manualOnly: true,
+        automationScope: newLeadDecision.scope,
+      });
+      await cancelPendingDelayedDeliveriesWithDb({
+        database: deps.db,
+        conversationId: conversation.id,
+        kinds: [DelayedDeliveryKind.BUFFERED_REPLY, DelayedDeliveryKind.FOLLOW_UP],
+      });
+
+      return {
+        ok: true,
+        agentId: agent.id,
+        conversationId: conversation.id,
+        status: "instagram_existing_conversation_recorded_no_auto_reply",
+        reason: newLeadDecision.reason,
+      };
+    }
+
+    if (instagramNewLeadPolicy.enabled) {
+      incomingAutomationScope = newLeadDecision.scope;
+
+      if (preflight?.status === "prior_history_found") {
+        const imported = await importInstagramHistoryWithDb(deps.db, {
+          agentId: agent.id,
+          contactId: incoming.contactId,
+          contactUsername: incoming.contactUsername,
+          contactDisplayName: incoming.contactDisplayName,
+          historyMessages: preflight.historyMessages,
+          automationScope: incomingAutomationScope,
+        });
+        existingConversation = imported.conversation;
+      }
     }
   }
 
@@ -4132,6 +4236,7 @@ async function handleIncomingEventWithDeps(
           threadId: incoming.threadId,
           subject: incoming.subject,
           conversationStatus: existingConversation?.status,
+          automationScope: incomingAutomationScope,
         });
 
     return {
@@ -4231,6 +4336,7 @@ async function handleIncomingEventWithDeps(
       threadId: incoming.threadId,
       subject: incoming.subject,
       conversationStatus: ConversationStatus.ESCALATED,
+      automationScope: incomingAutomationScope,
     });
     await notifyOwnerOfHandoffUpdateWithDb({
       database: deps.db,
@@ -4266,6 +4372,7 @@ async function handleIncomingEventWithDeps(
       threadId: incoming.threadId,
       subject: incoming.subject,
       conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
+      automationScope: incomingAutomationScope,
     });
     await cancelPendingDelayedDeliveriesWithDb({
       database: deps.db,
@@ -4321,6 +4428,7 @@ async function handleIncomingEventWithDeps(
       threadId: incoming.threadId,
       subject: incoming.subject,
       conversationStatus: ConversationStatus.CLOSED,
+      automationScope: incomingAutomationScope,
     });
     await cancelPendingDelayedDeliveriesWithDb({
       database: deps.db,
@@ -4355,6 +4463,7 @@ async function handleIncomingEventWithDeps(
       threadId: incoming.threadId,
       subject: incoming.subject,
       conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
+      automationScope: incomingAutomationScope,
     });
     const handoff = await requestOwnerHandoffWithDb({
       database: deps.db,
@@ -4387,6 +4496,7 @@ async function handleIncomingEventWithDeps(
       threadId: incoming.threadId,
       subject: incoming.subject,
       conversationStatus: existingConversation?.status ?? ConversationStatus.ACTIVE,
+      automationScope: incomingAutomationScope,
     });
     await cancelPendingDelayedDeliveriesWithDb({
       database: deps.db,
@@ -4437,6 +4547,7 @@ async function handleIncomingEventWithDeps(
     gmailMessageId: incoming.gmailMessageId,
     threadId: incoming.threadId,
     subject: incoming.subject,
+    conversationAutomationScope: incomingAutomationScope,
   });
 
   if (result.suppressReply) {
