@@ -927,6 +927,9 @@ type InstagramConversationDetailPayload = {
         data?: unknown[];
       };
     }>;
+    paging?: {
+      next?: string;
+    };
   };
 };
 
@@ -1076,6 +1079,10 @@ async function inspectInstagramConversationHistory(args: {
         contactId: args.contactId,
         pagesChecked: pageCount,
       });
+      return {
+        status: "error",
+        error: "Instagram conversation history could not be fully verified.",
+      };
     }
 
     if (!conversation?.id) {
@@ -1095,6 +1102,18 @@ async function inspectInstagramConversationHistory(args: {
       conversationUrl,
       credentials.pageAccessToken,
     );
+    if (detail.messages?.paging?.next) {
+      console.warn("[instagram-preflight] message history page limit reached", {
+        agentId: args.agent.id,
+        tenantId: args.agent.tenantId,
+        contactId: args.contactId,
+        instagramConversationId: conversation.id,
+      });
+      return {
+        status: "error",
+        error: "Instagram message history could not be fully verified.",
+      };
+    }
     const priorClassification = classifyInstagramPriorMessages({
       messages: detail.messages?.data,
       contactId: args.contactId,
