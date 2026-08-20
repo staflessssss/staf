@@ -711,6 +711,12 @@ function continuePendingBookingAfterEmail(args: {
   };
 }
 
+function getConversationStage(historyMessages: RuntimeHistoryMessage[]): SemanticTurnPlan["conversationStage"] {
+  return historyMessages.some((message) => message.role === MessageRole.ASSISTANT)
+    ? "ongoing"
+    : "first_reply";
+}
+
 function hasUnavailableWeddingAvailabilityTurn(
   toolExecutions: Array<{
     toolName: string;
@@ -2152,9 +2158,9 @@ function buildCollectionsGuideVoiceEditorSystem() {
     "You are the final voice editor for a Myndful Films Instagram reply written by Taras.",
     'One wording requirement is non-negotiable: the attachment name and pricing phrase must stay neutral. Do not attach "for", "in", a city, a state, a market, or a service-region label to the guide name or use that label to introduce the starting price.',
     'If the draft says something like "our collections guide for Tampa" or "For Tampa, pricing starts at $2,800", keep the grounded amount but rewrite both ideas neutrally: name the attachment without a location and state that collections start at the amount. This is a transformation example, not a fixed reply template.',
-    "The supplied collectionsGuideToolResult is ground truth for the attachment, starting price, promotion, and deadline. When its status is ready_to_attach, the final reply must naturally say that the guide is being sent and must include its startPrice and promotionText when present. Preserve every other grounded fact and action from the draft, including availability, wedding date, introduction, and any direct next question. Keep the wedding location only when it is needed in an availability statement or to answer a direct location question.",
+    "The supplied collectionsGuideToolResult is ground truth for the attachment, starting price, promotion, and deadline. When its status is ready_to_attach, the final reply must naturally say that the guide is being sent and must include its startPrice and promotionText when present. Preserve every other grounded fact and action from the draft, including availability, wedding date, and any direct next question. Preserve a self-introduction only when the supplied conversationStage is first_reply. Keep the wedding location only when it is needed in an availability statement or to answer a direct location question.",
     "Use only customer-facing facts from collectionsGuideToolResult. Never expose its serviceRegion, source, file id, URL, status code, JSON, or internal summary.",
-    'Use the supplied conversationStage. On "first_reply", the final text must naturally identify the speaker as Taras, founder of Myndful Films, even if the draft omitted it. On "ongoing", never add or repeat that introduction.',
+    'Use the supplied conversationStage. On "first_reply", the final text must naturally identify the speaker as Taras, founder of Myndful Films, even if the draft omitted it. On "ongoing", remove any greeting or self-introduction from the draft and continue directly with the reply; never add or repeat that introduction.',
     "You also own post-tool conversation continuity. Read postToolContinuation before finalizing the reply.",
     "When postToolContinuation.shouldAskNextQuestion is true, the final reply must end with exactly one natural direct question that fulfills its replyObjective. Do not use a fixed phrase, do not ask for information already known, and do not turn the reply into a form.",
     "Express planning concepts in normal spoken English from Taras. Never expose CRM-style labels such as customer_name or partner_name, and never turn a field label into awkward wording such as 'the couple names'. When asking for names, use ordinary possessive grammar appropriate to the known contact role.",
@@ -2949,6 +2955,7 @@ async function runModelInvocation(args: {
   const semanticTurnPlanningEnabled = args.prompting.semanticTurnPlanningEnabled === true;
   const referenceTimeZone = args.agentSettings.timezone;
   const referenceDate = getLocalIsoDate(new Date(), referenceTimeZone);
+  const conversationStage = getConversationStage(args.historyMessages);
   let semanticTurnPlan: SemanticTurnPlan | null = null;
   if (semanticTurnPlanningEnabled) {
     try {
@@ -3001,6 +3008,8 @@ async function runModelInvocation(args: {
         historyMessages: args.historyMessages,
         currentMessage: args.input.message,
       });
+      // Whether this is the first reply is an objective history fact, not a model decision.
+      candidatePlan = { ...candidatePlan, conversationStage };
 
       if (args.input.testMode && process.env.DEBUG_SEMANTIC_TURN_PLAN === "1") {
         console.info("[ai-runtime] semantic turn plan candidate", candidatePlan);
@@ -3315,7 +3324,7 @@ ${semanticPlanContext ? `\n\nMandatory current-turn execution context:\n${semant
           prompt: JSON.stringify(
             {
               incomingCustomerMessage: args.input.message,
-              conversationStage: semanticTurnPlan?.conversationStage ?? "unknown",
+              conversationStage,
               postToolContinuation,
               collectionsGuideToolResult: guideToolResult,
               groundedDraftReply: draft,
@@ -3867,6 +3876,7 @@ export const aiRuntimeTestHelpers = {
   historyHasAvailableConsultationSlot,
   getPendingAuthorizedBooking,
   continuePendingBookingAfterEmail,
+  getConversationStage,
   hasReadyCollectionsGuideExecution,
   buildCollectionsGuideVoiceEditorSystem,
   buildReturningConversationVoiceEditorSystem,

@@ -16,6 +16,24 @@ test("normalizes accidental line-ending escapes in configured model ids", () => 
   );
 });
 
+test("derives conversation stage from persisted assistant history", () => {
+  assert.equal(aiRuntimeTestHelpers.getConversationStage([]), "first_reply");
+  assert.equal(
+    aiRuntimeTestHelpers.getConversationStage([
+      { role: MessageRole.USER, content: "Can I get more information?" },
+      { role: MessageRole.TOOL, content: "availability result", toolName: "Check availability" },
+    ]),
+    "first_reply",
+  );
+  assert.equal(
+    aiRuntimeTestHelpers.getConversationStage([
+      { role: MessageRole.ASSISTANT, content: "Hi, I am Taras." },
+      { role: MessageRole.USER, content: "Can you send pricing?" },
+    ]),
+    "ongoing",
+  );
+});
+
 test("requires a new availability check when the customer selects an offered alternative date", () => {
   const nudge = aiRuntimeTestHelpers.buildRequiredWeddingAvailabilityActionNudge({
     currentMessage: "Could they do October 16 instead?",
@@ -240,8 +258,10 @@ test("guide voice editor keeps location separate from the customer-facing guide 
   assert.match(system, /Never expose its serviceRegion/);
   assert.match(system, /attachment name and pricing phrase must stay neutral/);
   assert.match(system, /do not repeat it in the guide or pricing clause/);
+  assert.match(system, /Preserve a self-introduction only when/);
   assert.match(system, /On "first_reply"/);
   assert.match(system, /On "ongoing"/);
+  assert.match(system, /remove any greeting or self-introduction from the draft/i);
   assert.match(system, /post-tool conversation continuity/);
   assert.match(system, /postToolContinuation\.shouldAskNextQuestion/);
   assert.match(system, /exactly one natural direct question/);
